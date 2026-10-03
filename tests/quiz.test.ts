@@ -4,7 +4,7 @@ import demo from '../src/data/demo.json';
 import demoQuiz from '../src/data/demo-quiz.json';
 import { createQuiz, mapEvidence, newAttempt, scoreQuiz, transcriptKey, updateAttempt, validateAttempt, validateQuestions, validateQuiz, validateQuizLesson } from '../src/lib/quiz';
 import { completeLesson, lessonCompleted, loadQuiz, loadQuizAttempt, readStorage, saveQuiz, saveQuizAttempt, writeStorage } from '../src/lib/storage';
-import { chatCompletionQuizProvider, createWorkersAiQuizProvider, generateLessonQuiz, QuizProviderError, readBoundedJson, WORKERS_AI_QUIZ_MODEL } from '../src/lib/providers/quiz';
+import { chatCompletionQuizProvider, createWorkersAiQuizProvider, generateLessonQuiz, QuizProviderError, readBoundedJson, WORKERS_AI_MODEL, WORKERS_AI_QUIZ_MODEL } from '../src/lib/providers/quiz';
 import { POST } from '../src/app/api/quiz/route';
 import type { QuizGenerationProvider } from '../src/lib/types';
 
@@ -132,12 +132,29 @@ test('Workers AI adapter uses the native binding and structured JSON without cre
   });
   const generated = await generateLessonQuiz({ ...lesson, id: 'workers-ai-video' }, new AbortController().signal, provider);
   assert.equal(generated.lessonId, 'workers-ai-video');
-  assert.equal(call.model, WORKERS_AI_QUIZ_MODEL);
+  assert.equal(WORKERS_AI_MODEL, '@cf/qwen/qwen3-30b-a3b-fp8');
+  assert.equal(WORKERS_AI_QUIZ_MODEL, WORKERS_AI_MODEL);
+  assert.equal(call.model, WORKERS_AI_MODEL);
   assert.deepEqual(call.input?.response_format, { type: 'json_object' });
-  assert.deepEqual(call.input?.chat_template_kwargs, { enable_thinking: false });
+  assert.equal(call.input?.chat_template_kwargs, undefined);
   assert.equal(call.options?.rejectIfBusy, true);
   const messages = call.input?.messages as Array<{ content: string }>;
   assert.ok(messages[1].content.includes(lesson.segments[0].japanese));
+  assert.ok(messages[1].content.endsWith('/no_think'));
+  assert.equal(messages[1].content.includes('mediaUrl'), false);
+});
+
+test('Workers AI JSON-mode direct response object is accepted without parsing reasoning fields', async () => {
+  const provider = createWorkersAiQuizProvider({
+    async run() {
+      return {
+        response: demoQuiz,
+        choices: [{ finish_reason: 'stop', message: { content: null, reasoning: 'provider-internal reasoning' } }],
+      };
+    },
+  });
+  const generated = await generateLessonQuiz({ ...lesson, id: 'workers-ai-direct-json' }, new AbortController().signal, provider);
+  assert.equal(generated.questions.length, 5);
 });
 
 test('chat-completions adapter uses server credentials and rejects truncated or malformed output (mocked fetch)', async () => {
