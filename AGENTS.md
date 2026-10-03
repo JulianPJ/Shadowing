@@ -14,4 +14,4 @@ Before making product, architecture, roadmap, media-provider, or deployment chan
 
 It is the persistent source of truth for the product purpose, current implementation, Cloudflare deployment context, development priorities, and post-MVP roadmap.
 
-**Current P0:** the production YouTube → lesson path is now verified through the caption relay. The relay host still runs on the verification Windows computer, so move it to supervised, always-on hosting and re-verify production before starting post-MVP feature work.
+**Current product priority:** implement the ordered learning-feature roadmap in `PROJECT_CONTEXT.md`, starting with post-video comprehension tests. Content-source/file-upload expansion is priority 5; do not move it ahead of comprehension, difficulty analysis, learner modelling, or the retention/monetisation layer without a concrete prerequisite.
