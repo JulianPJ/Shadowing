@@ -11,7 +11,12 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test:e2e": "playwright test",
-    "demo:generate": "node scripts/generate-demo.mjs"
+    "demo:generate": "node scripts/generate-demo.mjs",
+    "dev:vinext": "vite dev --port 3001",
+    "build:vinext": "vite build",
+    "start:vinext": "vite preview",
+    "deploy:vinext": "vinext-cloudflare deploy",
+    "deploy:response-store": "cf deploy --prebuilt --mode production --worker shadowing-response-store"
   },
   "repository": {
     "type": "git",
@@ -27,24 +32,32 @@
   "homepage": "https://github.com/JulianPJ/Shadowing#readme",
   "devDependencies": {
     "@andresaya/edge-tts": "^1.8.1",
+    "@cloudflare/vite-plugin": "^2.0.0-beta.sha-52b0dc0e9",
     "@playwright/test": "^1.63.0",
     "@types/node": "^26.6.4",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "@vitejs/plugin-rsc": "^0.5.35",
+    "cf": "^1.0.0-beta.12",
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.3.8",
     "ffmpeg-static": "^5.3.0",
     "sharp": "^0.35.5",
     "tsx": "^4.23.15",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vite": "^8.3.0"
   },
   "dependencies": {
+    "@cloudflare/workers-response-store": "^1.0.1",
     "@fontsource-variable/dm-sans": "^5.3.0",
     "@fontsource/noto-sans-jp": "^5.3.0",
+    "@vinext/cloudflare": "^1.0.1",
     "lucide-react": "^1.51.0",
     "next": "^16.3.8",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
+    "react-server-dom-webpack": "^19.3.0",
     "vinext": "^1.0.1",
     "youtube-transcript-plus": "^2.0.3"
   },

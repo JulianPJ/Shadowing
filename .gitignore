@@ -10,3 +10,6 @@ artifacts/
 *.tsbuildinfo
 __pycache__/
 .venv/
+/dist/
+.vinext/
+.cloudflare/
