@@ -17,7 +17,9 @@ export async function handleDifficultyRequest(request: Request, provider?: Diffi
     return Response.json({ analysis }, { headers });
   } catch (error) {
     const code = error instanceof DifficultyProviderError ? error.code : 'unavailable';
-    console.warn(JSON.stringify({ event: 'difficulty-analysis-failed', code, segmentCount: lesson.segments.length, elapsedMs: Date.now() - started }));
+    const stage = error instanceof DifficultyProviderError ? error.stage ?? 'unknown' : 'unknown';
+    const reason = error instanceof DifficultyProviderError ? error.reason : undefined;
+    console.warn(JSON.stringify({ event: 'difficulty-analysis-failed', code, stage, reason, segmentCount: lesson.segments.length, elapsedMs: Date.now() - started }));
     return Response.json({ code, error: error instanceof DifficultyProviderError ? error.message : 'Difficulty analysis is unavailable right now. Please try again.' }, { status: code === 'malformed' ? 502 : code === 'insufficient-transcript' ? 422 : 503, headers });
   }
 }
