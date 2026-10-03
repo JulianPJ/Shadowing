@@ -1,4 +1,5 @@
 import { myMemoryTranslation } from '@/lib/providers/translation';
+import { logPreparationError } from '@/lib/providers/errors';
 export const maxDuration = 20;
 const cache = new Map<string, string>();
 export async function POST(request: Request) {
@@ -13,7 +14,8 @@ export async function POST(request: Request) {
     if (cache.size >= 200) cache.delete(cache.keys().next().value!);
     cache.set(japanese, translation);
     return Response.json({ translation, provider: myMemoryTranslation.name });
-  } catch {
+  } catch (error) {
+    logPreparationError(error, { stage: 'translation', provider: myMemoryTranslation.name });
     return Response.json({ error: 'Translation is unavailable right now. The free service may be busy or at its daily limit. Try again later; you can keep shadowing.' }, { status: 503 });
   }
 }

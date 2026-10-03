@@ -9,7 +9,7 @@ export type Mode = 'shadowing' | 'continuous';
 export type PlaybackState = 'ready' | 'listening' | 'paused' | 'your-turn' | 'complete';
 export interface TranscriptionProvider<Input = string> {
   name: string;
-  transcribe(input: Input, signal?: AbortSignal): Promise<{ cues: Cue[]; title?: string; author?: string }>;
+  transcribe(input: Input, signal?: AbortSignal): Promise<{ cues: Cue[]; title?: string; author?: string; provider?: string }>;
 }
 export interface TranslationProvider {
   name: string;

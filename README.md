@@ -22,7 +22,7 @@ npm run build
 npm start
 ```
 
-No environment variables are required for the demo, subtitle import, YouTube captions, or translation. [.env.example](.env.example) documents the optional local Whisper setting.
+No environment variables are required for the demo, subtitle import, local direct YouTube retrieval, or translation. Production automatic captions use an authenticated relay because YouTube blocks Cloudflare egress. [.env.example](.env.example) documents the server settings; [production caption operations](docs/production-captions.md) covers deployment and the relay host.
 
 ## Features and practice flow
 
@@ -58,11 +58,15 @@ Shortcuts leave typing fields and open dialogs alone. Focused native buttons ret
 
 **A quiet morning** is an original 14-section beginner script with Japanese synthetic speech, an illustrated landscape video, audio-derived timings, and authored English translations. It runs without YouTube or a translation service. The app labels the voice as synthetic; it is not a human native-speaker recording.
 
+The Cloudflare entrypoint handles byte ranges for the small bundled MP4, including when the asset binding omits `Content-Length`. This preserves replay and section seeking in the deployed demo. The player and own-media import behavior are unchanged.
+
 ## YouTube and subtitle import
 
-Paste a YouTube URL to request existing **Japanese captions** using `youtube-transcript-plus`. Video metadata comes from YouTube's official oEmbed endpoint when available. Playback uses the official YouTube IFrame player.
+Paste a YouTube URL to request existing **Japanese captions**. The provider chain prefers a configured caption relay and falls back once to direct `youtube-transcript-plus` retrieval on infrastructure errors. Both return the same normalized cues; segmentation and the player are independent of the provider. Without relay settings, local development uses direct retrieval. Video metadata comes from YouTube's official oEmbed endpoint when available. Playback uses the official YouTube IFrame player.
 
 Caption retrieval is unofficial and can fail due to missing captions, YouTube changes, video restrictions, or server network/IP limits. Embedding may also be disabled by the owner. The app does not download/re-host YouTube videos or generate captions for captionless videos. Use **YouTube + subtitles**, your own media, or the demo when preparation fails.
+
+Errors distinguish invalid links, unavailable/private videos, genuinely missing Japanese captions, provider blocking, incompatible provider responses, timeouts, network failures, and unexpected failures. Content errors do not trigger another provider attempt. Server logs identify the stage, provider, video ID, exception, timing and abort state without exposing stacks or signed caption URLs to users.
 
 ### Transcript formats
 
@@ -140,7 +144,7 @@ The service allows the local app origins `http://localhost:3000` and `http://127
 
 ## Architecture
 
-The app uses **Next.js 16 App Router, React 19, TypeScript, authored CSS, and Lucide icons**. Node route handlers provide caption preparation and translation; the core app requires no separate backend service.
+The app uses **Next.js 16 App Router, React 19, TypeScript, authored CSS, and Lucide icons**. Cloudflare Workers via vinext is the canonical production target; Next.js runs locally. Route handlers provide caption preparation and translation. Production caption retrieval uses a small authenticated Worker/Durable Object broker and an outbound Node relay on a host whose YouTube access works. The app and media player remain on Cloudflare.
 
 | Location | Responsibility |
 | --- | --- |
@@ -158,7 +162,10 @@ The app uses **Next.js 16 App Router, React 19, TypeScript, authored CSS, and Lu
 | `src/app/api/prepare/route.ts` | `POST { url }`; NDJSON progress and lesson/error result |
 | `src/app/api/translate/route.ts` | `POST { japanese }`; translation result with bounded cache |
 | `src/data/demo.json`, `public/demo.*` | Bundled lesson transcript and media |
-| `tools/` | Optional local Python transcription service |
+| `scripts/caption-relay.ts` | Outbound Node caption relay, bounded concurrency/cache and reconnects |
+| `tools/caption-relay-worker/` | Authenticated Cloudflare broker with a hibernating WebSocket Durable Object |
+| `tools/whisper_service.py` | Optional local Python transcription service |
+| `cloudflare-worker.js`, `src/lib/demo-asset.ts` | vinext entry wrapper and bounded demo byte-range responses |
 | `tests/` | Unit and Playwright browser tests |
 
 Playback boundaries are checked every 35 ms while listening. YouTube reports time less precisely than HTML media, so some boundary overshoot is possible. Shadowing pauses when the tab becomes hidden to avoid timer-throttling overshoot; continuous mode keeps playing.
@@ -179,23 +186,24 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-Unit tests cover segmentation, rolling/overlapping captions, boundaries, subtitle parsing, URL validation, and demo timing. Browser tests cover bundled playback/pausing, replay/navigation, authored translation reveal, speed, continuous mode, position-preserving mode switches, refresh, microphone success/denial, local media/subtitle import and reattachment, bookmarks, search, keyboard typing guards, and mobile layout.
+Unit tests cover segmentation, rolling/overlapping captions, boundaries, subtitle parsing, URL validation, demo timing, caption error classification, provider fallback, relay validation/authentication, redirect rejection and bounded upstream reads. Browser tests cover bundled playback/pausing, replay/navigation, authored translation reveal, speed, continuous mode, position-preserving mode switches, refresh, microphone success/denial, local media/subtitle import and reattachment, bookmarks, search, keyboard typing guards, and mobile layout.
 
 `PLAYWRIGHT_BASE_URL` selects a running app other than `http://localhost:3000`; `PLAYWRIGHT_CHROME_PATH` selects an existing Chromium executable. Tests use a fake microphone source with the real `MediaRecorder` API.
 
 To manually exercise the real caption and translation providers against a running app:
 
 ```sh
-node scripts/check-integrations.mjs
-# Or supply the hosted app's URL:
-node scripts/check-integrations.mjs https://your-app.example
+node scripts/check-integrations.mjs http://localhost:3000
+node scripts/check-integrations.mjs https://shadowing.julianpopovskijones.workers.dev
+node scripts/check-youtube-browser.mjs https://shadowing.julianpopovskijones.workers.dev IJ6R4u05ppw
+node scripts/check-youtube-browser.mjs https://shadowing.julianpopovskijones.workers.dev KJblreFQ2R8
 ```
 
-The script uses `https://www.youtube.com/watch?v=IJ6R4u05ppw` and writes caption diagnostics to ignored `artifacts/`. This check depends on external service availability and is separate from deterministic tests.
+The integration script checks both `IJ6R4u05ppw` and `KJblreFQ2R8`, records HTTP status, NDJSON events/timing, normalized lessons and translation results in ignored `artifacts/`, and exits unsuccessfully if either external service fails. Additional video IDs/URLs can follow the base URL. The browser script uses installed Chrome (or `PLAYWRIGHT_CHROME_PATH`) and verifies preparation, practice navigation, real YouTube playback, automatic pause, replay, transcript navigation and refresh persistence. A fourth argument containing an integration report exercises manual transcript import. These real network checks are separate from deterministic tests.
 
 `npm run demo:generate` rebuilds the sample from [scripts/demo-lines.json](scripts/demo-lines.json). It uses Edge TTS's Japanese Nanami voice, FFmpeg, Sharp, and the bundled illustration. This development command requires network access; normal playback uses the checked-in MP4 without TTS dependencies.
 
-## Hosting through GitHub integration
+## Hosting
 
 ### Cloudflare Workers
 
@@ -208,16 +216,13 @@ Configure Workers Builds with these commands:
 | Deploy command | `npx @vinext/cloudflare deploy --skip-build` |
 | Node.js version | 24.x |
 
-The app uses vinext's Workers Cache adapter for page responses. It deploys as one
-Worker and requires no R2 bucket, Durable Object storage, or separate cache Worker.
-The app does not use a durable server data cache; practice data remains in the
-browser. `--skip-build` reuses the output from the build command.
+The app uses vinext's Workers Cache adapter for page responses. Practice data remains in the browser. Automatic captions additionally use `shadowing-caption-relay`, a separate Worker with a SQLite Durable Object coordinating an authenticated outbound WebSocket. It does not store lessons or user progress. No R2 bucket, paid caption API, tunnel subscription, or video hosting is introduced. The relay host must remain online; see [setup, secrets, health checks and limitations](docs/production-captions.md). `--skip-build` reuses the output from the build command.
 
 For a local build and deployment, sign in to Cloudflare and run `npm run deploy:vinext`.
 
-### Next.js hosting
+### Local Next.js build
 
-Connect this GitHub repository manually to your hosting provider and select its **Next.js** integration. The repo uses the standard build flow; no deployment CLI, provider credentials, local project linkage, or custom build-output conversion is required.
+The standard Next.js build remains available for local production checks with `npm run build` and `npm start`. Cloudflare is the production deployment target.
 
 | Setting | Value |
 | --- | --- |
@@ -225,14 +230,14 @@ Connect this GitHub repository manually to your hosting provider and select its 
 | Node.js version | 24.x |
 | Install command | `npm ci` |
 | Build command | `npm run build` |
-| Output | Framework default (`.next`), managed by the Next.js integration |
-| Required environment variables | None |
+| Output | `.next` |
+| Required environment variables | None for local direct retrieval, demo and imports |
 | Self-hosted Node start command | `npm start` |
 
-Caption/translation API routes require server support, so this is not a static GitHub Pages export. The hosting integration should handle deployments from GitHub. Dependencies, local hosting output, environment files, and test artifacts are ignored by Git. The optional Python service is not part of the hosted app.
+Caption/translation API routes require server support, so this is not a static GitHub Pages export. Dependencies, local hosting output, environment files, and test artifacts are ignored by Git. The optional Python service is not part of the hosted app.
 
 ## Limitations and intended next work
 
 The app provides practice tools, not a pronunciation evaluator. **Pronunciation scoring is not implemented**; `PronunciationAnalysisProvider` is only an extension interface. Recordings are not saved/exported, and practice data does not sync across devices. Free caption and translation services can fail or impose limits; the bundled demo and subtitle import provide alternatives.
 
-The highest-value improvements are word-level timing alignment, human-recorded sample lessons, an optional local Japanese translation provider, and on-device recording persistence. Furigana, automatic looping, and configurable practice pauses are future ideas, not current features.
+The next task is to move the caption relay from the verification computer to an always-on host and supervise its process. Closing the relay, sleeping the computer, or losing its network removes this reliable egress path; direct Worker fallback may still be blocked by YouTube. Production MyMemory requests also encountered HTTP 429 shared-egress quota exhaustion during verification. These operational issues take priority over post-MVP features. [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) remains the product and engineering source of truth.

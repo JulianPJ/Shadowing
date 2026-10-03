@@ -1,0 +1,167 @@
+import { fetchTranscript, type FetchParams } from 'youtube-transcript-plus';
+import type { TranscriptionProvider } from '../types';
+import { CaptionError, logPreparationError, normalizePreparationError } from './errors';
+import { validateCues } from '../segmentation';
+
+const directName = 'youtube-transcript-plus';
+type PlayerResponse = {
+  playabilityStatus?: { status?: string; reason?: string };
+  captions?: { playerCaptionsTracklistRenderer?: { captionTracks?: { languageCode: string }[] } };
+};
+
+export function checkPlayerResponse(player: PlayerResponse) {
+  if (!player || typeof player !== 'object') throw new CaptionError('provider-incompatible', 'Invalid player response', 'player', directName);
+  const status = player.playabilityStatus?.status;
+  const reason = player.playabilityStatus?.reason ?? '';
+  if (/not a bot|unusual traffic|too many requests|bot では|botでは/i.test(reason)) {
+    throw new CaptionError('provider-blocked', reason, 'player', directName);
+  }
+  if (status === 'ERROR' || status === 'UNPLAYABLE' || status === 'LOGIN_REQUIRED') {
+    throw new CaptionError('video-unavailable', reason || `Video playability: ${status}`, 'player', directName);
+  }
+  if (status !== 'OK') throw new CaptionError('provider-incompatible', 'Unrecognized player response', 'player', directName);
+  const tracks = player.captions?.playerCaptionsTracklistRenderer?.captionTracks ?? [];
+  if (!Array.isArray(tracks) || tracks.some(track => !track || typeof track.languageCode !== 'string')) throw new CaptionError('provider-incompatible', 'Invalid caption track list', 'player', directName);
+  if (!tracks.some(track => track.languageCode === 'ja')) {
+    throw new CaptionError('no-japanese-captions', 'Playable video has no Japanese caption track', 'player', directName);
+  }
+}
+
+// Limit upstream payloads before buffering them; YouTube watch pages can be large.
+export async function readProviderBody(response: Response, limit: number, stage: string, provider: string) {
+  if (!response.body) return '';
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let bytes = 0; let body = '';
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      bytes += value.byteLength;
+      if (bytes > limit) {
+        await reader.cancel();
+        throw new CaptionError('provider-incompatible', 'Provider response exceeded the size limit', stage, provider);
+      }
+      body += decoder.decode(value, { stream: true });
+    }
+    return body + decoder.decode();
+  } finally { reader.releaseLock(); }
+}
+
+export function createDirectYoutubeCaptions(fetchImpl: typeof fetch = fetch): TranscriptionProvider {
+  return {
+    name: directName,
+    async transcribe(videoId, signal) {
+      if (!/^[a-zA-Z0-9_-]{11}$/.test(videoId)) throw new CaptionError('invalid-url', 'Invalid video ID', 'identify', directName);
+      const providerFetch = (stage: string) => async (params: FetchParams) => {
+        const started = Date.now();
+        let response: Response;
+        try {
+          response = await fetchImpl(params.url, { method: params.method, body: params.body, signal: params.signal,
+            headers: { 'User-Agent': params.userAgent ?? '', 'Accept-Language': params.lang ?? 'ja', ...params.headers } });
+        } catch (error) {
+          if (signal?.aborted) throw signal.reason;
+          throw new CaptionError(normalizePreparationError(error).code === 'provider-incompatible' ? 'provider-incompatible' : 'network', 'YouTube request failed', stage, directName, { cause: error });
+        }
+        const body = await readProviderBody(response, stage === 'watch' ? 4_000_000 : 2_000_000, stage, directName);
+        const detail: Record<string, unknown> = { event: 'captions.upstream', provider: directName, videoId, stage,
+          status: response.status, elapsedMs: Date.now() - started, bytes: new TextEncoder().encode(body).length,
+          contentType: response.headers.get('content-type'), aborted: signal?.aborted ?? false };
+        if (stage === 'player' && response.ok) {
+          let player: PlayerResponse;
+          try { player = JSON.parse(body); } catch {
+            throw new CaptionError('provider-incompatible', 'YouTube player returned invalid JSON', stage, directName);
+          }
+          detail.playability = player?.playabilityStatus?.status;
+          detail.reason = player?.playabilityStatus?.reason;
+          const tracks = player?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+          detail.languages = Array.isArray(tracks) ? tracks.map(track => track.languageCode) : undefined;
+          console.info(JSON.stringify(detail));
+          checkPlayerResponse(player);
+        } else console.info(JSON.stringify(detail));
+        if (response.status === 429 || response.status === 403 || /class="g-recaptcha"|unusual traffic/i.test(body)) {
+          throw new CaptionError('provider-blocked', `YouTube rejected ${stage} (HTTP ${response.status})`, stage, directName);
+        }
+        if (!response.ok) {
+          throw new CaptionError(response.status === 404 ? 'video-unavailable' : 'network', `YouTube returned HTTP ${response.status}`, stage, directName);
+        }
+        if (stage === 'watch' && !body.includes('INNERTUBE_API_KEY')) {
+          throw new CaptionError('provider-incompatible', 'YouTube watch response has no API key', stage, directName);
+        }
+        if (stage === 'transcript' && !body.trim()) throw new CaptionError('provider-incompatible', 'YouTube returned an empty caption body', stage, directName);
+        // The body is decoded; retaining compression/length headers would be incorrect.
+        return new Response(body, { status: response.status, headers: { 'Content-Type': response.headers.get('content-type') ?? 'text/plain' } });
+      };
+      const result = await fetchTranscript(videoId, { lang: 'ja', videoDetails: true, signal, retries: 0,
+        videoFetch: providerFetch('watch'), playerFetch: providerFetch('player'), transcriptFetch: providerFetch('transcript') });
+      try {
+        return { cues: validateCues(result.segments.map(cue => ({ start: cue.offset, end: cue.offset + cue.duration, text: cue.text }))),
+          title: result.videoDetails.title, author: result.videoDetails.author, provider: directName };
+      } catch (error) {
+        throw new CaptionError('provider-incompatible', 'YouTube returned invalid caption data', 'transcript', directName, { cause: error });
+      }
+    },
+  };
+}
+
+const recoverable = new Set(['provider-blocked', 'provider-incompatible', 'network', 'network-timeout']);
+export function withTranscriptionFallback(providers: TranscriptionProvider[]): TranscriptionProvider {
+  if (!providers.length) throw new Error('At least one caption provider is required.');
+  return {
+    name: 'YouTube Japanese captions',
+    async transcribe(videoId, signal) {
+      for (let index = 0; index < providers.length; index++) {
+        const provider = providers[index];
+        signal?.throwIfAborted();
+        try {
+          const result = await provider.transcribe(videoId, signal);
+          return { ...result, provider: result.provider ?? provider.name };
+        } catch (error) {
+          if (signal?.aborted || !recoverable.has(normalizePreparationError(error, signal).code) || index === providers.length - 1) throw error;
+          logPreparationError(error, { stage: 'captions', provider: provider.name, videoId, signal });
+          console.info(JSON.stringify({ event: 'captions.fallback', videoId, from: provider.name, to: providers[index + 1].name }));
+        }
+      }
+      throw new Error('Caption provider chain exhausted.');
+    },
+  };
+}
+
+export function createCaptionRelay(url: string, token: string, fetchImpl: typeof fetch = fetch): TranscriptionProvider {
+  const provider = 'YouTube captions via relay';
+  const endpoint = new URL('/captions', url);
+  if (endpoint.protocol !== 'https:' && endpoint.hostname !== '127.0.0.1' && endpoint.hostname !== 'localhost') throw new Error('Caption relay requires HTTPS.');
+  return {
+    name: provider,
+    async transcribe(videoId, signal) {
+      const relaySignal = signal ? AbortSignal.any([signal, AbortSignal.timeout(12000)]) : AbortSignal.timeout(12000);
+      let response: Response;
+      try {
+        response = await fetchImpl(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ videoId }), signal: relaySignal, redirect: 'manual', cache: 'no-store' });
+      } catch (error) {
+        if (relaySignal.aborted) throw relaySignal.reason;
+        throw new CaptionError(normalizePreparationError(error).code === 'provider-incompatible' ? 'provider-incompatible' : 'network', 'Caption relay could not be reached', 'relay', provider, { cause: error });
+      }
+      // Workers supports manual/follow redirects. Never forward the bearer token to another origin.
+      if (response.status >= 300 && response.status < 400) {
+        await response.body?.cancel();
+        throw new CaptionError('provider-incompatible', 'Caption relay unexpectedly redirected', 'relay', provider);
+      }
+      console.info(JSON.stringify({ event: 'captions.relay', videoId, status: response.status, contentType: response.headers.get('content-type') }));
+      const body = await readProviderBody(response, 2_000_000, 'relay', provider);
+      let data;
+      try { data = JSON.parse(body); } catch { throw new CaptionError('provider-incompatible', `Relay returned invalid JSON (HTTP ${response.status})`, 'relay', provider); }
+      if (!data || typeof data !== 'object') throw new CaptionError('provider-incompatible', 'Relay returned an invalid response', 'relay', provider);
+      if (!response.ok) {
+        const allowed = ['video-unavailable', 'no-japanese-captions', 'provider-blocked', 'provider-incompatible', 'network-timeout', 'network'];
+        throw new CaptionError(allowed.includes(data.code) ? data.code : 'network', `Caption relay failed (HTTP ${response.status})`, 'relay', provider);
+      }
+      if (data.videoId !== videoId || !Array.isArray(data.cues)) throw new CaptionError('provider-incompatible', 'Relay response does not match the requested video', 'relay', provider);
+      try {
+        return { cues: validateCues(data.cues), title: typeof data.title === 'string' ? data.title : undefined,
+          author: typeof data.author === 'string' ? data.author : undefined, provider };
+      } catch { throw new CaptionError('provider-incompatible', 'Relay returned invalid cues', 'relay', provider); }
+    },
+  };
+}

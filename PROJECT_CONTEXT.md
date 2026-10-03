@@ -2,7 +2,7 @@
 
 > **Purpose:** persistent product and engineering context for future development.
 >
-> **Current snapshot:** 2026-10-03, based on `main` at commit `b7892366429880b6214b850ef64e9cabce749e22`.
+> **Current snapshot:** 2026-10-03, P0 diagnosis/provider fix on `main` (baseline `b7892366429880b6214b850ef64e9cabce749e22`).
 >
 > **Deployment target:** Cloudflare Workers via vinext. Cloudflare is the canonical hosted environment for this project; do not assume Vercel.
 
@@ -149,7 +149,7 @@ YouTube timing is inherently less precise than direct HTML media. The player cur
 
 Current transcript sources are:
 
-- YouTube Japanese captions through `youtube-transcript-plus`;
+- YouTube Japanese captions through an authenticated relay/direct provider chain; both use `youtube-transcript-plus` behind a fetch/response-validation adapter;
 - imported SRT;
 - imported WebVTT;
 - imported JSON;
@@ -231,7 +231,11 @@ Important files:
 | `src/lib/types.ts` | Lesson/segment/provider contracts |
 | `src/lib/segmentation.ts` | transcript cleanup and shadowing segmentation |
 | `src/lib/subtitles.ts` | SRT/VTT/JSON parsing |
-| `src/lib/providers/transcription.ts` | YouTube and imported transcript providers |
+| `src/lib/providers/transcription.ts` | YouTube provider chain and imported transcript provider |
+| `src/lib/providers/youtube-captions.ts` | Direct/relay retrieval, response checks and infrastructure fallback |
+| `src/lib/providers/errors.ts` | Safe diagnostic logging and error normalization |
+| `scripts/caption-relay.ts` | Outbound Node caption host |
+| `tools/caption-relay-worker/` | Authenticated broker Worker and hibernating WebSocket Durable Object |
 | `src/lib/providers/translation.ts` | translation provider |
 | `src/lib/storage.ts` | local persistence |
 | `src/app/api/prepare/route.ts` | streamed YouTube preparation route |
@@ -249,109 +253,66 @@ Current deployment path:
 - `npm run build:vinext`
 - `npx @vinext/cloudflare deploy --skip-build`
 
-The app is packaged as one Worker. It currently requires no R2 bucket, Durable Object, external database, or separate cache Worker.
+The app is packaged as one Worker. Automatic captions additionally use a small authenticated broker Worker and a SQLite Durable Object with a hibernating WebSocket to an outbound Node relay host. No R2 bucket, hosted user database, paid caption API or separate cache Worker is required. The relay host must stay online; see section 7 and [operations](docs/production-captions.md).
 
-The Cloudflare compatibility flag `nodejs_compat` is enabled.
+The app enables `nodejs_compat` and `global_fetch_strictly_public`; the latter makes public HTTPS broker requests reach the other Worker.
 
 When diagnosing a bug that occurs only after deployment, reproduce it in the actual Cloudflare Workers runtime rather than assuming behavior from `next dev` or a conventional Node server is representative.
 
 ---
 
-# 7. P0 — TOP PRIORITY: deployed YouTube preparation is broken
+# 7. P0 — production YouTube captions: diagnosed, relay implemented
 
-## Status
+## Status and next operational task
 
-**This is the first issue future development should address before adding post-MVP features.**
+The core production flow has a new provider strategy: an authenticated caption relay on a host whose YouTube access works, with direct Worker retrieval as an infrastructure fallback. Cloudflare Workers remains the canonical app host. No post-MVP feature work was started.
 
-Observed production environment:
+The verification relay currently runs on this Windows computer as a hidden background Node process. It is not a boot service and depends on the computer remaining awake and connected. **Always-on relay hosting/process supervision remains the next P0 task before declaring production uptime resolved.** The implementation can move to another host without changing the UI, lesson contract or broker URL. See [production caption operations](docs/production-captions.md).
 
-`https://shadowing.julianpopovskijones.workers.dev/`
+## Confirmed root cause
 
-Observed behavior from the production screenshot:
+Both `IJ6R4u05ppw` and `KJblreFQ2R8` succeed under local Next.js/Node and local vinext/workerd. On deployed Cloudflare egress:
 
-1. A valid YouTube URL is submitted.
-2. The app attempts to prepare it.
-3. The request ends with:
+- official YouTube oEmbed succeeds with HTTP 200;
+- watch HTML succeeds with HTTP 200 and an Innertube API key;
+- the YouTube player API returns HTTP 200 but `LOGIN_REQUIRED` / `Sign in to confirm you’re not a bot`, with no caption tracks;
+- a separate deployed Worker reproduces the same response;
+- the failure occurs before segmentation and before mounting the YouTube IFrame;
+- progress events stream promptly and failure takes about one second, with no timeout/abort.
 
-> “We couldn’t get Japanese captions for this video. Captions may be missing, or YouTube may be limiting access. Import a timestamped transcript to practice this video, or try the demo.”
+This is YouTube egress blocking, not the original player, segmentation, NDJSON or Node compatibility hypothesis. Direct production retrieval sometimes succeeds as egress conditions vary; it is unsuitable as the sole provider. No aggressive retries or paid infrastructure were introduced.
 
-The screenshot used:
+## Final provider architecture
 
-`https://www.youtube.com/watch?v=KJblreFQ2R8`
+`/api/prepare` → configured relay provider → authenticated HTTPS broker Worker → hibernating WebSocket Durable Object → outbound Node caption host → `youtube-transcript-plus` → normalized cues → segmentation in the app Worker → NDJSON lesson → browser storage → `/practice/[id]`.
 
-The same general YouTube path is reported to work locally.
+The caption dependency is retained behind a native-fetch adapter with explicit player-response checks. The provider strategy changed: relay first when configured, then one direct attempt for infrastructure failures. Genuine no-Japanese-caption and unavailable/private-video errors are terminal. Demo/imports use their existing paths. Lesson/segment and player behavior are preserved, with actual provider provenance recorded in `transcriptSource`.
 
-## Important distinction
+The app's server-only settings are `YOUTUBE_CAPTION_RELAY_URL` and `YOUTUBE_CAPTION_RELAY_TOKEN`; the broker requires the same token. Workers' public fetch routing flag allows calls to the broker's `workers.dev` endpoint. Redirects use `manual` and are rejected, since Workers does not support `redirect: 'error'`. These settings are never public browser variables.
 
-The current UI does not navigate to the practice player until transcript preparation succeeds.
+## Diagnostics and error behavior
 
-Therefore, although the user-visible symptom is “YouTube videos do not load in production,” the screenshot shows a failure during **server-side preparation/caption acquisition**, before the YouTube IFrame player is mounted.
+Structured server logs record metadata/caption stages, upstream HTTP status, minimal playability/language information, selected providers/fallbacks, segmentation counts, timing, exception name/message and signal state. Signed URLs are redacted; stacks/provider response bodies are not exposed to users.
 
-Do not initially assume this is a YouTube IFrame embed problem.
+Clean error codes distinguish `invalid-url`, `video-unavailable`, `no-japanese-captions`, `provider-blocked`, `provider-incompatible`, `network-timeout`, `network`, and `internal`. Missing captions are asserted only after a playable video explicitly has no Japanese caption track, rather than inferred from the library's ambiguous exception.
 
-The likely failing path is:
-
-`/api/prepare`
-→ `youtubeCaptions.transcribe(videoId)`
-→ `youtube-transcript-plus.fetchTranscript(...)`.
-
-That hypothesis must be confirmed with Cloudflare Worker logs and direct integration checks.
-
-## Why it matters
-
-YouTube is currently the lowest-friction primary entry point. If deployed users cannot turn a YouTube link into a lesson, the main product promise is broken even though the demo and manual subtitle import still work.
-
-Treat this as **P0 / release-blocking**.
-
-## Required investigation
-
-Start by comparing the same known-captioned video across runtimes.
-
-Run:
+## Verification commands and fixtures
 
 ```sh
 node scripts/check-integrations.mjs http://localhost:3000
+node scripts/check-integrations.mjs http://localhost:3001
 node scripts/check-integrations.mjs https://shadowing.julianpopovskijones.workers.dev
+node scripts/check-youtube-browser.mjs https://shadowing.julianpopovskijones.workers.dev IJ6R4u05ppw
+node scripts/check-youtube-browser.mjs https://shadowing.julianpopovskijones.workers.dev KJblreFQ2R8
 ```
 
-Also test the original integration video already referenced by the repository:
+Known Japanese fixtures yield 252 and 362 sections respectively. Real browser checks cover practice navigation, player initialization, shadowing playback, automatic pause, replay, transcript navigation and refresh persistence. The browser script can also exercise manual YouTube import from an integration report; it uses real requests and player playback. Reports are ignored under `artifacts/`, separate from deterministic unit/Playwright tests. `jNQXAC9IVRw` is the external no-Japanese-caption fixture; `aaaaaaaaaaa` is the unavailable-video fixture.
 
-`https://www.youtube.com/watch?v=IJ6R4u05ppw`
+Final validation: lint/typecheck, 21 unit tests, Next.js build, vinext/Cloudflare app build and broker build pass. All five existing Playwright tests pass locally and against production in Chrome, including recording/demo/own-media import. Both supplied production caption/browser flows and manual YouTube import pass. See the [deployment versions and verification record](docs/production-captions.md#verification-record-2026-10-03).
 
-Then:
+MyMemory translation is a separate remaining production limitation: deployed requests returned HTTP 429 daily quota exhaustion on shared Worker egress while local translation succeeded. Imported/authored translations and playback remain available. Do not count an integration-script translation failure as a caption regression.
 
-1. inspect Cloudflare Worker logs for the `/api/prepare` request;
-2. temporarily improve server-side diagnostics so the actual provider exception name/message and failing stage are visible in logs without exposing internals to users;
-3. verify whether YouTube oEmbed succeeds from the Worker;
-4. verify whether `youtube-transcript-plus` itself can execute correctly in the Workers runtime;
-5. determine whether the failure is runtime incompatibility or YouTube limiting/blocking requests from Cloudflare egress IPs;
-6. verify `AbortSignal.any`, timeouts, and streamed NDJSON behavior under the deployed vinext Worker;
-7. compare a captioned video, a video with no Japanese captions, and an unavailable/private video so the app can distinguish real content errors from provider/runtime errors.
-
-## Plausible causes to test, not assume
-
-- `youtube-transcript-plus` may rely on Node/runtime behavior that differs under Workers despite `nodejs_compat`;
-- YouTube may be throttling or rejecting requests from Cloudflare Worker egress;
-- the unofficial caption retrieval flow may depend on headers/cookies/request behavior that differs in production;
-- vinext/Workers streaming or cancellation behavior may expose a bug that local Next.js does not;
-- a dependency may bundle differently for the Worker runtime.
-
-Do not “fix” this by blindly increasing retries. If YouTube is explicitly limiting datacenter/Worker traffic, repeated retries will make reliability worse.
-
-## Acceptance criteria for P0
-
-The issue is not resolved until:
-
-- a known Japanese-captioned YouTube video can be submitted on the deployed Cloudflare URL;
-- `/api/prepare` returns a valid lesson;
-- the app reaches `/practice/[id]`;
-- the YouTube player initializes and plays;
-- shadowing boundaries/replay work against the deployed app;
-- expected “no Japanese captions” cases are distinguishable from infrastructure/provider failures;
-- the manual subtitle-import fallback remains available;
-- the hosted integration check is documented and easy to repeat.
-
-If reliable automatic YouTube caption retrieval cannot be made robust from Cloudflare Workers, keep the core UX and change the provider strategy rather than coupling the whole product to an unreliable unofficial request path.
+Production regression checks also found that the bundled MP4 asset ignores HTTP byte ranges, causing Chrome to report a zero-length seekable range and reset section navigation to time zero. A small Cloudflare entry wrapper now serves bounded byte-range responses for `/demo.mp4`, deriving the length when ASSETS omits it. The wrapper preserves vinext's named response/cache exports. Player/UI and own-media import behavior are unchanged.
 
 ---
 
@@ -396,7 +357,7 @@ This separation is important for the post-MVP roadmap.
 
 # 9. Post-MVP roadmap
 
-Do not begin these in earnest until P0 production YouTube reliability is understood.
+Do not begin these in earnest until the P0 relay uptime dependency has been addressed.
 
 ## Phase 1 — Content-source extensibility
 
@@ -717,13 +678,13 @@ Future agents should verify before proposing work. At this snapshot, the followi
 
 ### YouTube caption retrieval is unofficial
 
-`youtube-transcript-plus` is currently a critical dependency for the easiest onboarding path but relies on unofficial transcript retrieval. Treat production reliability as a first-class concern.
+`youtube-transcript-plus` remains behind a provider adapter. Production prefers a caption relay because direct Worker egress receives explicit YouTube bot challenges. Retrieval can still change or fail on the relay host; supervised always-on hosting and manual import remain necessary.
 
 ### Translation service is best-effort
 
-MyMemory is keyless/free and may have quota/quality limits. Translation failure must never block shadowing.
+MyMemory is keyless/free and may have quota/quality limits. Production verification encountered HTTP 429 daily quota exhaustion on shared Worker egress. Translation failure must never block shadowing.
 
-### No durable server data
+### No durable user progress
 
 Progress is local to the current browser/origin. This is intentional for now, but later personalization across devices will require accounts/storage.
 
@@ -749,7 +710,7 @@ Before many new providers are added, separate media source from transcript sourc
 
 Use this ordering when tradeoffs are necessary:
 
-1. **Production reliability of the core YouTube → lesson path**
+1. **Production reliability of the core YouTube → lesson path: supervised always-on caption relay**
 2. Shadowing UX and playback/timestamp reliability
 3. Transcript quality / segmentation
 4. Content-source flexibility and subtitle import

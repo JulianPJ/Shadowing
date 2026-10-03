@@ -4,5 +4,5 @@ import nextTs from 'eslint-config-next/typescript';
 export default defineConfig([
   ...nextVitals,
   ...nextTs,
-  globalIgnores(['.next/**', '.vercel/**', 'artifacts/**', '.demo-build/**', 'test-results/**', 'playwright-report/**']),
+  globalIgnores(['.next/**', '.vercel/**', '**/.cloudflare/**', 'artifacts/**', '.demo-build/**', 'test-results/**', 'playwright-report/**']),
 ]);
