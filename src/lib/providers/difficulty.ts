@@ -3,11 +3,11 @@ import demo from '../../data/demo.json';
 import demoDifficulty from '../../data/demo-difficulty.json';
 import { calculateSpeechSpeed, createDifficultyAnalysis, sampleDifficultyTranscript } from '../difficulty';
 import { object, transcriptRevision } from '../quiz';
-import { parseChatCompletion, WORKERS_AI_QUIZ_MODEL, type WorkersAiBindingLike } from './quiz';
+import { parseChatCompletion, WORKERS_AI_MODEL, type WorkersAiBindingLike } from './quiz';
 import type { DifficultyAnalysisProvider, QuizLesson } from '../types';
 
-// Same centrally configured model as comprehension, without adding credentials.
-export const WORKERS_AI_DIFFICULTY_MODEL = WORKERS_AI_QUIZ_MODEL;
+// All canonical hosted AI features share the same Workers AI model.
+export const WORKERS_AI_DIFFICULTY_MODEL = WORKERS_AI_MODEL;
 export class DifficultyProviderError extends Error {
   constructor(public code: 'unavailable' | 'malformed' | 'insufficient-transcript', message: string) { super(message); }
 }
@@ -36,13 +36,19 @@ export function createWorkersAiDifficultyProvider(ai: WorkersAiBindingLike): Dif
       let response: unknown;
       try {
         response = await withDifficultyAbort(() => ai.run(WORKERS_AI_DIFFICULTY_MODEL, {
-          messages: [{ role: 'system', content: PROMPT }, { role: 'user', content: JSON.stringify(input) }],
+          messages: [
+            { role: 'system', content: PROMPT },
+            { role: 'user', content: `${JSON.stringify(input)}\n/no_think` },
+          ],
           response_format: { type: 'json_object' }, max_completion_tokens: 2200,
-          temperature: 0.1, chat_template_kwargs: { enable_thinking: false },
+          temperature: 0.1,
         }, { rejectIfBusy: true }), signal);
       } catch { throw new DifficultyProviderError('unavailable', UNAVAILABLE); }
       try {
-        const choices = object(response).choices;
+        const parsed = object(response);
+        const direct = parsed.response;
+        if (direct && typeof direct === 'object' && !Array.isArray(direct)) return direct;
+        const choices = parsed.choices;
         if (!Array.isArray(choices) || choices.length !== 1) throw new Error();
         const content = object(object(choices[0]).message).content;
         if (typeof content !== 'string' || content.length > 24000) throw new Error();
