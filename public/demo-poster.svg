@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+<defs><linearGradient id="sky" x2="0" y2="1"><stop stop-color="#e3cfc0"/><stop offset="1" stop-color="#f2e4cd"/></linearGradient><linearGradient id="mountain" x2="0" y2="1"><stop stop-color="#82938a"/><stop offset="1" stop-color="#b6bbae"/></linearGradient><pattern id="grain" width="7" height="7" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r=".55" fill="#4b4d38" opacity=".055"/></pattern></defs>
+<path fill="url(#sky)" d="M0 0h1280v720H0z"/><circle cx="927" cy="201" r="67" fill="#c66950"/>
+<path fill="#c7c9b9" d="M0 437L115 371 264 406 431 288 558 378 740 307 912 401 1120 313 1280 384V720H0z"/>
+<path fill="url(#mountain)" d="M384 499L690 167 1016 499z"/><path fill="#f4ecdc" d="M595 270l95-103 100 102-39-6-25 20-37-20-21 20-24-17-28 8z"/>
+<path fill="#708379" d="M0 504Q192 407 392 508T777 490T1280 487V720H0z"/>
+<path fill="#536d61" d="M0 570Q258 481 543 576T1013 553T1280 551V720H0z"/>
+<path fill="#3c594b" d="M0 649Q232 556 528 653T1015 630T1280 629V720H0z"/>
+<path d="M0 0h1280v720H0z" fill="url(#grain)"/>
+<g fill="#fff9eb" font-family="Georgia,serif"><text x="68" y="88" font-size="17" letter-spacing="5">HIBIKI · LISTENING STUDIO</text><text x="68" y="176" font-size="48">A little Japanese,</text><text x="68" y="234" font-size="48" font-style="italic">every day.</text></g>
+<g stroke="#f3ecdb" fill="none" opacity=".4"><path d="M70 649h200"/><circle cx="300" cy="649" r="3"/><path d="M330 649h95"/></g>
+<text x="70" y="690" fill="#e7e6d7" font-family="Arial,sans-serif" font-size="13" letter-spacing="2">A QUIET MORNING · JAPANESE PRACTICE</text>
+</svg>

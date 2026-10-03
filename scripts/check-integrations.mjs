@@ -1,0 +1,10 @@
+import { mkdir, writeFile } from 'node:fs/promises';
+const base = process.argv[2] || 'http://localhost:3000';
+const response = await fetch(`${base}/api/prepare`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: 'https://www.youtube.com/watch?v=IJ6R4u05ppw' }), signal: AbortSignal.timeout(35000) });
+const text = await response.text();
+const lines = text.trim().split('\n').map(line => JSON.parse(line));
+await mkdir('artifacts', { recursive: true });
+await writeFile('artifacts/example-integration.json', JSON.stringify(lines, null, 2));
+for (const event of lines) console.log(event.lesson ? `Prepared: ${event.lesson.title} — ${event.lesson.segments.length} sections` : event);
+const translated = await fetch(`${base}/api/translate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ japanese: '今日はいい天気ですね。' }), signal: AbortSignal.timeout(18000) });
+console.log('Translation:', translated.status, await translated.json());
