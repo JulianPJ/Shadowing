@@ -7,3 +7,11 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+## Project context
+
+Before making product, architecture, roadmap, media-provider, or deployment changes, read `PROJECT_CONTEXT.md`.
+
+It is the persistent source of truth for the product purpose, current implementation, Cloudflare deployment context, development priorities, and post-MVP roadmap.
+
+**Current P0:** the deployed Cloudflare Workers app fails during the automatic YouTube caption/preparation path even though the same flow works locally. Fix and verify the production YouTube → lesson path before starting post-MVP feature work.
