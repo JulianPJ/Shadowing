@@ -9,7 +9,12 @@ import type { DifficultyAnalysisProvider, QuizLesson } from '../types';
 // All canonical hosted AI features share the same Workers AI model.
 export const WORKERS_AI_DIFFICULTY_MODEL = WORKERS_AI_MODEL;
 export class DifficultyProviderError extends Error {
-  constructor(public code: 'unavailable' | 'malformed' | 'insufficient-transcript', message: string) { super(message); }
+  constructor(
+    public code: 'unavailable' | 'malformed' | 'insufficient-transcript',
+    message: string,
+    public stage?: 'provider-call' | 'provider-response' | 'validation',
+    public reason?: string,
+  ) { super(message); }
 }
 const UNAVAILABLE = 'Difficulty analysis is unavailable right now. Please try again.';
 const MALFORMED = 'We could not make a reliable difficulty estimate. Please try again.';
@@ -43,7 +48,7 @@ export function createWorkersAiDifficultyProvider(ai: WorkersAiBindingLike): Dif
           response_format: { type: 'json_object' }, max_completion_tokens: 2200,
           temperature: 0.1,
         }, { rejectIfBusy: true }), signal);
-      } catch { throw new DifficultyProviderError('unavailable', UNAVAILABLE); }
+      } catch { throw new DifficultyProviderError('unavailable', UNAVAILABLE, 'provider-call'); }
       try {
         const parsed = object(response);
         const direct = parsed.response;
@@ -53,7 +58,7 @@ export function createWorkersAiDifficultyProvider(ai: WorkersAiBindingLike): Dif
         const content = object(object(choices[0]).message).content;
         if (typeof content !== 'string' || content.length > 24000) throw new Error();
         return parseChatCompletion(response);
-      } catch { throw new DifficultyProviderError('malformed', MALFORMED); }
+      } catch { throw new DifficultyProviderError('malformed', MALFORMED, 'provider-response'); }
     },
   };
 }
@@ -67,5 +72,8 @@ export async function generateLessonDifficulty(lesson: QuizLesson, signal: Abort
     output = await withDifficultyAbort(() => provider.analyze(sampleDifficultyTranscript(lesson), signal), signal);
   }
   try { return await createDifficultyAnalysis(output, lesson); }
-  catch { throw new DifficultyProviderError('malformed', MALFORMED); }
+  catch (error) {
+    const reason = error instanceof Error ? error.message : 'Invalid analysis.';
+    throw new DifficultyProviderError('malformed', MALFORMED, 'validation', reason);
+  }
 }
