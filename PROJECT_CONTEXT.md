@@ -2,7 +2,7 @@
 
 > **Purpose:** persistent product and engineering context for future development.
 >
-> **Current snapshot:** 2026-10-03, production running on Cloudflare Workers with the caption relay path verified; post-video comprehension checks implemented in the repository (not yet deployed/configured for external generation).
+> **Current snapshot:** 2026-10-03, production running on Cloudflare Workers with the caption relay path verified; post-video comprehension checks implemented with Cloudflare Workers AI as the canonical hosted generator.
 >
 > **Deployment target:** Cloudflare Workers via vinext. Cloudflare is the canonical hosted environment for this project; do not assume Vercel.
 
@@ -128,7 +128,7 @@ The practice experience already includes:
 
 Priority #1 is implemented in the repository. Finishing Shadowing practice or reaching the end in Continuous mode reveals an optional short comprehension check, with Japanese multiple-choice questions, immediate explanations, deterministic scores and replayable transcript evidence. Existing playback remains available on generation failure. Evidence replay uses the same media adapter, spans normalized sections, pauses at the evidence end and returns to the question without losing answers.
 
-`POST /api/quiz` uses a replaceable `QuizGenerationProvider`. The generic chat-completions adapter requires server-only `QUIZ_API_URL`, `QUIZ_API_KEY` and `QUIZ_MODEL` settings; they are declared in the Cloudflare config but were not configured/deployed during implementation. The canonical demo has an authored check requiring no provider. Questions/options and exact evidence references/quotes are validated strictly; timestamps come from normalized segments. External model interpretation still requires provider-quality evaluation.
+`POST /api/quiz` uses a replaceable `QuizGenerationProvider`. On the canonical Cloudflare deployment, the Worker injects a native Workers AI provider through the `AI` binding and currently uses `@cf/zai-org/glm-4.7-flash`; no quiz API-key secrets are required. The generic OpenAI-compatible adapter remains available for local development or alternate hosts. The canonical demo has an authored check requiring no provider. Questions/options and exact evidence references/quotes are validated strictly; timestamps come from normalized segments. External model interpretation still requires provider-quality evaluation.
 
 Validated quizzes are reused for a matching lesson/transcript SHA-256 fingerprint. Draft answers, completion and versioned UUID-based attempts persist through the existing local storage helpers. Attempt history includes lesson/video/quiz identity, score, total questions, per-question answers/correctness/evidence and start/update/completion timestamps for future account/profile sync. This adds no accounts or learner-profile system. See [comprehension checks](docs/comprehension-checks.md) for setup, limits and the persistence contract.
 
