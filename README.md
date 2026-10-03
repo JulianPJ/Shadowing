@@ -22,7 +22,7 @@ npm run build
 npm start
 ```
 
-No environment variables are required for the demo, subtitle import, local direct YouTube retrieval, or translation. Production automatic captions use an authenticated relay because YouTube blocks Cloudflare egress. [.env.example](.env.example) documents the server settings; [production caption operations](docs/production-captions.md) covers deployment and the relay host.
+No environment variables are required for the demo, subtitle import, local direct caption retrieval, or translation. Production automatic captions use the configured authenticated relay with a direct fallback. [.env.example](.env.example) documents the server settings; [production caption operations](docs/production-captions.md) covers deployment and health checks.
 
 ## Features and practice flow
 
@@ -62,11 +62,9 @@ The Cloudflare entrypoint handles byte ranges for the small bundled MP4, includi
 
 ## YouTube and subtitle import
 
-Paste a YouTube URL to request existing **Japanese captions**. The provider chain prefers a configured caption relay and falls back once to direct `youtube-transcript-plus` retrieval on infrastructure errors. Both return the same normalized cues; segmentation and the player are independent of the provider. Without relay settings, local development uses direct retrieval. Video metadata comes from YouTube's official oEmbed endpoint when available. Playback uses the official YouTube IFrame player.
+Paste a YouTube URL to request existing **Japanese captions**. Production uses the configured caption relay first and retains direct `youtube-transcript-plus` retrieval as a fallback. Both produce the same normalized cues, so segmentation and player behavior stay provider-independent. Video metadata comes from YouTube's official oEmbed endpoint when available, and playback uses the official YouTube IFrame player.
 
-Caption retrieval is unofficial and can fail due to missing captions, YouTube changes, video restrictions, or server network/IP limits. Embedding may also be disabled by the owner. The app does not download/re-host YouTube videos or generate captions for captionless videos. Use **YouTube + subtitles**, your own media, or the demo when preparation fails.
-
-Errors distinguish invalid links, unavailable/private videos, genuinely missing Japanese captions, provider blocking, incompatible provider responses, timeouts, network failures, and unexpected failures. Content errors do not trigger another provider attempt. Server logs identify the stage, provider, video ID, exception, timing and abort state without exposing stacks or signed caption URLs to users.
+Unavailable/private videos and videos without Japanese captions return clean content errors. The app does not download or re-host YouTube videos, and it does not generate captions for captionless videos. **YouTube + subtitles**, own media, and the bundled demo remain alternative input paths.
 
 ### Transcript formats
 
@@ -240,4 +238,4 @@ Caption/translation API routes require server support, so this is not a static G
 
 The app provides practice tools, not a pronunciation evaluator. **Pronunciation scoring is not implemented**; `PronunciationAnalysisProvider` is only an extension interface. Recordings are not saved/exported, and practice data does not sync across devices. Free caption and translation services can fail or impose limits; the bundled demo and subtitle import provide alternatives.
 
-The next task is to move the caption relay from the verification computer to an always-on host and supervise its process. Closing the relay, sleeping the computer, or losing its network removes this reliable egress path; direct Worker fallback may still be blocked by YouTube. Production MyMemory requests also encountered HTTP 429 shared-egress quota exhaustion during verification. These operational issues take priority over post-MVP features. [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) remains the product and engineering source of truth.
+The current product priority is the post-video learning loop: comprehension testing, content difficulty analysis, and a persistent learner profile. Content-source/file-upload expansion comes later in the ordered roadmap. [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) is the product and engineering source of truth.
