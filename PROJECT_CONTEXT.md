@@ -2,7 +2,7 @@
 
 > **Purpose:** persistent product and engineering context for future development.
 >
-> **Current snapshot:** 2026-10-03, production running on Cloudflare Workers with the caption relay path verified; roadmap reprioritized toward learning features.
+> **Current snapshot:** 2026-10-03, production running on Cloudflare Workers with the caption relay path verified; post-video comprehension checks implemented in the repository (not yet deployed/configured for external generation).
 >
 > **Deployment target:** Cloudflare Workers via vinext. Cloudflare is the canonical hosted environment for this project; do not assume Vercel.
 
@@ -124,6 +124,14 @@ The practice experience already includes:
 - responsive desktop/mobile UI;
 - persistence of lesson position and preferences.
 
+### Post-video comprehension checks
+
+Priority #1 is implemented in the repository. Finishing Shadowing practice or reaching the end in Continuous mode reveals an optional short comprehension check, with Japanese multiple-choice questions, immediate explanations, deterministic scores and replayable transcript evidence. Existing playback remains available on generation failure. Evidence replay uses the same media adapter, spans normalized sections, pauses at the evidence end and returns to the question without losing answers.
+
+`POST /api/quiz` uses a replaceable `QuizGenerationProvider`. The generic chat-completions adapter requires server-only `QUIZ_API_URL`, `QUIZ_API_KEY` and `QUIZ_MODEL` settings; they are declared in the Cloudflare config but were not configured/deployed during implementation. The canonical demo has an authored check requiring no provider. Questions/options and exact evidence references/quotes are validated strictly; timestamps come from normalized segments. External model interpretation still requires provider-quality evaluation.
+
+Validated quizzes are reused for a matching lesson/transcript SHA-256 fingerprint. Draft answers, completion and versioned UUID-based attempts persist through the existing local storage helpers. Attempt history includes lesson/video/quiz identity, score, total questions, per-question answers/correctness/evidence and start/update/completion timestamps for future account/profile sync. This adds no accounts or learner-profile system. See [comprehension checks](docs/comprehension-checks.md) for setup, limits and the persistence contract.
+
 ### Voice recording
 
 Basic learner recording is already implemented with browser `MediaRecorder`:
@@ -183,7 +191,8 @@ Current progress is browser-local:
 - playback speed;
 - translation visibility;
 - bookmarks;
-- translation cache.
+- translation cache;
+- transcript-specific lesson completion, cached comprehension checks and resumable quiz-attempt history.
 
 There is no account system, hosted user database, or cross-device sync.
 
@@ -202,6 +211,7 @@ The repository includes:
 - microphone success/denial coverage;
 - local media/subtitle import coverage;
 - mobile/layout checks;
+- deterministic comprehension schema/scoring/evidence/persistence/provider tests and Playwright quiz/replay/recovery/mobile coverage, including the built Cloudflare preview;
 - integration-check tooling for real caption/translation services.
 
 `scripts/check-integrations.mjs [base-url]` can exercise `/api/prepare` and `/api/translate` against either localhost or a hosted deployment.
@@ -238,6 +248,10 @@ Important files:
 | `tools/caption-relay-worker/` | Authenticated broker Worker and hibernating WebSocket Durable Object |
 | `src/lib/providers/translation.ts` | translation provider |
 | `src/lib/storage.ts` | local persistence |
+| `src/lib/quiz.ts` | quiz validation, evidence mapping, transcript fingerprint, scoring and attempt contracts |
+| `src/lib/providers/quiz.ts` | replaceable server-side generation and authored demo quiz |
+| `src/components/comprehension-quiz.tsx` | optional lesson quiz, feedback, replay and results |
+| `src/app/api/quiz/route.ts` | bounded, recoverable quiz-generation route |
 | `src/app/api/prepare/route.ts` | streamed YouTube preparation route |
 | `src/app/api/translate/route.ts` | lazy translation route |
 | `cloudflare.config.ts` | Cloudflare Worker definition |
@@ -323,6 +337,8 @@ This separation is important for the post-MVP roadmap.
 Feature work should follow this order unless a concrete production regression or prerequisite forces a change. Do not move file-upload/content-source expansion ahead of the learning features above it.
 
 ## 1. Post-video comprehension tests
+
+**Implemented in the repository:** optional completed-lesson checks, strict output/evidence validation, deterministic scoring, bounded evidence replay, transcript-keyed local reuse and portable attempt history. External generation still needs provider secrets and production deployment; the demo works without them. The remaining roadmap items below are intentionally unimplemented.
 
 After a learner completes a video, generate a short multiple-choice comprehension test grounded only in the transcript.
 
@@ -470,6 +486,7 @@ Future agents should verify before proposing work. At this snapshot, the followi
 - bookmarks/saved-section filtering;
 - recent local lessons;
 - local progress persistence;
+- post-video comprehension checks with explanations, evidence replay, quiz reuse and local attempt persistence (repository implementation; external provider/deployment pending);
 - local own-media import;
 - SRT/VTT/JSON transcript import;
 - YouTube + user transcript import;
@@ -491,6 +508,10 @@ MyMemory is keyless/free and may have quota/quality limits. Production verificat
 ### No durable user progress
 
 Progress is local to the current browser/origin. This is intentional for now, but later personalization across devices will require accounts/storage.
+
+### Comprehension generation needs server configuration
+
+The bundled demo is independent of external generation. Other transcripts need a configured JSON-capable chat-completions provider. Requests are bounded at 2,000 normalized sections / 60,000 Japanese characters; longer or unsuitable transcripts show a recoverable message. Structural/evidence checks cannot prove the semantic correctness of every model-generated question. Quiz results remain local and do not yet sync to an account.
 
 ### Translation server cache is in-memory
 

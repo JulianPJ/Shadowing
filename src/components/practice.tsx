@@ -3,13 +3,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, RotateCcw, Play, Pause, Headphones, Mic, Check, Languages, Bookmark, Keyboard, Upload, LoaderCircle, Search, AudioLines } from 'lucide-react';
 import demoData from '@/data/demo.json';
-import type { Lesson, Mode, PlaybackState } from '@/lib/types';
+import type { Lesson, Mode, PlaybackState, QuizEvidence } from '@/lib/types';
 import { validateCues } from '@/lib/segmentation';
-import { readStorage, writeStorage, saveLesson, getLiveMedia, type Preferences } from '@/lib/storage';
+import { readStorage, writeStorage, saveLesson, getLiveMedia, completeLesson, lessonCompleted, type Preferences } from '@/lib/storage';
 import { timestamp } from '@/lib/youtube';
 import { Header, Footer, HelpDialog } from './chrome';
 import { MediaPlayer, type MediaHandle } from './media-player';
 import { VoiceRecorder } from './voice-recorder';
+import { ComprehensionQuiz } from './comprehension-quiz';
 
 type Session = { lesson: Lesson; index: number; preferences: Preferences };
 export function Practice({ lessonId }: { lessonId: string }) {
@@ -53,6 +54,11 @@ function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () => void
   const [search, setSearch] = useState('');
   const [onlyFavorites, setOnlyFavorites] = useState(false);
   const [finished, setFinished] = useState(false);
+  const [completed, setCompleted] = useState(() => lessonCompleted(session.lesson));
+  const [quizOpen, setQuizOpen] = useState(false);
+  const [replayRange, setReplayRange] = useState<QuizEvidence | null>(null);
+  const replayResumeIndex = useRef<number | null>(null);
+  const playerColumn = useRef<HTMLDivElement>(null);
   const [practiceCount, setPracticeCount] = useState(0);
   const media = useRef<MediaHandle>(null);
   const transcript = useRef<HTMLDivElement>(null);
@@ -83,7 +89,8 @@ function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () => void
   const resetTranslation = useCallback(() => {
     translationAbort.current?.abort(); setTranslating(false); setTranslationError(''); setRevealed(false);
   }, []);
-  const navigate = useCallback((nextIndex: number, play = true) => {
+  const navigate = useCallback((nextIndex: number, play = true, evidenceReplay = false) => {
+    if (!evidenceReplay) { setReplayRange(null); replayResumeIndex.current = null; }
     const next = Math.min(Math.max(nextIndex, 0), lesson.segments.length - 1);
     const target = lesson.segments[next];
     media.current?.pause(); media.current?.seek(target.start);
@@ -100,9 +107,24 @@ function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () => void
     void media.current?.play().catch(() => { setStatus('paused'); setPlaybackError('Playback didn’t start. Try the play button inside the video.'); });
   }, [isPlaying, mode, status, segment.end, navigate, index]);
   const continuePractice = useCallback(() => {
-    if (index === lesson.segments.length - 1) { media.current?.pause(); setStatus('complete'); setFinished(true); setPracticeCount(n => n + 1); return; }
+    if (index === lesson.segments.length - 1) { media.current?.pause(); setStatus('complete'); setFinished(true); setCompleted(true); completeLesson(lesson); setPracticeCount(n => n + 1); return; }
     setPracticeCount(n => n + 1); navigate(index + 1);
-  }, [index, lesson.segments.length, navigate]);
+  }, [index, lesson, navigate]);
+
+  function replayEvidence(evidence: QuizEvidence) {
+    if (replayResumeIndex.current === null) replayResumeIndex.current = index;
+    setReplayRange(evidence);
+    navigate(lesson.segments.findIndex(s => s.id === evidence.segmentIds[0]), true, true);
+    playerColumn.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  function returnToQuiz() {
+    const resume = replayResumeIndex.current;
+    setReplayRange(null); replayResumeIndex.current = null;
+    media.current?.pause();
+    if (resume !== null) navigate(resume, false);
+    document.getElementById('lesson-quiz')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    document.getElementById('lesson-quiz')?.focus({ preventScroll: true });
+  }
 
   useEffect(() => {
     if (!ready || !isPlaying) return;
@@ -113,6 +135,11 @@ function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () => void
       if (seeking.current) {
         if (Math.abs(time - seeking.current.target) < 1.2 || Date.now() > seeking.current.deadline) seeking.current = null;
         else return;
+      }
+      if (replayRange) {
+        if (time >= replayRange.end - 0.025) { adapter.pause(); setElapsed(replayRange.end); setStatus('paused'); return; }
+        if (++frame % 5 === 0) setElapsed(time);
+        return;
       }
       // Detect user seeking with the native controls as well as advancing playback.
       const match = lesson.segments.findIndex((s, n) => time >= s.start - 0.02 && time < (lesson.segments[n + 1]?.start ?? duration + 1));
@@ -130,7 +157,7 @@ function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () => void
     const visibility = () => { if (document.hidden && mode === 'shadowing') { media.current?.pause(); setStatus('paused'); } else tick(); };
     document.addEventListener('visibilitychange', visibility);
     return () => { clearInterval(interval); document.removeEventListener('visibilitychange', visibility); };
-  }, [ready, isPlaying, mode, index, segment.end, lesson.segments, duration, resetTranslation]);
+  }, [ready, isPlaying, mode, index, segment.end, lesson.segments, duration, resetTranslation, replayRange]);
 
   const revealTranslation = useCallback(async () => {
     if (revealed) { setRevealed(false); return; }
@@ -150,18 +177,22 @@ function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () => void
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
       const element = event.target as HTMLElement;
-      if (event.ctrlKey || event.metaKey || event.altKey || event.repeat || element.closest('input, textarea, select, audio, video, [contenteditable="true"], dialog') || ([' ', 'Enter'].includes(event.key) && element.closest('button,a')) || document.querySelector('dialog[open]') || !ready || recording) return;
+      if (event.ctrlKey || event.metaKey || event.altKey || event.repeat || element.closest('input, textarea, select, audio, video, [contenteditable="true"], dialog') || ([' ', 'Enter'].includes(event.key) && element.closest('button,a')) || document.querySelector('dialog[open]') || !ready || recording || quizOpen) return;
       const actions: Record<string, () => void> = { ' ': togglePlayback, r: () => navigate(index), R: () => navigate(index), Enter: continuePractice, ArrowLeft: () => navigate(index - 1), ArrowRight: () => navigate(index + 1), t: () => void revealTranslation(), T: () => void revealTranslation() };
       const action = actions[event.key]; if (action) { event.preventDefault(); action(); }
     }
     window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey);
-  }, [ready, recording, togglePlayback, navigate, index, continuePractice, revealTranslation]);
+  }, [ready, recording, togglePlayback, navigate, index, continuePractice, revealTranslation, quizOpen]);
 
   const onPlaying = useCallback((playing: boolean) => {
     setStatus(current => playing ? 'listening' : current === 'listening' ? 'paused' : current);
   }, []);
   const onReady = useCallback(() => { setReady(true); setPlaybackError(''); media.current?.setSpeed(speed); }, [speed]);
-  const onEnded = useCallback(() => { setStatus(mode === 'shadowing' ? 'your-turn' : 'complete'); setElapsed(duration); }, [mode, duration]);
+  const onEnded = useCallback(() => {
+    if (replayRange) { setStatus('paused'); return; }
+    setStatus(mode === 'shadowing' ? 'your-turn' : 'complete'); setElapsed(duration);
+    if (mode === 'continuous') { setFinished(true); setCompleted(true); completeLesson(lesson); }
+  }, [mode, duration, lesson, replayRange]);
   const onMediaError = useCallback((message: string) => { setPlaybackError(message); setStatus('paused'); }, []);
   const pauseForRecording = useCallback(() => { media.current?.pause(); setStatus('your-turn'); }, []);
   function reattach(file: File | undefined) {
@@ -174,8 +205,9 @@ function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () => void
   return <main className="practice-main">
     <div className="practice-breadcrumb"><Link href="/"><ArrowLeft size={14} />Your practice</Link><span>/</span><span>{lesson.source === 'demo' ? 'Listening studio' : lesson.source === 'youtube' ? 'YouTube' : 'Your media'}</span><span className="private-label">One sentence at a time.</span></div>
     <div className="practice-title"><div><span className="eyebrow">{lesson.source === 'demo' ? 'A MOMENT FOR YOUR JAPANESE' : 'YOUR LISTENING SESSION'}</span><h1>{lesson.title}</h1><p>{lesson.author}<span>·</span>{lesson.segments.length} sections<span>·</span>{timestamp(duration)}</p></div><div className="practice-progress"><span>{index + 1}<span> / {lesson.segments.length}</span></span><div><i style={{ width: `${(index + 1) / lesson.segments.length * 100}%` }} /></div><span className="small muted">a little closer</span></div></div>
-    <div className="practice-grid"><div className="player-column">
+    <div className="practice-grid"><div className="player-column" ref={playerColumn}>
       <MediaPlayer ref={media} lesson={lesson} initialTime={lesson.segments[session.index].start} speed={speed} onReady={onReady} onPlaying={onPlaying} onEnded={onEnded} onError={onMediaError} />
+      {replayRange ? <div className="evidence-banner" role="status"><span>Lesson evidence · {timestamp(replayRange.start)} – {timestamp(replayRange.end)}</span><button className="button" onClick={returnToQuiz}>Return to question<ArrowRight size={16} /></button></div> : null}
       {lesson.source === 'upload' && !lesson.mediaUrl ? <label className="reattach button"><Upload size={16} />Reattach {lesson.mediaName || 'your media'}<input aria-label="Reattach media" type="file" accept="audio/*,video/*" onChange={event => reattach(event.target.files?.[0])} /></label> : null}
       <div className="player-settings"><div className="segmented-control" aria-label="Playback mode"><button className={mode === 'shadowing' ? 'selected' : ''} aria-pressed={mode === 'shadowing'} onClick={() => setMode('shadowing')}><Mic size={14} />Shadowing</button><button className={mode === 'continuous' ? 'selected' : ''} aria-pressed={mode === 'continuous'} onClick={() => setMode('continuous')}><Headphones size={14} />Continuous</button></div><label className="speed-control">Speed<select aria-label="Playback speed" value={speed} onChange={event => setSpeed(Number(event.target.value))}><option value="0.5">0.5×</option><option value="0.75">0.75×</option><option value="1">1×</option><option value="1.25">1.25×</option></select></label></div>
       <section className={`current-card state-${recording ? 'recording' : status}`} aria-labelledby="current-japanese">
@@ -192,6 +224,7 @@ function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () => void
       </section>
       <VoiceRecorder key={segment.id} enabled={ready && !isPlaying} nativePlaying={isPlaying} onBeforeRecord={pauseForRecording} onRecording={setRecording} />
       {finished ? <div className="completion-card" role="status"><span><Check size={20} /></span><div><strong>You made a little progress today.</strong><p>Every repetition helps the rhythm feel more familiar.</p></div><button className="text-button" onClick={() => navigate(0, false)}>Practice again<RotateCcw size={14} /></button></div> : null}
+      {completed ? <ComprehensionQuiz lesson={lesson} ready={ready} recording={recording} replaying={!!replayRange} onReplay={replayEvidence} onReturn={returnToQuiz} onOpenChange={open => { setQuizOpen(open); if (!open && replayRange) returnToQuiz(); else if (open) { media.current?.pause(); setStatus('paused'); } }} /> : null}
       {playbackError ? <p role="alert" className="error-message">{playbackError}</p> : null}
       <div className="player-footnote"><span>{lesson.source === 'demo' ? 'Studio sample · Japanese synthetic voice' : lesson.transcriptSource}</span><button className="text-button" onClick={onHelp}><Keyboard size={14} />Shortcuts</button></div>
       {!segment.translation ? <p className="translation-privacy">Revealing a translation sends only this sentence to the free MyMemory service.</p> : null}

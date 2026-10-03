@@ -1,0 +1,9 @@
+{
+  "questions": [
+    { "kind": "main-idea", "question": "この話は主に何についてですか。", "options": ["朝の過ごし方", "仕事の探し方", "夜の勉強", "旅行の準備"], "correctIndex": 0, "explanation": "The speaker introduces how they spend their mornings: 朝の過ごし方.", "evidence": { "segmentIds": ["segment-1"], "quote": "おはようございます。今日は、私の朝の過ごし方を紹介します。" } },
+    { "kind": "detail", "question": "毎朝、何時ごろに起きますか。", "options": ["六時ごろ", "七時ごろ", "八時ごろ", "九時ごろ"], "correctIndex": 1, "explanation": "七時ごろ means around seven, rather than exactly seven.", "evidence": { "segmentIds": ["segment-2"], "quote": "毎朝、七時ごろに起きます。" } },
+    { "kind": "sequence", "question": "コーヒーを入れる前に、何をしますか。", "options": ["朝ごはんを食べる", "家に帰る", "窓を開ける", "公園を散歩する"], "correctIndex": 2, "explanation": "まず introduces opening the window first. それから introduces making coffee afterward.", "evidence": { "segmentIds": ["segment-3", "segment-4", "segment-5"], "quote": "まず、窓を開けて、新鮮な空気を吸います。朝の静かな時間が、とても好きです。それから、温かいコーヒーを入れます。" } },
+    { "kind": "grammar", "question": "「コーヒーを飲みながら」は、この話ではどんな意味ですか。", "options": ["コーヒーを飲む前に", "コーヒーを飲んだ後で", "コーヒーを飲まないで", "コーヒーを飲むのと同時に"], "correctIndex": 3, "explanation": "ながら connects simultaneous actions: drinking coffee while thinking about the day's plans.", "evidence": { "segmentIds": ["segment-6"], "quote": "コーヒーを飲みながら、今日の予定を考えます。" } },
+    { "kind": "intent", "question": "忙しい日について、話し手は何を勧めていますか。", "options": ["少し自分の時間を作ること", "朝ごはんを食べないこと", "毎日旅行すること", "一日中寝ること"], "correctIndex": 0, "explanation": "The speaker asks listeners to try making a little time for themselves, even on busy days.", "evidence": { "segmentIds": ["segment-13"], "quote": "忙しい日も、少しだけ自分の時間を作ってみてください。" } }
+  ]
+}
