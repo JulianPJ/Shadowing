@@ -263,7 +263,7 @@ When diagnosing a bug that occurs only after deployment, reproduce it in the act
 
 # 7. Production caption path — implemented and verified
 
-The production YouTube → lesson path is working end-to-end and is not a current product-development blocker.
+The production YouTube → lesson path is working end-to-end. Treat the caption subsystem as implemented infrastructure unless a reproducible production regression appears.
 
 Current flow:
 
