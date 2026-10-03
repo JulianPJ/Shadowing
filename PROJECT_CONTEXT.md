@@ -2,7 +2,7 @@
 
 > **Purpose:** persistent product and engineering context for future development.
 >
-> **Current snapshot:** 2026-10-03, `main` at `c9cc467f37e76d8a5f2d8e877fdedaf1b21af711` after the production YouTube caption-path fix and end-to-end verification.
+> **Current snapshot:** 2026-10-03, production running on Cloudflare Workers with the caption relay path verified; roadmap reprioritized toward learning features.
 >
 > **Deployment target:** Cloudflare Workers via vinext. Cloudflare is the canonical hosted environment for this project; do not assume Vercel.
 
@@ -253,7 +253,7 @@ Current deployment path:
 - `npm run build:vinext`
 - `npx @vinext/cloudflare deploy --skip-build`
 
-The app is packaged as one Worker. Automatic captions additionally use a small authenticated broker Worker and a SQLite Durable Object with a hibernating WebSocket to an outbound Node relay host. No R2 bucket, hosted user database, paid caption API or separate cache Worker is required. The relay host must stay online; see section 7 and [operations](docs/production-captions.md).
+The app is packaged as one Worker. Automatic captions use a small authenticated broker Worker and a SQLite Durable Object with a hibernating WebSocket to an outbound Node relay host, with direct retrieval retained as a fallback. No R2 bucket, hosted user database, paid caption API or separate cache Worker is required. Treat this caption path as implemented infrastructure unless a production regression is observed; operational details live in [production caption operations](docs/production-captions.md).
 
 The app enables `nodejs_compat` and `global_fetch_strictly_public`; the latter makes public HTTPS broker requests reach the other Worker.
 
@@ -261,58 +261,21 @@ When diagnosing a bug that occurs only after deployment, reproduce it in the act
 
 ---
 
-# 7. P0 — production YouTube captions: diagnosed, relay implemented
+# 7. Production caption path — implemented and verified
 
-## Status and next operational task
+The production YouTube → lesson path is working end-to-end and is not a current product-development blocker.
 
-The production YouTube → lesson path is now functionally verified end-to-end using the caption relay, with direct Worker retrieval retained as an infrastructure fallback. Cloudflare Workers remains the canonical app host. Both supplied Japanese-caption fixtures prepare successfully in production and the real browser path reaches the player, shadows, pauses, replays, navigates the transcript, and persists state.
+Current flow:
 
-The remaining P0 is operational rather than application-level: the verification relay still runs on this Windows computer as a hidden background Node process. It is not a boot service and depends on the computer remaining awake and connected. **Move the relay to an always-on host and supervise the process before declaring production uptime resolved.** The relay can move hosts without changing the UI, lesson contract, or broker endpoint. See [production caption operations](docs/production-captions.md).
+`/api/prepare` → configured caption relay → authenticated broker Worker → Durable Object/WebSocket bridge → outbound Node caption host → normalized cues → segmentation → NDJSON lesson → browser storage → `/practice/[id]`.
 
-## Confirmed root cause
+The app keeps direct caption retrieval as a fallback and records the actual provider in `transcriptSource`. Genuine content errors such as unavailable/private videos or missing Japanese captions remain terminal content errors rather than reasons to redesign the provider path.
 
-Both `IJ6R4u05ppw` and `KJblreFQ2R8` succeed under local Next.js/Node and local vinext/workerd. On deployed Cloudflare egress:
+Server-only settings are `YOUTUBE_CAPTION_RELAY_URL` and `YOUTUBE_CAPTION_RELAY_TOKEN`. Keep secrets out of browser variables. Structured logs already cover provider selection, upstream status, preparation stages, timings, failures and completion.
 
-- official YouTube oEmbed succeeds with HTTP 200;
-- watch HTML succeeds with HTTP 200 and an Innertube API key;
-- the YouTube player API returns HTTP 200 but `LOGIN_REQUIRED` / `Sign in to confirm you’re not a bot`, with no caption tracks;
-- a separate deployed Worker reproduces the same response;
-- the failure occurs before segmentation and before mounting the YouTube IFrame;
-- progress events stream promptly and failure takes about one second, with no timeout/abort.
+Production verification has exercised real Japanese-caption videos through the deployed Worker and browser flow. Do not spend roadmap time re-investigating caption egress unless monitoring or a reproducible user report shows a new regression. Use [production caption operations](docs/production-captions.md) for deployment, health checks and troubleshooting.
 
-This is YouTube egress blocking, not the original player, segmentation, NDJSON or Node compatibility hypothesis. Direct production retrieval sometimes succeeds as egress conditions vary; it is unsuitable as the sole provider. No aggressive retries or paid infrastructure were introduced.
-
-## Final provider architecture
-
-`/api/prepare` → configured relay provider → authenticated HTTPS broker Worker → hibernating WebSocket Durable Object → outbound Node caption host → `youtube-transcript-plus` → normalized cues → segmentation in the app Worker → NDJSON lesson → browser storage → `/practice/[id]`.
-
-The caption dependency is retained behind a native-fetch adapter with explicit player-response checks. The provider strategy changed: relay first when configured, then one direct attempt for infrastructure failures. Genuine no-Japanese-caption and unavailable/private-video errors are terminal. Demo/imports use their existing paths. Lesson/segment and player behavior are preserved, with actual provider provenance recorded in `transcriptSource`.
-
-The app's server-only settings are `YOUTUBE_CAPTION_RELAY_URL` and `YOUTUBE_CAPTION_RELAY_TOKEN`; the broker requires the same token. Workers' public fetch routing flag allows calls to the broker's `workers.dev` endpoint. Redirects use `manual` and are rejected, since Workers does not support `redirect: 'error'`. These settings are never public browser variables.
-
-## Diagnostics and error behavior
-
-Structured server logs record metadata/caption stages, upstream HTTP status, minimal playability/language information, selected providers/fallbacks, segmentation counts, timing, exception name/message and signal state. Signed URLs are redacted; stacks/provider response bodies are not exposed to users.
-
-Clean error codes distinguish `invalid-url`, `video-unavailable`, `no-japanese-captions`, `provider-blocked`, `provider-incompatible`, `network-timeout`, `network`, and `internal`. Missing captions are asserted only after a playable video explicitly has no Japanese caption track, rather than inferred from the library's ambiguous exception.
-
-## Verification commands and fixtures
-
-```sh
-node scripts/check-integrations.mjs http://localhost:3000
-node scripts/check-integrations.mjs http://localhost:3001
-node scripts/check-integrations.mjs https://shadowing.julianpopovskijones.workers.dev
-node scripts/check-youtube-browser.mjs https://shadowing.julianpopovskijones.workers.dev IJ6R4u05ppw
-node scripts/check-youtube-browser.mjs https://shadowing.julianpopovskijones.workers.dev KJblreFQ2R8
-```
-
-Known Japanese fixtures yield 252 and 362 sections respectively. Real browser checks cover practice navigation, player initialization, shadowing playback, automatic pause, replay, transcript navigation and refresh persistence. The browser script can also exercise manual YouTube import from an integration report; it uses real requests and player playback. Reports are ignored under `artifacts/`, separate from deterministic unit/Playwright tests. `jNQXAC9IVRw` is the external no-Japanese-caption fixture; `aaaaaaaaaaa` is the unavailable-video fixture.
-
-Final validation: lint/typecheck, 21 unit tests, Next.js build, vinext/Cloudflare app build and broker build pass. All five existing Playwright tests pass locally and against production in Chrome, including recording/demo/own-media import. Both supplied production caption/browser flows and manual YouTube import pass. See the [deployment versions and verification record](docs/production-captions.md#verification-record-2026-10-03).
-
-MyMemory translation is a separate remaining production limitation: deployed requests returned HTTP 429 daily quota exhaustion on shared Worker egress while local translation succeeded. Imported/authored translations and playback remain available. Do not count an integration-script translation failure as a caption regression.
-
-Production regression checks also found that the bundled MP4 asset ignores HTTP byte ranges, causing Chrome to report a zero-length seekable range and reset section navigation to time zero. A small Cloudflare entry wrapper now serves bounded byte-range responses for `/demo.mp4`, deriving the length when ASSETS omits it. The wrapper preserves vinext's named response/cache exports. Player/UI and own-media import behavior are unchanged.
+MyMemory translation remains best-effort and independent from caption preparation. Translation failure must not block shadowing.
 
 ---
 
@@ -355,305 +318,140 @@ This separation is important for the post-MVP roadmap.
 
 ---
 
-# 9. Post-MVP roadmap
+# 9. Product roadmap — ordered priorities
 
-Do not begin these in earnest until the P0 relay uptime dependency has been addressed.
+Feature work should follow this order unless a concrete production regression or prerequisite forces a change. Do not move file-upload/content-source expansion ahead of the learning features above it.
 
-## Phase 1 — Content-source extensibility
+## 1. Post-video comprehension tests
 
-This is a high-value expansion because serious learners often already have Japanese subtitle files.
+After a learner completes a video, generate a short multiple-choice comprehension test grounded only in the transcript.
 
-### ASS / SSA support
+Requirements:
+- several question types such as main idea, detail, sequence, vocabulary/grammar in context, reference resolution and reasonable inference;
+- deterministic scoring;
+- a concise explanation after each answer;
+- transcript evidence timestamps for every question;
+- a **Replay relevant section** action that seeks directly to the supporting moment;
+- quiz generation failure must never block the completed shadowing lesson;
+- keep model/provider code behind a replaceable question-generation interface.
 
-Add subtitle parsing for:
+Persist quiz attempts as learner signals for the profile described below.
 
-- `.ass`
-- `.ssa`
+## 2. Content difficulty analysis
 
-For the first version, extract:
-
-- start time;
-- end time;
-- visible dialogue text.
-
-Strip ASS styling/positioning overrides that are irrelevant to shadowing.
-
-Do not attempt to preserve all ASS layout semantics initially.
-
-### Subtitle offset / synchronization
-
-Imported subtitles and media are often slightly misaligned.
-
-Add a saved per-lesson global offset, for example:
-
-`-0.5s | Reset | +0.5s`
-
-All effective segment times should use the offset without modifying the source file.
-
-### Bilingual subtitle tracks
-
-Allow a Japanese subtitle file and an English subtitle file to be loaded together.
-
-Align translations by timestamp overlap/fuzzy timing rather than assuming cue indexes match exactly.
-
-This can provide high-quality translation without an AI/API call.
-
-### Direct media URLs
-
-Support browser-playable direct media where practical (for example MP4/WebM and suitable HLS support).
-
-### Custom embeds
-
-Treat custom websites/providers as explicit playback adapters.
-
-Do **not** promise “paste any streaming website.” Arbitrary iframes may be blocked by CSP/X-Frame-Options and cross-origin JavaScript cannot generally control a third-party player.
-
-A provider should only be supported when it can legally/technically be embedded and exposes sufficient playback control (seek, play, pause, current time).
-
-Local media already exists and should remain a first-class privacy/cost-friendly path.
-
-## Phase 2 — Post-video comprehension test
-
-After completing a video, offer a short multiple-choice test generated from the transcript.
-
-### Initial generation provider decision
-
-For the first implementation, use **Cloudflare Workers AI** so hosted development can stay within Cloudflare's free allowance. Choose the smallest/basic Cloudflare model that can reliably comprehend Japanese and follow the structured quiz schema.
-
-Keep generation behind a `QuestionGenerationProvider` (or equivalent) interface so the model/provider can later be swapped or extended with fallbacks without changing quiz UI/data contracts.
-
-For now there is **no provider fallback chain**. If Workers AI is unavailable, over quota, or returns an unusable response, fail cleanly with a simple questions-service error. Quiz failure must never block the completed shadowing lesson.
-
-Validate generated quizzes as strict structured data and cache/reuse them for the same transcript where practical. Scoring is deterministic in the app; the model is only used to generate the questions.
-
-Each question should contain structured grounding:
-
-```ts
-{
-  question: string;
-  options: string[];
-  correctIndex: number;
-  explanation: string;
-  evidenceStart: number;
-  evidenceEnd: number;
-  type: string;
-  difficulty: string;
-}
-```
-
-Question types should include:
-
-- main idea;
-- detail recall;
-- sequence;
-- vocabulary in context;
-- grammar in context;
-- reference resolution;
-- speaker intent/attitude;
-- reasonable inference.
-
-### Key differentiator: replay evidence
-
-When a learner gets a question wrong, provide:
-
-**Replay relevant section**
-
-The question must therefore be tied to transcript timestamps.
-
-### Test difficulty
-
-Offer:
-
-- Easy;
-- Normal;
-- Challenge.
-
-Difficulty should change question sophistication, not source content.
-
-Support alternate question generation for retesting so the learner does not simply memorize answer positions.
-
-## Phase 3 — Content difficulty analysis
-
-Estimate learner-oriented difficulty rather than claiming an exact JLPT classification.
-
-Useful output:
-
-- overall estimated range, e.g. N3–N2;
+Analyze each completed/prepared lesson and estimate:
+- approximate JLPT range;
 - vocabulary difficulty;
 - grammar difficulty;
 - speech speed;
-- casual-language density;
-- sentence complexity.
+- conversational complexity.
 
-Potential signals:
+Store both a compact overall level and the underlying dimensions. Treat the result as an estimate, not an official JLPT classification. Prefer explainable signals that can later feed learner-specific difficulty.
 
-- vocabulary frequency / JLPT associations;
-- grammar structures;
-- sentence length;
-- speech rate;
-- kanji complexity;
-- contractions and omissions;
-- slang;
-- domain-specific language.
+## 3. Progress and learner modelling
 
-Later distinguish:
+Build a persistent **user/learner profile**, not merely aggregate counters.
 
-- **estimated content level**;
-- **estimated difficulty for this learner**.
-
-## Phase 4 — Transcript intelligence
-
-This area can borrow useful interaction ideas from reading-focused apps such as Todaii while keeping Hibiki shadowing-first.
-
-### Tap-to-lookup
-
-Click/tap transcript words to show:
-
-- dictionary form;
-- reading;
-- meaning;
-- part of speech;
-- contextual meaning;
-- save/known controls.
-
-The learner should not need to leave the player.
-
-### Optional JLPT highlighting
-
-Provide a user-controlled transcript overlay for N5/N4/N3/N2/N1 or uncommon vocabulary.
-
-Keep the default screen calm; do not turn the transcript into a wall of color.
-
-### Vocabulary extraction
-
-After processing a video, identify useful words and expressions.
-
-Every item should stay connected to:
-
-- the original sentence;
-- timestamp;
-- replayable source audio;
-- translation/context.
-
-Prefer useful expressions over mechanically listing every uncommon token.
-
-### Grammar extraction
-
-Identify noteworthy grammar patterns used in the transcript and provide:
-
-- short explanation;
-- approximate level;
-- exact source sentence;
-- translation;
-- timestamp;
-- replay button.
-
-The value is grammar in authentic spoken context, not generic generated lessons.
-
-## Phase 5 — Weak-section review
-
-Combine learner signals to identify difficult sections.
-
-Signals can include:
-
-- failed comprehension question;
-- repeated replays;
-- translation reveal;
-- bookmark / “difficult” marking;
-- repeated voice attempts;
-- vocabulary lookup;
-- later pronunciation feedback.
-
-Then generate:
-
-**Review weak sections**
-
-Example:
-
-- original video: 18 minutes;
-- targeted review: 3 minutes.
-
-The important loop is:
-
-**Watch → Shadow → Test → Detect weakness → Shadow weak sections again**
-
-This should become a defining feature.
-
-## Phase 6 — Saved vocabulary and spaced review
-
-Build lightweight review before attempting a full Anki replacement.
-
-Save:
-
-- word/expression;
-- reading;
-- meaning;
-- original sentence;
-- source video/lesson;
-- timestamp;
-- learning state.
-
-Context-first cards should be able to replay the source audio.
-
-Later add simple spaced repetition for vocabulary, expressions, grammar, difficult sentences, and listening items.
-
-## Phase 7 — Progress and learner model
-
-Once there is enough data, track useful trends:
-
-- minutes shadowed;
-- segments completed;
-- videos completed;
-- quiz performance;
-- typical content level;
-- playback speed;
+The profile should accumulate a history of lessons and outcomes, including where available:
+- video/lesson watched;
+- date and completion state;
+- estimated content difficulty/JLPT range;
+- time spent shadowing;
 - replay frequency;
+- quiz attempted/not attempted and score;
 - translation reveals;
-- vocabulary lookups;
-- saved sections;
-- grammar difficulties;
-- voice attempts.
+- saved words/expressions;
+- difficult or repeatedly replayed sections;
+- learner's typical content level and recent trend.
 
-Prefer actionable learning information over decorative gamification.
+The first version may remain local-first, but choose data contracts that can later sync to an account without redesigning the feature model. The profile should become the shared input for adaptive difficulty, weak-section review, recommendations and future cross-device sync.
 
-Eventually use history to estimate **difficulty for this learner**, not just generic content difficulty.
+## 4. Polish / monetisation layer
 
-## Phase 8 — Pronunciation feedback
+Only after retention signals justify it, add:
+- accounts;
+- cross-device sync;
+- durable hosted persistence;
+- analytics;
+- sensible free/premium limits;
+- premium features;
+- subscription/billing infrastructure.
 
-Build incrementally on the existing recorder.
+Do not let monetisation architecture dominate the current learning-product work.
 
-### Stage 1 — already implemented
+## 5. Broaden content sources
 
-Manual native-vs-learner A/B listening.
+After the higher-priority learning loop exists, improve source flexibility:
+- ASS/SSA subtitle parsing;
+- global subtitle offset controls;
+- bilingual subtitle alignment;
+- browser-playable direct media URLs;
+- cleaner separation of `MediaSource` and `TranscriptSource`.
 
-### Stage 2
+Local media remains a first-class privacy/cost-friendly path. Do not promise arbitrary streaming-site support.
 
-Transcribe the learner's recording and compare recognized Japanese with the target.
+## 6. Transcript intelligence — end-of-video review
 
-Label this as speech-recognition/content comparison, not pronunciation scoring.
+Do **not** make tap-to-lookup the main feature.
 
-### Stage 3
+At the end of a lesson, generate a concise review containing:
+- important grammar actually used in the video, constrained to roughly the video's/learner's level;
+- a key vocabulary/expressions list from the transcript;
+- source sentence and timestamp/context for each item where practical.
 
-Provide specific likely problems where confidence is sufficient, such as missing words/morae, long vowels, or timing differences.
+Avoid surfacing advanced grammar merely because it can technically be detected. For example, an N3-level lesson should not turn into an N1 grammar lesson.
 
-### Stage 4
+## 7. Weak-section review
 
-Explore more advanced phoneme, rhythm, timing, and pitch-accent feedback.
+Use learner signals such as replay count, repeated attempts, translation reveals, quiz evidence and explicit bookmarks to identify difficult moments.
 
-Do not ship an authoritative numeric pronunciation score unless the measurement actually justifies it.
+Automatically create a shorter review/shadowing session from those sections, preserving timestamps and enough surrounding context to make each clip understandable.
 
-## Phase 9 — AI discussion based on the video
+## 8. Personalised difficulty / adaptive practice
 
-After a learner has shadowed/tested a video, offer Japanese conversation about that content.
+Estimate how difficult a lesson and individual sections are **for this learner**, using the learner profile plus content analysis.
 
-The conversation should be grounded in:
+Use that estimate to adapt:
+- quiz difficulty;
+- review selection;
+- amount/type of assistance;
+- recommended next content range.
 
-- transcript;
-- summary;
-- vocabulary;
-- learner level/difficulty.
+Keep the adaptation explainable and avoid hiding the original transcript/content.
 
-This should feel like active production connected to the media, not a generic chatbot tab.
+## 9. Pronunciation feedback
+
+Build incrementally:
+1. speech-to-text comparison against the target line;
+2. timing/alignment feedback;
+3. mora and vowel-length issues;
+4. rhythm;
+5. potentially pitch-accent feedback when reliability is good enough.
+
+Reuse the existing browser recording flow. Do not present low-confidence pronunciation analysis as authoritative.
+
+## 10. Saved vocabulary and contextual review
+
+Let learners save words/expressions with:
+- source sentence;
+- video/lesson;
+- timestamp;
+- meaning/translation;
+- replayable source audio/context.
+
+Later add spaced repetition. Keep saved items tied to authentic context rather than becoming a detached generic word list.
+
+## 11. AI conversation based on the video — low priority
+
+After the core comprehension/review/adaptive loop is strong, optionally let learners discuss the completed content in Japanese.
+
+Ground the conversation in:
+- the transcript;
+- lesson summary;
+- important vocabulary/grammar;
+- learner level/profile.
+
+This should feel like active production connected to the video, not a generic chatbot. It is intentionally the lowest priority in this roadmap.
 
 ---
 
@@ -686,10 +484,6 @@ Future agents should verify before proposing work. At this snapshot, the followi
 
 # 11. Known constraints / technical debt
 
-### YouTube caption retrieval is unofficial
-
-`youtube-transcript-plus` remains behind a provider adapter. Production prefers a caption relay because direct Worker egress receives explicit YouTube bot challenges. Retrieval can still change or fail on the relay host; supervised always-on hosting and manual import remain necessary.
-
 ### Translation service is best-effort
 
 MyMemory is keyless/free and may have quota/quality limits. Production verification encountered HTTP 429 daily quota exhaustion on shared Worker egress. Translation failure must never block shadowing.
@@ -718,20 +512,21 @@ Before many new providers are added, separate media source from transcript sourc
 
 # 12. Development priorities
 
-Use this ordering when tradeoffs are necessary:
+Use the exact roadmap ordering in section 9 when tradeoffs are necessary:
 
-1. **Production reliability of the core YouTube → lesson path: move the verified caption relay to supervised, always-on hosting**
-2. Shadowing UX and playback/timestamp reliability
-3. Transcript quality / segmentation
-4. Content-source flexibility and subtitle import
-5. Comprehension testing and timestamped review
-6. Vocabulary/grammar intelligence
-7. Weak-section / retention loop
-8. Personalized progress
-9. Pronunciation analysis
-10. Nice-to-have presentation and gamification
+1. Post-video comprehension tests
+2. Content difficulty analysis
+3. Progress and learner modelling, centered on a persistent learner profile
+4. Polish / monetisation layer
+5. Broaden content sources
+6. End-of-video transcript intelligence: level-appropriate grammar + key vocabulary
+7. Weak-section review
+8. Personalised difficulty / adaptive practice
+9. Pronunciation feedback
+10. Saved vocabulary and contextual review
+11. AI conversation based on the video — deliberately low priority
 
-Do not sacrifice the first three for impressive AI features.
+Core playback, preparation and segmentation reliability remain regression constraints, but they are not roadmap items to re-investigate without evidence of a real regression.
 
 ---
 
