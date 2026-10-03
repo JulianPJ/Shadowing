@@ -128,18 +128,27 @@ test('storage failure is non-blocking and analysis does not duplicate the transc
   assert.equal(await loadDifficulty(lesson), null); assert.equal(await saveDifficulty(analysis, lesson), false);
   assert.doesNotThrow(() => saveLesson(demoLesson, 0));
 });
-test('Workers AI adapter uses existing model, bounded JSON, low temperature and no thinking with a mocked binding', async () => {
+test('Workers AI adapter uses Qwen, bounded JSON, low temperature and explicit no-think prompting with a mocked binding', async () => {
   let calls = 0;
   const provider = createWorkersAiDifficultyProvider({ async run(model, input, options) {
-    calls++; assert.equal(model, WORKERS_AI_DIFFICULTY_MODEL); assert.equal(input.max_completion_tokens, 2200);
-    assert.deepEqual(input.response_format, { type: 'json_object' }); assert.deepEqual(input.chat_template_kwargs, { enable_thinking: false });
+    calls++; assert.equal(model, WORKERS_AI_DIFFICULTY_MODEL); assert.equal(model, '@cf/qwen/qwen3-30b-a3b-fp8'); assert.equal(input.max_completion_tokens, 2200);
+    assert.deepEqual(input.response_format, { type: 'json_object' }); assert.equal(input.chat_template_kwargs, undefined);
     assert.equal(input.temperature, 0.1); assert.deepEqual(options, { rejectIfBusy: true });
+    const messages = input.messages as Array<{ content: string }>; assert.ok(messages[1].content.endsWith('/no_think'));
     return { choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(authored) } }] };
   } });
   const analysis = await generateLessonDifficulty({ ...lesson, id: 'custom' }, signal(), provider);
   assert.equal(analysis.lessonId, 'custom'); assert.equal(calls, 1);
   await generateLessonDifficulty(lesson, signal(), provider); assert.equal(calls, 1);
 });
+test('difficulty accepts Workers AI direct JSON response objects', async () => {
+  const provider = createWorkersAiDifficultyProvider({ async run() {
+    return { response: authored, choices: [{ finish_reason: 'stop', message: { content: null, reasoning: 'provider-internal reasoning' } }] };
+  } });
+  const analysis = await generateLessonDifficulty({ ...lesson, id: 'direct-json' }, signal(), provider);
+  assert.equal(analysis.lessonId, 'direct-json');
+});
+
 test('malformed JSON, incomplete output, oversized content and binding failures are recoverable', async () => {
   for (const response of [{}, { choices: [] }, { choices: [{ finish_reason: 'length', message: { content: '{}' } }] }, { choices: [{ finish_reason: 'stop', message: { content: '{broken' } }] }, { choices: [{ finish_reason: 'stop', message: { content: 'x'.repeat(24001) } }] }]) {
     const provider = createWorkersAiDifficultyProvider({ async run() { return response; } });
