@@ -13,11 +13,11 @@ function text(value: unknown, max = 600): string {
   if (typeof value !== 'string' || !value.trim() || value.length > max) throw new QuizValidationError('Invalid text.');
   return value.trim();
 }
-export function validateQuizLesson(value: unknown): QuizLesson {
+export function validateQuizLesson(value: unknown, limits = { maxSegments: 2000, maxCharacters: 60000 }): QuizLesson {
   const raw = object(value);
   const id = text(raw.id, 200);
   const videoId = raw.videoId === undefined ? undefined : text(raw.videoId, 100);
-  if (!Array.isArray(raw.segments) || !raw.segments.length || raw.segments.length > 2000) throw new QuizValidationError('A supported transcript is required.');
+  if (!Array.isArray(raw.segments) || !raw.segments.length || raw.segments.length > limits.maxSegments) throw new QuizValidationError('A supported transcript is required.');
   const ids = new Set<string>();
   let previousEnd = 0;
   const segments: Segment[] = raw.segments.map(value => {
@@ -27,7 +27,7 @@ export function validateQuizLesson(value: unknown): QuizLesson {
     ids.add(id); previousEnd = s.end;
     return { id, start: s.start, end: s.end, japanese: text(s.japanese, 5000) };
   });
-  if (segments.reduce((n, s) => n + s.japanese.length, 0) > 60000) throw new QuizValidationError('This transcript is too long for a short comprehension check.');
+  if (segments.reduce((n, s) => n + s.japanese.length, 0) > limits.maxCharacters) throw new QuizValidationError(limits.maxCharacters === 60000 ? 'This transcript is too long for a short comprehension check.' : 'This transcript is too long for analysis.');
   return { id, ...(videoId ? { videoId } : {}), segments };
 }
 export function transcriptRevision(lesson: QuizLesson): string {

@@ -2,7 +2,7 @@
 
 > **Purpose:** persistent product and engineering context for future development.
 >
-> **Current snapshot:** 2026-10-03, production running on Cloudflare Workers with the caption relay path verified; post-video comprehension checks implemented with Cloudflare Workers AI as the canonical hosted generator.
+> **Current snapshot:** 2026-10-03, production running on Cloudflare Workers with the caption relay path verified; comprehension checks and content difficulty implemented in the repository, with native Workers AI as the canonical hosted provider. Difficulty is built and locally verified; it has not been deployed in this task.
 >
 > **Deployment target:** Cloudflare Workers via vinext. Cloudflare is the canonical hosted environment for this project; do not assume Vercel.
 
@@ -132,6 +132,14 @@ Priority #1 is implemented in the repository. Finishing Shadowing practice or re
 
 Validated quizzes are reused for a matching lesson/transcript SHA-256 fingerprint. Draft answers, completion and versioned UUID-based attempts persist through the existing local storage helpers. Attempt history includes lesson/video/quiz identity, score, total questions, per-question answers/correctness/evidence and start/update/completion timestamps for future account/profile sync. This adds no accounts or learner-profile system. See [comprehension checks](docs/comprehension-checks.md) for setup, limits and the persistence contract.
 
+### Content difficulty analysis
+
+Priority #2 is implemented. Prepared lessons show a calm information card below practice controls: caption-derived speech pace is immediate; semantic estimates are requested explicitly and cached locally. The compact summary covers approximate JLPT range, vocabulary, grammar, speech and conversational complexity, with expandable evidence and confidence. It is a content-only estimate, never an official JLPT classification or learner-performance score.
+
+`POST /api/difficulty` uses a replaceable `DifficultyAnalysisProvider`, injected by the canonical Worker through `env.AI`. It reuses `@cf/zai-org/glm-4.7-flash`, JSON mode, bounded output and disabled thinking, adding no API-key secrets. One call analyzes at most 12 windows / 36 excerpts / 9,000 characters across the entire lesson. Speech is computed in code: Japanese-script characters per minute over captioned intervals plus gaps up to one second, excluding long gaps. Strict validation rejects invalid ranges/scores/fields, fabricated or unsampled quotes and model timestamps; application code supplies labels, coverage and evidence section times.
+
+Versioned compact records persist through `loadDifficulty`/`saveDifficulty`, with stable content identity and the existing SHA-256 transcript fingerprint. Edits invalidate reuse; reload never triggers inference. The exact demo has an authored estimate. Failures, pending generation and blocked storage do not block playback, shadowing, quizzes or completion. No learner profile or later roadmap feature is introduced. See [content difficulty](docs/content-difficulty.md) for exact calculation, input/sample limits, contracts and limitations. Live semantic quality remains to be evaluated; no live-model test was run for this implementation.
+
 ### Voice recording
 
 Basic learner recording is already implemented with browser `MediaRecorder`:
@@ -212,6 +220,7 @@ The repository includes:
 - local media/subtitle import coverage;
 - mobile/layout checks;
 - deterministic comprehension schema/scoring/evidence/persistence/provider tests and Playwright quiz/replay/recovery/mobile coverage, including the built Cloudflare preview;
+- deterministic content difficulty schema, pace, sampling, fingerprint/storage and mocked Workers AI tests, plus browser summary/details/cache/retry/mobile/transcript-edit coverage;
 - integration-check tooling for real caption/translation services.
 
 `scripts/check-integrations.mjs [base-url]` can exercise `/api/prepare` and `/api/translate` against either localhost or a hosted deployment.
@@ -249,6 +258,10 @@ Important files:
 | `src/lib/providers/translation.ts` | translation provider |
 | `src/lib/storage.ts` | local persistence |
 | `src/lib/quiz.ts` | quiz validation, evidence mapping, transcript fingerprint, scoring and attempt contracts |
+| `src/lib/difficulty.ts` | content difficulty validation, deterministic speech metrics and bounded sampling |
+| `src/lib/providers/difficulty.ts` | replaceable native Workers AI semantic analysis and authored demo estimate |
+| `src/lib/difficulty-api.ts`, `src/app/api/difficulty/route.ts` | bounded, independent difficulty API shared with the canonical Worker |
+| `src/components/lesson-difficulty.tsx` | lazy difficulty summary, evidence details and retry |
 | `src/lib/providers/quiz.ts` | replaceable server-side generation and authored demo quiz |
 | `src/components/comprehension-quiz.tsx` | optional lesson quiz, feedback, replay and results |
 | `src/app/api/quiz/route.ts` | bounded, recoverable quiz-generation route |
@@ -338,7 +351,7 @@ Feature work should follow this order unless a concrete production regression or
 
 ## 1. Post-video comprehension tests
 
-**Implemented in the repository:** optional completed-lesson checks, strict output/evidence validation, deterministic scoring, bounded evidence replay, transcript-keyed local reuse and portable attempt history. External generation still needs provider secrets and production deployment; the demo works without them. The remaining roadmap items below are intentionally unimplemented.
+**Implemented:** optional completed-lesson checks, strict output/evidence validation, deterministic scoring, bounded evidence replay, transcript-keyed local reuse and portable attempt history. Canonical production generation uses native Workers AI; the demo is independent of inference. Later quality tuning is separate from roadmap #2.
 
 After a learner completes a video, generate a short multiple-choice comprehension test grounded only in the transcript.
 
@@ -354,6 +367,8 @@ Requirements:
 Persist quiz attempts as learner signals for the profile described below.
 
 ## 2. Content difficulty analysis
+
+**Implemented in the repository:** hybrid deterministic speech pace and lazy semantic JLPT/vocabulary/grammar/conversation estimates, strict evidence validation, bounded full-lesson sampling and transcript-keyed local persistence. Next priority is #3, progress and learner modelling; it remains unimplemented.
 
 Analyze each completed/prepared lesson and estimate:
 - approximate JLPT range;
@@ -486,7 +501,8 @@ Future agents should verify before proposing work. At this snapshot, the followi
 - bookmarks/saved-section filtering;
 - recent local lessons;
 - local progress persistence;
-- post-video comprehension checks with explanations, evidence replay, quiz reuse and local attempt persistence (repository implementation; external provider/deployment pending);
+- post-video comprehension checks with explanations, evidence replay, quiz reuse and local attempt persistence (native Workers AI in canonical production);
+- content difficulty estimates with deterministic caption pace, bounded semantic analysis, validated evidence and local reuse (repository implementation, locally verified; deployment pending);
 - local own-media import;
 - SRT/VTT/JSON transcript import;
 - YouTube + user transcript import;
@@ -511,7 +527,11 @@ Progress is local to the current browser/origin. This is intentional for now, bu
 
 ### Comprehension generation needs server configuration
 
-The bundled demo is independent of external generation. Other transcripts need a configured JSON-capable chat-completions provider. Requests are bounded at 2,000 normalized sections / 60,000 Japanese characters; longer or unsuitable transcripts show a recoverable message. Structural/evidence checks cannot prove the semantic correctness of every model-generated question. Quiz results remain local and do not yet sync to an account.
+The bundled demo is independent of inference. Canonical Cloudflare production uses the native `AI` binding; standard Next.js development may use the existing optional chat-completions adapter. Requests are bounded at 2,000 normalized sections / 60,000 Japanese characters; longer or unsuitable transcripts show a recoverable message. Structural/evidence checks cannot prove the semantic correctness of every model-generated question. Quiz results remain local and do not yet sync to an account.
+
+### Content difficulty is an estimate
+
+Bounded samples can miss unusual sections and distant references. Caption-derived speech pace depends on spelling and timing, not measured morae or audio activity; its thresholds are product heuristics. Semantic quality needs real-lesson evaluation. Native inference already underway may continue after the request timeout. Estimates remain local with no cross-device/shared cache. See [content difficulty limitations](docs/content-difficulty.md).
 
 ### Translation server cache is in-memory
 

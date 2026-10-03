@@ -36,7 +36,7 @@ export async function readBoundedJson(source: Request | Response, maxBytes: numb
   return JSON.parse(new TextDecoder().decode(buffer));
 }
 
-function parseChatCompletion(data: unknown): unknown {
+export function parseChatCompletion(data: unknown): unknown {
   const parsed = object(data);
   if (!Array.isArray(parsed.choices) || !parsed.choices.length) throw new Error('Missing choices');
   const choice = object(parsed.choices[0]);
@@ -65,7 +65,7 @@ export const chatCompletionQuizProvider: QuizGenerationProvider = {
   },
 };
 
-type WorkersAiBindingLike = {
+export type WorkersAiBindingLike = {
   run(model: string, input: Record<string, unknown>, options?: { rejectIfBusy?: boolean }): Promise<unknown>;
 };
 

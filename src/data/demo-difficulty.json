@@ -1,0 +1,6 @@
+{
+  "overall": { "jlptMin": "N5", "jlptMax": "N4", "confidence": "medium", "explanation": "This short studio script appears mostly elementary: everyday morning routines, polite sentences and clear sequencing, with a few more demanding expressions." },
+  "vocabulary": { "level": 2, "explanation": "Mostly concrete everyday words, with a few expressions for describing feelings and routines.", "examples": [{ "segmentId": "segment-9", "quote": "気持ちが落ち着きます", "explanation": "An expression about feeling calm adds a little lexical demand." }] },
+  "grammar": { "level": 2, "explanation": "Polite basic sentences are mixed with connected actions, simultaneous actions and simple conditions.", "examples": [{ "segmentId": "segment-6", "quote": "コーヒーを飲みながら", "explanation": "Two simultaneous actions are linked with ながら." }, { "segmentId": "segment-10", "quote": "家に帰ったら", "explanation": "A simple conditional connects the return home with breakfast." }] },
+  "conversationalComplexity": { "level": 1, "explanation": "One speaker follows an explicit morning sequence with little implied context or fragmented speech.", "examples": [{ "segmentId": "segment-5", "quote": "それから", "explanation": "An explicit transition makes the sequence easy to follow." }] }
+}

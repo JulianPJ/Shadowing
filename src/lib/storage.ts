@@ -1,4 +1,5 @@
-import type { Lesson, LessonQuiz, Mode, QuizAttempt, QuizLesson } from './types';
+import type { ContentDifficultyAnalysis, Lesson, LessonQuiz, Mode, QuizAttempt, QuizLesson } from './types';
+import { validateDifficultyAnalysis } from './difficulty';
 import { transcriptRevision, validateAttempt, validateQuiz } from './quiz';
 export type StudyRecord = { lesson: Lesson; index: number; updatedAt: number };
 export type Preferences = { mode: Mode; speed: number; translation: boolean };
@@ -28,6 +29,12 @@ export async function loadQuiz(lesson: QuizLesson): Promise<LessonQuiz | null> {
   try { return await validateQuiz(readStorage(`quiz:${lesson.id}`, null), lesson); } catch { return null; }
 }
 export function saveQuiz(quiz: LessonQuiz) { return writeStorage(`quiz:${quiz.lessonId}`, quiz); }
+export async function loadDifficulty(lesson: QuizLesson): Promise<ContentDifficultyAnalysis | null> {
+  try { return await validateDifficultyAnalysis(readStorage(`difficulty:${lesson.id}`, null), lesson); } catch { return null; }
+}
+export async function saveDifficulty(analysis: ContentDifficultyAnalysis, lesson: QuizLesson) {
+  try { return writeStorage(`difficulty:${lesson.id}`, await validateDifficultyAnalysis(analysis, lesson)); } catch { return false; }
+}
 export function loadQuizAttempt(quiz: LessonQuiz, lesson: QuizLesson): QuizAttempt | null {
   try { return validateAttempt(readStorage(`quiz-attempt:${quiz.id}`, null), quiz, lesson); } catch { return null; }
 }

@@ -43,6 +43,7 @@ Available functionality:
 - Microphone recording and A/B listening. Starting one playback source pauses the other. Recordings are limited to 60 seconds and cleared when changing sections or leaving the player.
 - Locally saved transcripts, last section, mode/speed, bookmarks, cached translations, and current-section translation visibility. The home screen displays the three most recent lessons from a history of up to eight.
 - Responsive desktop/mobile layouts, locally served Japanese fonts, keyboard focus styles, modal focus management, and reduced-motion support.
+- Optional estimated content difficulty: approximate JLPT range, vocabulary, grammar, caption-derived speech pace and conversational complexity, with bounded transcript evidence and local reuse. See [calculation, Workers AI setup and persistence](docs/content-difficulty.md).
 
 | Shortcut | Action |
 | --- | --- |
@@ -102,6 +103,8 @@ The keyless service has quotas and variable quality. Failures show a retryable m
 Practice data lives in browser `localStorage`, scoped to the current origin/browser/device. There are no accounts, hosted database, or cross-device synchronization. Clearing site storage removes saved practice data. Recordings stay in memory and are neither uploaded nor persisted. YouTube requests and requested MyMemory translations require network access. Optional Whisper transcription sends selected media directly to the configured local service.
 
 Recording requires a browser with `MediaRecorder`, a microphone, permission, and **HTTPS or localhost**. Denied permission shows a recovery message while playback remains available.
+
+Requesting a difficulty estimate sends the Japanese transcript through the app API; only bounded samples reach the analysis provider. Cached estimates stay on this device. The bundled demo uses authored data.
 
 ## Optional local Whisper transcription
 

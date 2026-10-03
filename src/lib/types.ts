@@ -31,6 +31,31 @@ export interface QuizGenerationProvider {
   // Provider output is untrusted; the application validates it and supplies IDs/times.
   generate(lesson: QuizLesson, signal: AbortSignal): Promise<unknown>;
 }
+export type JlptLevel = 'N5' | 'N4' | 'N3' | 'N2' | 'N1';
+export type DifficultyLevel = 1 | 2 | 3 | 4 | 5;
+export type DifficultyEvidence = { segmentId: string; quote: string; explanation: string; start: number; end: number };
+export type DifficultyDimension = { level: DifficultyLevel; label: string; explanation: string; examples: DifficultyEvidence[] };
+export type SpeechSpeed = {
+  metricVersion: 1; value: number | null; unit: 'Japanese characters/min';
+  level: DifficultyLevel | null; label: string; explanation: string;
+  japaneseCharacters: number; activeSeconds: number; excludedGapSeconds: number;
+};
+export type DifficultyCoverage = {
+  strategyVersion: 1; totalSegments: number; sampledSegments: number;
+  totalCharacters: number; sampledCharacters: number;
+};
+// Content-only record: reference by id + transcriptKey in future lesson-history events.
+export type ContentDifficultyAnalysis = {
+  schemaVersion: 1; id: string; lessonId: string; transcriptKey: string; generatedAt: string;
+  overall: { jlptMin: JlptLevel; jlptMax: JlptLevel; label: string; explanation: string; confidence: 'low' | 'medium' | 'high' };
+  vocabulary: DifficultyDimension; grammar: DifficultyDimension; speechSpeed: SpeechSpeed;
+  conversationalComplexity: DifficultyDimension; coverage: DifficultyCoverage;
+};
+export type DifficultyAnalysisInput = { windows: { id: string; japanese: string }[][]; coverage: DifficultyCoverage };
+export interface DifficultyAnalysisProvider {
+  name: string;
+  analyze(input: DifficultyAnalysisInput, signal: AbortSignal): Promise<unknown>;
+}
 export type QuizAnswerResult = {
   questionId: string; kind: QuestionKind; selectedIndex: number; correctIndex: number;
   correct: boolean; evidence: QuizEvidence;
