@@ -2,7 +2,7 @@
 
 > **Purpose:** persistent product and engineering context for future development.
 >
-> **Current snapshot:** 2026-10-03, P0 diagnosis/provider fix on `main` (baseline `b7892366429880b6214b850ef64e9cabce749e22`).
+> **Current snapshot:** 2026-10-03, `main` at `c9cc467f37e76d8a5f2d8e877fdedaf1b21af711` after the production YouTube caption-path fix and end-to-end verification.
 >
 > **Deployment target:** Cloudflare Workers via vinext. Cloudflare is the canonical hosted environment for this project; do not assume Vercel.
 
@@ -170,7 +170,7 @@ English is lazy and hidden by default.
 
 Current automatic translation uses MyMemory through `/api/translate`. Results are cached in the browser and in a small server-memory cache. Imported/authored translations bypass the external service.
 
-This provider is free/keyless but quota and quality are not guaranteed.
+This provider is free/keyless but quota and quality are not guaranteed. Production verification has already hit MyMemory's shared-egress daily quota; this is accepted as a non-blocking MVP limitation for now. Translation failure must not block shadowing.
 
 ### Persistence
 
@@ -265,9 +265,9 @@ When diagnosing a bug that occurs only after deployment, reproduce it in the act
 
 ## Status and next operational task
 
-The core production flow has a new provider strategy: an authenticated caption relay on a host whose YouTube access works, with direct Worker retrieval as an infrastructure fallback. Cloudflare Workers remains the canonical app host. No post-MVP feature work was started.
+The production YouTube → lesson path is now functionally verified end-to-end using the caption relay, with direct Worker retrieval retained as an infrastructure fallback. Cloudflare Workers remains the canonical app host. Both supplied Japanese-caption fixtures prepare successfully in production and the real browser path reaches the player, shadows, pauses, replays, navigates the transcript, and persists state.
 
-The verification relay currently runs on this Windows computer as a hidden background Node process. It is not a boot service and depends on the computer remaining awake and connected. **Always-on relay hosting/process supervision remains the next P0 task before declaring production uptime resolved.** The implementation can move to another host without changing the UI, lesson contract or broker URL. See [production caption operations](docs/production-captions.md).
+The remaining P0 is operational rather than application-level: the verification relay still runs on this Windows computer as a hidden background Node process. It is not a boot service and depends on the computer remaining awake and connected. **Move the relay to an always-on host and supervise the process before declaring production uptime resolved.** The relay can move hosts without changing the UI, lesson contract, or broker endpoint. See [production caption operations](docs/production-captions.md).
 
 ## Confirmed root cause
 
@@ -415,6 +415,16 @@ Local media already exists and should remain a first-class privacy/cost-friendly
 ## Phase 2 — Post-video comprehension test
 
 After completing a video, offer a short multiple-choice test generated from the transcript.
+
+### Initial generation provider decision
+
+For the first implementation, use **Cloudflare Workers AI** so hosted development can stay within Cloudflare's free allowance. Choose the smallest/basic Cloudflare model that can reliably comprehend Japanese and follow the structured quiz schema.
+
+Keep generation behind a `QuestionGenerationProvider` (or equivalent) interface so the model/provider can later be swapped or extended with fallbacks without changing quiz UI/data contracts.
+
+For now there is **no provider fallback chain**. If Workers AI is unavailable, over quota, or returns an unusable response, fail cleanly with a simple questions-service error. Quiz failure must never block the completed shadowing lesson.
+
+Validate generated quizzes as strict structured data and cache/reuse them for the same transcript where practical. Scoring is deterministic in the app; the model is only used to generate the questions.
 
 Each question should contain structured grounding:
 
@@ -710,7 +720,7 @@ Before many new providers are added, separate media source from transcript sourc
 
 Use this ordering when tradeoffs are necessary:
 
-1. **Production reliability of the core YouTube → lesson path: supervised always-on caption relay**
+1. **Production reliability of the core YouTube → lesson path: move the verified caption relay to supervised, always-on hosting**
 2. Shadowing UX and playback/timestamp reliability
 3. Transcript quality / segmentation
 4. Content-source flexibility and subtitle import
