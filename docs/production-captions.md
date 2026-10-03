@@ -1,6 +1,6 @@
 # Production caption operations
 
-The production app runs on Cloudflare Workers/vinext at `shadowing.julianpopovskijones.workers.dev`. Automatic YouTube caption preparation is an implemented, verified subsystem; it is not a current product-roadmap blocker.
+The production app runs on Cloudflare Workers/vinext at `shadowing.julianpopovskijones.workers.dev`. Automatic YouTube caption preparation is an implemented, verified subsystem.
 
 ## Current architecture
 
