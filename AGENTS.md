@@ -14,4 +14,4 @@ Before making product, architecture, roadmap, media-provider, or deployment chan
 
 It is the persistent source of truth for the product purpose, current implementation, Cloudflare deployment context, development priorities, and post-MVP roadmap.
 
-**Current P0:** the deployed Cloudflare Workers app fails during the automatic YouTube caption/preparation path even though the same flow works locally. Fix and verify the production YouTube → lesson path before starting post-MVP feature work.
+**Current P0:** the production YouTube → lesson path is now verified through the caption relay. The relay host still runs on the verification Windows computer, so move it to supervised, always-on hosting and re-verify production before starting post-MVP feature work.
