@@ -1,9 +1,24 @@
 import type { ContentDifficultyAnalysis, Lesson, LessonQuiz, Mode, QuizAttempt, QuizLesson } from './types';
 import { validateDifficultyAnalysis } from './difficulty';
 import { transcriptRevision, validateAttempt, validateQuiz } from './quiz';
+import { ARCHIVE_LIMIT, HISTORY_BYTE_LIMIT, compactDifficulty, compactHistory, emptyHistory, validateHistory } from './learner-progress';
+import type { LearnerHistory } from './learner-types';
 export type StudyRecord = { lesson: Lesson; index: number; updatedAt: number };
 export type Preferences = { mode: Mode; speed: number; translation: boolean };
 const PREFIX = 'hibiki:v1:';
+const unsaved = new Map<string, unknown>();
+let storageFailed = false;
+export function progressStorageFailed() { return storageFailed; }
+export function reportStorageFailure() {
+  storageFailed = true;
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event('hibiki:storage-warning'));
+}
+export function storageKeys(): string[] {
+  const keys = new Set<string>(unsaved.keys());
+  try { for (let i = 0; i < localStorage.length; i++) { const key = localStorage.key(i); if (key?.startsWith(PREFIX)) keys.add(key.slice(PREFIX.length)); } }
+  catch { reportStorageFailure(); }
+  return [...keys];
+}
 // Local object URLs survive client-side navigation, but intentionally not a full refresh.
 const liveMedia = new Map<string, string>();
 export function getLiveMedia(id: string) { return liveMedia.get(id); }
@@ -14,10 +29,29 @@ export function rememberMedia(id: string, url: string) {
   if (liveMedia.size > 8) { const oldest = liveMedia.keys().next().value!; URL.revokeObjectURL(liveMedia.get(oldest)!); liveMedia.delete(oldest); }
 }
 export function readStorage<T>(key: string, fallback: T): T {
+  if (unsaved.has(key)) return structuredClone(unsaved.get(key)) as T;
   try { const value = localStorage.getItem(PREFIX + key); return value ? JSON.parse(value) as T : fallback; } catch { return fallback; }
 }
 export function writeStorage(key: string, value: unknown) {
-  try { localStorage.setItem(PREFIX + key, JSON.stringify(value)); return true; } catch { return false; /* Playback still works. */ }
+  try { localStorage.setItem(PREFIX + key, JSON.stringify(value)); unsaved.delete(key); return true; }
+  catch { unsaved.set(key, structuredClone(value)); reportStorageFailure(); return false; /* Playback still works. */ }
+}
+export function writeLearnerHistory(history: LearnerHistory, protectedId?: string) {
+  const existing = readStorage<{ schemaVersion?: unknown } | null>('learner-history', null);
+  if (existing && typeof existing.schemaVersion === 'number' && existing.schemaVersion !== 1) { reportStorageFailure(); return false; }
+  const compact = compactHistory(history, protectedId);
+  if (compact.archives.length > ARCHIVE_LIMIT || JSON.stringify(compact).length * 2 > HISTORY_BYTE_LIMIT) { reportStorageFailure(); return false; }
+  return writeStorage('learner-history', compact);
+}
+export function loadFavorites(lesson: Lesson): string[] {
+  const raw = readStorage<unknown>(`favorites:${lesson.id}`, []);
+  const valid = new Set(lesson.segments.map(s => s.id));
+  return Array.isArray(raw) ? [...new Set(raw.filter((id): id is string => typeof id === 'string' && valid.has(id)))] : [];
+}
+export function loadTranslationCache(lessonId: string): Record<string, string> {
+  const raw = readStorage<unknown>(`translations:${lessonId}`, {});
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  return Object.fromEntries(Object.entries(raw).filter((entry): entry is [string, string] => typeof entry[1] === 'string' && entry[1].length <= 10000));
 }
 export function lessonCompleted(lesson: QuizLesson) {
   return readStorage<{ transcript: string } | null>(`completion:${lesson.id}`, null)?.transcript === transcriptRevision(lesson);
@@ -33,7 +67,13 @@ export async function loadDifficulty(lesson: QuizLesson): Promise<ContentDifficu
   try { return await validateDifficultyAnalysis(readStorage(`difficulty:${lesson.id}`, null), lesson); } catch { return null; }
 }
 export async function saveDifficulty(analysis: ContentDifficultyAnalysis, lesson: QuizLesson) {
-  try { return writeStorage(`difficulty:${lesson.id}`, await validateDifficultyAnalysis(analysis, lesson)); } catch { return false; }
+  try {
+    const safe = await validateDifficultyAnalysis(analysis, lesson);
+    const saved = writeStorage(`difficulty:${lesson.id}`, safe);
+    const history = validateHistory(readStorage('learner-history', emptyHistory()));
+    history.difficulties = [...history.difficulties.filter(d => d.id !== safe.id), compactDifficulty(safe)];
+    return writeLearnerHistory(history) && saved;
+  } catch { return false; }
 }
 export function loadQuizAttempt(quiz: LessonQuiz, lesson: QuizLesson): QuizAttempt | null {
   try { return validateAttempt(readStorage(`quiz-attempt:${quiz.id}`, null), quiz, lesson); } catch { return null; }
@@ -49,7 +89,8 @@ export function saveQuizAttempt(attempt: QuizAttempt, quiz: LessonQuiz, lesson: 
 }
 export function saveLesson(lesson: Lesson, index: number) {
   if (lesson.source === 'upload' && lesson.mediaUrl) rememberMedia(lesson.id, lesson.mediaUrl);
-  const history = readStorage<StudyRecord[]>('history', []);
+  const rawHistory = readStorage<StudyRecord[]>('history', []);
+  const history = Array.isArray(rawHistory) ? rawHistory.filter(item => item?.lesson?.id && Array.isArray(item.lesson.segments)) : [];
   // Object URLs don't survive reload; keep the transcript and prompt to reattach the media.
   const safeLesson = lesson.source === 'upload' ? { ...lesson, mediaUrl: undefined } : lesson;
   writeStorage('history', [{ lesson: safeLesson, index, updatedAt: Date.now() }, ...history.filter(item => item.lesson.id !== lesson.id)].slice(0, 8));

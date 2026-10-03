@@ -6,11 +6,11 @@ import { loadDifficulty, saveDifficulty } from '@/lib/storage';
 import { timestamp } from '@/lib/youtube';
 import type { ContentDifficultyAnalysis, Lesson } from '@/lib/types';
 
-export const LessonDifficulty = memo(function LessonDifficulty({ lesson }: { lesson: Lesson }) {
+export const LessonDifficulty = memo(function LessonDifficulty({ lesson, onWaitingChange }: { lesson: Lesson; onWaitingChange?: (waiting: boolean) => void }) {
   // Transcript edits discard in-memory results and cancel obsolete requests too.
-  return <DifficultyCard key={`${lesson.id}:${transcriptRevision(lesson)}`} lesson={lesson} />;
+  return <DifficultyCard key={`${lesson.id}:${transcriptRevision(lesson)}`} lesson={lesson} onWaitingChange={onWaitingChange} />;
 });
-function DifficultyCard({ lesson }: { lesson: Lesson }) {
+function DifficultyCard({ lesson, onWaitingChange }: { lesson: Lesson; onWaitingChange?: (waiting: boolean) => void }) {
   const [analysis, setAnalysis] = useState<ContentDifficultyAnalysis | null>(null);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -31,7 +31,7 @@ function DifficultyCard({ lesson }: { lesson: Lesson }) {
   }, []);
   async function analyze() {
     if (busy.current || checkingCache || analysis) return;
-    busy.current = true; setLoading(true); setError(''); setOpen(true);
+    busy.current = true; setLoading(true); setError(''); setOpen(true); onWaitingChange?.(true);
     const controller = new AbortController(); abort.current = controller;
     const unavailable = 'Difficulty analysis is unavailable right now. Please try again.';
     try {
@@ -50,7 +50,7 @@ function DifficultyCard({ lesson }: { lesson: Lesson }) {
     } catch (error) {
       // Only our own messages reach the UI, never arbitrary upstream diagnostics.
       if (!controller.signal.aborted) setError(error instanceof Error && ['There is not enough', 'This transcript', 'We could not', 'Difficulty analysis is unavailable'].some(prefix => error.message.startsWith(prefix)) ? error.message : unavailable);
-    } finally { busy.current = false; if (!controller.signal.aborted) setLoading(false); }
+    } finally { busy.current = false; if (!controller.signal.aborted) { setLoading(false); onWaitingChange?.(false); } }
   }
   const dimensions = analysis ? [
     { title: 'Vocabulary', value: analysis.vocabulary },

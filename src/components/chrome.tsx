@@ -6,7 +6,7 @@ import { useEffect, useRef } from 'react';
 export function Header({ onHelp, player = false }: { onHelp: () => void; player?: boolean }) {
   return <header className={`site-header ${player ? 'practice-header' : ''}`}><div className="header-inner">
     <Link className="brand" href="/" aria-label="Hibiki home"><span className="brand-mark"><AudioLines size={22} strokeWidth={1.6} /></span><span>hibiki<span className="brand-japanese" lang="ja">響</span></span></Link>
-    <nav aria-label="Main navigation"><button className="nav-link" onClick={onHelp}>{player ? <><Keyboard size={16} /> Shortcuts</> : 'How it works'}</button><Link className="nav-demo" href={player ? '/' : '/practice/demo'}>{player ? 'New practice' : 'Try a practice'}<ArrowUpRight size={15} /></Link></nav>
+    <nav aria-label="Main navigation"><Link className="nav-link" href="/progress">Progress</Link><button className="nav-link" onClick={onHelp}>{player ? <><Keyboard size={16} /> Shortcuts</> : 'How it works'}</button><Link className="nav-demo" href={player ? '/' : '/practice/demo'}>{player ? 'New practice' : 'Try a practice'}<ArrowUpRight size={15} /></Link></nav>
   </div></header>;
 }
 export function Footer() { return <footer className="site-footer"><span>Made for a little progress, every day.</span><span lang="ja">聞く。まねる。身につく。</span></footer>; }

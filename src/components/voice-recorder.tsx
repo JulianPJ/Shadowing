@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Mic, Square, Trash2, LoaderCircle } from 'lucide-react';
 
-export function VoiceRecorder({ enabled, nativePlaying, onBeforeRecord, onRecording }: { enabled: boolean; nativePlaying: boolean; onBeforeRecord: () => void; onRecording: (active: boolean) => void }) {
+export function VoiceRecorder({ enabled, nativePlaying, onBeforeRecord, onRecording, onAttempt }: { enabled: boolean; nativePlaying: boolean; onBeforeRecord: () => void; onRecording: (active: boolean) => void; onAttempt?: () => void }) {
   const [recording, setRecording] = useState(false);
   const [requesting, setRequesting] = useState(false);
   const [recorded, setRecorded] = useState('');
@@ -49,7 +49,7 @@ export function VoiceRecorder({ enabled, nativePlaying, onBeforeRecord, onRecord
         objectUrl.current = url; setRecorded(url); setRecording(false); callback.current(false);
       };
       instance.onerror = () => { setError('Recording was interrupted. Please try again.'); media.getTracks().forEach(track => track.stop()); setRecording(false); callback.current(false); };
-      instance.start(); setSeconds(0); setRecording(true); callback.current(true);
+      instance.start(); onAttempt?.(); setSeconds(0); setRecording(true); callback.current(true);
     } catch (error) {
       if (id !== requestId.current) return;
       const name = error instanceof DOMException ? error.name : '';

@@ -2,7 +2,7 @@
 
 > **Purpose:** persistent product and engineering context for future development.
 >
-> **Current snapshot:** 2026-10-03, production running on Cloudflare Workers with the caption relay path verified; comprehension checks and content difficulty implemented in the repository, with native Workers AI as the canonical hosted provider. Hosted semantic generation is standardized on Qwen3-30B-A3B; difficulty is implemented and production deployment is handled through the normal Cloudflare build.
+> **Current snapshot:** 2026-10-04, production running on Cloudflare Workers with the caption relay path verified; comprehension checks and content difficulty are implemented and production Qwen smoke testing has occurred. Native Workers AI / Qwen3-30B-A3B remains the canonical hosted provider. Roadmap #3, local progress and learner modelling, is implemented and verified in the repository on Next.js and the built Cloudflare preview; this feature has not been deployed. The next roadmap item is #4, polish / monetisation.
 >
 > **Deployment target:** Cloudflare Workers via vinext. Cloudflare is the canonical hosted environment for this project; do not assume Vercel.
 
@@ -138,7 +138,15 @@ Priority #2 is implemented. Prepared lessons show a calm information card below 
 
 `POST /api/difficulty` uses a replaceable `DifficultyAnalysisProvider`, injected by the canonical Worker through `env.AI`. It reuses `@cf/qwen/qwen3-30b-a3b-fp8`, JSON mode, bounded output and disabled thinking, adding no API-key secrets. One call analyzes at most 12 windows / 36 excerpts / 9,000 characters across the entire lesson. Speech is computed in code: Japanese-script characters per minute over captioned intervals plus gaps up to one second, excluding long gaps. Strict validation rejects invalid ranges/scores/fields, fabricated or unsampled quotes and model timestamps; application code supplies labels, coverage and evidence section times.
 
-Versioned compact records persist through `loadDifficulty`/`saveDifficulty`, with stable content identity and the existing SHA-256 transcript fingerprint. Edits invalidate reuse; reload never triggers inference. The exact demo has an authored estimate. Failures, pending generation and blocked storage do not block playback, shadowing, quizzes or completion. No learner profile or later roadmap feature is introduced. See [content difficulty](docs/content-difficulty.md) for exact calculation, input/sample limits, contracts and limitations. Live semantic quality remains to be evaluated; no live-model test was run for this implementation.
+Versioned compact records persist through `loadDifficulty`/`saveDifficulty`, with stable content identity and the existing SHA-256 transcript fingerprint. Edits invalidate reuse; reload never triggers inference. The exact demo has an authored estimate. Failures, pending generation and blocked storage do not block playback, shadowing, quizzes or completion. The learner profile now references the validated compact dimensions without duplicating explanations/evidence. See [content difficulty](docs/content-difficulty.md) for exact calculation, input/sample limits, contracts and limitations. Production Qwen smoke testing has occurred; broader semantic-quality evaluation remains useful.
+
+### Progress and learner modelling
+
+Priority #3 is implemented locally, without inference. `/progress`, reached through the existing header, derives a versioned learner profile from UUID-based practice sessions, existing quiz attempts, compact validated difficulty references, and current section bookmarks. It shows active practice time, distinct practised/completed lessons, comprehension results and retakes, replay/translation/recording signals, revision-specific lesson history, typical practised content and conservative trends when evidence is sufficient, and transparent attention-section reasons. It links only to locally available matching transcript revisions.
+
+Time uses monotonic intervals: visible advancing playback, recording, 30 seconds after deliberate interaction, or a bounded Shadowing spoken-response window. Hidden/idle/suspended time, quizzes and difficulty waits are excluded. Sessions resume in the same tab within 30 minutes for the same transcript; later practice creates a new UUID. Checkpoints, lifecycle flushes and idempotent legacy backfill preserve known facts without inventing historical time or reveal counts. Detailed sessions compact into bounded per-revision archives while retaining lifetime totals and section signals; storage failures warn without blocking playback. See [learner progress](docs/learner-progress.md) for exact algorithms, contracts, bounds, migration and limitations.
+
+Verification: 75 unit tests and all 24 Playwright tests pass on both the Next.js production server and built Cloudflare preview using installed Chrome; lint, typecheck and both builds pass. This implementation adds no accounts, hosted sync, analytics, recommendations, adaptive practice, vocabulary saving or automatic weak-section review. The next priority is #4; it is not implemented here.
 
 ### Voice recording
 
@@ -200,7 +208,9 @@ Current progress is browser-local:
 - translation visibility;
 - bookmarks;
 - translation cache;
-- transcript-specific lesson completion, cached comprehension checks and resumable quiz-attempt history.
+- transcript-specific lesson completion, cached comprehension checks and resumable quiz-attempt history;
+- versioned local learner-history sessions and compact retention archives, independent of the eight recent lessons;
+- deterministic learner-profile aggregation and validated compact content-difficulty references.
 
 There is no account system, hosted user database, or cross-device sync.
 
@@ -257,6 +267,11 @@ Important files:
 | `tools/caption-relay-worker/` | Authenticated broker Worker and hibernating WebSocket Durable Object |
 | `src/lib/providers/translation.ts` | translation provider |
 | `src/lib/storage.ts` | local persistence |
+| `src/lib/learner-types.ts`, `src/lib/learner-progress.ts` | versioned learner contracts, validation and deterministic profile/content/attention aggregation |
+| `src/lib/learner-storage.ts` | learner-history persistence, portable quiz-history reads and idempotent legacy migration |
+| `src/lib/practice-clock.ts`, `src/lib/practice-checkpoint.ts` | monotonic active time, actual playback activity and bounded incremental checkpoints |
+| `src/components/use-practice-progress.ts` | practice signals, session resume and lifecycle persistence |
+| `src/components/learner-progress.tsx`, `src/app/progress/page.tsx` | dedicated local learner-progress surface |
 | `src/lib/quiz.ts` | quiz validation, evidence mapping, transcript fingerprint, scoring and attempt contracts |
 | `src/lib/difficulty.ts` | content difficulty validation, deterministic speech metrics and bounded sampling |
 | `src/lib/providers/difficulty.ts` | replaceable native Workers AI semantic analysis and authored demo estimate |
@@ -368,7 +383,7 @@ Persist quiz attempts as learner signals for the profile described below.
 
 ## 2. Content difficulty analysis
 
-**Implemented in the repository:** hybrid deterministic speech pace and lazy semantic JLPT/vocabulary/grammar/conversation estimates, strict evidence validation, bounded full-lesson sampling and transcript-keyed local persistence. Next priority is #3, progress and learner modelling; it remains unimplemented.
+**Implemented:** hybrid deterministic speech pace and lazy semantic JLPT/vocabulary/grammar/conversation estimates, strict evidence validation, bounded full-lesson sampling and transcript-keyed local persistence. Production Qwen smoke testing has occurred. The priority #3 learner profile now reuses this content identity and compact dimensions.
 
 Analyze each completed/prepared lesson and estimate:
 - approximate JLPT range;
@@ -381,6 +396,8 @@ Store both a compact overall level and the underlying dimensions. Treat the resu
 
 ## 3. Progress and learner modelling
 
+**Implemented in the repository and verified on both production runtimes locally:** versioned local practice sessions, conservative active-time tracking, replay/reveal/bookmark/recording metadata, existing quiz-history aggregation, exact-transcript content-difficulty association, median typical-content/trend estimates, transparent section attention, migration, bounded retention and `/progress`. No formal learner JLPT level is inferred. No hosted sync or later roadmap item is included. Next priority: #4, polish / monetisation. See [learner progress](docs/learner-progress.md).
+
 Build a persistent **user/learner profile**, not merely aggregate counters.
 
 The profile should accumulate a history of lessons and outcomes, including where available:
@@ -391,7 +408,7 @@ The profile should accumulate a history of lessons and outcomes, including where
 - replay frequency;
 - quiz attempted/not attempted and score;
 - translation reveals;
-- saved words/expressions;
+- bookmarked/saved sections (saved vocabulary remains priority #10);
 - difficult or repeatedly replayed sections;
 - learner's typical content level and recent trend.
 
@@ -502,7 +519,8 @@ Future agents should verify before proposing work. At this snapshot, the followi
 - recent local lessons;
 - local progress persistence;
 - post-video comprehension checks with explanations, evidence replay, quiz reuse and local attempt persistence (native Workers AI in canonical production);
-- content difficulty estimates with deterministic caption pace, bounded semantic analysis, validated evidence and local reuse (repository implementation, locally verified; deployment pending);
+- content difficulty estimates with deterministic caption pace, bounded semantic analysis, validated evidence and local reuse (production Qwen smoke-tested);
+- local persistent learner profile with practice sessions, active time, section signals, comprehension history, typical practised content, conservative trend and dedicated progress page (locally verified; this feature's deployment pending);
 - local own-media import;
 - SRT/VTT/JSON transcript import;
 - YouTube + user transcript import;
@@ -521,7 +539,7 @@ Future agents should verify before proposing work. At this snapshot, the followi
 
 MyMemory is keyless/free and may have quota/quality limits. Production verification encountered HTTP 429 daily quota exhaustion on shared Worker egress. Translation failure must never block shadowing.
 
-### No durable user progress
+### No hosted user progress
 
 Progress is local to the current browser/origin. This is intentional for now, but later personalization across devices will require accounts/storage.
 
