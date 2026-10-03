@@ -6,17 +6,15 @@ The learner answers one question at a time, receives an explanation and Japanese
 
 ## Server provider configuration
 
-The demo has an authored five-question check and requires no external service. Other lessons use `QuizGenerationProvider` through `POST /api/quiz`. The shipped adapter accepts a chat-completions JSON API; a different provider can implement the same interface without changing playback or quiz UI.
+The demo has an authored five-question check and requires no model call. Other hosted lessons use `QuizGenerationProvider` through `POST /api/quiz`.
 
-Set these **server-only** values in local environment files or as secrets on the canonical Cloudflare app Worker:
+On Cloudflare, the production Worker handles that route with a native **Workers AI binding** (`env.AI`) and `@cf/zai-org/glm-4.7-flash`. There is no quiz API key, endpoint secret or model-name secret in production. `cloudflare.config.ts` declares `AI: bindings.ai()`, and the Cloudflare entrypoint injects a Workers-AI-backed provider into the shared quiz request handler.
 
-- `QUIZ_API_URL`: full HTTPS chat-completions endpoint.
-- `QUIZ_API_KEY`: bearer token.
-- `QUIZ_MODEL`: a model supporting `response_format: { type: 'json_object' }` and nonstreaming chat completions.
+The model is used with JSON mode, thinking disabled for this structured task, bounded output, and fail-fast capacity handling. The application still validates every generated question/evidence object before accepting it.
 
-The endpoint must accept `model` and `messages`, and return `choices[0].message.content` containing JSON with `finish_reason: 'stop'`. No particular vendor or model is required. `cloudflare.config.ts` declares the three secret bindings. Never use `NEXT_PUBLIC_` names. No credentials were configured or changed as part of implementing the feature.
+For local Next.js development or a future alternate host, the generic OpenAI-compatible adapter remains available and can optionally read `QUIZ_API_URL`, `QUIZ_API_KEY` and `QUIZ_MODEL` from the local process environment. Those variables are not required by the canonical Cloudflare deployment.
 
-Only normalized Japanese segment text/IDs go to generation. Media, recordings, learner answers, translation cache and bookmarks are excluded. The UI discloses transcript use before generating a new check. Upstream response text and credentials are never included in client errors or logs.
+Only normalized Japanese segment text/IDs go to generation. Media, recordings, learner answers, translation cache and bookmarks are excluded. The UI discloses transcript use before generating a new check. Provider response text and credentials are never included in client errors or logs.
 
 ## Validation and failure behavior
 
