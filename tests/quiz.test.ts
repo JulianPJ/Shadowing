@@ -4,7 +4,7 @@ import demo from '../src/data/demo.json';
 import demoQuiz from '../src/data/demo-quiz.json';
 import { createQuiz, mapEvidence, newAttempt, scoreQuiz, transcriptKey, updateAttempt, validateAttempt, validateQuestions, validateQuiz, validateQuizLesson } from '../src/lib/quiz';
 import { completeLesson, lessonCompleted, loadQuiz, loadQuizAttempt, readStorage, saveQuiz, saveQuizAttempt, writeStorage } from '../src/lib/storage';
-import { chatCompletionQuizProvider, generateLessonQuiz, QuizProviderError, readBoundedJson } from '../src/lib/providers/quiz';
+import { chatCompletionQuizProvider, createWorkersAiQuizProvider, generateLessonQuiz, QuizProviderError, readBoundedJson, WORKERS_AI_QUIZ_MODEL } from '../src/lib/providers/quiz';
 import { POST } from '../src/app/api/quiz/route';
 import type { QuizGenerationProvider } from '../src/lib/types';
 
@@ -122,6 +122,24 @@ test('replaceable provider generates arbitrary lesson quizzes without any live s
   await assert.rejects(generateLessonQuiz({ ...lesson, id: 'custom' }, new AbortController().signal, { name: 'bad', async generate() { return { questions: [null] }; } }), error => error instanceof QuizProviderError && error.code === 'malformed');
   await assert.rejects(generateLessonQuiz({ ...lesson, id: 'custom' }, new AbortController().signal, { name: 'empty', async generate() { return { questions: [] }; } }), error => error instanceof QuizProviderError && error.code === 'insufficient-transcript');
 });
+test('Workers AI adapter uses the native binding and structured JSON without credentials', async () => {
+  let call: { model?: string; input?: Record<string, unknown>; options?: { rejectIfBusy?: boolean } } = {};
+  const provider = createWorkersAiQuizProvider({
+    async run(model, input, options) {
+      call = { model, input, options };
+      return { choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(demoQuiz) } }] };
+    },
+  });
+  const generated = await generateLessonQuiz({ ...lesson, id: 'workers-ai-video' }, new AbortController().signal, provider);
+  assert.equal(generated.lessonId, 'workers-ai-video');
+  assert.equal(call.model, WORKERS_AI_QUIZ_MODEL);
+  assert.deepEqual(call.input?.response_format, { type: 'json_object' });
+  assert.deepEqual(call.input?.chat_template_kwargs, { enable_thinking: false });
+  assert.equal(call.options?.rejectIfBusy, true);
+  const messages = call.input?.messages as Array<{ content: string }>;
+  assert.ok(messages[1].content.includes(lesson.segments[0].japanese));
+});
+
 test('chat-completions adapter uses server credentials and rejects truncated or malformed output (mocked fetch)', async () => {
   const oldFetch = globalThis.fetch;
   const oldEnv = { url: process.env.QUIZ_API_URL, key: process.env.QUIZ_API_KEY, model: process.env.QUIZ_MODEL };
