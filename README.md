@@ -197,6 +197,26 @@ The script uses `https://www.youtube.com/watch?v=IJ6R4u05ppw` and writes caption
 
 ## Hosting through GitHub integration
 
+### Cloudflare Workers
+
+The Cloudflare deployment uses vinext and the typed configuration in `cloudflare.config.ts`.
+Configure Workers Builds with these commands:
+
+| Setting | Value |
+| --- | --- |
+| Build command | `npm run build:vinext` |
+| Deploy command | `npx @vinext/cloudflare deploy --skip-build` |
+| Node.js version | 24.x |
+
+The app uses vinext's Workers Cache adapter for page responses. It deploys as one
+Worker and requires no R2 bucket, Durable Object storage, or separate cache Worker.
+The app does not use a durable server data cache; practice data remains in the
+browser. `--skip-build` reuses the output from the build command.
+
+For a local build and deployment, sign in to Cloudflare and run `npm run deploy:vinext`.
+
+### Next.js hosting
+
 Connect this GitHub repository manually to your hosting provider and select its **Next.js** integration. The repo uses the standard build flow; no deployment CLI, provider credentials, local project linkage, or custom build-output conversion is required.
 
 | Setting | Value |
