@@ -42,6 +42,13 @@ test('malformed, ambiguous and unsupported provider output is rejected', () => {
   }
   for (const raw of [null, [], { questions: [] }, { questions: demoQuiz.questions.slice(0, 2) }, { questions: Array(8).fill(demoQuiz.questions[0]) }, { questions: [demoQuiz.questions[0], demoQuiz.questions[0], demoQuiz.questions[1]] }]) assert.throws(() => validateQuestions(raw, lesson));
 });
+test('evidence can be grounded by IDs alone and the application derives the canonical quote', () => {
+  const mapped = mapEvidence({ segmentIds: ['segment-3', 'segment-4'] }, lesson.segments);
+  assert.equal(mapped.quote, lesson.segments[2].japanese + lesson.segments[3].japanese);
+  assert.equal(mapped.start, lesson.segments[2].start);
+  assert.equal(mapped.end, lesson.segments[3].end);
+});
+
 test('evidence rejects disjoint, reversed, duplicate and fabricated timestamps; preserves fractional times', () => {
   const q = demoQuiz.questions[2].evidence;
   const mapped = mapEvidence(q, lesson.segments);
@@ -153,7 +160,9 @@ test('normal transcripts go directly to Qwen with the complete Japanese transcri
   assert.equal(calls.length, 1);
   assert.equal(calls[0].model, WORKERS_AI_MODEL);
   assert.equal(calls.some(call => call.model === WORKERS_AI_QUIZ_SELECTOR_MODEL), false);
-  assert.deepEqual(calls[0].input.response_format, { type: 'json_object' });
+  const responseFormat = calls[0].input.response_format as { type?: string; json_schema?: unknown };
+  assert.equal(responseFormat.type, 'json_schema');
+  assert.ok(responseFormat.json_schema);
   assert.equal(calls[0].options?.rejectIfBusy, true);
   const messages = calls[0].input.messages as Array<{ content: string }>;
   assert.ok(messages[1].content.includes(lesson.segments[0].japanese));
