@@ -298,7 +298,7 @@ Current deployment path:
 
 - `npm run build:vinext`
 - `npm run db:migrate:production` (must succeed before Worker deployment)
-- `npx @vinext/cloudflare deploy --skip-build`
+- `npx @vinext/cloudflare deploy --prebuilt`
 
 The app is packaged as one Worker. Automatic captions use a small authenticated broker Worker and a SQLite Durable Object with a hibernating WebSocket to an outbound Node relay host, with direct retrieval retained as a fallback. No R2 bucket, hosted user database, paid caption API or separate cache Worker is required. Treat this caption path as implemented infrastructure unless a production regression is observed; operational details live in [production caption operations](docs/production-captions.md).
 

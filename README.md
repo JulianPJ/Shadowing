@@ -216,10 +216,10 @@ Configure Workers Builds with these commands:
 | Setting | Value |
 | --- | --- |
 | Build command | `npm run build:vinext` |
-| Deploy command | `npx @vinext/cloudflare deploy --skip-build` |
+| Deploy command | `npx @vinext/cloudflare deploy --prebuilt` |
 | Node.js version | 24.x |
 
-The app uses vinext's Workers Cache adapter for page responses. Practice data remains in the browser. Automatic captions additionally use `shadowing-caption-relay`, a separate Worker with a SQLite Durable Object coordinating an authenticated outbound WebSocket. It does not store lessons or user progress. No R2 bucket, paid caption API, tunnel subscription, or video hosting is introduced. The relay host must remain online; see [setup, secrets, health checks and limitations](docs/production-captions.md). `--skip-build` reuses the output from the build command.
+The app uses vinext's Workers Cache adapter for page responses. Practice data remains in the browser. Automatic captions additionally use `shadowing-caption-relay`, a separate Worker with a SQLite Durable Object coordinating an authenticated outbound WebSocket. It does not store lessons or user progress. No R2 bucket, paid caption API, tunnel subscription, or video hosting is introduced. The relay host must remain online; see [setup, secrets, health checks and limitations](docs/production-captions.md). `--prebuilt` reuses the output from the build command.
 
 For a local build and deployment, sign in to Cloudflare and run `npm run deploy:vinext`.
 
