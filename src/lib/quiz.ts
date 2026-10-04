@@ -47,7 +47,9 @@ export function mapEvidence(value: unknown, segments: Segment[]): QuizEvidence {
   const relevant = segments.slice(first, first + segmentIds.length);
   if (first < 0 || relevant.length !== segmentIds.length || relevant.some((s, i) => s.id !== segmentIds[i])) throw new QuizValidationError('Evidence must reference consecutive lesson sections.');
   const quote = relevant.map(s => s.japanese).join('');
-  if (typeof raw.quote !== 'string' || raw.quote.replace(/\s/g, '') !== quote.replace(/\s/g, '')) throw new QuizValidationError('Evidence does not match this transcript.');
+  // Providers only need to return grounded segment IDs; the application derives
+  // canonical evidence text. Persisted/legacy quotes, when present, must still match.
+  if (raw.quote !== undefined && (typeof raw.quote !== 'string' || raw.quote.replace(/\s/g, '') !== quote.replace(/\s/g, ''))) throw new QuizValidationError('Evidence does not match this transcript.');
   const start = relevant[0].start, end = relevant.at(-1)!.end;
   if ((raw.start !== undefined && raw.start !== start) || (raw.end !== undefined && raw.end !== end)) throw new QuizValidationError('Evidence timestamps do not match.');
   return { segmentIds, quote, start, end };
