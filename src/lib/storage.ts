@@ -48,8 +48,12 @@ export function loadFavorites(lesson: Lesson): string[] {
   const valid = new Set(lesson.segments.map(s => s.id));
   return Array.isArray(raw) ? [...new Set(raw.filter((id): id is string => typeof id === 'string' && valid.has(id)))] : [];
 }
+export const TRANSLATION_CACHE_VERSION = 2;
+export function translationCacheKey(lessonId: string) {
+  return `translations:v${TRANSLATION_CACHE_VERSION}:${lessonId}`;
+}
 export function loadTranslationCache(lessonId: string): Record<string, string> {
-  const raw = readStorage<unknown>(`translations:${lessonId}`, {});
+  const raw = readStorage<unknown>(translationCacheKey(lessonId), {});
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
   return Object.fromEntries(Object.entries(raw).filter((entry): entry is [string, string] => typeof entry[1] === 'string' && entry[1].length <= 10000));
 }
