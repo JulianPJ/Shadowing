@@ -41,7 +41,7 @@ export type SpeechSpeed = {
   japaneseCharacters: number; activeSeconds: number; excludedGapSeconds: number;
 };
 export type DifficultyCoverage = {
-  strategyVersion: 1; totalSegments: number; sampledSegments: number;
+  strategyVersion: 2; totalSegments: number; sampledSegments: number;
   totalCharacters: number; sampledCharacters: number;
 };
 // Content-only record: reference by id + transcriptKey in future lesson-history events.
@@ -51,7 +51,7 @@ export type ContentDifficultyAnalysis = {
   vocabulary: DifficultyDimension; grammar: DifficultyDimension; speechSpeed: SpeechSpeed;
   conversationalComplexity: DifficultyDimension; coverage: DifficultyCoverage;
 };
-export type DifficultyAnalysisInput = { windows: { id: string; japanese: string }[][]; coverage: DifficultyCoverage };
+export type DifficultyAnalysisInput = { japanese: string; coverage: DifficultyCoverage };
 export interface DifficultyAnalysisProvider {
   name: string;
   analyze(input: DifficultyAnalysisInput, signal: AbortSignal): Promise<unknown>;
