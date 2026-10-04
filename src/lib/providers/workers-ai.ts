@@ -1,6 +1,6 @@
 export const WORKERS_AI_GENERATIVE_MODEL = '@cf/qwen/qwen3-30b-a3b-fp8';
 export const WORKERS_AI_DECISION_MODEL = '@cf/cloudflare/clef-flash';
-export const WORKERS_AI_TRANSLATION_MODEL = '@cf/meta/m2m100-1.2b';
+export const WORKERS_AI_TRANSLATION_MODEL = WORKERS_AI_GENERATIVE_MODEL;
 
 export type WorkersAiBindingLike = {
   run(model: string, input: Record<string, unknown>, options?: { rejectIfBusy?: boolean }): Promise<unknown>;
