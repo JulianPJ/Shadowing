@@ -22,9 +22,42 @@ The input is either:
 
 Produce 3–7 distinct questions (normally 5), four plausible but unambiguous options each and exactly one correct index (0–3). Vary correct answer positions and use a useful mix of main-idea, detail, sequence, vocabulary, grammar, reference, intent and inference when genuinely supported. Questions and options should be simple Japanese; explanations concise English. Prefer clear, meaningful comprehension over obscure trivia.
 
-Evidence must be the complete text of 1–24 consecutive supplied segments concatenated verbatim, with their exact IDs in transcript order. If the input uses windows, one question's evidence must stay inside one supplied window. Do not invent timestamps. The application has already rejected transcripts that are too short to support a quiz, so return 3–7 questions rather than an empty array.
+Evidence must contain only the exact IDs of 1–24 consecutive supplied segments in transcript order. Do not copy the evidence text and do not invent timestamps; the application reconstructs the canonical quote and replay timing from validated segment IDs. If the input uses windows, one question's evidence must stay inside one supplied window. The application has already rejected transcripts that are too short to support a quiz, so return 3–7 questions rather than an empty array.
 
-Return ONLY JSON: {"questions":[{"kind":"detail","question":"...","options":["...","...","...","..."],"correctIndex":0,"explanation":"...","evidence":{"segmentIds":["segment-id"],"quote":"exact full Japanese segment text"}}]}.`;
+Make all four option strings distinct. Return only the requested structured JSON fields.`;
+
+const QUIZ_RESPONSE_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['questions'],
+  properties: {
+    questions: {
+      type: 'array',
+      minItems: 3,
+      maxItems: 7,
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['kind', 'question', 'options', 'correctIndex', 'explanation', 'evidence'],
+        properties: {
+          kind: { type: 'string', enum: ['main-idea', 'detail', 'sequence', 'vocabulary', 'grammar', 'reference', 'intent', 'inference'] },
+          question: { type: 'string' },
+          options: { type: 'array', minItems: 4, maxItems: 4, items: { type: 'string' } },
+          correctIndex: { type: 'integer', minimum: 0, maximum: 3 },
+          explanation: { type: 'string' },
+          evidence: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['segmentIds'],
+            properties: {
+              segmentIds: { type: 'array', minItems: 1, maxItems: 24, items: { type: 'string' } },
+            },
+          },
+        },
+      },
+    },
+  },
+} as const;
 
 type CompactSegment = Pick<Segment, 'id' | 'japanese'>;
 type QuizWindow = { id: string; index: number; start: number; segments: CompactSegment[] };
@@ -257,7 +290,7 @@ export function createWorkersAiQuizProvider(ai: WorkersAiBindingLike): QuizGener
       try {
         response = await runWorkersAi<unknown>(ai, WORKERS_AI_QUIZ_MODEL, {
           messages,
-          response_format: { type: 'json_object' },
+          response_format: { type: 'json_schema', json_schema: QUIZ_RESPONSE_SCHEMA },
           max_completion_tokens: 3000,
           temperature: 0.2,
         }, signal);
