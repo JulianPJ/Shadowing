@@ -28,8 +28,9 @@ export async function handleQuizRequest(request: Request, provider?: QuizGenerat
   } catch (error) {
     const code = error instanceof QuizProviderError ? error.code : 'unavailable';
     const stage = error instanceof QuizProviderError ? error.stage ?? 'unknown' : 'unknown';
-    // Never log transcript, upstream response, endpoint or credentials.
-    console.warn(JSON.stringify({ event: 'quiz-generation-failed', code, stage, segmentCount: lesson.segments.length }));
+    const reason = error instanceof QuizProviderError ? error.reason : undefined;
+    // Never log transcript, upstream response, endpoint, credentials or model output.
+    console.warn(JSON.stringify({ event: 'quiz-generation-failed', code, stage, reason, segmentCount: lesson.segments.length }));
     return Response.json(
       {
         code,
