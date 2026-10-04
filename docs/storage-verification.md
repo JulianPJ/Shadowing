@@ -16,7 +16,7 @@ Production setup and rollout completed using the connected Cloudflare account. N
 
 The database was created first, the committed migration applied next, and the Worker deployed afterward. Connected-account inspection confirmed the D1 binding and preservation of AI, ASSETS, IMAGES, version metadata, DeepL and caption-relay secrets. Local migration applied from empty storage; its second normal application performed no work.
 
-The Cloudflare build trigger's deployment command is now `npm run db:migrate:production && npx @vinext/cloudflare deploy --prebuilt`. The installed CLI supports `--prebuilt` rather than the previous `--skip-build`. Migration failure prevents deployment. No manual database creation, migration, binding or deployment remains for this rollout.
+The Cloudflare build trigger's deployment command is now `npm run db:migrate:production && npx cf deploy --prebuilt`. Native `cf deploy --prebuilt` deploys the typed build output directly, avoiding differences in CLI resolution between local npm and Cloudflare Builds. Migration failure prevents deployment. No manual database creation, migration, binding or deployment remains for this rollout.
 
 ## Schema, keys and privacy
 

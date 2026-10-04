@@ -51,12 +51,12 @@ npm run test:d1:runtime
 # Production: authenticated cf CLI, same connected account
 npm run db:migrate:production
 npm run db:migrations:production
-npx @vinext/cloudflare deploy --prebuilt
+npx cf deploy --prebuilt
 ```
 
-`db:migrations:*` lists **pending** migrations; an empty list means current. Applying normally twice is safe. Local migration commands use `.cloudflare/state`, never production. `npm run deploy:vinext -- --prebuilt` gates deployment on a successful production migration.
+`db:migrations:*` lists **pending** migrations; an empty list means current. Applying normally twice is safe. Local migration commands use `.cloudflare/state`, never production. `npm run deploy:vinext` gates deployment on a successful production migration.
 
-The connected Cloudflare build trigger must use `npm run db:migrate:production && npx @vinext/cloudflare deploy --prebuilt` as its deployment command (build remains `npm run build:vinext`). The build token needs D1 migration permissions; a failure must stop deployment. Do not assume the vinext deploy command applies SQL. For manual API-based operations, apply the same committed statements and ledger atomically, then verify the ledger before deployment.
+The connected Cloudflare build trigger must use `npm run db:migrate:production && npx cf deploy --prebuilt` as its deployment command (build remains `npm run build:vinext`). The build token needs D1 migration permissions; a failure must stop deployment. Do not assume the vinext deploy command applies SQL. For manual API-based operations, apply the same committed statements and ledger atomically, then verify the ledger before deployment.
 
 `npm test` exercises real local D1/workerd repositories with deterministic fixtures, privacy, corruption, indexed access, uniqueness, forging, version misses and outage fallback. `npm run test:d1:runtime` loads the actual built production Worker with local D1, mocked caption egress and a mocked Workers AI RPC binding. Preparing/quiz/difficulty twice proves each provider is called once; second calls throw if mistakenly invoked. CI does not contact live providers. Production smoke uses real public captions and limited inference, verifies durable row counts and repeated cache headers without dumping content.
 
