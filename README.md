@@ -96,7 +96,7 @@ With subtitle import, media stays in the browser. After a full refresh, the tran
 
 ## Translation, storage, and privacy
 
-Demo translations are authored, and imported translations are used when supplied. In canonical Cloudflare production, other sections request Japanese-to-English translation from **Workers AI M2M100** only when revealed. Only the current Japanese section is sent. Responses are cached in the browser and a bounded in-memory server cache. MyMemory remains a keyless local/non-Cloudflare fallback.
+Demo translations are authored, and imported translations are used when supplied. In canonical Cloudflare production, other sections request Japanese-to-English translation from **Workers AI Qwen3-30B-A3B** only when revealed. Hibiki sends the current Japanese section plus at most one neighboring section on each side as bounded context; Qwen is instructed to translate only the current section, preserve names/titles, and run in no-think mode. Responses are cached in the browser and a bounded in-memory server cache. MyMemory remains a keyless local/non-Cloudflare fallback.
 
 Translation failures show a retryable message and do not prevent playback. The reveal button returns to a usable state after a failure instead of remaining stuck open. Another implementation can replace `TranslationProvider`.
 
@@ -161,7 +161,7 @@ The app uses **Next.js 16 App Router, React 19, TypeScript, authored CSS, and Lu
 | `src/lib/providers/` | Caption, translation, and local Whisper implementations |
 | `src/lib/types.ts` | Lesson/section models and provider contracts |
 | `src/app/api/prepare/route.ts` | `POST { url }`; NDJSON progress and lesson/error result |
-| `src/app/api/translate/route.ts` | `POST { japanese }`; translation result with bounded cache |
+| `src/app/api/translate/route.ts` | `POST { japanese, previousJapanese?, nextJapanese? }`; contextual translation result with bounded cache |
 | `src/data/demo.json`, `public/demo.*` | Bundled lesson transcript and media |
 | `scripts/caption-relay.ts` | Outbound Node caption relay, bounded concurrency/cache and reconnects |
 | `tools/caption-relay-worker/` | Authenticated Cloudflare broker with a hibernating WebSocket Durable Object |
