@@ -149,6 +149,25 @@ function selectorResponse(input: Record<string, unknown>) {
   return { model: 'clef-flash', answers };
 }
 
+test('quiz prompt forbids learner-facing segment metadata and prioritizes content comprehension', async () => {
+  const calls: Array<{ model: string; input: Record<string, unknown> }> = [];
+  const provider = createWorkersAiQuizProvider({
+    async run(model, input) {
+      calls.push({ model, input });
+      return { choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(demoQuiz) } }] };
+    },
+  });
+  await generateLessonQuiz({ ...lesson, id: 'prompt-contract' }, new AbortController().signal, provider);
+  const messages = calls[0].input.messages as Array<{ role: string; content: string }>;
+  const system = messages[0].content;
+  assert.match(system, /CONTENT and MEANING/);
+  assert.match(system, /Segment IDs exist ONLY for evidence grounding/);
+  assert.match(system, /Never ask:/);
+  assert.match(system, /which segment number contains something/);
+  assert.match(system, /teacher use this to check whether the learner understood the actual content/);
+  assert.match(system, /without mentioning segment numbers or technical metadata/);
+});
+
 test('normal transcripts go directly to Qwen with the complete Japanese transcript', async () => {
   const calls: Array<{ model: string; input: Record<string, unknown>; options?: { rejectIfBusy?: boolean } }> = [];
   const provider = createWorkersAiQuizProvider({
