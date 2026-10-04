@@ -155,11 +155,11 @@ The app uses **Next.js 16 App Router, React 19, TypeScript, authored CSS, and Lu
 | --- | --- |
 | `src/app/` | Home/practice routes, styles, error and not-found pages |
 | `src/components/home.tsx` | URL preparation, progress, demo, recent lessons |
-| `src/components/practice.tsx` | Playback state, boundaries, navigation, transcript, bookmarks, lazy translation |
+| `src/components/practice.tsx`, `src/components/practice/` | Lesson hydration, player coordination, current section, transcript and isolated playback/translation hooks |
 | `src/components/media-player.tsx` | YouTube IFrame and HTML media playback adapter |
 | `src/components/voice-recorder.tsx` | Permissions, MediaRecorder, A/B listening, cleanup |
 | `src/components/import-dialog.tsx` | Subtitle/media import and optional transcription |
-| `src/lib/storage.ts` | Browser persistence and session media URLs |
+| `src/lib/storage.ts`, `src/lib/storage/` | Compatible persistence entry point and focused browser, lesson, preference and learning modules |
 | `src/lib/segmentation.ts` | Caption validation, cleanup, deduplication, sentence/clause grouping |
 | `src/lib/subtitles.ts` | SRT, WebVTT, and JSON parsing |
 | `src/lib/providers/` | Caption, translation, and local Whisper implementations |
@@ -172,6 +172,8 @@ The app uses **Next.js 16 App Router, React 19, TypeScript, authored CSS, and Lu
 | `tools/whisper_service.py` | Optional local Python transcription service |
 | `cloudflare-worker.js`, `src/lib/demo-asset.ts` | vinext entry wrapper and bounded demo byte-range responses |
 | `tests/` | Unit and Playwright browser tests |
+
+See [code navigation and focused verification](docs/architecture.md) for module ownership, compatibility boundaries and formatting commands.
 
 Playback boundaries are checked every 35 ms while listening. YouTube reports time less precisely than HTML media, so some boundary overshoot is possible. Shadowing pauses when the tab becomes hidden to avoid timer-throttling overshoot; continuous mode keeps playing.
 

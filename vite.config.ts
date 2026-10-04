@@ -1,9 +1,9 @@
-import { defineConfig } from "vite";
-import vinext from "vinext";
-import { cloudflare } from "@cloudflare/vite-plugin";
-import { workersCacheCdnAdapter } from "@vinext/cloudflare/cache/workers-cache-cdn-adapter";
-import { imagesOptimizer } from "@vinext/cloudflare/images/images-optimizer";
-import path from "node:path";
+import { defineConfig } from 'vite';
+import vinext from 'vinext';
+import { cloudflare } from '@cloudflare/vite-plugin';
+import { workersCacheCdnAdapter } from '@vinext/cloudflare/cache/workers-cache-cdn-adapter';
+import { imagesOptimizer } from '@vinext/cloudflare/images/images-optimizer';
+import path from 'node:path';
 
 export default defineConfig({
   plugins: [
@@ -13,14 +13,14 @@ export default defineConfig({
     }),
     cloudflare({
       viteEnvironment: {
-        name: "rsc",
-        childEnvironments: ["ssr"],
+        name: 'rsc',
+        childEnvironments: ['ssr'],
       },
     }),
   ],
   resolve: {
     alias: {
-      "sharp": path.resolve(import.meta.dirname, "empty-stub.js"),
+      sharp: path.resolve(import.meta.dirname, 'empty-stub.js'),
     },
   },
 });

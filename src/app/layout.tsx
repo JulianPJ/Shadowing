@@ -5,9 +5,14 @@ import '@fontsource/noto-sans-jp/500.css';
 import './globals.css';
 export const metadata: Metadata = {
   title: 'Hibiki — Find your Japanese rhythm',
-  description: 'Listen. Pause. Make it your own. A calm space for section-by-section Japanese shadowing practice.',
+  description:
+    'Listen. Pause. Make it your own. A calm space for section-by-section Japanese shadowing practice.',
   icons: { icon: '/icon.svg' },
 };
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en"><body>{children}</body></html>;
+  return (
+    <html lang="en">
+      <body>{children}</body>
+    </html>
+  );
 }

@@ -14,4 +14,8 @@ Before making product, architecture, roadmap, media-provider, or deployment chan
 
 It is the persistent source of truth for the product purpose, current implementation, Cloudflare deployment context, development priorities, and post-MVP roadmap.
 
-**Current product priority:** implement the ordered learning-feature roadmap in `PROJECT_CONTEXT.md`, starting with post-video comprehension tests. Content-source/file-upload expansion is priority 5; do not move it ahead of comprehension, difficulty analysis, learner modelling, or the retention/monetisation layer without a concrete prerequisite.
+**Current product priority:** priorities 1–3 (comprehension, difficulty analysis, local learner modelling) are implemented. Continue with priority 4, polish / monetisation, following the ordering in `PROJECT_CONTEXT.md`. Content-source expansion remains priority 5.
+
+## Code navigation and checks
+
+Read [docs/architecture.md](docs/architecture.md) for module ownership, compatibility boundaries and focused verification commands. Keep the public library facades compatible; change the underlying domain module when working on a specific concern.

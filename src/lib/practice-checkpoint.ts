@@ -4,12 +4,20 @@ import { CHECKPOINT_MS } from './learner-progress';
 export class PracticeCheckpoint {
   private dirty = false;
   private lastWrite: number;
-  constructor(now: number) { this.lastWrite = now; }
-  mark() { this.dirty = true; }
-  due(now: number) { return this.dirty && now - this.lastWrite >= CHECKPOINT_MS; }
+  constructor(now: number) {
+    this.lastWrite = now;
+  }
+  mark() {
+    this.dirty = true;
+  }
+  due(now: number) {
+    return this.dirty && now - this.lastWrite >= CHECKPOINT_MS;
+  }
   flush(now: number, write: () => boolean): boolean | null {
     if (!this.dirty) return null;
-    const saved = write(); this.dirty = false; this.lastWrite = now;
+    const saved = write();
+    this.dirty = false;
+    this.lastWrite = now;
     return saved;
   }
 }

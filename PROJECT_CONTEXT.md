@@ -293,10 +293,12 @@ Important files:
 | `src/components/comprehension-quiz.tsx` | optional lesson quiz, feedback, replay and results |
 | `src/app/api/quiz/route.ts` | bounded, recoverable quiz-generation route |
 | `src/app/api/prepare/route.ts` | streamed YouTube preparation route |
-| `src/lib/translation-api.ts`, `src/app/api/translate/route.ts` | shared lazy translation handler; Workers AI in production |
+| `src/lib/translation-api.ts`, `src/app/api/translate/route.ts` | shared lazy translation handler; DeepL in production |
 | `cloudflare.config.ts` | Cloudflare Worker definition |
 | `vite.config.ts` | vinext + Cloudflare build integration |
 | `scripts/check-integrations.mjs` | real hosted/local integration smoke check |
+
+See [module ownership and verification](docs/architecture.md) for the current code layout.
 
 ## 6. Hosting: Cloudflare is canonical
 
@@ -371,7 +373,7 @@ Persist quiz attempts as learner signals for the profile described below.
 
 ## 2. Content difficulty analysis
 
-**Implemented:** hybrid deterministic speech pace and lazy semantic JLPT/vocabulary/grammar/conversation estimates, strict evidence validation, bounded full-lesson sampling and transcript-keyed local persistence. Production Qwen smoke testing has occurred. The priority #3 learner profile now reuses this content identity and compact dimensions.
+**Implemented:** deterministic speech pace and lazy semantic JLPT/vocabulary/grammar/conversation estimates using Clef Flash, strict validation, consecutive full-transcript coverage and transcript-keyed browser/D1 persistence. The priority #3 learner profile now reuses this content identity and compact dimensions.
 
 Analyze each completed/prepared lesson and estimate:
 - approximate JLPT range;
@@ -507,8 +509,8 @@ Future agents should verify before proposing work. At this snapshot, the followi
 - recent local lessons;
 - local progress persistence;
 - post-video comprehension checks with explanations, evidence replay, quiz reuse and local attempt persistence (native Workers AI in canonical production);
-- content difficulty estimates with deterministic caption pace, bounded semantic analysis, validated evidence and local reuse (production Qwen smoke-tested);
-- local persistent learner profile with practice sessions, active time, section signals, comprehension history, typical practised content, conservative trend and dedicated progress page (locally verified; this feature's deployment pending);
+- content difficulty estimates with deterministic caption pace, Clef Flash full-transcript classification, strict validation and browser/D1 reuse;
+- local persistent learner profile with practice sessions, active time, section signals, comprehension history, typical practised content, conservative trend and dedicated progress page (deployed and locally verified);
 - local own-media import;
 - SRT/VTT/ASS/SSA/JSON/timestamped TXT transcript import;
 - YouTube/Vimeo/direct linked media + user transcript import and retained-link no-caption continuation;
@@ -538,7 +540,7 @@ The bundled demo is independent of inference. Canonical Cloudflare production us
 
 ### Content difficulty is an estimate
 
-Bounded samples can miss unusual sections and distant references. Caption-derived speech pace depends on spelling and timing, not measured morae or audio activity; its thresholds are product heuristics. Semantic quality needs real-lesson evaluation. Native inference already underway may continue after the request timeout. Estimates have browser L1 caching and D1 L2 reuse for trusted hosted transcripts; learner data remains local without cross-device sync. See [content difficulty limitations](docs/content-difficulty.md).
+Full-transcript classification avoids sparse sampling, but chunked analysis can still miss distant relationships between chunks. Caption-derived speech pace depends on spelling and timing, not measured morae or audio activity; its thresholds are product heuristics. Semantic quality needs real-lesson evaluation. Native inference already underway may continue after the request timeout. Estimates have browser L1 caching and D1 L2 reuse for trusted hosted transcripts; learner data remains local without cross-device sync. See [content difficulty limitations](docs/content-difficulty.md).
 
 ### Translation server cache is in-memory
 
@@ -552,9 +554,9 @@ Object URLs cannot survive a full refresh. The transcript persists but the learn
 
 The Python faster-whisper service is not part of the hosted Cloudflare app.
 
-### Media/transcript model needs generalization
+### Media and transcript sources are separate
 
-Before many new providers are added, separate media source from transcript source as described above.
+The versioned `mediaSource` and `transcript` contracts already separate playback from caption/import provenance. Extend these contracts when adding providers, preserving existing lesson IDs and local-media privacy.
 
 ---
 

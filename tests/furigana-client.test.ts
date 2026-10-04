@@ -6,19 +6,33 @@ import type { JapaneseReadingToken } from '../src/lib/japanese-readings';
 class FakeWorker {
   static instances: FakeWorker[] = [];
   messages: { id: number; text: string }[] = [];
-  onmessage?: (event: { data: { id: number; tokens: JapaneseReadingToken[]; error?: boolean } }) => void;
+  onmessage?: (event: {
+    data: { id: number; tokens: JapaneseReadingToken[]; error?: boolean };
+  }) => void;
   onerror?: () => void;
   terminated = false;
-  constructor(readonly url: string) { FakeWorker.instances.push(this); }
-  postMessage(message: { id: number; text: string }) { this.messages.push(message); }
-  terminate() { this.terminated = true; }
-  reply(index: number) { const request = this.messages[index]; this.onmessage?.({ data: { id: request.id, tokens: [{ text: request.text, reading: 'にほんご' }] } }); }
+  constructor(readonly url: string) {
+    FakeWorker.instances.push(this);
+  }
+  postMessage(message: { id: number; text: string }) {
+    this.messages.push(message);
+  }
+  terminate() {
+    this.terminated = true;
+  }
+  reply(index: number) {
+    const request = this.messages[index];
+    this.onmessage?.({
+      data: { id: request.id, tokens: [{ text: request.text, reading: 'にほんご' }] },
+    });
+  }
 }
 Object.defineProperty(globalThis, 'Worker', { configurable: true, value: FakeWorker });
 test('reading cache is lazy, deduplicates in-flight/cached canonical text and recovers worker failures', async () => {
   assert.deepEqual(await japaneseReadings('こんにちは。'), [{ text: 'こんにちは。' }]);
   assert.equal(FakeWorker.instances.length, 0);
-  const first = japaneseReadings('日本語'), repeated = japaneseReadings('日本語');
+  const first = japaneseReadings('日本語'),
+    repeated = japaneseReadings('日本語');
   assert.equal(first, repeated);
   const worker = FakeWorker.instances[0];
   assert.equal(worker.url, '/furigana/v1/worker.js');

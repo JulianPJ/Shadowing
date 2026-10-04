@@ -2,7 +2,11 @@ export const WORKERS_AI_GENERATIVE_MODEL = '@cf/qwen/qwen3-30b-a3b-fp8';
 export const WORKERS_AI_DECISION_MODEL = '@cf/cloudflare/clef-flash';
 
 export type WorkersAiBindingLike = {
-  run(model: string, input: Record<string, unknown>, options?: { rejectIfBusy?: boolean }): Promise<unknown>;
+  run(
+    model: string,
+    input: Record<string, unknown>,
+    options?: { rejectIfBusy?: boolean },
+  ): Promise<unknown>;
 };
 
 export class WorkersAiCallError extends Error {}
@@ -22,7 +26,7 @@ export async function runWorkersAi<T>(
         if (signal.aborted) throw new WorkersAiCallError('cancelled');
         return ai.run(model, input, { rejectIfBusy: true });
       })
-      .then(value => resolve(value as T), reject)
+      .then((value) => resolve(value as T), reject)
       .finally(() => signal.removeEventListener('abort', abort));
   });
 }

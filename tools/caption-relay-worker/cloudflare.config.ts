@@ -7,7 +7,10 @@ export const worker = defineWorker({
   compatibilityFlags: ['nodejs_compat'],
   exports: { CaptionRelay: exports.durableObject({ storage: 'sqlite' }) },
   env: {
-    CAPTION_RELAY: bindings.durableObject({ worker: 'shadowing-caption-relay', exportName: 'CaptionRelay' }),
+    CAPTION_RELAY: bindings.durableObject({
+      worker: 'shadowing-caption-relay',
+      exportName: 'CaptionRelay',
+    }),
     YOUTUBE_CAPTION_RELAY_TOKEN: bindings.secret(),
   },
   observability: { enabled: true },
