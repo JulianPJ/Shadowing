@@ -2,7 +2,7 @@
 
 > **Purpose:** persistent product and engineering context for future development.
 >
-> **Current snapshot:** 2026-10-04, production running on Cloudflare Workers with the caption relay path verified; comprehension checks and content difficulty are implemented and production Qwen smoke testing has occurred. Native Workers AI / Qwen3-30B-A3B remains the canonical hosted provider. Roadmap #3, local progress and learner modelling, is implemented and verified in the repository on Next.js and the built Cloudflare preview; this feature has not been deployed. The next roadmap item is #4, polish / monetisation.
+> **Current snapshot:** 2026-10-04, production runs on Cloudflare Workers with the caption relay path verified and roadmap priorities #1–#3 implemented. Hosted AI is split by task: Clef Flash provides cheap typed decisions for full-transcript difficulty classification and quiz-window selection, Qwen3-30B-A3B generates the final comprehension questions, and M2M100 handles production Japanese→English translation. Local learner progress is deployed. The next roadmap item is #4, polish / monetisation.
 >
 > **Deployment target:** Cloudflare Workers via vinext. Cloudflare is the canonical hosted environment for this project; do not assume Vercel.
 
@@ -128,17 +128,17 @@ The practice experience already includes:
 
 Priority #1 is implemented in the repository. Finishing Shadowing practice or reaching the end in Continuous mode reveals an optional short comprehension check, with Japanese multiple-choice questions, immediate explanations, deterministic scores and replayable transcript evidence. Existing playback remains available on generation failure. Evidence replay uses the same media adapter, spans normalized sections, pauses at the evidence end and returns to the question without losing answers.
 
-`POST /api/quiz` uses a replaceable `QuizGenerationProvider`. On the canonical Cloudflare deployment, the Worker injects a native Workers AI provider through the `AI` binding and currently uses `@cf/qwen/qwen3-30b-a3b-fp8`; no quiz API-key secrets are required. The generic OpenAI-compatible adapter remains available for local development or alternate hosts. The canonical demo has an authored check requiring no provider. Questions/options and exact evidence references/quotes are validated strictly; timestamps come from normalized segments. External model interpretation still requires provider-quality evaluation.
+`POST /api/quiz` uses a replaceable `QuizGenerationProvider`. Canonical Cloudflare production first evaluates consecutive transcript windows across the lesson with `@cf/cloudflare/clef-flash`, preserving broad lesson coverage and selecting the strongest/self-contained material with question-type diversity. Only those `{ id, japanese }` windows go to `@cf/qwen/qwen3-30b-a3b-fp8` for one generation pass; there is no regeneration loop. No timestamps, media metadata or learner data are sent to either model. Questions/options and exact evidence references/quotes are validated strictly, and application code maps validated segment IDs back to timestamps. No quiz API-key secrets are required.
 
 Validated quizzes are reused for a matching lesson/transcript SHA-256 fingerprint. Draft answers, completion and versioned UUID-based attempts persist through the existing local storage helpers. Attempt history includes lesson/video/quiz identity, score, total questions, per-question answers/correctness/evidence and start/update/completion timestamps for future account/profile sync. This adds no accounts or learner-profile system. See [comprehension checks](docs/comprehension-checks.md) for setup, limits and the persistence contract.
 
 ### Content difficulty analysis
 
-Priority #2 is implemented. Prepared lessons show a calm information card below practice controls: caption-derived speech pace is immediate; semantic estimates are requested explicitly and cached locally. The compact summary covers approximate JLPT range, vocabulary, grammar, speech and conversational complexity, with expandable evidence and confidence. It is a content-only estimate, never an official JLPT classification or learner-performance score.
+Priority #2 is implemented as a compact classification rather than a generated explanation panel. The UI shows approximate level (N5+, N5–N4, N4–N3, N3–N2, N2–N1, N1+), vocabulary/grammar/conversation (Beginner → Native), and deterministic speech pace (Slow → Very fast). It is a content estimate, never an official JLPT classification or learner-performance score.
 
-`POST /api/difficulty` uses a replaceable `DifficultyAnalysisProvider`, injected by the canonical Worker through `env.AI`. It reuses `@cf/qwen/qwen3-30b-a3b-fp8`, JSON mode, bounded output and disabled thinking, adding no API-key secrets. One call analyzes at most 12 windows / 36 excerpts / 9,000 characters across the entire lesson. Speech is computed in code: Japanese-script characters per minute over captioned intervals plus gaps up to one second, excluding long gaps. Strict validation rejects invalid ranges/scores/fields, fabricated or unsampled quotes and model timestamps; application code supplies labels, coverage and evidence section times.
+`POST /api/difficulty` uses a replaceable `DifficultyAnalysisProvider`, injected by the canonical Worker through `env.AI`. Production uses `@cf/cloudflare/clef-flash` and sends only normalized Japanese transcript text. Normal lessons use the complete transcript in one decision request. Unusually large scripts are split into consecutive full-coverage chunks and the typed choice probabilities are aggregated deterministically by character weight, avoiding the old 36-section sparse sample. Speech stays deterministic application code and timestamps never go to the model.
 
-Versioned compact records persist through `loadDifficulty`/`saveDifficulty`, with stable content identity and the existing SHA-256 transcript fingerprint. Edits invalidate reuse; reload never triggers inference. The exact demo has an authored estimate. Failures, pending generation and blocked storage do not block playback, shadowing, quizzes or completion. The learner profile now references the validated compact dimensions without duplicating explanations/evidence. See [content difficulty](docs/content-difficulty.md) for exact calculation, input/sample limits, contracts and limitations. Production Qwen smoke testing has occurred; broader semantic-quality evaluation remains useful.
+Versioned compact records persist through `loadDifficulty`/`saveDifficulty` with the existing SHA-256 transcript fingerprint. The full-coverage strategy version invalidates old sampled caches. The exact demo has an authored classification. Failures, pending inference and blocked storage do not block playback, shadowing, quizzes or completion. The learner profile continues to consume only the compact validated dimensions. See [content difficulty](docs/content-difficulty.md).
 
 ### Progress and learner modelling
 
@@ -192,9 +192,7 @@ Typical target length is roughly 2–8 seconds, but natural language boundaries 
 
 English is lazy and hidden by default.
 
-Current automatic translation uses MyMemory through `/api/translate`. Results are cached in the browser and in a small server-memory cache. Imported/authored translations bypass the external service.
-
-This provider is free/keyless but quota and quality are not guaranteed. Production verification has already hit MyMemory's shared-egress daily quota; this is accepted as a non-blocking MVP limitation for now. Translation failure must not block shadowing.
+Canonical production translation uses the existing native Workers AI binding with `@cf/meta/m2m100-1.2b` for Japanese→English. Only the current Japanese section is sent when the learner explicitly reveals it; results are cached in the browser and in a bounded server-memory cache. Imported/authored translations bypass inference. MyMemory remains a keyless local/non-Cloudflare fallback only. Translation failure is retryable and never blocks shadowing.
 
 ### Persistence
 
@@ -273,15 +271,15 @@ Important files:
 | `src/components/use-practice-progress.ts` | practice signals, session resume and lifecycle persistence |
 | `src/components/learner-progress.tsx`, `src/app/progress/page.tsx` | dedicated local learner-progress surface |
 | `src/lib/quiz.ts` | quiz validation, evidence mapping, transcript fingerprint, scoring and attempt contracts |
-| `src/lib/difficulty.ts` | content difficulty validation, deterministic speech metrics and bounded sampling |
-| `src/lib/providers/difficulty.ts` | replaceable native Workers AI semantic analysis and authored demo estimate |
+| `src/lib/difficulty.ts` | content difficulty validation, deterministic speech metrics and full-transcript input |
+| `src/lib/providers/difficulty.ts` | Clef Flash full-coverage typed classification and authored demo estimate |
 | `src/lib/difficulty-api.ts`, `src/app/api/difficulty/route.ts` | bounded, independent difficulty API shared with the canonical Worker |
-| `src/components/lesson-difficulty.tsx` | lazy difficulty summary, evidence details and retry |
-| `src/lib/providers/quiz.ts` | replaceable server-side generation and authored demo quiz |
+| `src/components/lesson-difficulty.tsx` | lazy compact difficulty classifications and retry |
+| `src/lib/providers/quiz.ts` | Clef Flash window selection, Qwen generation and authored demo quiz |
 | `src/components/comprehension-quiz.tsx` | optional lesson quiz, feedback, replay and results |
 | `src/app/api/quiz/route.ts` | bounded, recoverable quiz-generation route |
 | `src/app/api/prepare/route.ts` | streamed YouTube preparation route |
-| `src/app/api/translate/route.ts` | lazy translation route |
+| `src/lib/translation-api.ts`, `src/app/api/translate/route.ts` | shared lazy translation handler; Workers AI in production |
 | `cloudflare.config.ts` | Cloudflare Worker definition |
 | `vite.config.ts` | vinext + Cloudflare build integration |
 | `scripts/check-integrations.mjs` | real hosted/local integration smoke check |
