@@ -4,7 +4,7 @@ import demo from '../src/data/demo.json';
 import demoQuiz from '../src/data/demo-quiz.json';
 import { createQuiz, mapEvidence, newAttempt, scoreQuiz, transcriptKey, updateAttempt, validateAttempt, validateQuestions, validateQuiz, validateQuizLesson } from '../src/lib/quiz';
 import { completeLesson, lessonCompleted, loadQuiz, loadQuizAttempt, readStorage, saveQuiz, saveQuizAttempt, writeStorage } from '../src/lib/storage';
-import { buildQuizWindows, chatCompletionQuizProvider, createWorkersAiQuizProvider, generateLessonQuiz, QuizProviderError, readBoundedJson, WORKERS_AI_MODEL, WORKERS_AI_QUIZ_MODEL, WORKERS_AI_QUIZ_SELECTOR_MODEL } from '../src/lib/providers/quiz';
+import { buildQuizWindows, chatCompletionQuizProvider, createWorkersAiQuizProvider, DIRECT_QWEN_MAX_JAPANESE_CHARS, generateLessonQuiz, MIN_QUIZ_JAPANESE_CHARS, quizGenerationRoute, quizJapaneseCharacterCount, QuizProviderError, readBoundedJson, WORKERS_AI_MODEL, WORKERS_AI_QUIZ_MODEL, WORKERS_AI_QUIZ_SELECTOR_MODEL } from '../src/lib/providers/quiz';
 import { POST } from '../src/app/api/quiz/route';
 import type { QuizGenerationProvider } from '../src/lib/types';
 
@@ -120,7 +120,12 @@ test('replaceable provider generates arbitrary lesson quizzes without any live s
   assert.equal(calls, 1); assert.equal(quiz.lessonId, 'custom');
   await generateLessonQuiz(lesson, new AbortController().signal, mock); assert.equal(calls, 1);
   await assert.rejects(generateLessonQuiz({ ...lesson, id: 'custom' }, new AbortController().signal, { name: 'bad', async generate() { return { questions: [null] }; } }), error => error instanceof QuizProviderError && error.code === 'malformed');
-  await assert.rejects(generateLessonQuiz({ ...lesson, id: 'custom' }, new AbortController().signal, { name: 'empty', async generate() { return { questions: [] }; } }), error => error instanceof QuizProviderError && error.code === 'insufficient-transcript');
+  await assert.rejects(generateLessonQuiz({ ...lesson, id: 'custom' }, new AbortController().signal, { name: 'empty', async generate() { return { questions: [] }; } }), error => error instanceof QuizProviderError && error.code === 'malformed');
+  let shortCalls = 0;
+  const shortLesson = { id: 'too-short', segments: [{ id: 'a', start: 0, end: 1, japanese: 'はい。' }, { id: 'b', start: 1, end: 2, japanese: 'そうです。' }] };
+  await assert.rejects(generateLessonQuiz(shortLesson, new AbortController().signal, { name: 'short', async generate() { shortCalls++; return demoQuiz; } }), error => error instanceof QuizProviderError && error.code === 'insufficient-transcript');
+  assert.equal(shortCalls, 0);
+  assert.ok(MIN_QUIZ_JAPANESE_CHARS > 0);
 });
 function selectorResponse(input: Record<string, unknown>) {
   const questions = input.questions as Record<string, unknown>, answers: Record<string, unknown> = {};
@@ -132,7 +137,35 @@ function selectorResponse(input: Record<string, unknown>) {
   return { model: 'clef-flash', answers };
 }
 
-test('Workers AI adapter uses Clef Flash selection before bounded Qwen generation', async () => {
+test('normal transcripts go directly to Qwen with the complete Japanese transcript', async () => {
+  const calls: Array<{ model: string; input: Record<string, unknown>; options?: { rejectIfBusy?: boolean } }> = [];
+  const provider = createWorkersAiQuizProvider({
+    async run(model, input, options) {
+      calls.push({ model, input, options });
+      return { choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(demoQuiz) } }] };
+    },
+  });
+  const custom = { ...lesson, id: 'workers-ai-video' };
+  assert.equal(quizGenerationRoute(custom), 'direct-qwen');
+  assert.ok(quizJapaneseCharacterCount(custom) < DIRECT_QWEN_MAX_JAPANESE_CHARS);
+  const generated = await generateLessonQuiz(custom, new AbortController().signal, provider);
+  assert.equal(generated.lessonId, 'workers-ai-video');
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].model, WORKERS_AI_MODEL);
+  assert.equal(calls.some(call => call.model === WORKERS_AI_QUIZ_SELECTOR_MODEL), false);
+  assert.deepEqual(calls[0].input.response_format, { type: 'json_object' });
+  assert.equal(calls[0].options?.rejectIfBusy, true);
+  const messages = calls[0].input.messages as Array<{ content: string }>;
+  assert.ok(messages[1].content.includes(lesson.segments[0].japanese));
+  assert.ok(messages[1].content.includes(lesson.segments.at(-1)!.japanese));
+  assert.ok(messages[1].content.includes('"segments"'));
+  assert.equal(messages[1].content.includes('"windows"'), false);
+  assert.equal(messages[1].content.includes('"start"'), false);
+  assert.equal(messages[1].content.includes('mediaUrl'), false);
+  assert.ok(messages[1].content.endsWith('/no_think'));
+});
+
+test('large transcripts use Clef Flash selection, then expanded context goes to Qwen', async () => {
   const calls: Array<{ model: string; input: Record<string, unknown>; options?: { rejectIfBusy?: boolean } }> = [];
   const provider = createWorkersAiQuizProvider({
     async run(model, input, options) {
@@ -141,31 +174,38 @@ test('Workers AI adapter uses Clef Flash selection before bounded Qwen generatio
       return { choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(demoQuiz) } }] };
     },
   });
-  const custom = { ...lesson, id: 'workers-ai-video' };
-  const generated = await generateLessonQuiz(custom, new AbortController().signal, provider);
-  assert.equal(generated.lessonId, 'workers-ai-video');
-  assert.equal(WORKERS_AI_MODEL, '@cf/qwen/qwen3-30b-a3b-fp8');
-  assert.equal(WORKERS_AI_QUIZ_SELECTOR_MODEL, '@cf/cloudflare/clef-flash');
+  const large = {
+    id: 'large-workers-ai-video',
+    segments: Array.from({ length: 180 }, (_, i) => ({
+      id: `segment-${i + 1}`,
+      start: i * 3,
+      end: i * 3 + 2.5,
+      japanese: `これは長い日本語教材の第${i + 1}の文です。${'日本語の内容を詳しく説明します。'.repeat(6)}`,
+    })),
+  };
+  assert.equal(quizGenerationRoute(large), 'clef-qwen');
+  assert.ok(quizJapaneseCharacterCount(large) > DIRECT_QWEN_MAX_JAPANESE_CHARS);
+  await provider.generate(large, new AbortController().signal);
   assert.equal(calls[0].model, WORKERS_AI_QUIZ_SELECTOR_MODEL);
+  assert.equal(calls.at(-1)!.model, WORKERS_AI_MODEL);
+  assert.ok(calls.filter(call => call.model === WORKERS_AI_QUIZ_SELECTOR_MODEL).length >= 2);
   const selectorState = calls[0].input.state as { windows: Array<{ segments: Array<{ id: string; japanese: string }> }> };
   assert.ok(selectorState.windows.length > 0);
-  assert.ok(selectorState.windows[0].segments[0].japanese);
   assert.equal(JSON.stringify(selectorState).includes('"start"'), false);
-  const qwenCall = calls.at(-1)!;
-  assert.equal(qwenCall.model, WORKERS_AI_MODEL);
-  assert.deepEqual(qwenCall.input.response_format, { type: 'json_object' });
-  assert.equal(qwenCall.options?.rejectIfBusy, true);
-  const messages = qwenCall.input.messages as Array<{ content: string }>;
-  assert.ok(messages[1].content.includes(lesson.segments[0].japanese));
-  assert.ok(messages[1].content.endsWith('/no_think'));
-  assert.equal(messages[1].content.includes('mediaUrl'), false);
-  assert.ok(buildQuizWindows(custom).every(window => window.segments.length <= 8));
+  const messages = calls.at(-1)!.input.messages as Array<{ content: string }>;
+  const payload = JSON.parse(messages[1].content.replace(/\n\/no_think$/, '')) as { windows: Array<{ segments: Array<{ id: string; japanese: string }> }> };
+  assert.ok(payload.windows.length > 0);
+  assert.ok(payload.windows.every(window => window.segments.length > 8 && window.segments.length <= 18));
+  assert.equal(messages[1].content.includes('"start"'), false);
+  assert.ok(buildQuizWindows(large).every(window => window.segments.length <= 8));
 });
 
-test('Workers AI JSON-mode direct response object is accepted after selector pass', async () => {
+test('Workers AI JSON-mode direct response object is accepted without selector pass', async () => {
+  let calls = 0;
   const provider = createWorkersAiQuizProvider({
-    async run(model, input) {
-      if (model === WORKERS_AI_QUIZ_SELECTOR_MODEL) return selectorResponse(input);
+    async run(model) {
+      calls++;
+      assert.equal(model, WORKERS_AI_MODEL);
       return {
         response: demoQuiz,
         choices: [{ finish_reason: 'stop', message: { content: null, reasoning: 'provider-internal reasoning' } }],
@@ -174,6 +214,7 @@ test('Workers AI JSON-mode direct response object is accepted after selector pas
   });
   const generated = await generateLessonQuiz({ ...lesson, id: 'workers-ai-direct-json' }, new AbortController().signal, provider);
   assert.equal(generated.questions.length, 5);
+  assert.equal(calls, 1);
 });
 
 test('chat-completions adapter uses server credentials and rejects truncated or malformed output (mocked fetch)', async () => {
@@ -195,7 +236,7 @@ test('chat-completions adapter uses server credentials and rejects truncated or 
     assert.equal(JSON.stringify(generatedBody).includes('test-secret'), false);
     globalThis.fetch = async () => Response.json({ choices: [{ finish_reason: 'stop', message: { content: JSON.stringify({ questions: [] }) } }] });
     const empty = await POST(new Request('http://localhost/api/quiz', { method: 'POST', body: JSON.stringify({ ...lesson, id: 'custom-video' }) }));
-    assert.equal(empty.status, 422); assert.equal((await empty.json()).code, 'insufficient-transcript');
+    assert.equal(empty.status, 502); assert.equal((await empty.json()).code, 'malformed');
     for (const content of ['not json', '{}']) {
       globalThis.fetch = async () => Response.json({ choices: [{ finish_reason: 'length', message: { content } }] });
       await assert.rejects(chatCompletionQuizProvider.generate(lesson, new AbortController().signal), QuizProviderError);
