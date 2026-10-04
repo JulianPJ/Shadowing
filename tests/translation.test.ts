@@ -18,14 +18,14 @@ test('Workers AI translation uses Qwen in no-think mode with bounded neighboring
   assert.equal(translated, "It's time for Yuyu's Japanese Podcast.");
   assert.equal(call.model, WORKERS_AI_TRANSLATION_MODEL);
   assert.equal(call.model, '@cf/qwen/qwen3-30b-a3b-fp8');
-  assert.equal(call.input?.max_tokens, 1200);
+  assert.equal(call.input?.max_tokens, 800);
   assert.equal(call.input?.temperature, 0);
   const messages = call.input?.messages as Array<{ role: string; content: string }>;
-  assert.match(messages[0].content, /Translate CURRENT only/);
-  assert.match(messages[0].content, /Return only the English translation/);
-  assert.match(messages[1].content, /みなさんこんにちは/);
-  assert.match(messages[1].content, /ゆゆの日本語ポッドキャストのお時間です/);
-  assert.match(messages[1].content, /今日のテーマについて話します/);
+  assert.match(messages[0].content, /Translate ONLY the text inside <current>/);
+  assert.match(messages[0].content, /NEVER translate, quote, paraphrase, or include it/);
+  assert.match(messages[1].content, /<previous>みなさんこんにちは。<\/previous>/);
+  assert.match(messages[1].content, /<current>ゆゆの日本語ポッドキャストのお時間です。<\/current>/);
+  assert.match(messages[1].content, /<next>今日のテーマについて話します。<\/next>/);
   assert.ok(messages[1].content.endsWith('/no_think'));
 });
 
