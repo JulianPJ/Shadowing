@@ -54,24 +54,54 @@ export function mapEvidence(value: unknown, segments: Segment[]): QuizEvidence {
   if ((raw.start !== undefined && raw.start !== start) || (raw.end !== undefined && raw.end !== end)) throw new QuizValidationError('Evidence timestamps do not match.');
   return { segmentIds, quote, start, end };
 }
+function validateQuestion(value: unknown, index: number, lesson: QuizLesson, seen: Set<string>): QuizQuestion {
+  const q = object(value); keys(q, ['id', 'kind', 'question', 'options', 'correctIndex', 'explanation', 'evidence']);
+  if (!QUESTION_KINDS.includes(q.kind as QuestionKind)) throw new QuizValidationError('Invalid question kind.');
+  const question = text(q.question);
+  if (seen.has(question)) throw new QuizValidationError('Duplicate question.');
+  if (!Array.isArray(q.options) || q.options.length !== 4) throw new QuizValidationError('Four options are required.');
+  const options = q.options.map(option => text(option, 350));
+  if (new Set(options.map(s => s.normalize('NFKC').toLowerCase())).size !== 4 || !Number.isInteger(q.correctIndex) || (q.correctIndex as number) < 0 || (q.correctIndex as number) >= 4) throw new QuizValidationError('Invalid answer options.');
+  if (q.id !== undefined && q.id !== `question-${index + 1}`) throw new QuizValidationError('Invalid question ID.');
+  const validated = { id: `question-${index + 1}`, kind: q.kind as QuestionKind, question, options, correctIndex: q.correctIndex as number, explanation: text(q.explanation, 1000), evidence: mapEvidence(q.evidence, lesson.segments) };
+  seen.add(question);
+  return validated;
+}
+
 export function validateQuestions(value: unknown, lesson: QuizLesson): QuizQuestion[] {
   const raw = object(value); keys(raw, ['questions']);
   if (!Array.isArray(raw.questions) || raw.questions.length < 3 || raw.questions.length > 7) throw new QuizValidationError('Expected three to seven questions.');
   const seen = new Set<string>();
-  return raw.questions.map((value, i) => {
-    const q = object(value); keys(q, ['id', 'kind', 'question', 'options', 'correctIndex', 'explanation', 'evidence']);
-    if (!QUESTION_KINDS.includes(q.kind as QuestionKind)) throw new QuizValidationError('Invalid question kind.');
-    const question = text(q.question);
-    if (seen.has(question)) throw new QuizValidationError('Duplicate question.'); seen.add(question);
-    if (!Array.isArray(q.options) || q.options.length !== 4) throw new QuizValidationError('Four options are required.');
-    const options = q.options.map(option => text(option, 350));
-    if (new Set(options.map(s => s.normalize('NFKC').toLowerCase())).size !== 4 || !Number.isInteger(q.correctIndex) || (q.correctIndex as number) < 0 || (q.correctIndex as number) >= 4) throw new QuizValidationError('Invalid answer options.');
-    if (q.id !== undefined && q.id !== `question-${i + 1}`) throw new QuizValidationError('Invalid question ID.');
-    return { id: `question-${i + 1}`, kind: q.kind as QuestionKind, question, options, correctIndex: q.correctIndex as number, explanation: text(q.explanation, 1000), evidence: mapEvidence(q.evidence, lesson.segments) };
-  });
+  return raw.questions.map((value, i) => validateQuestion(value, i, lesson, seen));
 }
+
+// Model output is untrusted. Keep only individually strict, grounded questions and
+// require at least three; this avoids failing an otherwise useful quiz because one
+// candidate contains duplicate options or bad evidence. There is no regeneration loop.
+export function filterGeneratedQuestions(value: unknown, lesson: QuizLesson, limit = 5): QuizQuestion[] {
+  const raw = object(value); keys(raw, ['questions']);
+  if (!Array.isArray(raw.questions) || raw.questions.length < 3 || raw.questions.length > 7) throw new QuizValidationError('Expected three to seven questions.');
+  const accepted: QuizQuestion[] = [], seen = new Set<string>();
+  for (const value of raw.questions) {
+    if (accepted.length >= limit) break;
+    try {
+      const candidate = { ...object(value) };
+      delete candidate.id;
+      accepted.push(validateQuestion(candidate, accepted.length, lesson, seen));
+    } catch (error) {
+      if (!(error instanceof QuizValidationError)) throw error;
+    }
+  }
+  if (accepted.length < 3) throw new QuizValidationError('Expected at least three valid questions.');
+  return accepted;
+}
+
 export async function createQuiz(value: unknown, lesson: QuizLesson): Promise<LessonQuiz> {
   return { schemaVersion: 1, id: crypto.randomUUID(), lessonId: lesson.id, transcriptKey: await transcriptKey(lesson), generatedAt: new Date().toISOString(), questions: validateQuestions(value, lesson) };
+}
+
+export async function createGeneratedQuiz(value: unknown, lesson: QuizLesson): Promise<LessonQuiz> {
+  return { schemaVersion: 1, id: crypto.randomUUID(), lessonId: lesson.id, transcriptKey: await transcriptKey(lesson), generatedAt: new Date().toISOString(), questions: filterGeneratedQuestions(value, lesson) };
 }
 function isoDate(value: unknown): string {
   if (typeof value !== 'string' || !Number.isFinite(Date.parse(value)) || new Date(value).toISOString() !== value) throw new QuizValidationError('Invalid date.');
