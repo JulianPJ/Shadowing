@@ -5,10 +5,11 @@ import type { Lesson, LessonQuiz, QuizAttempt, QuizEvidence } from '@/lib/types'
 import { newAttempt, object, updateAttempt, validateQuiz, validateQuizLesson } from '@/lib/quiz';
 import { loadQuiz, loadQuizAttempt, saveQuiz, saveQuizAttempt } from '@/lib/storage';
 import { timestamp } from '@/lib/youtube';
+import { JapaneseText } from './japanese-text';
 import { contentRequest } from '@/lib/content-request';
 
-type Props = { lesson: Lesson; ready: boolean; recording: boolean; replaying: boolean; onReplay: (evidence: QuizEvidence) => void; onReturn: () => void; onOpenChange: (open: boolean) => void };
-export function ComprehensionQuiz({ lesson, ready, recording, replaying, onReplay, onReturn, onOpenChange }: Props) {
+type Props = { furigana?: boolean; lesson: Lesson; ready: boolean; recording: boolean; replaying: boolean; onReplay: (evidence: QuizEvidence) => void; onReturn: () => void; onOpenChange: (open: boolean) => void };
+export function ComprehensionQuiz({ furigana = false, lesson, ready, recording, replaying, onReplay, onReturn, onOpenChange }: Props) {
   const [quiz, setQuiz] = useState<LessonQuiz | null>(null);
   const [attempt, setAttempt] = useState<QuizAttempt | null>(null);
   const [open, setOpen] = useState(false);
@@ -72,9 +73,9 @@ export function ComprehensionQuiz({ lesson, ready, recording, replaying, onRepla
       {loading ? <p className="quiz-loading" role="status"><LoaderCircle size={20} className="spin" />Preparing questions from your lesson…</p> : error ? <div role="alert"><p>{error}</p><p className="small muted">Your completed practice is still here.</p><button className="button" onClick={() => void start()}><RotateCcw size={16} />Retry comprehension check</button></div> : quiz && attempt && question ? <>
         {completed ? <div className="quiz-summary" role="status"><Check size={24} /><div><strong>Comprehension check complete</strong><p>{attempt.score} / {attempt.totalQuestions} correct</p><p className="small muted">{storageWarning ? 'Results are available for this visit.' : 'Result saved on this device.'}</p></div></div> : null}
         <p className="eyebrow">{completed ? 'REVIEW' : 'QUESTION'} {questionIndex + 1} / {quiz.questions.length}</p>
-        <h3 className="quiz-question" ref={heading} tabIndex={-1} lang="ja">{question.question}</h3>
-        <div className="quiz-options" role="group" aria-label="Answer options">{question.options.map((option, i) => <button key={i} className={`quiz-option ${result?.selectedIndex === i ? 'chosen' : ''} ${result && question.correctIndex === i ? 'correct' : ''}`} disabled={!!result || completed} onClick={() => answer(i)}><span>{String.fromCharCode(65 + i)}</span><span lang="ja">{option}</span>{result && question.correctIndex === i ? <Check size={16} aria-label="Correct answer" /> : null}{result?.selectedIndex === i ? <span className="small">Your answer</span> : null}</button>)}</div>
-        {result ? <div className="quiz-feedback" role="status"><strong>{result.correct ? 'Correct.' : 'Not quite.'}</strong><p>{question.explanation}</p><blockquote lang="ja">{question.evidence.quote}</blockquote><p className="small muted">{timestamp(question.evidence.start)} – {timestamp(question.evidence.end)}{lesson.segments.some(s => question.evidence.segmentIds.includes(s.id) && s.estimated) ? ' · Approximate segment timing' : ''}</p>
+        <h3 className="quiz-question" ref={heading} tabIndex={-1} lang="ja" aria-label={question.question}><JapaneseText text={question.question} furigana={furigana} /></h3>
+        <div className="quiz-options" role="group" aria-label="Answer options">{question.options.map((option, i) => <button key={i} className={`quiz-option ${result?.selectedIndex === i ? 'chosen' : ''} ${result && question.correctIndex === i ? 'correct' : ''}`} disabled={!!result || completed} onClick={() => answer(i)}><span>{String.fromCharCode(65 + i)}</span><span lang="ja"><JapaneseText text={option} furigana={furigana} /></span>{result && question.correctIndex === i ? <Check size={16} aria-label="Correct answer" /> : null}{result?.selectedIndex === i ? <span className="small">Your answer</span> : null}</button>)}</div>
+        {result ? <div className="quiz-feedback" role="status"><strong>{result.correct ? 'Correct.' : 'Not quite.'}</strong><p>{question.explanation}</p><blockquote lang="ja"><JapaneseText text={question.evidence.quote} furigana={furigana} /></blockquote><p className="small muted">{timestamp(question.evidence.start)} – {timestamp(question.evidence.end)}{lesson.segments.some(s => question.evidence.segmentIds.includes(s.id) && s.estimated) ? ' · Approximate segment timing' : ''}</p>
           <button className="button primary quiz-replay" disabled={!ready || recording} onClick={() => onReplay(question.evidence)}><RotateCcw size={17} />Replay relevant section</button>
           {!ready ? <p className="small muted">Reattach your media or wait for the player to listen again.</p> : null}
         </div> : null}

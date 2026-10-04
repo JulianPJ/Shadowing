@@ -124,6 +124,14 @@ The practice experience already includes:
 - responsive desktop/mobile UI;
 - persistence of lesson position and preferences.
 
+### Studio Mode and Furigana
+
+The practice UI offers **Studio Mode**, a locally persisted, reversible layout preference. Desktop uses a wide player, capped relative to viewport height so the current section remains visible on laptops. Existing controls, current-section actions and recording follow immediately; transcript, difficulty and comprehension stay reachable below by scrolling. Tablets/mobile retain a full-width 16:9 player and compact controls. CSS changes the priority of the existing mounted tree: there is no new route, player, or separate playback/quiz state.
+
+**Furigana** defaults off and uses the reusable `JapaneseText` renderer for the current section, full transcript and comprehension questions/options/evidence. Kuromoji 0.1.2 with IPADIC supplies deterministic dictionary readings in a lazy browser worker. There is no AI request or external reading service. The optional dictionary is 17,791,956 compressed bytes; it is justified by inflection and contextual morphology coverage and never enters the main client/Worker bundle. It loads from same-origin static assets only after enabling readings. Canonical Japanese stays untouched; unknown words remain plain. Reading ambiguity and proper names remain limitations.
+
+Both `studioMode` and `furigana` extend the existing `hibiki:v1:preferences` key with strict false defaults for older preferences. Derived annotation promises are cached by canonical source string (bounded to 2,000 entries) and never saved to a Lesson, Segment, D1 or learner history. Future hosted annotation could use `transcriptHash + furiganaGeneratorVersion`; that cache is unimplemented. See [asset preparation, identity verification and browser coverage](docs/studio-furigana.md).
+
 ### Post-video comprehension checks
 
 Priority #1 is implemented in the repository. Finishing Shadowing practice or reaching the end in Continuous mode reveals an optional short comprehension check, with Japanese multiple-choice questions, immediate explanations, deterministic scores and replayable transcript evidence. Existing playback remains available on generation failure. Evidence replay uses the same media adapter, spans normalized sections, pauses at the evidence end and returns to the question without losing answers.

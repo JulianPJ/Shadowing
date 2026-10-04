@@ -24,7 +24,12 @@
     "caption-relay": "node --env-file=.env.caption-relay --import tsx scripts/caption-relay.ts",
     "build:caption-relay": "cd tools/caption-relay-worker && cf build",
     "deploy:caption-relay": "cd tools/caption-relay-worker && cf deploy --prebuilt",
-    "check:youtube-browser": "node scripts/check-youtube-browser.mjs"
+    "check:youtube-browser": "node scripts/check-youtube-browser.mjs",
+    "furigana:prepare": "node scripts/prepare-furigana.mjs",
+    "predev": "npm run furigana:prepare",
+    "prebuild": "npm run furigana:prepare",
+    "predev:vinext": "npm run furigana:prepare",
+    "prebuild:vinext": "npm run furigana:prepare"
   },
   "repository": {
     "type": "git",
@@ -50,9 +55,11 @@
     "@vitejs/plugin-react": "^6.1.1",
     "@vitejs/plugin-rsc": "^0.5.35",
     "cf": "^1.0.0-beta.12",
+    "esbuild": "0.28.2",
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.3.8",
     "ffmpeg-static": "^5.3.0",
+    "kuromoji": "0.1.2",
     "miniflare": "^5.20260930.0-alpha",
     "sharp": "^0.35.5",
     "tsx": "^4.23.15",
