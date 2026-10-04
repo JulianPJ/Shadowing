@@ -11,9 +11,10 @@ export interface TranscriptionProvider<Input = string> {
   name: string;
   transcribe(input: Input, signal?: AbortSignal): Promise<{ cues: Cue[]; title?: string; author?: string; provider?: string }>;
 }
+export type TranslationContext = { previousJapanese?: string; nextJapanese?: string };
 export interface TranslationProvider {
   name: string;
-  translate(japanese: string, signal?: AbortSignal): Promise<string>;
+  translate(japanese: string, signal?: AbortSignal, context?: TranslationContext): Promise<string>;
 }
 export type QuestionKind = 'main-idea' | 'detail' | 'sequence' | 'vocabulary' | 'grammar' | 'reference' | 'intent' | 'inference';
 export type QuizLesson = Pick<Lesson, 'id' | 'videoId' | 'segments'>;
