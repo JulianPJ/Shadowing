@@ -1,39 +1,54 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createWorkersAiTranslationProvider, myMemoryTranslation } from '../src/lib/providers/translation';
+import { createDeepLTranslationProvider, myMemoryTranslation } from '../src/lib/providers/translation';
 import { handleTranslationRequest } from '../src/lib/translation-api';
-import { WORKERS_AI_TRANSLATION_MODEL } from '../src/lib/providers/workers-ai';
 
-test('Workers AI translation uses Qwen in no-think mode with bounded neighboring context', async () => {
-  let call: { model?: string; input?: Record<string, unknown> } = {};
-  const provider = createWorkersAiTranslationProvider({ async run(model, input) {
-    call = { model, input };
-    return { choices: [{ finish_reason: 'stop', message: { content: "It's time for Yuyu's Japanese Podcast." } }] };
-  } });
+test('DeepL API Free translation sends only the current section as billable text and neighbors as context', async () => {
+  let url = '';
+  let init: RequestInit | undefined;
+  const fakeFetch: typeof fetch = async (input, options) => {
+    url = String(input);
+    init = options;
+    return new Response(JSON.stringify({ translations: [{ detected_source_language: 'JA', text: "It's time for Yuyu's Japanese podcast." }] }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+  const provider = createDeepLTranslationProvider('test-key:fx', fakeFetch);
   const translated = await provider.translate(
     'ゆゆの日本語ポッドキャストのお時間です。',
     new AbortController().signal,
     { previousJapanese: 'みなさんこんにちは。', nextJapanese: '今日のテーマについて話します。' },
   );
-  assert.equal(translated, "It's time for Yuyu's Japanese Podcast.");
-  assert.equal(call.model, WORKERS_AI_TRANSLATION_MODEL);
-  assert.equal(call.model, '@cf/qwen/qwen3-30b-a3b-fp8');
-  assert.equal(call.input?.max_tokens, 800);
-  assert.equal(call.input?.temperature, 0);
-  const messages = call.input?.messages as Array<{ role: string; content: string }>;
-  assert.match(messages[0].content, /Translate ONLY the text inside <current>/);
-  assert.match(messages[0].content, /NEVER translate, quote, paraphrase, or include it/);
-  assert.match(messages[1].content, /<previous>みなさんこんにちは。<\/previous>/);
-  assert.match(messages[1].content, /<current>ゆゆの日本語ポッドキャストのお時間です。<\/current>/);
-  assert.match(messages[1].content, /<next>今日のテーマについて話します。<\/next>/);
-  assert.ok(messages[1].content.endsWith('/no_think'));
+  assert.equal(translated, "It's time for Yuyu's Japanese podcast.");
+  assert.equal(provider.name, 'DeepL');
+  assert.equal(url, 'https://api-free.deepl.com/v2/translate');
+  assert.equal(new Headers(init?.headers).get('authorization'), 'DeepL-Auth-Key test-key:fx');
+  const body = JSON.parse(String(init?.body));
+  assert.deepEqual(body.text, ['ゆゆの日本語ポッドキャストのお時間です。']);
+  assert.equal(body.source_lang, 'JA');
+  assert.equal(body.target_lang, 'EN-US');
+  assert.equal(body.context, 'みなさんこんにちは。\n今日のテーマについて話します。');
 });
 
-test('Workers AI translation accepts the direct response string shape', async () => {
-  const provider = createWorkersAiTranslationProvider({ async run() {
-    return { response: 'A natural translation.' };
-  } });
-  assert.equal(await provider.translate('自然な翻訳です。', new AbortController().signal), 'A natural translation.');
+test('DeepL Pro keys use the Pro API endpoint', async () => {
+  let url = '';
+  const fakeFetch: typeof fetch = async input => {
+    url = String(input);
+    return new Response(JSON.stringify({ translations: [{ text: 'Natural translation.' }] }), { status: 200 });
+  };
+  const provider = createDeepLTranslationProvider('paid-key', fakeFetch);
+  assert.equal(await provider.translate('自然な翻訳です。', new AbortController().signal), 'Natural translation.');
+  assert.equal(url, 'https://api.deepl.com/v2/translate');
+});
+
+test('DeepL provider rejects upstream failures without exposing response details', async () => {
+  const fakeFetch: typeof fetch = async () => new Response('SECRET upstream body', { status: 456 });
+  const provider = createDeepLTranslationProvider('test-key:fx', fakeFetch);
+  await assert.rejects(
+    () => provider.translate('こんにちは。', new AbortController().signal),
+    error => error instanceof Error && error.message === 'DeepL translation is unavailable.',
+  );
 });
 
 test('shared translation API validates origin/input, passes bounded context and returns provider identity', async () => {
