@@ -17,6 +17,7 @@ export default defineConfig({
       ASSETS: bindings.assets(),
       IMAGES: bindings.images(),
       AI: bindings.ai(),
+      DEEPL_AUTH_KEY: bindings.secret(),
       YOUTUBE_CAPTION_RELAY_URL: bindings.secret(),
       YOUTUBE_CAPTION_RELAY_TOKEN: bindings.secret(),
     },

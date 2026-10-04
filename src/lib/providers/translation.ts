@@ -1,9 +1,8 @@
 import type { TranslationContext, TranslationProvider } from '../types';
 import { cleanText } from '../segmentation';
-import { object } from '../quiz';
-import { runWorkersAi, WORKERS_AI_TRANSLATION_MODEL, type WorkersAiBindingLike } from './workers-ai';
 
-const QWEN_TRANSLATION_SYSTEM_PROMPT = 'You are a Japanese-to-English translation engine. Translate ONLY the text inside <current>. Text inside <previous> and <next> is context only: use it to resolve meaning, but NEVER translate, quote, paraphrase, or include it in the answer. Preserve names and titles. Output only the natural English translation of <current>, with no label, quotes, explanation, or extra text.';
+const DEEPL_FREE_API = 'https://api-free.deepl.com';
+const DEEPL_PRO_API = 'https://api.deepl.com';
 
 function chunks(text: string): string[] {
   const parts: string[] = []; let part = '';
@@ -15,30 +14,12 @@ function chunks(text: string): string[] {
   return parts;
 }
 
-function qwenTranslationMessages(japanese: string, context?: TranslationContext) {
-  const parts = [
-    context?.previousJapanese ? `<previous>${context.previousJapanese}</previous>` : '',
-    `<current>${japanese}</current>`,
-    context?.nextJapanese ? `<next>${context.nextJapanese}</next>` : '',
-    '/no_think',
-  ].filter(Boolean);
-  return [
-    { role: 'system', content: QWEN_TRANSLATION_SYSTEM_PROMPT },
-    { role: 'user', content: parts.join('\n') },
-  ];
+function deepLContext(context?: TranslationContext) {
+  return [context?.previousJapanese, context?.nextJapanese].filter((value): value is string => Boolean(value?.trim())).join('\n');
 }
 
-function parseQwenTranslation(response: unknown): string {
-  const raw = object(response);
-  let translated: unknown = raw.response;
-  if (typeof translated !== 'string') {
-    if (!Array.isArray(raw.choices) || !raw.choices.length) throw new Error('Invalid translation response.');
-    const choice = object(raw.choices[0]);
-    if (choice.finish_reason !== undefined && choice.finish_reason !== 'stop') throw new Error('Incomplete translation response.');
-    translated = object(choice.message).content;
-  }
-  if (typeof translated !== 'string' || !translated.trim() || translated.length > 10000) throw new Error('Invalid translation response.');
-  return cleanText(translated);
+function deepLEndpoint(authKey: string) {
+  return `${authKey.trim().endsWith(':fx') ? DEEPL_FREE_API : DEEPL_PRO_API}/v2/translate`;
 }
 
 // Keyless fallback for local/non-Cloudflare development only.
@@ -60,17 +41,33 @@ export const myMemoryTranslation: TranslationProvider = {
   },
 };
 
-export function createWorkersAiTranslationProvider(ai: WorkersAiBindingLike): TranslationProvider {
+export function createDeepLTranslationProvider(authKey: string, fetcher: typeof fetch = fetch): TranslationProvider {
+  const key = authKey.trim();
+  if (!key) throw new Error('DeepL is not configured.');
   return {
-    name: 'Workers AI · Qwen3',
+    name: 'DeepL',
     async translate(japanese, signal, context) {
-      const activeSignal = signal ?? new AbortController().signal;
-      const response = await runWorkersAi<unknown>(ai, WORKERS_AI_TRANSLATION_MODEL, {
-        messages: qwenTranslationMessages(japanese, context),
-        max_tokens: 800,
-        temperature: 0,
-      }, activeSignal);
-      return parseQwenTranslation(response);
+      const contextualJapanese = deepLContext(context);
+      const response = await fetcher(deepLEndpoint(key), {
+        method: 'POST',
+        headers: {
+          Authorization: `DeepL-Auth-Key ${key}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          text: [japanese],
+          source_lang: 'JA',
+          target_lang: 'EN-US',
+          ...(contextualJapanese ? { context: contextualJapanese } : {}),
+        }),
+        signal,
+        cache: 'no-store',
+      });
+      if (!response.ok) throw new Error('DeepL translation is unavailable.');
+      const data = await response.json() as { translations?: Array<{ text?: unknown }> };
+      const translated = data.translations?.[0]?.text;
+      if (typeof translated !== 'string' || !translated.trim() || translated.length > 10000) throw new Error('Invalid DeepL translation response.');
+      return cleanText(translated);
     },
   };
 }

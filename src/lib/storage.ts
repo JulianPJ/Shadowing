@@ -48,7 +48,7 @@ export function loadFavorites(lesson: Lesson): string[] {
   const valid = new Set(lesson.segments.map(s => s.id));
   return Array.isArray(raw) ? [...new Set(raw.filter((id): id is string => typeof id === 'string' && valid.has(id)))] : [];
 }
-export const TRANSLATION_CACHE_VERSION = 2;
+export const TRANSLATION_CACHE_VERSION = 3;
 export function translationCacheKey(lessonId: string) {
   return `translations:v${TRANSLATION_CACHE_VERSION}:${lessonId}`;
 }
