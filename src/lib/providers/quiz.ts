@@ -1,7 +1,7 @@
 // Server module: imported only by quiz request handlers. Never import into a client component.
 import demo from '../../data/demo.json';
 import demoQuiz from '../../data/demo-quiz.json';
-import { createQuiz, object, QuizValidationError, transcriptRevision } from '../quiz';
+import { createGeneratedQuiz, createQuiz, object, QuizValidationError, transcriptRevision } from '../quiz';
 import type { LessonQuiz, QuestionKind, QuizGenerationProvider, QuizLesson, Segment } from '../types';
 import { runWorkersAi, WORKERS_AI_DECISION_MODEL, WORKERS_AI_GENERATIVE_MODEL, type WorkersAiBindingLike } from './workers-ai';
 
@@ -312,7 +312,7 @@ export async function generateLessonQuiz(lesson: QuizLesson, signal: AbortSignal
     const output = canonicalDemo ? demoQuiz : await provider.generate(lesson, signal);
     const raw = object(output);
     if (Array.isArray(raw.questions) && !raw.questions.length) throw new QuizProviderError('malformed', 'We could not make a reliable check from this response. Please try again.', 'validation', 'Model returned no questions.');
-    return await createQuiz(output, lesson);
+    return canonicalDemo ? await createQuiz(output, lesson) : await createGeneratedQuiz(output, lesson);
   }
   catch (error) {
     if (error instanceof QuizValidationError) throw new QuizProviderError('malformed', 'We could not make a reliable check from this response. Please try again.', 'validation', error.message);
