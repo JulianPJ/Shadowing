@@ -37,6 +37,8 @@ Available functionality:
 - Streamed preparation progress, bounded timeouts, and import fallbacks when captions are unavailable.
 - Sentence/clause segmentation using punctuation, caption timing, and pauses; estimated timings are marked when a caption is split.
 - **Shadowing** mode with automatic pauses and **Continuous** mode with a following transcript. Switching modes preserves playback position.
+- **Studio Mode** provides a wide, video-first desktop layout, with controls and the current section followed by the transcript, difficulty and comprehension panels. It uses the same player/state and restores the normal layout instantly; its preference stays local.
+- **Furigana** is optional and off by default. Semantic ruby readings appear on the current section, transcript and comprehension questions/options/evidence. Kuromoji 0.1.2 + IPADIC generate readings deterministically in a lazy browser worker, with no AI request or external reading service. Readings are display-only: canonical Japanese, transcript hashes/keys, search, bookmarks and D1 storage remain unchanged. Both display preferences use `hibiki:v1:preferences`. See [implementation, asset sizes, limitations and verification](docs/studio-furigana.md).
 - Instant replay, previous/next section, section and lesson progress, and speeds of **0.5×, 0.75×, 1×, and 1.25×**.
 - English hidden initially, revealed on demand, and hidden again when moving to another section.
 - Searchable timestamped Japanese transcript, section bookmarks, and a saved-sections filter.

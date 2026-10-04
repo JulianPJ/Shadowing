@@ -48,3 +48,44 @@
 @media(max-width:700px){.quiz-card{padding:20px;margin-top:20px}.quiz-card h2{font-size:25px}.quiz-question{font-size:19px}.quiz-feedback{padding:16px}.quiz-toolbar{align-items:flex-start}.quiz-option{padding:12px;gap:9px;flex-wrap:wrap}.quiz-option>.small{width:100%;padding-left:19px}.quiz-card .button{white-space:normal}.quiz-actions>.button{flex:1}.evidence-banner{top:8px;font-size:11px}.evidence-banner .button{padding:10px 12px;font-size:12px;white-space:normal;flex-shrink:0;max-width:60%}}
 .vimeo-host { width: 100%; height: 100%; border: 0; position: absolute; inset: 0; }
 .media-source-link { position: absolute; bottom: 8px; left: 8px; right: 8px; z-index: 3; background: var(--paper, #fff); padding: 6px 10px; border-radius: 6px; }
+
+/* Display preferences keep the same mounted practice tree and media handles. */
+.practice-breadcrumb{flex-wrap:wrap}
+.practice-view-controls{display:flex;gap:8px;margin-left:auto}
+.practice-view-controls .button{font-size:11px;padding:8px 12px;min-height:44px;gap:7px}
+.practice-view-controls [aria-pressed=true]{background:var(--green-pale);border-color:#a9b99e;color:var(--green)}
+.player-settings{flex-wrap:wrap;gap:8px}
+.japanese-text{overflow-wrap:anywhere}
+.with-furigana{line-height:2.15}
+.japanese-text ruby{ruby-position:over;ruby-align:center}
+.japanese-text rt{font-size:.48em;line-height:1.2;letter-spacing:0;font-weight:400;color:var(--muted);user-select:none}
+.row-content .with-furigana{line-height:2.1}
+.quiz-option>span:nth-child(2){min-width:0}
+.studio-mode .practice-grid{display:flex;flex-direction:column;gap:0}
+.studio-mode .player-column{display:contents}
+.studio-mode .practice-grid>*:not(.player-column),.studio-mode .player-column>*{width:100%;min-width:0}
+.studio-mode .transcript-card{order:1;position:static;height:auto;max-height:none;min-height:0;margin-top:28px;overflow:visible}
+.studio-mode .transcript-scroll{overflow:visible;content-visibility:visible;flex:none}
+.studio-mode .quiz-card,.studio-mode .difficulty-card,.studio-mode .player-footnote,.studio-mode .translation-privacy{order:2}
+.studio-mode .transcript-row{width:100%}
+@media(min-width:901px){
+  .studio-mode .media-frame{aspect-ratio:21/9;max-height:42svh}
+  .studio-mode .practice-title{margin:12px 0 18px}
+  .studio-mode .practice-title .eyebrow{display:none}
+  .studio-mode .practice-title h1{font-size:28px}
+  .studio-mode .current-card h2{font-size:28px;min-height:0;margin:12px 0;line-height:1.85}
+  .studio-mode .current-card h2:has(.with-furigana){line-height:2.15}
+  .studio-mode .current-card{padding:20px 28px 16px}
+  .studio-mode .practice-controls{justify-content:center}
+  .studio-mode .recording-panel{padding-top:18px}
+}
+@media(max-width:900px){
+  .studio-mode .media-frame{aspect-ratio:16/9}
+  .studio-mode .transcript-card{overflow:hidden}
+  .studio-mode .transcript-scroll{max-height:620px;overflow:auto}
+}
+@media(max-width:700px){
+  .practice-view-controls{margin-left:0;width:100%;margin-top:6px}
+  .practice-view-controls .button{flex:1}
+  .studio-mode .transcript-card{margin-top:25px}
+}

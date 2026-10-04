@@ -5,7 +5,17 @@ import { transcriptRevision, validateAttempt, validateQuiz } from './quiz';
 import { ARCHIVE_LIMIT, HISTORY_BYTE_LIMIT, compactDifficulty, compactHistory, emptyHistory, validateHistory } from './learner-progress';
 import type { LearnerHistory } from './learner-types';
 export type StudyRecord = { lesson: Lesson; index: number; updatedAt: number };
-export type Preferences = { mode: Mode; speed: number; translation: boolean };
+export type Preferences = { mode: Mode; speed: number; translation: boolean; studioMode: boolean; furigana: boolean };
+export function loadPreferences(): Preferences {
+  const raw = readStorage<Partial<Preferences> | null>('preferences', null);
+  return {
+    mode: raw?.mode === 'continuous' ? 'continuous' : 'shadowing',
+    speed: [0.5, 0.75, 1, 1.25].includes(raw?.speed as number) ? raw!.speed! : 1,
+    translation: false,
+    studioMode: raw?.studioMode === true,
+    furigana: raw?.furigana === true,
+  };
+}
 const PREFIX = 'hibiki:v1:';
 const unsaved = new Map<string, unknown>();
 let storageFailed = false;
