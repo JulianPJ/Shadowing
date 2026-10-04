@@ -95,7 +95,7 @@ function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () => void
   useEffect(() => () => { translationAbort.current?.abort(); }, []);
 
   const resetTranslation = useCallback(() => {
-    translationAbort.current?.abort(); setTranslating(false); setTranslationError(''); setRevealed(false);
+    translationAbort.current?.abort(); setTranslating(false); setTranslationError(''); setTranslationProvider(''); setRevealed(false);
   }, []);
   const navigate = useCallback((nextIndex: number, play = true, evidenceReplay = false) => {
     if (!evidenceReplay) { setReplayRange(null); replayResumeIndex.current = null; }
