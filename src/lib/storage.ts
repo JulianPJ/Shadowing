@@ -1,4 +1,5 @@
 import type { ContentDifficultyAnalysis, Lesson, LessonQuiz, Mode, QuizAttempt, QuizLesson } from './types';
+import { migrateLesson, lessonMedia } from './media';
 import { validateDifficultyAnalysis } from './difficulty';
 import { transcriptRevision, validateAttempt, validateQuiz } from './quiz';
 import { ARCHIVE_LIMIT, HISTORY_BYTE_LIMIT, compactDifficulty, compactHistory, emptyHistory, validateHistory } from './learner-progress';
@@ -92,12 +93,23 @@ export function saveQuizAttempt(attempt: QuizAttempt, quiz: LessonQuiz, lesson: 
   return historySaved && draftSaved;
 }
 export function saveLesson(lesson: Lesson, index: number) {
-  if (lesson.source === 'upload' && lesson.mediaUrl) rememberMedia(lesson.id, lesson.mediaUrl);
+  lesson = migrateLesson(lesson);
+  const local = lessonMedia(lesson).type === 'local';
+  if (local && lesson.mediaUrl) rememberMedia(lesson.id, lesson.mediaUrl);
   const rawHistory = readStorage<StudyRecord[]>('history', []);
   const history = Array.isArray(rawHistory) ? rawHistory.filter(item => item?.lesson?.id && Array.isArray(item.lesson.segments)) : [];
   // Object URLs don't survive reload; keep the transcript and prompt to reattach the media.
-  const safeLesson = lesson.source === 'upload' ? { ...lesson, mediaUrl: undefined } : lesson;
+  const safeLesson = local ? { ...lesson, mediaUrl: undefined } : lesson;
   writeStorage('history', [{ lesson: safeLesson, index, updatedAt: Date.now() }, ...history.filter(item => item.lesson.id !== lesson.id)].slice(0, 8));
   writeStorage(`lesson:${lesson.id}`, safeLesson);
   writeStorage(`position:${lesson.id}`, index);
+}
+export function loadLesson(id: string): Lesson | null {
+  const raw = readStorage<Lesson | null>(`lesson:${id}`, null);
+  try { return raw && raw.id === id && Array.isArray(raw.segments) ? migrateLesson(raw) : null; } catch { return null; }
+}
+export function recentLessons(): StudyRecord[] {
+  const raw = readStorage<StudyRecord[]>('history', []);
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap(item => { try { return item?.lesson?.segments?.length ? [{ ...item, lesson: migrateLesson(item.lesson) }] : []; } catch { return []; } });
 }

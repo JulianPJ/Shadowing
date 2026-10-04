@@ -57,7 +57,7 @@ export function LearnerProgress() {
       </>}
       {profile.lessons.length ? <section className="progress-panel"><h2>Recent lesson activity</h2><ul className="progress-list">{profile.lessons.slice(0, 20).map(l => <li key={`${l.lesson.lessonId}:${l.lesson.transcriptKey}`}>
         <div>{available.includes(identityKey(l.lesson)) ? <Link href={`/practice/${encodeURIComponent(l.lesson.lessonId)}`}>{l.lesson.title}<ArrowRight size={14} /></Link> : <strong>{l.lesson.title}</strong>}
-        <p>{activityDate(l.lastPractisedAt)} · {l.lesson.source === 'upload' ? 'Your media' : l.lesson.source === 'demo' ? 'Studio sample' : 'YouTube'}</p>
+        <p>{activityDate(l.lastPractisedAt)} · {{ upload: 'Your media', demo: 'Studio sample', youtube: 'YouTube', vimeo: 'Vimeo', direct: 'Direct video' }[l.lesson.source]}</p>
         <p>{l.completed ? 'Completed' : l.practised ? 'Practised' : 'Earlier saved lesson'} · {practiceTime(l.activeSeconds)} · {l.sessions} practice sessions</p>
         <p className="small muted">{l.quizAttempts ? `${l.quizCompleted} completed checks / ${l.quizAttempts} attempts` : 'No comprehension check recorded'}{l.difficulty ? ` · Content ${l.difficulty.jlptMin}${l.difficulty.jlptMax !== l.difficulty.jlptMin ? `–${l.difficulty.jlptMax}` : ''}` : ''}</p>
         {!available.includes(identityKey(l.lesson)) ? <p className="small muted">This lesson transcript is no longer available in this browser.</p> : null}</div>

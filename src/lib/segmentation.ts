@@ -4,7 +4,7 @@ export function cleanText(text: string) {
   return text.replace(/<[^>]*>/g, '').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#(\d+);/g, (_, n: string) => String.fromCodePoint(Math.min(Number(n), 0x10ffff))).replace(/\s+/g, ' ').trim();
 }
 export function validateCues(input: unknown): Cue[] {
-  if (!Array.isArray(input) || input.length === 0) throw new Error('No timestamped speech was found. Import a Japanese SRT, VTT, or JSON transcript.');
+  if (!Array.isArray(input) || input.length === 0) throw new Error('No timestamped speech was found. Import Japanese SRT, VTT, ASS, SSA, or JSON. Plain text needs timestamps.');
   if (input.length > 15000) throw new Error('This transcript is too large. Please use a shorter video (up to 15,000 caption cues).');
   const cues: Cue[] = [];
   for (const value of input) {

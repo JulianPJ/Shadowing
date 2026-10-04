@@ -18,11 +18,11 @@ try {
     const lesson = fixture.captions.flatMap(item => item.events).find(event => event.lesson?.videoId === videoId)?.lesson;
     if (!lesson) throw new Error('Import report has no lesson for the requested video.');
     await page.getByRole('button', { name: 'Import media or subtitles' }).click();
-    await page.getByLabel('YouTube video URL', { exact: true }).fill(`https://www.youtube.com/watch?v=${videoId}`);
+    await page.getByLabel('Video link', { exact: true }).fill(`https://www.youtube.com/watch?v=${videoId}`);
     await page.getByLabel('Paste timestamped transcript').fill(JSON.stringify(lesson.segments));
     await page.getByRole('button', { name: 'Start practicing' }).click();
   } else {
-    await page.getByRole('textbox', { name: 'Paste a Japanese YouTube video URL' }).fill(`https://www.youtube.com/watch?v=${videoId}`);
+    await page.getByRole('textbox', { name: 'Paste a Japanese video link' }).fill(`https://www.youtube.com/watch?v=${videoId}`);
     // Capture the stream as the browser receives it; client navigation can discard CDP response bodies.
     let captured;
     await page.route('**/api/prepare', async route => {

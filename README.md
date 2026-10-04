@@ -2,7 +2,7 @@
 
 Hibiki is a personal Japanese listening and speaking practice app. It turns timestamped speech into short sections so you can **listen → pause → repeat aloud → replay → continue** at your own pace.
 
-The intention of this repository is to make regular shadowing easy: use Japanese YouTube captions or your own media and subtitles, focus on the sound first, and reveal English only when you need it. It is a working practice prototype with replaceable transcription and translation providers. The core app needs no account, database, paid API key, or model download.
+The intention of this repository is to make regular shadowing easy: bring a supported video link or your own media, pair it with Japanese captions or a timed transcript, focus on the sound first, and reveal English only when you need it. It is a working practice prototype with replaceable media, transcription and translation providers. The core app needs no account, database, paid API key, or model download.
 
 ## Quick start
 
@@ -13,7 +13,7 @@ npm ci
 npm run dev
 ```
 
-Open [localhost:3000](http://localhost:3000) and choose **Try the demo**. Alternatively, paste a Japanese YouTube URL or choose **Import media or subtitles**. On Windows PowerShell with script execution restricted, use `npm.cmd` and `npx.cmd`.
+Open [localhost:3000](http://localhost:3000) and choose **Try the demo**. Alternatively, paste a Japanese video link or choose **Import media or subtitles**. On Windows PowerShell with script execution restricted, use `npm.cmd` and `npx.cmd`.
 
 For a production build:
 
@@ -26,7 +26,7 @@ No environment variables are required for the demo, subtitle import, or local di
 
 ## Features and practice flow
 
-1. **Choose a lesson.** Start the bundled demo, prepare a YouTube video with Japanese captions, or pair your own audio/video with timestamped subtitles.
+1. **Choose a lesson.** Start the bundled demo, prepare a YouTube video with Japanese captions, or pair a supported video link/local audio/video file with a timestamped transcript.
 2. **Listen to a section.** Shadowing mode pauses playback at the section boundary and gives you as much time as you need to repeat it.
 3. **Repeat and compare.** Replay the source, optionally record your voice, and listen to your attempt before continuing.
 4. **Continue or review.** Move between sections, click a transcript row, search for Japanese phrases, or filter to bookmarked sections.
@@ -61,15 +61,17 @@ Shortcuts leave typing fields and open dialogs alone. Focused native buttons ret
 
 The Cloudflare entrypoint handles byte ranges for the small bundled MP4, including when the asset binding omits `Content-Length`. This preserves replay and section seeking in the deployed demo. The player and own-media import behavior are unchanged.
 
-## YouTube and subtitle import
+## Video links and transcript import
 
 Paste a YouTube URL to request existing **Japanese captions**. Production uses the configured caption relay first and retains direct `youtube-transcript-plus` retrieval as a fallback. Both produce the same normalized cues, so segmentation and player behavior stay provider-independent. Video metadata comes from YouTube's official oEmbed endpoint when available, and playback uses the official YouTube IFrame player.
 
-Unavailable/private videos and videos without Japanese captions return clean content errors. The app does not download or re-host YouTube videos, and it does not generate captions for captionless videos. **YouTube + subtitles**, own media, and the bundled demo remain alternative input paths.
+YouTube, Vimeo and direct HTTP(S) audio/video links use normalized playback controls. Vimeo/direct links currently need your transcript; missing Japanese YouTube captions open the same **Video link + transcript** dialog with the resolved link and metadata retained. Caption relay outages and other infrastructure failures remain distinct errors. The app does not download or re-host third-party media.
+
+For other public pages, Hibiki attempts browser-side extraction from media sources, OpenGraph and JSON-LD metadata where CORS permits access. The extracted direct link is exposed for opening and playback. Arbitrary iframes are unsupported; this path cannot bypass authentication, DRM, referrer/embedding restrictions or CORS. Vimeo speed changes depend on creator settings. See [media contracts, migration, extraction limits and future seams](docs/media-sources.md).
 
 ### Transcript formats
 
-Import **SRT, WebVTT, or JSON**, or paste timestamped transcript text. Subtitle files may be up to **2 MB**. [public/demo.vtt](public/demo.vtt) is a ready-to-use example.
+Import **SRT, WebVTT, ASS, SSA, or JSON**, or paste timestamped transcript text. **TXT** may contain the same timed syntax; untimed prose is rejected. ASS/SSA parse Events Dialogue rows, centisecond timestamps, override tags and line breaks through the same cue validation. Subtitle files may be up to **2 MB**. [public/demo.vtt](public/demo.vtt) is a ready-to-use example.
 
 JSON accepts an array or an object containing a `segments` array:
 
@@ -90,7 +92,7 @@ Segmentation cleans markup, removes repeated rolling-caption text, trims display
 
 ### Own audio/video
 
-Choose **Import media or subtitles → Own media**, then select media and Japanese subtitles. Formats depend on the browser's codecs; common choices include MP4, WebM, MP3, WAV, and M4A. Media is limited to **250 MB**.
+Choose **Import media or subtitles → Own media**, then select media and Japanese subtitles. Formats depend on the browser's codecs; common candidates include MP4/M4V, WebM, MOV, MP3/M4A/AAC, WAV, OGG/OGA/OGV and FLAC. Selection uses media MIME categories and the browser determines decoding support; unsupported files produce a playback error. Media is limited to **250 MB**.
 
 With subtitle import, media stays in the browser. After a full refresh, the transcript and last section remain saved, but you must reattach the original media file. Browser object URLs survive only the current session.
 
@@ -100,7 +102,7 @@ Demo translations are authored, and imported translations are used when supplied
 
 Translation failures show a retryable message and do not prevent playback. The reveal button returns to a usable state after a failure instead of remaining stuck open. Another implementation can replace `TranslationProvider`.
 
-Practice data lives in browser `localStorage`, scoped to the current origin/browser/device. There are no accounts, hosted database, or cross-device synchronization. Clearing site storage removes saved practice data. Recordings stay in memory and are neither uploaded nor persisted. YouTube requests and requested automatic translations require network access. Optional Whisper transcription sends selected media directly to the configured local service.
+Practice data lives in browser `localStorage`, scoped to the current origin/browser/device. There are no accounts, hosted database, or cross-device synchronization. Versioned media/transcript contracts and no-op linked-transcript repository / future generated-transcript provider boundaries exist, but no D1/shared transcript cache or hosted AI subtitle generation is implemented. User transcript imports stay private/browser-local, including those paired with public links. Clearing site storage removes saved practice data. Recordings stay in memory and are neither uploaded nor persisted. YouTube requests and requested automatic translations require network access. Optional Whisper transcription sends selected media directly to the configured local service.
 
 Recording requires a browser with `MediaRecorder`, a microphone, permission, and **HTTPS or localhost**. Denied permission shows a recovery message while playback remains available.
 

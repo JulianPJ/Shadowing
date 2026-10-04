@@ -91,9 +91,9 @@ test('imported local media and SRT play, pause, translate and recover on refresh
 test('invalid URL, shortcut typing guard, bookmarks, search, and mobile layout', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');
-  await page.getByRole('textbox', { name: 'Paste a Japanese YouTube video URL' }).fill('https://example.com/watch?v=IJ6R4u05ppw');
+  await page.getByRole('textbox', { name: 'Paste a Japanese video link' }).fill('javascript:alert(1)');
   await page.getByRole('button', { name: 'Start shadowing' }).click();
-  await expect(page.locator('.error-message')).toContainText('not from YouTube');
+  await expect(page.locator('.error-message')).toContainText('HTTP(S)');
   await page.screenshot({ path: 'artifacts/home-mobile.png', fullPage: true });
   await page.getByRole('link', { name: 'Try the demo', exact: true }).last().click();
   await expect(page.getByRole('button', { name: 'Listen', exact: true })).toBeEnabled();

@@ -1,8 +1,22 @@
 export type Cue = { start: number; end: number; text: string; translation?: string; estimated?: boolean };
 export type Segment = { id: string; start: number; end: number; japanese: string; translation?: string; estimated?: boolean };
+export type LinkedMediaSource = { schemaVersion: 1; canonicalUrl: string; contentKey: string } & (
+  | { type: 'youtube'; provider: 'youtube'; videoId: string }
+  | { type: 'vimeo'; provider: 'vimeo'; videoId: string }
+  | { type: 'direct'; discoveredFrom?: string }
+);
+export type MediaSource = LinkedMediaSource | { schemaVersion: 1; type: 'local'; fileName: string } | { schemaVersion: 1; type: 'demo' };
+export type TranscriptSource = {
+  schemaVersion: 1; type: 'provider-captions' | 'user-upload' | 'user-paste' | 'generated' | 'authored';
+  language: 'ja'; provenance: string; provider?: string; transcriptHash?: string;
+  normalizationVersion: 1; segmentationVersion: 1;
+};
+export type ResolvedMedia = { originalUrl: string; media: LinkedMediaSource; title?: string; author?: string };
 export type Lesson = {
-  id: string; title: string; author: string; source: 'demo' | 'youtube' | 'upload';
+  id: string; title: string; author: string; source: 'demo' | 'youtube' | 'vimeo' | 'direct' | 'upload';
   videoId?: string; mediaUrl?: string; mediaName?: string; segments: Segment[];
+  // Additive contracts keep legacy lesson IDs and transcript-keyed learning artifacts intact.
+  mediaSource?: MediaSource; transcript?: TranscriptSource;
   transcriptSource: string; notice?: string;
 };
 export type Mode = 'shadowing' | 'continuous';

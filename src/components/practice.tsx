@@ -5,7 +5,8 @@ import { ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, RotateCcw, Play, Paus
 import demoData from '@/data/demo.json';
 import type { Lesson, Mode, PlaybackState, QuizEvidence } from '@/lib/types';
 import { validateCues } from '@/lib/segmentation';
-import { readStorage, writeStorage, saveLesson, getLiveMedia, completeLesson, lessonCompleted, loadFavorites, loadTranslationCache, translationCacheKey, type Preferences } from '@/lib/storage';
+import { readStorage, writeStorage, saveLesson, loadLesson, getLiveMedia, completeLesson, lessonCompleted, loadFavorites, loadTranslationCache, translationCacheKey, type Preferences } from '@/lib/storage';
+import { lessonMedia, migrateLesson, sourceLabel, MEDIA_ACCEPT, validateMediaFile } from '@/lib/media';
 import { timestamp } from '@/lib/youtube';
 import { Header, Footer, HelpDialog } from './chrome';
 import { MediaPlayer, type MediaHandle } from './media-player';
@@ -23,9 +24,9 @@ export function Practice({ lessonId }: { lessonId: string }) {
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     try {
-      const lesson = lessonId === 'demo' ? demoData as Lesson : readStorage<Lesson | null>(`lesson:${lessonId}`, null);
+      const lesson = lessonId === 'demo' ? migrateLesson(demoData as Lesson) : loadLesson(lessonId);
       if (!lesson || !lesson.segments?.length) { setMissing(true); return; }
-      if (lesson.source === 'upload') lesson.mediaUrl = getLiveMedia(lesson.id);
+      if (lessonMedia(lesson).type === 'local') lesson.mediaUrl = getLiveMedia(lesson.id);
       validateCues(lesson.segments);
       const rawIndex = readStorage<number>(`position:${lessonId}`, 0);
       const index = Number.isInteger(rawIndex) ? Math.max(0, Math.min(rawIndex, lesson.segments.length - 1)) : 0;
@@ -227,19 +228,19 @@ function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () => void
   const pauseForRecording = useCallback(() => { media.current?.pause(); setStatus('your-turn'); }, []);
   function reattach(file: File | undefined) {
     if (!file) return;
-    if (file.size > 250 * 1024 * 1024) { setPlaybackError('Choose a file smaller than 250 MB.'); return; }
+    try { validateMediaFile(file); } catch (error) { setPlaybackError((error as Error).message); return; }
     const mediaUrl = URL.createObjectURL(file);
     setLesson(current => ({ ...current, mediaUrl })); setReady(false);
   }
   const filtered = lesson.segments.map((s, n) => ({ segment: s, index: n })).filter(item => (!onlyFavorites || favorites.includes(item.segment.id)) && (!search || item.segment.japanese.includes(search.trim())));
   return <main className="practice-main" onClickCapture={progress.interact} onKeyDownCapture={event => { if (!event.repeat) progress.interact(); }}>
     {progress.warning ? <p className="small error-message" role="status">Progress for this visit may not be saved.</p> : null}
-    <div className="practice-breadcrumb"><Link href="/"><ArrowLeft size={14} />Your practice</Link><span>/</span><span>{lesson.source === 'demo' ? 'Listening studio' : lesson.source === 'youtube' ? 'YouTube' : 'Your media'}</span><span className="private-label">One sentence at a time.</span></div>
+    <div className="practice-breadcrumb"><Link href="/"><ArrowLeft size={14} />Your practice</Link><span>/</span><span>{sourceLabel(lesson)}</span><span className="private-label">One sentence at a time.</span></div>
     <div className="practice-title"><div><span className="eyebrow">{lesson.source === 'demo' ? 'A MOMENT FOR YOUR JAPANESE' : 'YOUR LISTENING SESSION'}</span><h1>{lesson.title}</h1><p>{lesson.author}<span>·</span>{lesson.segments.length} sections<span>·</span>{timestamp(duration)}</p></div><div className="practice-progress"><span>{index + 1}<span> / {lesson.segments.length}</span></span><div><i style={{ width: `${(index + 1) / lesson.segments.length * 100}%` }} /></div><span className="small muted">a little closer</span></div></div>
     <div className="practice-grid"><div className="player-column" ref={playerColumn}>
       <MediaPlayer ref={media} lesson={lesson} initialTime={lesson.segments[session.index].start} speed={speed} onReady={onReady} onPlaying={onPlaying} onEnded={onEnded} onError={onMediaError} />
       {replayRange ? <div className="evidence-banner" role="status"><span>Lesson evidence · {timestamp(replayRange.start)} – {timestamp(replayRange.end)}</span><button className="button" onClick={returnToQuiz}>Return to question<ArrowRight size={16} /></button></div> : null}
-      {lesson.source === 'upload' && !lesson.mediaUrl ? <label className="reattach button"><Upload size={16} />Reattach {lesson.mediaName || 'your media'}<input aria-label="Reattach media" type="file" accept="audio/*,video/*" onChange={event => reattach(event.target.files?.[0])} /></label> : null}
+      {lessonMedia(lesson).type === 'local' && !lesson.mediaUrl ? <label className="reattach button"><Upload size={16} />Reattach {lesson.mediaName || 'your media'}<input aria-label="Reattach media" type="file" accept={MEDIA_ACCEPT} onChange={event => reattach(event.target.files?.[0])} /></label> : null}
       <div className="player-settings"><div className="segmented-control" aria-label="Playback mode"><button className={mode === 'shadowing' ? 'selected' : ''} aria-pressed={mode === 'shadowing'} onClick={() => setMode('shadowing')}><Mic size={14} />Shadowing</button><button className={mode === 'continuous' ? 'selected' : ''} aria-pressed={mode === 'continuous'} onClick={() => setMode('continuous')}><Headphones size={14} />Continuous</button></div><label className="speed-control">Speed<select aria-label="Playback speed" value={speed} onChange={event => setSpeed(Number(event.target.value))}><option value="0.5">0.5×</option><option value="0.75">0.75×</option><option value="1">1×</option><option value="1.25">1.25×</option></select></label></div>
       <section className={`current-card state-${recording ? 'recording' : status}`} aria-labelledby="current-japanese">
         <div className="current-heading"><span className="state-badge" role="status" data-testid="playback-state">{recording ? <Mic size={13} /> : status === 'listening' ? <AudioLines size={14} /> : status === 'your-turn' ? <Mic size={13} /> : <span className="tiny-dot" />}{stateLabel}</span><span className="section-time">{timestamp(segment.start)} — {timestamp(segment.end)}</span></div>

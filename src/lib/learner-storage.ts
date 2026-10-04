@@ -39,7 +39,7 @@ export function availableLesson(id: string): Lesson | null {
   try {
     const value = id === 'demo' ? demo : readStorage(`lesson:${id}`, null), r = object(value);
     const normalized = validateQuizLesson(r, { maxSegments: 10000, maxCharacters: 300000 });
-    if (normalized.id !== id || typeof r.title !== 'string' || !r.title.trim() || typeof r.author !== 'string' || !['demo', 'youtube', 'upload'].includes(r.source as string)) return null;
+    if (normalized.id !== id || typeof r.title !== 'string' || !r.title.trim() || typeof r.author !== 'string' || !['demo', 'youtube', 'vimeo', 'direct', 'upload'].includes(r.source as string)) return null;
     return { ...r, ...normalized } as Lesson;
   } catch { return null; }
 }

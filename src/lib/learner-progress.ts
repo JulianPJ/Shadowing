@@ -33,7 +33,7 @@ function nullableDate(v: unknown) { return v === null ? null : date(v); }
 function fingerprint(v: unknown) { const s = str(v, 64); if (!/^[a-f0-9]{64}$/.test(s)) throw new Error('Invalid fingerprint'); return s; }
 export function validateIdentity(v: unknown): LessonIdentity {
   const r = strict(v, ['lessonId', 'transcriptKey', 'videoId', 'title', 'author', 'source', 'duration', 'segmentCount']);
-  if (!['demo', 'youtube', 'upload'].includes(r.source as string)) throw new Error('Invalid source');
+  if (!['demo', 'youtube', 'vimeo', 'direct', 'upload'].includes(r.source as string)) throw new Error('Invalid source');
   if (typeof r.author !== 'string' || r.author.length > 300) throw new Error('Invalid author');
   const duration = count(r.duration), segmentCount = count(r.segmentCount, true);
   if (duration > 86400 || segmentCount < 1 || segmentCount > 10000) throw new Error('Invalid lesson bounds');

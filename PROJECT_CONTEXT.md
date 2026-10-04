@@ -89,9 +89,9 @@ The repository already contains a substantial working MVP rather than scaffoldin
 
 The home page currently supports:
 
-- a Japanese YouTube URL;
+- a Japanese video link (YouTube, Vimeo or direct HTTP(S) audio/video);
 - a bundled demo lesson;
-- importing YouTube plus user-provided subtitles;
+- importing a supported video link plus a user transcript;
 - importing local audio/video plus subtitles;
 - recent lessons saved on the current device;
 - streamed preparation progress and recoverable error states.
@@ -162,10 +162,11 @@ This means future pronunciation work should build on the existing recording flow
 
 ### Media playback
 
-`src/components/media-player.tsx` provides two playback paths:
+`src/components/media-player.tsx` dispatches isolated adapters through normalized `MediaHandle` controls:
 
 1. **YouTube:** official IFrame Player API, using `youtube-nocookie.com`, an explicit `origin`, playback controls, retries, and player error handling.
-2. **Local/demo media:** browser `<video>` playback.
+2. **Vimeo:** documented browser Player SDK, serialized commands and actual-time polling; embedding/privacy and speed changes remain subject to creator settings.
+3. **Direct/local/demo media:** browser `<video>` playback, with codec/decode and finite-duration errors. Unsupported public pages get a bounded, credential-free browser CORS discovery attempt for HTML media sources/OpenGraph/JSON-LD; an extracted direct media link is exposed. Generic iframe embedding alone is unsupported.
 
 YouTube timing is inherently less precise than direct HTML media. The player currently checks shadowing boundaries frequently and pauses hidden-tab shadowing to reduce timer-throttling overshoot.
 
@@ -177,10 +178,12 @@ Current transcript sources are:
 - imported SRT;
 - imported WebVTT;
 - imported JSON;
+- imported ASS/SSA Events Dialogue lines;
+- timestamped TXT (untimed text is rejected);
 - pasted timestamped transcript text;
 - optional local Whisper/faster-whisper for the learner's own media.
 
-Current import support does **not** yet include ASS/SSA.
+All imported formats share cue validation. Genuine missing Japanese captions retain the resolved video and open **Video link + transcript** automatically; caption infrastructure failures stay errors. Vimeo/direct links enter the transcript continuation immediately. Local file selection is capability-based, retains the 250 MB bound, and reports browser decode failures.
 
 ### Segmentation
 
@@ -252,12 +255,12 @@ Important files:
 | --- | --- |
 | `src/components/home.tsx` | URL preparation, progress, demo, recent lessons |
 | `src/components/practice.tsx` | practice state, segment navigation, boundaries, transcript, bookmarks, translation |
-| `src/components/media-player.tsx` | YouTube and HTML-media playback adapter |
+| `src/components/media-player.tsx` | YouTube, Vimeo and HTML-media adapter dispatcher |
 | `src/components/voice-recorder.tsx` | MediaRecorder flow and A/B listening |
-| `src/components/import-dialog.tsx` | YouTube + subtitles and own-media import |
+| `src/components/import-dialog.tsx` | Video link + transcript and own-media import |
 | `src/lib/types.ts` | Lesson/segment/provider contracts |
 | `src/lib/segmentation.ts` | transcript cleanup and shadowing segmentation |
-| `src/lib/subtitles.ts` | SRT/VTT/JSON parsing |
+| `src/lib/subtitles.ts` | SRT/VTT/ASS/SSA/JSON/timed TXT parsing |
 | `src/lib/providers/transcription.ts` | YouTube provider chain and imported transcript provider |
 | `src/lib/providers/youtube-captions.ts` | Direct/relay retrieval, response checks and infrastructure fallback |
 | `src/lib/providers/errors.ts` | Safe diagnostic logging and error normalization |
@@ -309,7 +312,7 @@ Current flow:
 
 `/api/prepare` → configured caption relay → authenticated broker Worker → Durable Object/WebSocket bridge → outbound Node caption host → normalized cues → segmentation → NDJSON lesson → browser storage → `/practice/[id]`.
 
-The app keeps direct caption retrieval as a fallback and records the actual provider in `transcriptSource`. Genuine content errors such as unavailable/private videos or missing Japanese captions remain terminal content errors rather than reasons to redesign the provider path.
+The app keeps direct caption retrieval as a fallback and records the actual provider in `transcriptSource`. Unavailable/private videos remain content errors. Genuinely missing Japanese captions open the retained-video user-transcript continuation. Relay/network/provider failures stay distinct errors; none justify redesigning the working relay path.
 
 Server-only settings are `YOUTUBE_CAPTION_RELAY_URL` and `YOUTUBE_CAPTION_RELAY_TOKEN`. Keep secrets out of browser variables. Structured logs already cover provider selection, upstream status, preparation stages, timings, failures and completion.
 
@@ -319,42 +322,17 @@ DeepL translation is independent from caption preparation. Translation failure m
 
 ---
 
-# 8. Architectural direction before broader media support
+# 8. Media and transcript contracts — implemented
 
-The current `Lesson` model uses:
+The model now separates versioned `MediaSource` (YouTube/Vimeo/direct/local/demo) and `TranscriptSource` (provider-captions/user-upload/user-paste/generated/authored) from normalized lesson sections and playback controls. Linked sources have deterministic `contentKey` values; local files never have globally reusable identity. Normalized-cue SHA-256 transcript hashes remain independent from media identity and existing quiz/difficulty fingerprints.
 
-`source: 'demo' | 'youtube' | 'upload'`
+Legacy lessons migrate additively on read/save, retaining IDs, sections and learning artifacts. The existing `source`, YouTube-only `videoId` and readable `transcriptSource` label remain compatible; new `mediaSource` and `transcript` contracts carry the normalized identity and provenance.
 
-That is sufficient for the MVP but will become restrictive as media/transcript options grow.
+A no-op `LinkedTranscriptRepository` and future `GeneratedTranscriptProvider` contract establish the sequence: resolve identity → transcript lookup → provider captions → user transcript now → future approved-audio generation → validate → persist/reuse with explicit visibility. No D1/R2/KV shared transcript storage, hosted AI subtitle generation or remote media download exists. User transcripts remain private/browser-local.
 
-Before implementing custom embeds or several new content sources, evolve the model toward separate concepts:
+See [media sources](docs/media-sources.md) for exact contracts, migrations, extraction security/limitations, supported URLs/formats and deterministic tests. Practice continues to consume normalized `MediaHandle` operations; provider-specific code stays in adapters. The current user-requested source expansion does not reorder the remaining roadmap below.
 
-```ts
-interface MediaSource {
-  type: 'youtube' | 'local' | 'direct' | 'embed';
-  // provider-specific fields
-}
-
-interface TranscriptSource {
-  type: 'youtube-captions' | 'ass' | 'ssa' | 'srt' | 'vtt' | 'json' | 'generated';
-}
-```
-
-The shadowing player should consume normalized media controls plus normalized timestamped segments. It should not care how the transcript was acquired.
-
-Conceptually:
-
-```text
-MediaSource + TranscriptSource
-            ↓
-    Normalized lesson
-            ↓
-      Shadowing player
-            ↓
-Quiz / vocabulary / grammar / review
-```
-
-This separation is important for the post-MVP roadmap.
+Verification for this refactor: 94 unit tests and all 35 Playwright tests pass on the Next.js production server and built Cloudflare Worker in local workerd. Type checking, lint and both builds pass; lint retains four pre-existing unused-code warnings. The isolated Worker test configuration omits remote inference/production secrets; provider/player boundaries are mocked. Two stale difficulty-panel tests were updated to match the already-implemented compact classification UI without changing that feature.
 
 ---
 
@@ -428,11 +406,11 @@ Do not let monetisation architecture dominate the current learning-product work.
 ## 5. Broaden content sources
 
 After the higher-priority learning loop exists, improve source flexibility:
-- ASS/SSA subtitle parsing;
+- ASS/SSA subtitle parsing (implemented);
 - global subtitle offset controls;
 - bilingual subtitle alignment;
-- browser-playable direct media URLs;
-- cleaner separation of `MediaSource` and `TranscriptSource`.
+- browser-playable direct media URLs and controlled Vimeo embeds (implemented);
+- versioned separation of `MediaSource` and `TranscriptSource` (implemented; future shared storage/generation remain contracts only).
 
 Local media remains a first-class privacy/cost-friendly path. Do not promise arbitrary streaming-site support.
 
@@ -520,8 +498,9 @@ Future agents should verify before proposing work. At this snapshot, the followi
 - content difficulty estimates with deterministic caption pace, bounded semantic analysis, validated evidence and local reuse (production Qwen smoke-tested);
 - local persistent learner profile with practice sessions, active time, section signals, comprehension history, typical practised content, conservative trend and dedicated progress page (locally verified; this feature's deployment pending);
 - local own-media import;
-- SRT/VTT/JSON transcript import;
-- YouTube + user transcript import;
+- SRT/VTT/ASS/SSA/JSON/timestamped TXT transcript import;
+- YouTube/Vimeo/direct linked media + user transcript import and retained-link no-caption continuation;
+- best-effort browser-side public media discovery;
 - bundled deterministic demo;
 - optional local Whisper;
 - responsive/mobile behavior;

@@ -12,25 +12,19 @@ async function openDemo(page: Page) {
   await expect(page.getByRole('button', { name: 'Listen', exact: true })).toBeEnabled();
   await expect(page.getByRole('button', { name: 'Estimate difficulty', exact: true })).toBeEnabled();
 }
-test('lazy analysis shows all five dimensions, exact evidence, expands/collapses and reuses reload cache', async ({ page }) => {
+test('lazy analysis shows compact classifications for all five dimensions and reuses reload cache', async ({ page }) => {
   const errors: string[] = []; page.on('pageerror', e => errors.push(e.message));
   const analysis = await createDifficultyAnalysis(authored, demo as Lesson); let calls = 0;
   await page.route('**/api/difficulty', route => { calls++; return route.fulfill({ json: { analysis } }); });
   await openDemo(page);
   const card = page.getByTestId('lesson-difficulty');
   await expect(card).toContainText('Estimated from captions'); expect(calls).toBe(0);
+  await expect(card).toContainText('not an official JLPT classification');
   await page.getByRole('button', { name: 'Estimate difficulty', exact: true }).click();
   await expect(card.locator('dl')).toContainText('N5–N4');
   for (const dimension of ['Approx. level', 'Vocabulary', 'Grammar', 'Speech', 'Conversation']) await expect(card.getByText(dimension, { exact: true })).toBeVisible();
-  await expect(card.locator('#difficulty-details')).toContainText('コーヒーを飲みながら');
-  await expect(card.locator('#difficulty-details')).toContainText('0:27–0:33');
-  await expect(card.locator('#difficulty-details')).toContainText('not an official JLPT classification');
-  await card.getByRole('button', { name: 'Hide difficulty details' }).click();
-  await expect(card.locator('#difficulty-details')).toHaveCount(0);
-  await card.getByRole('button', { name: 'Show difficulty details' }).click();
-  await expect(card.locator('#difficulty-details')).toBeVisible();
+  await expect(card).toContainText('Classification uses the full Japanese transcript');
   await page.reload(); await expect(card.locator('dl')).toContainText('N5–N4');
-  await card.getByRole('button', { name: 'Show difficulty details' }).click();
   expect(calls).toBe(1); expect(errors).toEqual([]);
 });
 test('API failure and malformed result can be retried while playback and the completed quiz still work', async ({ page }) => {
@@ -56,11 +50,11 @@ test('API failure and malformed result can be retried while playback and the com
 });
 test('real authored demo route works without provider credentials and fits mobile', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 }); await openDemo(page);
+  expect(await page.getByRole('button', { name: 'Estimate difficulty', exact: true }).evaluate(e => e.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44);
   await page.getByRole('button', { name: 'Estimate difficulty', exact: true }).click();
   const card = page.getByTestId('lesson-difficulty'); await expect(card.locator('dl')).toContainText('N5–N4');
-  await expect(card.locator('#difficulty-details')).toBeVisible();
+  await expect(card).toContainText('Classification uses the full Japanese transcript');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  expect(await card.getByRole('button').evaluate(e => e.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44);
   await card.scrollIntoViewIfNeeded(); await page.screenshot({ path: 'artifacts/difficulty-mobile.png', fullPage: true });
 });
 test('editing the same stored lesson invalidates cached analysis and generates for the new transcript', async ({ page }) => {
