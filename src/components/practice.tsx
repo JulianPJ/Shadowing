@@ -179,7 +179,16 @@ function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () => void
     const controller = new AbortController(); translationAbort.current?.abort(); translationAbort.current = controller;
     setTranslating(true);
     try {
-      const response = await fetch('/api/translate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ japanese: segment.japanese }), signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15000)]) });
+      const response = await fetch('/api/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          japanese: segment.japanese,
+          previousJapanese: lesson.segments[index - 1]?.japanese,
+          nextJapanese: lesson.segments[index + 1]?.japanese,
+        }),
+        signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15000)]),
+      });
       const data = await response.json();
       if (!response.ok || typeof data.translation !== 'string' || !data.translation.trim()) throw new Error(data.error || 'Translation is unavailable right now. Try again later.');
       if (!controller.signal.aborted) {
@@ -193,7 +202,7 @@ function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () => void
         setTranslationError(error instanceof Error && error.name !== 'TimeoutError' ? error.message : 'Translation took too long. Please try again.');
       }
     } finally { if (!controller.signal.aborted) setTranslating(false); }
-  }, [revealed, translation, segment, recordSignal]);
+  }, [revealed, translation, segment, recordSignal, lesson.segments, index]);
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -252,7 +261,7 @@ function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () => void
       {playbackError ? <p role="alert" className="error-message">{playbackError}</p> : null}
       <LessonDifficulty lesson={lesson} onWaitingChange={setDifficultyWaiting} />
       <div className="player-footnote"><span>{lesson.source === 'demo' ? 'Studio sample · Japanese synthetic voice' : lesson.transcriptSource}</span><button className="text-button" onClick={onHelp}><Keyboard size={14} />Shortcuts</button></div>
-      {!segment.translation ? <p className="translation-privacy">Revealing a translation sends only this Japanese section for translation. It never includes your recordings, quiz results, or learner history.</p> : null}
+      {!segment.translation ? <p className="translation-privacy">Revealing a translation sends this Japanese section plus up to one neighboring Japanese section on each side for context. It never includes your recordings, quiz results, or learner history.</p> : null}
     </div><aside className="transcript-card" aria-labelledby="transcript-title"><div className="transcript-heading"><div><span className="eyebrow">FOLLOW THE CONVERSATION</span><h2 id="transcript-title">Your transcript</h2></div><span className="transcript-count">{lesson.segments.length}</span></div><div className="transcript-tools"><label className="transcript-search"><Search size={15} /><input aria-label="Search Japanese transcript" placeholder="Find a phrase…" value={search} onChange={event => setSearch(event.target.value)} /></label><button className={`icon-button ${onlyFavorites ? 'saved' : ''}`} aria-label={onlyFavorites ? 'Show all sections' : 'Show saved sections'} aria-pressed={onlyFavorites} onClick={() => setOnlyFavorites(!onlyFavorites)}><Bookmark size={16} fill={onlyFavorites ? 'currentColor' : 'none'} /></button></div><div className="transcript-scroll" ref={transcript} tabIndex={0} aria-label="Timestamped Japanese sections"><div>{filtered.map(item => <button key={item.segment.id} ref={item.index === index ? activeRow : undefined} data-testid={`transcript-${item.index}`} aria-current={item.index === index ? 'true' : undefined} className={`transcript-row ${item.index === index ? 'current' : item.index < index ? 'past' : ''}`} disabled={recording} onClick={() => navigate(item.index, ready)}><span className="row-number">{item.index === index ? <AudioLines size={16} /> : item.index < index ? <Check size={13} /> : String(item.index + 1).padStart(2, '0')}</span><span className="row-content"><span className="row-time">{timestamp(item.segment.start)}{favorites.includes(item.segment.id) ? <Bookmark size={11} fill="currentColor" /> : null}</span><span lang="ja">{item.segment.japanese}</span></span>{item.index === index ? <span className="active-dot" /> : null}</button>)}</div>{!filtered.length ? <p className="transcript-empty">{onlyFavorites ? 'Save a section with the bookmark beside its translation button.' : 'No phrases found. Try a shorter Japanese phrase.'}</p> : null}</div><div className="transcript-bottom"><span><span className="tiny-dot" />{mode === 'shadowing' ? 'A pause after every section' : 'Following your listening'}</span><span>{practiceCount ? `${practiceCount} repetitions` : 'Your own pace'}</span></div></aside></div>
     <div className="practice-signoff"><span lang="ja">焦らず、少しずつ。</span><span>No rush. Just a little closer.</span></div>
   </main>;
