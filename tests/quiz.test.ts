@@ -128,6 +128,11 @@ test('replaceable provider generates arbitrary lesson quizzes without any live s
   await generateLessonQuiz(lesson, new AbortController().signal, mock); assert.equal(calls, 1);
   await assert.rejects(generateLessonQuiz({ ...lesson, id: 'custom' }, new AbortController().signal, { name: 'bad', async generate() { return { questions: [null] }; } }), error => error instanceof QuizProviderError && error.code === 'malformed');
   await assert.rejects(generateLessonQuiz({ ...lesson, id: 'custom' }, new AbortController().signal, { name: 'empty', async generate() { return { questions: [] }; } }), error => error instanceof QuizProviderError && error.code === 'malformed');
+  const oneBadCandidate = structuredClone(demoQuiz);
+  oneBadCandidate.questions[1].options = ['同じ', '同じ', '違う', '別'];
+  const filtered = await generateLessonQuiz({ ...lesson, id: 'filtered' }, new AbortController().signal, { name: 'partly-bad', async generate() { return oneBadCandidate; } });
+  assert.equal(filtered.questions.length, 4);
+  assert.ok(filtered.questions.every((q, i) => q.id === `question-${i + 1}`));
   let shortCalls = 0;
   const shortLesson = { id: 'too-short', segments: [{ id: 'a', start: 0, end: 1, japanese: 'はい。' }, { id: 'b', start: 1, end: 2, japanese: 'そうです。' }] };
   await assert.rejects(generateLessonQuiz(shortLesson, new AbortController().signal, { name: 'short', async generate() { shortCalls++; return demoQuiz; } }), error => error instanceof QuizProviderError && error.code === 'insufficient-transcript');
