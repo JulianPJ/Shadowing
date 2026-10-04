@@ -52,7 +52,7 @@ try {
   const result = await response.json();
   report.translation = { status: response.status, elapsedMs: Date.now() - started, ...result };
   console.log('Translation:', report.translation);
-  if (!response.ok || !result.translation || !/podcast/i.test(result.translation)) failed = true;
+  if (!response.ok || !result.translation || !/podcast/i.test(result.translation) || result.provider !== 'DeepL') failed = true;
 } catch (error) { failed = true; report.translation = { error: error.message }; }
 await mkdir('artifacts', { recursive: true });
 const target = `artifacts/integration-${new URL(base).hostname}-${Date.now()}.json`;
