@@ -5,7 +5,7 @@ import { ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, RotateCcw, Play, Paus
 import demoData from '@/data/demo.json';
 import type { Lesson, Mode, PlaybackState, QuizEvidence } from '@/lib/types';
 import { validateCues } from '@/lib/segmentation';
-import { readStorage, writeStorage, saveLesson, getLiveMedia, completeLesson, lessonCompleted, loadFavorites, loadTranslationCache, type Preferences } from '@/lib/storage';
+import { readStorage, writeStorage, saveLesson, getLiveMedia, completeLesson, lessonCompleted, loadFavorites, loadTranslationCache, translationCacheKey, type Preferences } from '@/lib/storage';
 import { timestamp } from '@/lib/youtube';
 import { Header, Footer, HelpDialog } from './chrome';
 import { MediaPlayer, type MediaHandle } from './media-player';
@@ -83,7 +83,7 @@ function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () => void
   useEffect(() => { saveLesson(lesson, index); }, [lesson, index]);
   useEffect(() => { writeStorage('preferences', { mode, speed, translation: false }); media.current?.setSpeed(speed); }, [mode, speed]);
   useEffect(() => { writeStorage(`reveal:${lesson.id}:${segment.id}`, revealed); }, [lesson.id, segment.id, revealed]);
-  useEffect(() => { writeStorage(`translations:${lesson.id}`, translations); }, [lesson.id, translations]);
+  useEffect(() => { writeStorage(translationCacheKey(lesson.id), translations); }, [lesson.id, translations]);
   useEffect(() => { writeStorage(`favorites:${lesson.id}`, favorites); }, [lesson.id, favorites]);
   useEffect(() => {
     const row = activeRow.current; const container = transcript.current;
