@@ -4,7 +4,7 @@ import demo from '../src/data/demo.json';
 import demoQuiz from '../src/data/demo-quiz.json';
 import { createQuiz, mapEvidence, newAttempt, scoreQuiz, transcriptKey, updateAttempt, validateAttempt, validateQuestions, validateQuiz, validateQuizLesson } from '../src/lib/quiz';
 import { completeLesson, lessonCompleted, loadQuiz, loadQuizAttempt, readStorage, saveQuiz, saveQuizAttempt, writeStorage } from '../src/lib/storage';
-import { chatCompletionQuizProvider, createWorkersAiQuizProvider, generateLessonQuiz, QuizProviderError, readBoundedJson, WORKERS_AI_MODEL, WORKERS_AI_QUIZ_MODEL } from '../src/lib/providers/quiz';
+import { buildQuizWindows, chatCompletionQuizProvider, createWorkersAiQuizProvider, generateLessonQuiz, QuizProviderError, readBoundedJson, WORKERS_AI_MODEL, WORKERS_AI_QUIZ_MODEL, WORKERS_AI_QUIZ_SELECTOR_MODEL } from '../src/lib/providers/quiz';
 import { POST } from '../src/app/api/quiz/route';
 import type { QuizGenerationProvider } from '../src/lib/types';
 
@@ -122,31 +122,50 @@ test('replaceable provider generates arbitrary lesson quizzes without any live s
   await assert.rejects(generateLessonQuiz({ ...lesson, id: 'custom' }, new AbortController().signal, { name: 'bad', async generate() { return { questions: [null] }; } }), error => error instanceof QuizProviderError && error.code === 'malformed');
   await assert.rejects(generateLessonQuiz({ ...lesson, id: 'custom' }, new AbortController().signal, { name: 'empty', async generate() { return { questions: [] }; } }), error => error instanceof QuizProviderError && error.code === 'insufficient-transcript');
 });
-test('Workers AI adapter uses the native binding and structured JSON without credentials', async () => {
-  let call: { model?: string; input?: Record<string, unknown>; options?: { rejectIfBusy?: boolean } } = {};
+function selectorResponse(input: Record<string, unknown>) {
+  const questions = input.questions as Record<string, unknown>, answers: Record<string, unknown> = {};
+  for (const key of Object.keys(questions)) {
+    if (key.endsWith('_suitability')) answers[key] = { type: 'score', score: 2.7, confidence: 0.8, probabilities: { 0: 0.01, 1: 0.04, 2: 0.2, 3: 0.75 } };
+    else if (key.endsWith('_self_contained')) answers[key] = { type: 'noul', noul: 0.92 };
+    else answers[key] = { type: 'choice', choice: 'detail', confidence: 0.8, probabilities: { detail: 0.8, sequence: 0.2 } };
+  }
+  return { model: 'clef-flash', answers };
+}
+
+test('Workers AI adapter uses Clef Flash selection before bounded Qwen generation', async () => {
+  const calls: Array<{ model: string; input: Record<string, unknown>; options?: { rejectIfBusy?: boolean } }> = [];
   const provider = createWorkersAiQuizProvider({
     async run(model, input, options) {
-      call = { model, input, options };
+      calls.push({ model, input, options });
+      if (model === WORKERS_AI_QUIZ_SELECTOR_MODEL) return selectorResponse(input);
       return { choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(demoQuiz) } }] };
     },
   });
-  const generated = await generateLessonQuiz({ ...lesson, id: 'workers-ai-video' }, new AbortController().signal, provider);
+  const custom = { ...lesson, id: 'workers-ai-video' };
+  const generated = await generateLessonQuiz(custom, new AbortController().signal, provider);
   assert.equal(generated.lessonId, 'workers-ai-video');
   assert.equal(WORKERS_AI_MODEL, '@cf/qwen/qwen3-30b-a3b-fp8');
-  assert.equal(WORKERS_AI_QUIZ_MODEL, WORKERS_AI_MODEL);
-  assert.equal(call.model, WORKERS_AI_MODEL);
-  assert.deepEqual(call.input?.response_format, { type: 'json_object' });
-  assert.equal(call.input?.chat_template_kwargs, undefined);
-  assert.equal(call.options?.rejectIfBusy, true);
-  const messages = call.input?.messages as Array<{ content: string }>;
+  assert.equal(WORKERS_AI_QUIZ_SELECTOR_MODEL, '@cf/cloudflare/clef-flash');
+  assert.equal(calls[0].model, WORKERS_AI_QUIZ_SELECTOR_MODEL);
+  const selectorState = calls[0].input.state as { windows: Array<{ segments: Array<{ id: string; japanese: string }> }> };
+  assert.ok(selectorState.windows.length > 0);
+  assert.ok(selectorState.windows[0].segments[0].japanese);
+  assert.equal(JSON.stringify(selectorState).includes('"start"'), false);
+  const qwenCall = calls.at(-1)!;
+  assert.equal(qwenCall.model, WORKERS_AI_MODEL);
+  assert.deepEqual(qwenCall.input.response_format, { type: 'json_object' });
+  assert.equal(qwenCall.options?.rejectIfBusy, true);
+  const messages = qwenCall.input.messages as Array<{ content: string }>;
   assert.ok(messages[1].content.includes(lesson.segments[0].japanese));
   assert.ok(messages[1].content.endsWith('/no_think'));
   assert.equal(messages[1].content.includes('mediaUrl'), false);
+  assert.ok(buildQuizWindows(custom).every(window => window.segments.length <= 8));
 });
 
-test('Workers AI JSON-mode direct response object is accepted without parsing reasoning fields', async () => {
+test('Workers AI JSON-mode direct response object is accepted after selector pass', async () => {
   const provider = createWorkersAiQuizProvider({
-    async run() {
+    async run(model, input) {
+      if (model === WORKERS_AI_QUIZ_SELECTOR_MODEL) return selectorResponse(input);
       return {
         response: demoQuiz,
         choices: [{ finish_reason: 'stop', message: { content: null, reasoning: 'provider-internal reasoning' } }],
