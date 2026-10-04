@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createDeepLTranslationProvider, myMemoryTranslation } from '../src/lib/providers/translation';
+import {
+  createDeepLTranslationProvider,
+  myMemoryTranslation,
+} from '../src/lib/providers/translation';
 import { handleTranslationRequest } from '../src/lib/translation-api';
 
 test('DeepL API Free translation sends only the current section as billable text and neighbors as context', async () => {
@@ -9,10 +12,17 @@ test('DeepL API Free translation sends only the current section as billable text
   const fakeFetch: typeof fetch = async (input, options) => {
     url = String(input);
     init = options;
-    return new Response(JSON.stringify({ translations: [{ detected_source_language: 'JA', text: "It's time for Yuyu's Japanese podcast." }] }), {
-      status: 200,
-      headers: { 'content-type': 'application/json' },
-    });
+    return new Response(
+      JSON.stringify({
+        translations: [
+          { detected_source_language: 'JA', text: "It's time for Yuyu's Japanese podcast." },
+        ],
+      }),
+      {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      },
+    );
   };
   const provider = createDeepLTranslationProvider('test-key:fx', fakeFetch);
   const translated = await provider.translate(
@@ -33,12 +43,17 @@ test('DeepL API Free translation sends only the current section as billable text
 
 test('DeepL Pro keys use the Pro API endpoint', async () => {
   let url = '';
-  const fakeFetch: typeof fetch = async input => {
+  const fakeFetch: typeof fetch = async (input) => {
     url = String(input);
-    return new Response(JSON.stringify({ translations: [{ text: 'Natural translation.' }] }), { status: 200 });
+    return new Response(JSON.stringify({ translations: [{ text: 'Natural translation.' }] }), {
+      status: 200,
+    });
   };
   const provider = createDeepLTranslationProvider('paid-key', fakeFetch);
-  assert.equal(await provider.translate('自然な翻訳です。', new AbortController().signal), 'Natural translation.');
+  assert.equal(
+    await provider.translate('自然な翻訳です。', new AbortController().signal),
+    'Natural translation.',
+  );
   assert.equal(url, 'https://api.deepl.com/v2/translate');
 });
 
@@ -47,30 +62,74 @@ test('DeepL provider rejects upstream failures without exposing response details
   const provider = createDeepLTranslationProvider('test-key:fx', fakeFetch);
   await assert.rejects(
     () => provider.translate('こんにちは。', new AbortController().signal),
-    error => error instanceof Error && error.message === 'DeepL translation is unavailable.',
+    (error) => error instanceof Error && error.message === 'DeepL translation is unavailable.',
   );
 });
 
 test('shared translation API validates origin/input, passes bounded context and returns provider identity', async () => {
   let receivedContext: unknown;
-  const provider = { name: 'mock-translation', async translate(_japanese: string, _signal?: AbortSignal, context?: unknown) { receivedContext = context; return 'Good morning.'; } };
-  const request = (body: unknown, origin = 'https://hibiki.test') => new Request('https://hibiki.test/api/translate', { method: 'POST', headers: { origin, 'content-type': 'application/json' }, body: JSON.stringify(body) });
-  assert.equal((await handleTranslationRequest(request({ japanese: 'おはようございます。' }, 'https://other.test'), provider)).status, 403);
+  const provider = {
+    name: 'mock-translation',
+    async translate(_japanese: string, _signal?: AbortSignal, context?: unknown) {
+      receivedContext = context;
+      return 'Good morning.';
+    },
+  };
+  const request = (body: unknown, origin = 'https://hibiki.test') =>
+    new Request('https://hibiki.test/api/translate', {
+      method: 'POST',
+      headers: { origin, 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  assert.equal(
+    (
+      await handleTranslationRequest(
+        request({ japanese: 'おはようございます。' }, 'https://other.test'),
+        provider,
+      )
+    ).status,
+    403,
+  );
   assert.equal((await handleTranslationRequest(request({ japanese: '' }), provider)).status, 400);
-  assert.equal((await handleTranslationRequest(request({ japanese: 'おはようございます。', previousJapanese: 42 }), provider)).status, 400);
-  const response = await handleTranslationRequest(request({
-    japanese: 'おはようございます。',
+  assert.equal(
+    (
+      await handleTranslationRequest(
+        request({ japanese: 'おはようございます。', previousJapanese: 42 }),
+        provider,
+      )
+    ).status,
+    400,
+  );
+  const response = await handleTranslationRequest(
+    request({
+      japanese: 'おはようございます。',
+      previousJapanese: 'みなさん、',
+      nextJapanese: '今日もよろしくお願いします。',
+    }),
+    provider,
+  );
+  assert.equal(response.status, 200);
+  assert.deepEqual(receivedContext, {
     previousJapanese: 'みなさん、',
     nextJapanese: '今日もよろしくお願いします。',
-  }), provider);
-  assert.equal(response.status, 200);
-  assert.deepEqual(receivedContext, { previousJapanese: 'みなさん、', nextJapanese: '今日もよろしくお願いします。' });
-  assert.deepEqual(await response.json(), { translation: 'Good morning.', provider: 'mock-translation' });
+  });
+  assert.deepEqual(await response.json(), {
+    translation: 'Good morning.',
+    provider: 'mock-translation',
+  });
 });
 
 test('translation provider failures are recoverable and never expose internals', async () => {
-  const provider = { name: 'mock-failure', async translate() { throw Error('SECRET upstream'); } };
-  const request = new Request('https://hibiki.test/api/translate', { method: 'POST', body: JSON.stringify({ japanese: 'こんにちは。' }) });
+  const provider = {
+    name: 'mock-failure',
+    async translate() {
+      throw Error('SECRET upstream');
+    },
+  };
+  const request = new Request('https://hibiki.test/api/translate', {
+    method: 'POST',
+    body: JSON.stringify({ japanese: 'こんにちは。' }),
+  });
   const response = await handleTranslationRequest(request, provider);
   assert.equal(response.status, 503);
   assert.equal((await response.text()).includes('SECRET'), false);

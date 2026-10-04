@@ -1,10 +1,44 @@
+import { installMemoryStorage } from './helpers/memory-storage';
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import demo from '../src/data/demo.json';
 import demoQuiz from '../src/data/demo-quiz.json';
-import { createQuiz, mapEvidence, newAttempt, scoreQuiz, transcriptKey, updateAttempt, validateAttempt, validateQuestions, validateQuiz, validateQuizLesson } from '../src/lib/quiz';
-import { completeLesson, lessonCompleted, loadQuiz, loadQuizAttempt, readStorage, saveQuiz, saveQuizAttempt, writeStorage } from '../src/lib/storage';
-import { buildQuizWindows, chatCompletionQuizProvider, createWorkersAiQuizProvider, DIRECT_QWEN_MAX_JAPANESE_CHARS, generateLessonQuiz, MIN_QUIZ_JAPANESE_CHARS, quizGenerationRoute, quizJapaneseCharacterCount, QuizProviderError, readBoundedJson, WORKERS_AI_MODEL, WORKERS_AI_QUIZ_MODEL, WORKERS_AI_QUIZ_SELECTOR_MODEL } from '../src/lib/providers/quiz';
+import {
+  createQuiz,
+  mapEvidence,
+  newAttempt,
+  scoreQuiz,
+  transcriptKey,
+  updateAttempt,
+  validateAttempt,
+  validateQuestions,
+  validateQuiz,
+  validateQuizLesson,
+} from '../src/lib/quiz';
+import {
+  completeLesson,
+  lessonCompleted,
+  loadQuiz,
+  loadQuizAttempt,
+  readStorage,
+  saveQuiz,
+  saveQuizAttempt,
+  writeStorage,
+} from '../src/lib/storage';
+import {
+  buildQuizWindows,
+  chatCompletionQuizProvider,
+  createWorkersAiQuizProvider,
+  DIRECT_QWEN_MAX_JAPANESE_CHARS,
+  generateLessonQuiz,
+  MIN_QUIZ_JAPANESE_CHARS,
+  quizGenerationRoute,
+  quizJapaneseCharacterCount,
+  QuizProviderError,
+  readBoundedJson,
+  WORKERS_AI_MODEL,
+  WORKERS_AI_QUIZ_SELECTOR_MODEL,
+} from '../src/lib/providers/quiz';
 import { POST } from '../src/app/api/quiz/route';
 import type { QuizGenerationProvider } from '../src/lib/types';
 
@@ -12,35 +46,72 @@ const lesson = validateQuizLesson(demo);
 const memory = new Map<string, string>();
 beforeEach(() => {
   memory.clear();
-  Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: { getItem: (key: string) => memory.get(key) ?? null, setItem: (key: string, value: string) => memory.set(key, value) } });
+  installMemoryStorage(memory);
 });
 test('strict schema accepts a grounded mix, assigns IDs and derives evidence timestamps', () => {
   const questions = validateQuestions(demoQuiz, lesson);
-  assert.equal(questions.length, 5); assert.equal(new Set(questions.map(q => q.kind)).size, 5);
-  assert.equal(questions[1].evidence.start, 8.132); assert.equal(questions[1].evidence.end, 12.15);
+  assert.equal(questions.length, 5);
+  assert.equal(new Set(questions.map((q) => q.kind)).size, 5);
+  assert.equal(questions[1].evidence.start, 8.132);
+  assert.equal(questions[1].evidence.end, 12.15);
   assert.equal(questions[2].evidence.start, demo.segments[2].start);
   assert.equal(questions[2].evidence.end, demo.segments[4].end);
 });
 test('malformed, ambiguous and unsupported provider output is rejected', () => {
   for (const mutate of [
-    (q: Record<string, unknown>) => { q.kind = 'made-up'; },
-    (q: Record<string, unknown>) => { q.correctIndex = 4; },
-    (q: Record<string, unknown>) => { q.correctIndex = '0'; },
-    (q: Record<string, unknown>) => { q.correctIndex = 0.5; },
-    (q: Record<string, unknown>) => { q.options = ['a', 'a', 'b', 'c']; },
-    (q: Record<string, unknown>) => { q.options = ['A', 'a', 'b', 'c']; },
-    (q: Record<string, unknown>) => { q.options = ['a', 'b']; },
-    (q: Record<string, unknown>) => { q.explanation = ''; },
-    (q: Record<string, unknown>) => { q.question = 'x'.repeat(601); },
-    (q: Record<string, unknown>) => { q.evidence = { segmentIds: ['missing'], quote: 'invented' }; },
-    (q: Record<string, unknown>) => { q.evidence = { segmentIds: ['segment-1'], quote: 'invented fact' }; },
-    (q: Record<string, unknown>) => { q.surprise = true; },
-    (q: Record<string, unknown>) => { q.id = 'injected'; },
+    (q: Record<string, unknown>) => {
+      q.kind = 'made-up';
+    },
+    (q: Record<string, unknown>) => {
+      q.correctIndex = 4;
+    },
+    (q: Record<string, unknown>) => {
+      q.correctIndex = '0';
+    },
+    (q: Record<string, unknown>) => {
+      q.correctIndex = 0.5;
+    },
+    (q: Record<string, unknown>) => {
+      q.options = ['a', 'a', 'b', 'c'];
+    },
+    (q: Record<string, unknown>) => {
+      q.options = ['A', 'a', 'b', 'c'];
+    },
+    (q: Record<string, unknown>) => {
+      q.options = ['a', 'b'];
+    },
+    (q: Record<string, unknown>) => {
+      q.explanation = '';
+    },
+    (q: Record<string, unknown>) => {
+      q.question = 'x'.repeat(601);
+    },
+    (q: Record<string, unknown>) => {
+      q.evidence = { segmentIds: ['missing'], quote: 'invented' };
+    },
+    (q: Record<string, unknown>) => {
+      q.evidence = { segmentIds: ['segment-1'], quote: 'invented fact' };
+    },
+    (q: Record<string, unknown>) => {
+      q.surprise = true;
+    },
+    (q: Record<string, unknown>) => {
+      q.id = 'injected';
+    },
   ]) {
-    const raw = structuredClone(demoQuiz); mutate(raw.questions[0]);
+    const raw = structuredClone(demoQuiz);
+    mutate(raw.questions[0]);
     assert.throws(() => validateQuestions(raw, lesson));
   }
-  for (const raw of [null, [], { questions: [] }, { questions: demoQuiz.questions.slice(0, 2) }, { questions: Array(8).fill(demoQuiz.questions[0]) }, { questions: [demoQuiz.questions[0], demoQuiz.questions[0], demoQuiz.questions[1]] }]) assert.throws(() => validateQuestions(raw, lesson));
+  for (const raw of [
+    null,
+    [],
+    { questions: [] },
+    { questions: demoQuiz.questions.slice(0, 2) },
+    { questions: Array(8).fill(demoQuiz.questions[0]) },
+    { questions: [demoQuiz.questions[0], demoQuiz.questions[0], demoQuiz.questions[1]] },
+  ])
+    assert.throws(() => validateQuestions(raw, lesson));
 });
 test('evidence can be grounded by IDs alone and the application derives the canonical quote', () => {
   const mapped = mapEvidence({ segmentIds: ['segment-3', 'segment-4'] }, lesson.segments);
@@ -52,19 +123,39 @@ test('evidence can be grounded by IDs alone and the application derives the cano
 test('evidence rejects disjoint, reversed, duplicate and fabricated timestamps; preserves fractional times', () => {
   const q = demoQuiz.questions[2].evidence;
   const mapped = mapEvidence(q, lesson.segments);
-  assert.equal(mapped.start, 12.4); assert.equal(mapped.end, 27.57);
+  assert.equal(mapped.start, 12.4);
+  assert.equal(mapped.end, 27.57);
   assert.deepEqual(mapped.segmentIds, ['segment-3', 'segment-4', 'segment-5']);
-  for (const ids of [['segment-3', 'segment-5'], ['segment-5', 'segment-4'], ['segment-3', 'segment-3']]) assert.throws(() => mapEvidence({ ...q, segmentIds: ids }, lesson.segments));
+  for (const ids of [
+    ['segment-3', 'segment-5'],
+    ['segment-5', 'segment-4'],
+    ['segment-3', 'segment-3'],
+  ])
+    assert.throws(() => mapEvidence({ ...q, segmentIds: ids }, lesson.segments));
   assert.throws(() => mapEvidence({ ...q, start: 0 }, lesson.segments));
   assert.throws(() => mapEvidence({ ...q, end: 999 }, lesson.segments));
   assert.deepEqual(mapEvidence(mapped, lesson.segments), mapped);
 });
 test('transcript input rejects missing, overlapping, duplicate, invalid or oversized normalized sections', () => {
-  for (const segments of [[], [{ ...lesson.segments[0], start: -1 }], [{ ...lesson.segments[0], end: Infinity }], [{ ...lesson.segments[0], japanese: '' }], [lesson.segments[0], lesson.segments[0]], Array.from({ length: 13 }, (_, i) => ({ id: `${i}`, start: i, end: i + 1, japanese: 'あ'.repeat(5000) }))]) assert.throws(() => validateQuizLesson({ id: 'test', segments }));
+  for (const segments of [
+    [],
+    [{ ...lesson.segments[0], start: -1 }],
+    [{ ...lesson.segments[0], end: Infinity }],
+    [{ ...lesson.segments[0], japanese: '' }],
+    [lesson.segments[0], lesson.segments[0]],
+    Array.from({ length: 13 }, (_, i) => ({
+      id: `${i}`,
+      start: i,
+      end: i + 1,
+      japanese: 'あ'.repeat(5000),
+    })),
+  ])
+    assert.throws(() => validateQuizLesson({ id: 'test', segments }));
 });
 test('transcript fingerprints change for edited text, timing or segment identity but ignore media URLs', async () => {
   const key = await transcriptKey(lesson);
-  assert.equal(key.length, 64); assert.equal(await transcriptKey({ ...lesson, segments: structuredClone(lesson.segments) }), key);
+  assert.equal(key.length, 64);
+  assert.equal(await transcriptKey({ ...lesson, segments: structuredClone(lesson.segments) }), key);
   for (const field of ['japanese', 'start', 'id'] as const) {
     const changed = structuredClone(lesson);
     if (field === 'start') changed.segments[0].start = 0.1;
@@ -74,29 +165,44 @@ test('transcript fingerprints change for edited text, timing or segment identity
 });
 test('scoring is deterministic, including wrong answers and partial attempts; completion requires all answers', async () => {
   const quiz = await createQuiz(demoQuiz, lesson);
-  const answers = quiz.questions.map(q => q.correctIndex);
+  const answers = quiz.questions.map((q) => q.correctIndex);
   assert.equal(scoreQuiz(quiz, answers).score, 5);
   assert.equal(scoreQuiz(quiz, [1, 1]).score, 1);
   assert.equal(scoreQuiz(quiz, []).score, 0);
-  for (const answers of [[-1], [4], [0.5], [NaN], [0, 0, 0, 0, 0, 0]]) assert.throws(() => scoreQuiz(quiz, answers));
+  for (const answers of [[-1], [4], [0.5], [NaN], [0, 0, 0, 0, 0, 0]])
+    assert.throws(() => scoreQuiz(quiz, answers));
   const attempt = newAttempt(quiz, lesson);
   assert.throws(() => updateAttempt(attempt, quiz, [0], true));
   const complete = updateAttempt(attempt, quiz, answers, true);
-  assert.ok(complete.completedAt); assert.equal(complete.score, 5);
+  assert.ok(complete.completedAt);
+  assert.equal(complete.score, 5);
   assert.deepEqual(validateAttempt(complete, quiz, lesson), complete);
   // Future sync may reorder object keys without changing the learner event.
-  const reordered = { ...complete, results: complete.results.map(r => ({ evidence: r.evidence, correct: r.correct, correctIndex: r.correctIndex, selectedIndex: r.selectedIndex, kind: r.kind, questionId: r.questionId })) };
+  const reordered = {
+    ...complete,
+    results: complete.results.map((r) => ({
+      evidence: r.evidence,
+      correct: r.correct,
+      correctIndex: r.correctIndex,
+      selectedIndex: r.selectedIndex,
+      kind: r.kind,
+      questionId: r.questionId,
+    })),
+  };
   assert.deepEqual(validateAttempt(reordered, quiz, lesson), complete);
   assert.throws(() => validateAttempt({ ...complete, score: 0 }, quiz, lesson));
 });
 test('local quiz cache is reused only for matching lesson/transcript; damaged storage is recoverable', async () => {
   const quiz = await createQuiz(demoQuiz, lesson);
-  assert.equal(saveQuiz(quiz), true); assert.deepEqual(await loadQuiz(lesson), quiz);
-  const edited = structuredClone(lesson); edited.segments[0].end -= 0.1;
+  assert.equal(saveQuiz(quiz), true);
+  assert.deepEqual(await loadQuiz(lesson), quiz);
+  const edited = structuredClone(lesson);
+  edited.segments[0].end -= 0.1;
   assert.equal(await loadQuiz(edited), null);
   await assert.rejects(validateQuiz({ ...quiz, lessonId: 'other' }, lesson));
   await assert.rejects(validateQuiz({ ...quiz, generatedAt: 'invalid' }, lesson));
-  memory.set('hibiki:v1:quiz:demo', '{broken'); assert.equal(await loadQuiz(lesson), null);
+  memory.set('hibiki:v1:quiz:demo', '{broken');
+  assert.equal(await loadQuiz(lesson), null);
 });
 test('attempts resume, upsert by event ID, retain retakes and export portable lesson/video/results history', async () => {
   const videoLesson = { ...lesson, videoId: 'video-id' };
@@ -105,46 +211,134 @@ test('attempts resume, upsert by event ID, retain retakes and export portable le
   assert.equal(saveQuizAttempt(attempt, quiz, videoLesson), true);
   assert.deepEqual(loadQuizAttempt(quiz, videoLesson), attempt);
   const finished = updateAttempt(attempt, quiz, [0, 0, 2, 3, 0], true);
-  saveQuizAttempt(finished, quiz, videoLesson); saveQuizAttempt(finished, quiz, videoLesson);
+  saveQuizAttempt(finished, quiz, videoLesson);
+  saveQuizAttempt(finished, quiz, videoLesson);
   assert.equal(readStorage<unknown[]>('quiz-attempts', []).length, 1);
-  const retake = newAttempt(quiz, videoLesson); saveQuizAttempt(retake, quiz, videoLesson);
-  const history = readStorage<typeof finished[]>('quiz-attempts', []);
-  assert.equal(history.length, 2); assert.equal(history[0].lessonId, 'demo'); assert.equal(history[0].videoId, 'video-id');
-  assert.equal(history[0].quizAttempted, true); assert.equal(history[0].score, 4); assert.equal(history[0].totalQuestions, 5); assert.ok(history[0].completedAt);
-  assert.equal(history[0].results[1].correct, false); assert.equal(history[0].results[1].selectedIndex, 0);
-  writeStorage(`quiz-attempt:${quiz.id}`, { ...finished, score: 99 }); assert.equal(loadQuizAttempt(quiz, videoLesson), null);
+  const retake = newAttempt(quiz, videoLesson);
+  saveQuizAttempt(retake, quiz, videoLesson);
+  const history = readStorage<(typeof finished)[]>('quiz-attempts', []);
+  assert.equal(history.length, 2);
+  assert.equal(history[0].lessonId, 'demo');
+  assert.equal(history[0].videoId, 'video-id');
+  assert.equal(history[0].quizAttempted, true);
+  assert.equal(history[0].score, 4);
+  assert.equal(history[0].totalQuestions, 5);
+  assert.ok(history[0].completedAt);
+  assert.equal(history[0].results[1].correct, false);
+  assert.equal(history[0].results[1].selectedIndex, 0);
+  writeStorage(`quiz-attempt:${quiz.id}`, { ...finished, score: 99 });
+  assert.equal(loadQuizAttempt(quiz, videoLesson), null);
 });
 test('lesson completion tracks the exact transcript and storage errors never throw into practice', () => {
-  assert.equal(lessonCompleted(lesson), false); completeLesson(lesson); assert.equal(lessonCompleted(lesson), true);
+  assert.equal(lessonCompleted(lesson), false);
+  completeLesson(lesson);
+  assert.equal(lessonCompleted(lesson), true);
   assert.equal(lessonCompleted({ ...lesson, segments: lesson.segments.slice(1) }), false);
-  Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: { getItem() { throw new Error('blocked'); }, setItem() { throw new Error('quota'); } } });
-  assert.equal(writeStorage('test', {}), false); assert.equal(lessonCompleted(lesson), false); assert.doesNotThrow(() => completeLesson(lesson));
+  Object.defineProperty(globalThis, 'localStorage', {
+    configurable: true,
+    value: {
+      getItem() {
+        throw new Error('blocked');
+      },
+      setItem() {
+        throw new Error('quota');
+      },
+    },
+  });
+  assert.equal(writeStorage('test', {}), false);
+  assert.equal(lessonCompleted(lesson), false);
+  assert.doesNotThrow(() => completeLesson(lesson));
 });
 test('replaceable provider generates arbitrary lesson quizzes without any live service; demo is independent', async () => {
   let calls = 0;
-  const mock: QuizGenerationProvider = { name: 'mock', async generate() { calls++; return demoQuiz; } };
-  const quiz = await generateLessonQuiz({ ...lesson, id: 'custom' }, new AbortController().signal, mock);
-  assert.equal(calls, 1); assert.equal(quiz.lessonId, 'custom');
-  await generateLessonQuiz(lesson, new AbortController().signal, mock); assert.equal(calls, 1);
-  await assert.rejects(generateLessonQuiz({ ...lesson, id: 'custom' }, new AbortController().signal, { name: 'bad', async generate() { return { questions: [null] }; } }), error => error instanceof QuizProviderError && error.code === 'malformed');
-  await assert.rejects(generateLessonQuiz({ ...lesson, id: 'custom' }, new AbortController().signal, { name: 'empty', async generate() { return { questions: [] }; } }), error => error instanceof QuizProviderError && error.code === 'malformed');
+  const mock: QuizGenerationProvider = {
+    name: 'mock',
+    async generate() {
+      calls++;
+      return demoQuiz;
+    },
+  };
+  const quiz = await generateLessonQuiz(
+    { ...lesson, id: 'custom' },
+    new AbortController().signal,
+    mock,
+  );
+  assert.equal(calls, 1);
+  assert.equal(quiz.lessonId, 'custom');
+  await generateLessonQuiz(lesson, new AbortController().signal, mock);
+  assert.equal(calls, 1);
+  await assert.rejects(
+    generateLessonQuiz({ ...lesson, id: 'custom' }, new AbortController().signal, {
+      name: 'bad',
+      async generate() {
+        return { questions: [null] };
+      },
+    }),
+    (error) => error instanceof QuizProviderError && error.code === 'malformed',
+  );
+  await assert.rejects(
+    generateLessonQuiz({ ...lesson, id: 'custom' }, new AbortController().signal, {
+      name: 'empty',
+      async generate() {
+        return { questions: [] };
+      },
+    }),
+    (error) => error instanceof QuizProviderError && error.code === 'malformed',
+  );
   const oneBadCandidate = structuredClone(demoQuiz);
   oneBadCandidate.questions[1].options = ['同じ', '同じ', '違う', '別'];
-  const filtered = await generateLessonQuiz({ ...lesson, id: 'filtered' }, new AbortController().signal, { name: 'partly-bad', async generate() { return oneBadCandidate; } });
+  const filtered = await generateLessonQuiz(
+    { ...lesson, id: 'filtered' },
+    new AbortController().signal,
+    {
+      name: 'partly-bad',
+      async generate() {
+        return oneBadCandidate;
+      },
+    },
+  );
   assert.equal(filtered.questions.length, 4);
   assert.ok(filtered.questions.every((q, i) => q.id === `question-${i + 1}`));
   let shortCalls = 0;
-  const shortLesson = { id: 'too-short', segments: [{ id: 'a', start: 0, end: 1, japanese: 'はい。' }, { id: 'b', start: 1, end: 2, japanese: 'そうです。' }] };
-  await assert.rejects(generateLessonQuiz(shortLesson, new AbortController().signal, { name: 'short', async generate() { shortCalls++; return demoQuiz; } }), error => error instanceof QuizProviderError && error.code === 'insufficient-transcript');
+  const shortLesson = {
+    id: 'too-short',
+    segments: [
+      { id: 'a', start: 0, end: 1, japanese: 'はい。' },
+      { id: 'b', start: 1, end: 2, japanese: 'そうです。' },
+    ],
+  };
+  await assert.rejects(
+    generateLessonQuiz(shortLesson, new AbortController().signal, {
+      name: 'short',
+      async generate() {
+        shortCalls++;
+        return demoQuiz;
+      },
+    }),
+    (error) => error instanceof QuizProviderError && error.code === 'insufficient-transcript',
+  );
   assert.equal(shortCalls, 0);
   assert.ok(MIN_QUIZ_JAPANESE_CHARS > 0);
 });
 function selectorResponse(input: Record<string, unknown>) {
-  const questions = input.questions as Record<string, unknown>, answers: Record<string, unknown> = {};
+  const questions = input.questions as Record<string, unknown>,
+    answers: Record<string, unknown> = {};
   for (const key of Object.keys(questions)) {
-    if (key.endsWith('_suitability')) answers[key] = { type: 'score', score: 2.7, confidence: 0.8, probabilities: { 0: 0.01, 1: 0.04, 2: 0.2, 3: 0.75 } };
+    if (key.endsWith('_suitability'))
+      answers[key] = {
+        type: 'score',
+        score: 2.7,
+        confidence: 0.8,
+        probabilities: { 0: 0.01, 1: 0.04, 2: 0.2, 3: 0.75 },
+      };
     else if (key.endsWith('_self_contained')) answers[key] = { type: 'noul', noul: 0.92 };
-    else answers[key] = { type: 'choice', choice: 'detail', confidence: 0.8, probabilities: { detail: 0.8, sequence: 0.2 } };
+    else
+      answers[key] = {
+        type: 'choice',
+        choice: 'detail',
+        confidence: 0.8,
+        probabilities: { detail: 0.8, sequence: 0.2 },
+      };
   }
   return { model: 'clef-flash', answers };
 }
@@ -154,26 +348,41 @@ test('quiz prompt forbids learner-facing segment metadata and prioritizes conten
   const provider = createWorkersAiQuizProvider({
     async run(model, input) {
       calls.push({ model, input });
-      return { choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(demoQuiz) } }] };
+      return {
+        choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(demoQuiz) } }],
+      };
     },
   });
-  await generateLessonQuiz({ ...lesson, id: 'prompt-contract' }, new AbortController().signal, provider);
+  await generateLessonQuiz(
+    { ...lesson, id: 'prompt-contract' },
+    new AbortController().signal,
+    provider,
+  );
   const messages = calls[0].input.messages as Array<{ role: string; content: string }>;
   const system = messages[0].content;
   assert.match(system, /CONTENT and MEANING/);
   assert.match(system, /Segment IDs exist ONLY for evidence grounding/);
   assert.match(system, /Never ask:/);
   assert.match(system, /which segment number contains something/);
-  assert.match(system, /teacher use this to check whether the learner understood the actual content/);
+  assert.match(
+    system,
+    /teacher use this to check whether the learner understood the actual content/,
+  );
   assert.match(system, /without mentioning segment numbers or technical metadata/);
 });
 
 test('normal transcripts go directly to Qwen with the complete Japanese transcript', async () => {
-  const calls: Array<{ model: string; input: Record<string, unknown>; options?: { rejectIfBusy?: boolean } }> = [];
+  const calls: Array<{
+    model: string;
+    input: Record<string, unknown>;
+    options?: { rejectIfBusy?: boolean };
+  }> = [];
   const provider = createWorkersAiQuizProvider({
     async run(model, input, options) {
       calls.push({ model, input, options });
-      return { choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(demoQuiz) } }] };
+      return {
+        choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(demoQuiz) } }],
+      };
     },
   });
   const custom = { ...lesson, id: 'workers-ai-video' };
@@ -183,7 +392,10 @@ test('normal transcripts go directly to Qwen with the complete Japanese transcri
   assert.equal(generated.lessonId, 'workers-ai-video');
   assert.equal(calls.length, 1);
   assert.equal(calls[0].model, WORKERS_AI_MODEL);
-  assert.equal(calls.some(call => call.model === WORKERS_AI_QUIZ_SELECTOR_MODEL), false);
+  assert.equal(
+    calls.some((call) => call.model === WORKERS_AI_QUIZ_SELECTOR_MODEL),
+    false,
+  );
   const responseFormat = calls[0].input.response_format as { type?: string; json_schema?: unknown };
   assert.equal(responseFormat.type, 'json_schema');
   assert.ok(responseFormat.json_schema);
@@ -199,12 +411,18 @@ test('normal transcripts go directly to Qwen with the complete Japanese transcri
 });
 
 test('large transcripts use Clef Flash selection, then expanded context goes to Qwen', async () => {
-  const calls: Array<{ model: string; input: Record<string, unknown>; options?: { rejectIfBusy?: boolean } }> = [];
+  const calls: Array<{
+    model: string;
+    input: Record<string, unknown>;
+    options?: { rejectIfBusy?: boolean };
+  }> = [];
   const provider = createWorkersAiQuizProvider({
     async run(model, input, options) {
       calls.push({ model, input, options });
       if (model === WORKERS_AI_QUIZ_SELECTOR_MODEL) return selectorResponse(input);
-      return { choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(demoQuiz) } }] };
+      return {
+        choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(demoQuiz) } }],
+      };
     },
   });
   const large = {
@@ -221,16 +439,22 @@ test('large transcripts use Clef Flash selection, then expanded context goes to 
   await provider.generate(large, new AbortController().signal);
   assert.equal(calls[0].model, WORKERS_AI_QUIZ_SELECTOR_MODEL);
   assert.equal(calls.at(-1)!.model, WORKERS_AI_MODEL);
-  assert.ok(calls.filter(call => call.model === WORKERS_AI_QUIZ_SELECTOR_MODEL).length >= 2);
-  const selectorState = calls[0].input.state as { windows: Array<{ segments: Array<{ id: string; japanese: string }> }> };
+  assert.ok(calls.filter((call) => call.model === WORKERS_AI_QUIZ_SELECTOR_MODEL).length >= 2);
+  const selectorState = calls[0].input.state as {
+    windows: Array<{ segments: Array<{ id: string; japanese: string }> }>;
+  };
   assert.ok(selectorState.windows.length > 0);
   assert.equal(JSON.stringify(selectorState).includes('"start"'), false);
   const messages = calls.at(-1)!.input.messages as Array<{ content: string }>;
-  const payload = JSON.parse(messages[1].content.replace(/\n\/no_think$/, '')) as { windows: Array<{ segments: Array<{ id: string; japanese: string }> }> };
+  const payload = JSON.parse(messages[1].content.replace(/\n\/no_think$/, '')) as {
+    windows: Array<{ segments: Array<{ id: string; japanese: string }> }>;
+  };
   assert.ok(payload.windows.length > 0);
-  assert.ok(payload.windows.every(window => window.segments.length > 8 && window.segments.length <= 18));
+  assert.ok(
+    payload.windows.every((window) => window.segments.length > 8 && window.segments.length <= 18),
+  );
   assert.equal(messages[1].content.includes('"start"'), false);
-  assert.ok(buildQuizWindows(large).every(window => window.segments.length <= 8));
+  assert.ok(buildQuizWindows(large).every((window) => window.segments.length <= 8));
 });
 
 test('Workers AI JSON-mode direct response object is accepted without selector pass', async () => {
@@ -241,57 +465,120 @@ test('Workers AI JSON-mode direct response object is accepted without selector p
       assert.equal(model, WORKERS_AI_MODEL);
       return {
         response: demoQuiz,
-        choices: [{ finish_reason: 'stop', message: { content: null, reasoning: 'provider-internal reasoning' } }],
+        choices: [
+          {
+            finish_reason: 'stop',
+            message: { content: null, reasoning: 'provider-internal reasoning' },
+          },
+        ],
       };
     },
   });
-  const generated = await generateLessonQuiz({ ...lesson, id: 'workers-ai-direct-json' }, new AbortController().signal, provider);
+  const generated = await generateLessonQuiz(
+    { ...lesson, id: 'workers-ai-direct-json' },
+    new AbortController().signal,
+    provider,
+  );
   assert.equal(generated.questions.length, 5);
   assert.equal(calls, 1);
 });
 
 test('chat-completions adapter uses server credentials and rejects truncated or malformed output (mocked fetch)', async () => {
   const oldFetch = globalThis.fetch;
-  const oldEnv = { url: process.env.QUIZ_API_URL, key: process.env.QUIZ_API_KEY, model: process.env.QUIZ_MODEL };
-  process.env.QUIZ_API_URL = 'https://quiz.example/v1/chat/completions'; process.env.QUIZ_API_KEY = 'test-secret'; process.env.QUIZ_MODEL = 'test-model';
+  const oldEnv = {
+    url: process.env.QUIZ_API_URL,
+    key: process.env.QUIZ_API_KEY,
+    model: process.env.QUIZ_MODEL,
+  };
+  process.env.QUIZ_API_URL = 'https://quiz.example/v1/chat/completions';
+  process.env.QUIZ_API_KEY = 'test-secret';
+  process.env.QUIZ_MODEL = 'test-model';
   try {
     globalThis.fetch = async (_input, init) => {
       assert.equal(new Headers(init?.headers).get('authorization'), 'Bearer test-secret');
-      const body = JSON.parse(init?.body as string); assert.equal(body.model, 'test-model'); assert.ok(body.messages[1].content.includes(lesson.segments[0].japanese));
+      const body = JSON.parse(init?.body as string);
+      assert.equal(body.model, 'test-model');
+      assert.ok(body.messages[1].content.includes(lesson.segments[0].japanese));
       assert.equal(body.messages[1].content.includes('mediaUrl'), false);
-      return Response.json({ choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(demoQuiz) } }] });
+      return Response.json({
+        choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(demoQuiz) } }],
+      });
     };
-    assert.deepEqual(await chatCompletionQuizProvider.generate(lesson, new AbortController().signal), demoQuiz);
-    const generated = await POST(new Request('http://localhost/api/quiz', { method: 'POST', body: JSON.stringify({ ...lesson, id: 'custom-video' }) }));
+    assert.deepEqual(
+      await chatCompletionQuizProvider.generate(lesson, new AbortController().signal),
+      demoQuiz,
+    );
+    const generated = await POST(
+      new Request('http://localhost/api/quiz', {
+        method: 'POST',
+        body: JSON.stringify({ ...lesson, id: 'custom-video' }),
+      }),
+    );
     assert.equal(generated.status, 200);
     const generatedBody = await generated.json();
     await validateQuiz(generatedBody.quiz, { ...lesson, id: 'custom-video' });
     assert.equal(JSON.stringify(generatedBody).includes('test-secret'), false);
-    globalThis.fetch = async () => Response.json({ choices: [{ finish_reason: 'stop', message: { content: JSON.stringify({ questions: [] }) } }] });
-    const empty = await POST(new Request('http://localhost/api/quiz', { method: 'POST', body: JSON.stringify({ ...lesson, id: 'custom-video' }) }));
-    assert.equal(empty.status, 502); assert.equal((await empty.json()).code, 'malformed');
+    globalThis.fetch = async () =>
+      Response.json({
+        choices: [
+          { finish_reason: 'stop', message: { content: JSON.stringify({ questions: [] }) } },
+        ],
+      });
+    const empty = await POST(
+      new Request('http://localhost/api/quiz', {
+        method: 'POST',
+        body: JSON.stringify({ ...lesson, id: 'custom-video' }),
+      }),
+    );
+    assert.equal(empty.status, 502);
+    assert.equal((await empty.json()).code, 'malformed');
     for (const content of ['not json', '{}']) {
-      globalThis.fetch = async () => Response.json({ choices: [{ finish_reason: 'length', message: { content } }] });
-      await assert.rejects(chatCompletionQuizProvider.generate(lesson, new AbortController().signal), QuizProviderError);
+      globalThis.fetch = async () =>
+        Response.json({ choices: [{ finish_reason: 'length', message: { content } }] });
+      await assert.rejects(
+        chatCompletionQuizProvider.generate(lesson, new AbortController().signal),
+        QuizProviderError,
+      );
     }
     globalThis.fetch = async () => new Response('provider private error', { status: 429 });
-    await assert.rejects(chatCompletionQuizProvider.generate(lesson, new AbortController().signal), /unavailable/);
+    await assert.rejects(
+      chatCompletionQuizProvider.generate(lesson, new AbortController().signal),
+      /unavailable/,
+    );
   } finally {
     globalThis.fetch = oldFetch;
-    for (const [key, value] of Object.entries({ QUIZ_API_URL: oldEnv.url, QUIZ_API_KEY: oldEnv.key, QUIZ_MODEL: oldEnv.model })) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+    for (const [key, value] of Object.entries({
+      QUIZ_API_URL: oldEnv.url,
+      QUIZ_API_KEY: oldEnv.key,
+      QUIZ_MODEL: oldEnv.model,
+    })) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
   }
 });
 test('route accepts demo, rejects invalid/oversized input and cross-origin requests; failures are safe', async () => {
-  const request = (body: unknown, origin = 'http://localhost') => new Request('http://localhost/api/quiz', { method: 'POST', headers: { origin }, body: JSON.stringify(body) });
-  const response = await POST(request(lesson)); assert.equal(response.status, 200); assert.equal(response.headers.get('cache-control'), 'no-store');
+  const request = (body: unknown, origin = 'http://localhost') =>
+    new Request('http://localhost/api/quiz', {
+      method: 'POST',
+      headers: { origin },
+      body: JSON.stringify(body),
+    });
+  const response = await POST(request(lesson));
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('cache-control'), 'no-store');
   await validateQuiz((await response.json()).quiz, lesson);
   assert.equal((await POST(request({ id: 'bad', segments: [] }))).status, 400);
   assert.equal((await POST(request(lesson, 'https://external.example'))).status, 403);
   assert.equal((await POST(request({ junk: 'x'.repeat(350001) }))).status, 400);
   await assert.rejects(readBoundedJson(new Response('x'.repeat(101)), 100));
-  const apiUrl = process.env.QUIZ_API_URL; delete process.env.QUIZ_API_URL;
+  const apiUrl = process.env.QUIZ_API_URL;
+  delete process.env.QUIZ_API_URL;
   try {
     const unavailable = await POST(request({ ...lesson, id: 'no-provider' }));
-    assert.equal(unavailable.status, 503); assert.equal((await unavailable.json()).code, 'unconfigured');
-  } finally { if (apiUrl !== undefined) process.env.QUIZ_API_URL = apiUrl; }
+    assert.equal(unavailable.status, 503);
+    assert.equal((await unavailable.json()).code, 'unconfigured');
+  } finally {
+    if (apiUrl !== undefined) process.env.QUIZ_API_URL = apiUrl;
+  }
 });

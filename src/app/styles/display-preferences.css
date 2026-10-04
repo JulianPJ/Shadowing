@@ -1,0 +1,475 @@
+/* Display preferences keep the same mounted practice tree and media handles. */
+.practice-breadcrumb {
+  flex-wrap: wrap;
+}
+.practice-view-controls {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+.practice-view-controls .button {
+  font-size: 11px;
+  padding: 8px 12px;
+  min-height: 44px;
+  gap: 7px;
+}
+.practice-view-controls [aria-pressed='true'] {
+  background: var(--green-pale);
+  border-color: #a9b99e;
+  color: var(--green);
+}
+.player-settings {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.japanese-text {
+  overflow-wrap: anywhere;
+}
+.with-furigana {
+  line-height: 2.15;
+}
+.japanese-text ruby {
+  ruby-position: over;
+  ruby-align: center;
+}
+.japanese-text rt {
+  font-size: 0.48em;
+  line-height: 1.2;
+  letter-spacing: 0;
+  font-weight: 400;
+  color: var(--muted);
+  user-select: none;
+}
+.row-content .with-furigana {
+  line-height: 2.1;
+}
+.quiz-option > span:nth-child(2) {
+  min-width: 0;
+}
+/* Studio Mode is an immersive split workspace: media dominates, current + upcoming stay beside it. */
+body.studio-active {
+  background: #101310;
+}
+body.studio-active .site-header,
+body.studio-active .site-footer {
+  display: none;
+}
+.studio-mode {
+  width: 100vw;
+  max-width: none;
+  min-height: 100vh;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+  padding: 18px clamp(18px, 3vw, 54px) 52px;
+  background: #101310;
+  color: #f1efe8;
+}
+.studio-mode .practice-breadcrumb {
+  max-width: 1720px;
+  margin: 0 auto 14px;
+  color: #aeb7ae;
+}
+.studio-mode .practice-breadcrumb > a,
+.studio-mode .practice-breadcrumb > span {
+  color: #aeb7ae;
+}
+.studio-mode .private-label {
+  margin-left: auto;
+  color: #778078;
+}
+.studio-mode .practice-view-controls {
+  margin-left: 16px;
+}
+.studio-mode .practice-view-controls .button {
+  background: #181d19;
+  border-color: #303832;
+  color: #dce3dc;
+}
+.studio-mode .practice-view-controls .button:hover {
+  background: #202720;
+  border-color: #465148;
+}
+.studio-mode .practice-view-controls [aria-pressed='true'] {
+  background: #29352d;
+  border-color: #607464;
+  color: #eff5ef;
+}
+.studio-mode .practice-title {
+  display: none;
+}
+.studio-mode .practice-grid {
+  max-width: 1720px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 3.35fr) minmax(310px, 1fr);
+  column-gap: 14px;
+  row-gap: 10px;
+  align-items: start;
+}
+.studio-mode .player-column {
+  display: contents;
+}
+.studio-mode .practice-grid > *:not(.player-column),
+.studio-mode .player-column > * {
+  min-width: 0;
+}
+.studio-mode .media-frame {
+  grid-column: 1;
+  grid-row: 1;
+  aspect-ratio: 16/9;
+  width: 100%;
+  max-height: calc(100vh - 122px);
+  border-radius: 8px;
+  background: #000;
+  box-shadow: 0 18px 55px #0008;
+}
+.studio-mode .current-card {
+  grid-column: 2;
+  grid-row: 1;
+  height: 100%;
+  max-height: none;
+  overflow: auto;
+  padding: 18px 17px 16px;
+  border: 1px solid #313a33;
+  border-radius: 8px;
+  background: #171b18;
+  color: #f1efe8;
+  box-shadow: 0 18px 55px #0005;
+}
+.studio-mode .current-card h2 {
+  min-height: 0;
+  margin: 12px 0 10px;
+  font-size: 22px;
+  line-height: 1.72;
+  color: #fff;
+}
+.studio-mode .current-card h2:has(.with-furigana) {
+  line-height: 2.05;
+}
+.studio-mode .current-heading {
+  position: sticky;
+  top: -18px;
+  z-index: 2;
+  margin: -18px -17px 0;
+  padding: 15px 17px 10px;
+  background: linear-gradient(#171b18 80%, #171b1800);
+}
+.studio-mode .state-badge {
+  background: #26332a;
+  color: #dce8de;
+}
+.studio-mode .section-time,
+.studio-mode .turn-instruction,
+.studio-mode .recording-hint,
+.studio-mode .translation-privacy,
+.studio-mode .translation-source {
+  color: #9ca79d;
+}
+.studio-mode .translation-button {
+  color: #d9e4da;
+}
+.studio-mode .current-translation {
+  max-height: min(180px, 22vh);
+  overflow: auto;
+  padding-right: 8px;
+  color: #c9d8c9;
+  scrollbar-width: thin;
+  scrollbar-color: #566259 transparent;
+}
+.studio-mode .current-card .button:not(.primary) {
+  background: #263029;
+  border-color: #46534a;
+  color: #eef3ef;
+}
+.studio-mode .current-card .button:not(.primary):hover {
+  background: #303a32;
+  border-color: #5c6a60;
+}
+.studio-mode .current-card .button.primary {
+  background: #b65d48;
+  border-color: #b65d48;
+  color: #fff9f4;
+}
+.studio-mode .current-card .button.primary:hover {
+  background: #c96c55;
+  border-color: #c96c55;
+}
+.studio-mode .current-card .icon-button {
+  background: #263029;
+  border: 1px solid #46534a;
+  color: #eef3ef;
+}
+.studio-mode .current-card .icon-button:hover {
+  background: #303a32;
+  border-color: #5c6a60;
+}
+.studio-mode .current-card button:disabled {
+  background: #202621 !important;
+  border-color: #303832 !important;
+  color: #89958b !important;
+  opacity: 0.72;
+}
+.studio-mode .icon-button:hover {
+  background: #273029;
+}
+.studio-mode .favorite-button.saved {
+  background: #38251f;
+  color: #e99b82;
+}
+.studio-mode .section-track {
+  background: #2b322d;
+}
+.studio-mode .player-settings {
+  grid-column: 1;
+  grid-row: 2;
+  padding: 8px 2px 0;
+  color: #c3cbc4;
+}
+.studio-mode .segmented-control {
+  background: #181d19;
+  border-color: #303832;
+}
+.studio-mode .segmented-control button {
+  color: #aab4ac;
+}
+.studio-mode .segmented-control button.selected {
+  background: #303a33;
+  color: #fff;
+}
+.studio-mode .speed-control {
+  color: #aeb7ae;
+}
+.studio-mode .speed-control select {
+  background: #181d19;
+  border-color: #303832;
+  color: #e7ece7;
+}
+.studio-mode .recording-panel,
+.studio-mode .completion-card,
+.studio-mode .evidence-banner,
+.studio-mode .reattach,
+.studio-mode .quiz-card,
+.studio-mode .difficulty-card,
+.studio-mode .player-footnote,
+.studio-mode .translation-privacy,
+.studio-mode .error-message {
+  grid-column: 1 / -1;
+}
+.studio-mode .recording-panel {
+  padding: 16px 0 0;
+  border-color: #303832;
+}
+.studio-mode .recording-panel audio {
+  filter: invert(0.88) hue-rotate(180deg);
+}
+.studio-mode .transcript-card {
+  grid-column: 1 / -1;
+  position: static;
+  height: min(720px, calc(100vh - 90px));
+  max-height: min(720px, calc(100vh - 90px));
+  min-height: 420px;
+  margin-top: 22px;
+  overflow: hidden;
+  background: #171b18;
+  border-color: #303832;
+  color: #e7ece7;
+}
+.studio-mode .transcript-heading,
+.studio-mode .transcript-tools,
+.studio-mode .transcript-bottom {
+  border-color: #303832;
+}
+.studio-mode .transcript-search {
+  background: #111512;
+  border-color: #303832;
+}
+.studio-mode .transcript-search input {
+  color: #eef2ee;
+}
+.studio-mode .transcript-row {
+  width: 100%;
+  border-color: #272e29;
+  color: #d7ddd8;
+}
+.studio-mode .transcript-row:hover,
+.studio-mode .transcript-row.current {
+  background: #222a24;
+}
+.studio-mode .transcript-heading,
+.studio-mode .transcript-tools,
+.studio-mode .transcript-bottom {
+  flex: 0 0 auto;
+}
+.studio-mode .transcript-scroll {
+  overflow: auto;
+  content-visibility: visible;
+  flex: 1 1 auto;
+  min-height: 0;
+  overscroll-behavior: contain;
+  scrollbar-color: #566259 transparent;
+}
+.studio-mode .quiz-card,
+.studio-mode .difficulty-card {
+  color: var(--ink);
+}
+.studio-mode .player-footnote {
+  color: #89948b;
+}
+.studio-mode .practice-signoff {
+  max-width: 1720px;
+  margin: 0 auto;
+  color: #88938a;
+}
+@media (min-width: 901px) {
+  .studio-mode .practice-controls {
+    gap: 5px;
+  }
+  .studio-mode .practice-controls .button {
+    padding: 9px 10px;
+    font-size: 10px;
+    min-height: 38px;
+  }
+  .studio-mode .practice-controls .icon-button {
+    height: 38px;
+    width: 30px;
+    color: #d4ddd5;
+  }
+  .studio-mode .translation-row {
+    margin-top: 2px;
+  }
+  .studio-mode .turn-instruction {
+    margin-top: 9px;
+  }
+}
+@media (max-width: 1100px) and (min-width: 901px) {
+  .studio-mode .practice-grid {
+    grid-template-columns: minmax(0, 2.5fr) minmax(285px, 1fr);
+  }
+  .studio-mode .current-card h2 {
+    font-size: 19px;
+  }
+}
+@media (max-width: 900px) {
+  body.studio-active .site-header {
+    display: block;
+    background: var(--bg);
+  }
+  .studio-mode {
+    width: auto;
+    min-height: 0;
+    margin: 0 26px;
+    padding: 21px 0;
+    background: transparent;
+    color: var(--ink);
+  }
+  .studio-mode .practice-breadcrumb {
+    margin: 0;
+    color: var(--muted);
+  }
+  .studio-mode .practice-breadcrumb > a,
+  .studio-mode .practice-breadcrumb > span {
+    color: inherit;
+  }
+  .studio-mode .practice-view-controls {
+    margin-left: auto;
+  }
+  .studio-mode .practice-view-controls .button {
+    background: var(--paper);
+    border-color: var(--line);
+    color: var(--ink);
+  }
+  .studio-mode .practice-view-controls [aria-pressed='true'] {
+    background: var(--green-pale);
+    border-color: #a9b99e;
+    color: var(--green);
+  }
+  .studio-mode .practice-title {
+    display: flex;
+  }
+  .studio-mode .practice-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin-top: 21px;
+  }
+  .studio-mode .media-frame {
+    order: 0;
+    aspect-ratio: 16/9;
+    max-height: none;
+    border-radius: 10px;
+  }
+  .studio-mode .player-settings {
+    order: 1;
+    width: 100%;
+    padding: 14px 0 16px;
+    color: inherit;
+  }
+  .studio-mode .current-card {
+    order: 2;
+    width: 100%;
+    height: auto;
+    max-height: none;
+    overflow: visible;
+    background: var(--paper);
+    color: var(--ink);
+    border-color: #c9d1c5;
+  }
+  .studio-mode .current-card h2 {
+    color: var(--ink);
+    font-size: 22px;
+  }
+  .studio-mode .current-heading {
+    position: static;
+    margin: 0;
+    padding: 0;
+    background: none;
+  }
+  .studio-mode .transcript-card {
+    order: 4;
+    width: 100%;
+    height: 520px;
+    max-height: 620px;
+    min-height: 0;
+    margin-top: 25px;
+    background: var(--paper);
+    color: var(--ink);
+    border-color: var(--line);
+    overflow: hidden;
+  }
+  .studio-mode .transcript-scroll {
+    max-height: none;
+    overflow: auto;
+  }
+  .studio-mode .recording-panel,
+  .studio-mode .completion-card,
+  .studio-mode .evidence-banner,
+  .studio-mode .reattach,
+  .studio-mode .quiz-card,
+  .studio-mode .difficulty-card,
+  .studio-mode .player-footnote,
+  .studio-mode .translation-privacy,
+  .studio-mode .error-message {
+    order: 3;
+    width: 100%;
+  }
+  .studio-mode .quiz-card,
+  .studio-mode .difficulty-card {
+    color: var(--ink);
+  }
+  .studio-mode .practice-signoff {
+    color: inherit;
+  }
+}
+@media (max-width: 700px) {
+  .practice-view-controls {
+    margin-left: 0;
+    width: 100%;
+    margin-top: 6px;
+  }
+  .practice-view-controls .button {
+    flex: 1;
+  }
+  .studio-mode {
+    margin: 0 22px;
+  }
+}

@@ -1,0 +1,13 @@
+node_modules
+.next
+.cloudflare
+.vinext
+.wrangler
+artifacts
+test-results
+playwright-report
+public
+package-lock.json
+src/data
+next-env.d.ts
+scripts/demo-lines.json
