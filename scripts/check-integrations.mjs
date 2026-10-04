@@ -39,11 +39,20 @@ for (const input of videos) {
 }
 try {
   const started = Date.now();
-  const response = await fetch(`${base}/api/translate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ japanese: '今日はいい天気ですね。' }), signal: AbortSignal.timeout(18000) });
+  const response = await fetch(`${base}/api/translate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      japanese: 'ゆゆの日本語ポッドキャストのお時間です。',
+      previousJapanese: 'みなさんこんにちは。',
+      nextJapanese: '今日のテーマについて話します。',
+    }),
+    signal: AbortSignal.timeout(18000),
+  });
   const result = await response.json();
   report.translation = { status: response.status, elapsedMs: Date.now() - started, ...result };
   console.log('Translation:', report.translation);
-  if (!response.ok || !result.translation) failed = true;
+  if (!response.ok || !result.translation || !/podcast/i.test(result.translation)) failed = true;
 } catch (error) { failed = true; report.translation = { error: error.message }; }
 await mkdir('artifacts', { recursive: true });
 const target = `artifacts/integration-${new URL(base).hostname}-${Date.now()}.json`;
