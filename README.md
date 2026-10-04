@@ -102,11 +102,11 @@ Demo translations are authored, and imported translations are used when supplied
 
 Translation failures show a retryable message and do not prevent playback. The reveal button returns to a usable state after a failure instead of remaining stuck open. Another implementation can replace `TranslationProvider`.
 
-Practice data lives in browser `localStorage`, scoped to the current origin/browser/device. There are no accounts, hosted database, or cross-device synchronization. Versioned media/transcript contracts and no-op linked-transcript repository / future generated-transcript provider boundaries exist, but no D1/shared transcript cache or hosted AI subtitle generation is implemented. User transcript imports stay private/browser-local, including those paired with public links. Clearing site storage removes saved practice data. Recordings stay in memory and are neither uploaded nor persisted. YouTube requests and requested automatic translations require network access. Optional Whisper transcription sends selected media directly to the configured local service.
+Practice data lives in browser `localStorage`, scoped to the current origin/browser/device. Native Cloudflare D1 stores reusable provider transcripts and trusted transcript-derived quizzes/difficulty as a shared content cache. There are no accounts, hosted learner history, or cross-device learner synchronization. See [storage architecture and migrations](docs/storage.md). Hosted AI subtitle generation remains unimplemented. User transcript imports stay private/browser-local, including those paired with public links. Clearing site storage removes saved practice data. Recordings stay in memory and are neither uploaded nor persisted. YouTube requests and requested automatic translations require network access. Optional Whisper transcription sends selected media directly to the configured local service.
 
 Recording requires a browser with `MediaRecorder`, a microphone, permission, and **HTTPS or localhost**. Denied permission shows a recovery message while playback remains available.
 
-Requesting a difficulty estimate sends only the normalized Japanese transcript through the app API. The decision classifier covers the full transcript, chunking only when the script exceeds the safe per-request budget. Cached estimates stay on this device. The bundled demo uses authored data.
+Requesting a difficulty estimate sends only the normalized Japanese transcript through the app API. The decision classifier covers the full transcript, chunking only when the script exceeds the safe per-request budget. Browser-cached estimates stay on this device; estimates derived from matching hosted system transcripts can also be reused through D1. The bundled demo uses authored data.
 
 ## Optional local Whisper transcription
 
@@ -216,12 +216,12 @@ Configure Workers Builds with these commands:
 | Setting | Value |
 | --- | --- |
 | Build command | `npm run build:vinext` |
-| Deploy command | `npx @vinext/cloudflare deploy --skip-build` |
+| Deploy command | `npm run deploy:vinext` (migrate D1, then deploy) |
 | Node.js version | 24.x |
 
-The app uses vinext's Workers Cache adapter for page responses. Practice data remains in the browser. Automatic captions additionally use `shadowing-caption-relay`, a separate Worker with a SQLite Durable Object coordinating an authenticated outbound WebSocket. It does not store lessons or user progress. No R2 bucket, paid caption API, tunnel subscription, or video hosting is introduced. The relay host must remain online; see [setup, secrets, health checks and limitations](docs/production-captions.md). `--skip-build` reuses the output from the build command.
+The app uses vinext's Workers Cache adapter for page responses. Practice data remains in the browser. Automatic captions additionally use `shadowing-caption-relay`, a separate Worker with a SQLite Durable Object coordinating an authenticated outbound WebSocket. It does not store lessons or user progress. No R2 bucket, paid caption API, tunnel subscription, or video hosting is introduced. The relay host must remain online; see [setup, secrets, health checks and limitations](docs/production-captions.md). `--prebuilt` reuses the output from the build command.
 
-For a local build and deployment, sign in to Cloudflare and run `npm run deploy:vinext`.
+For a local build and deployment, sign in to Cloudflare, run `npm run build:vinext`, then `npm run deploy:vinext`. The deploy script applies committed D1 migrations first and stops on failure.
 
 ### Local Next.js build
 

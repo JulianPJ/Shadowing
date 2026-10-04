@@ -1,5 +1,6 @@
 import { resolveMediaUrl } from './media';
-import { linkedTranscripts, transcriptHash, type LinkedTranscriptRepository } from './linked-transcripts';
+import { linkedTranscripts, transcriptHash, storedMediaIdentity, validateStoredTranscript, type LinkedTranscriptRepository } from './linked-transcripts';
+import { storageFallback, storageEvent } from './d1';
 import { segmentTranscript, validateCues } from './segmentation';
 import type { Lesson, ResolvedMedia, TranscriptionProvider, TranscriptSource } from './types';
 import { logPreparationError } from './providers/errors';
@@ -41,7 +42,13 @@ export function createPrepareHandler({ captions, repository = linkedTranscripts,
           }
           resolved = { ...resolved, title, author };
           stage = 'captions'; emit({ stage, message: 'Looking for Japanese captions…', resolved, video: { videoId, title, author } });
-          const stored = await repository.lookup({ contentKey: media.contentKey, language: 'ja' });
+          const stored = await storageFallback('d1.transcript.lookup_failed', null, async () => {
+            const candidate = await repository.lookup({ contentKey: media.contentKey, language: 'ja' });
+            if (!candidate) return null;
+            const safe = await validateStoredTranscript(candidate);
+            return safe.contentKey === media.contentKey ? safe : null;
+          });
+          storageEvent(stored ? 'd1.transcript.hit' : 'd1.transcript.miss');
           if (!stored && !videoId) {
             emit({ code: 'no-caption-provider', error: 'No Japanese subtitles were found automatically. Add your own transcript to continue.', resolved }); return;
           }
@@ -52,6 +59,10 @@ export function createPrepareHandler({ captions, repository = linkedTranscripts,
           const hash = await transcriptHash(cues);
           if (stored && (stored.schemaVersion !== 1 || stored.contentKey !== media.contentKey || stored.language !== 'ja' || stored.transcriptHash !== hash)) throw new Error('Stored transcript does not match this media.');
           const transcript: TranscriptSource = stored?.source || { schemaVersion: 1, type: 'provider-captions', language: 'ja', provenance: result.provider || captions.name, provider: result.provider || captions.name, transcriptHash: hash, normalizationVersion: 1, segmentationVersion: 1 };
+          if (!stored) await storageFallback('d1.transcript.save_failed', undefined, () => repository.save({
+            schemaVersion: 1, contentKey: media.contentKey, media: storedMediaIdentity(media), language: 'ja',
+            source: transcript, cues, transcriptHash: hash, createdAt: new Date().toISOString(), visibility: 'system',
+          }));
           const lesson: Lesson = {
             id: media.type === 'direct' ? `direct-${media.contentKey.slice(7)}` : `${media.type}-${media.videoId}`,
             videoId, title: 'title' in result && typeof result.title === 'string' && result.title ? result.title.slice(0, 500) : title,

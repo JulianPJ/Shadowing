@@ -4,6 +4,7 @@ import { calculateSpeechSpeed, validateDifficultyAnalysis, validateDifficultyLes
 import { object, transcriptRevision } from '@/lib/quiz';
 import { loadDifficulty, saveDifficulty } from '@/lib/storage';
 import type { ContentDifficultyAnalysis, Lesson } from '@/lib/types';
+import { contentRequest } from '@/lib/content-request';
 
 export const LessonDifficulty = memo(function LessonDifficulty({ lesson, onWaitingChange }: { lesson: Lesson; onWaitingChange?: (waiting: boolean) => void }) {
   return <DifficultyCard key={`${lesson.id}:${transcriptRevision(lesson)}`} lesson={lesson} onWaitingChange={onWaitingChange} />;
@@ -33,7 +34,7 @@ function DifficultyCard({ lesson, onWaitingChange }: { lesson: Lesson; onWaiting
       let input;
       try { input = validateDifficultyLesson(lesson); }
       catch { throw new Error('This transcript cannot support difficulty analysis. You can keep practicing.'); }
-      const response = await fetch('/api/difficulty', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input), signal: AbortSignal.any([controller.signal, AbortSignal.timeout(35000)]) });
+      const response = await fetch('/api/difficulty', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(contentRequest(lesson, input)), signal: AbortSignal.any([controller.signal, AbortSignal.timeout(35000)]) });
       const data = object(await response.json());
       if (!response.ok) throw new Error(data.code === 'insufficient-transcript' ? 'There is not enough Japanese transcript for a useful estimate.' : data.code === 'malformed' ? 'We could not make a reliable difficulty estimate. Please try again.' : unavailable);
       let next;

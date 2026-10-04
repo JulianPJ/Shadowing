@@ -5,6 +5,7 @@ import type { Lesson, LessonQuiz, QuizAttempt, QuizEvidence } from '@/lib/types'
 import { newAttempt, object, updateAttempt, validateQuiz, validateQuizLesson } from '@/lib/quiz';
 import { loadQuiz, loadQuizAttempt, saveQuiz, saveQuizAttempt } from '@/lib/storage';
 import { timestamp } from '@/lib/youtube';
+import { contentRequest } from '@/lib/content-request';
 
 type Props = { lesson: Lesson; ready: boolean; recording: boolean; replaying: boolean; onReplay: (evidence: QuizEvidence) => void; onReturn: () => void; onOpenChange: (open: boolean) => void };
 export function ComprehensionQuiz({ lesson, ready, recording, replaying, onReplay, onReturn, onOpenChange }: Props) {
@@ -33,7 +34,7 @@ export function ComprehensionQuiz({ lesson, ready, recording, replaying, onRepla
       const input = validateQuizLesson(lesson);
       let currentQuiz = quiz || await loadQuiz(input);
       if (!currentQuiz) {
-        const response = await fetch('/api/quiz', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input), signal: AbortSignal.any([controller.signal, AbortSignal.timeout(40000)]) });
+        const response = await fetch('/api/quiz', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(contentRequest(lesson, input)), signal: AbortSignal.any([controller.signal, AbortSignal.timeout(40000)]) });
         let data: Record<string, unknown>;
         try { data = object(await response.json()); }
         catch { throw new Error('We could not load a reliable check. Please try again.'); }

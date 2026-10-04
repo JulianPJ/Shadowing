@@ -199,7 +199,9 @@ Canonical production translation uses the DeepL text-translation API with a serv
 
 ### Persistence
 
-Current progress is browser-local:
+Native Cloudflare D1 stores reusable provider Japanese captions and validated quizzes/difficulty artifacts derived from matching hosted system transcripts. Cache reads verify cue and segmented transcript hashes; generator versions invalidate output changes. D1 failures fall back to caption acquisition/inference. Private uploads and playback secrets never enter the shared store. See [storage architecture and migrations](docs/storage.md).
+
+Current learner progress remains browser-local:
 
 - lesson data;
 - recent history;
@@ -247,7 +249,8 @@ Current stack:
 - Lucide icons;
 - Cloudflare Workers deployment via vinext/Vite;
 - Workers Cache adapter for page responses;
-- browser `localStorage` for practice persistence.
+- native Cloudflare D1 for shared linked transcripts and trusted quiz/difficulty artifacts;
+- browser `localStorage` for anonymous learner/practice persistence.
 
 Important files:
 
@@ -294,7 +297,8 @@ The hosted app uses **Cloudflare Workers**, not Vercel.
 Current deployment path:
 
 - `npm run build:vinext`
-- `npx @vinext/cloudflare deploy --skip-build`
+- `npm run db:migrate:production` (must succeed before Worker deployment)
+- `npx cf deploy --prebuilt`
 
 The app is packaged as one Worker. Automatic captions use a small authenticated broker Worker and a SQLite Durable Object with a hibernating WebSocket to an outbound Node relay host, with direct retrieval retained as a fallback. No R2 bucket, hosted user database, paid caption API or separate cache Worker is required. Treat this caption path as implemented infrastructure unless a production regression is observed; operational details live in [production caption operations](docs/production-captions.md).
 
@@ -328,7 +332,7 @@ The model now separates versioned `MediaSource` (YouTube/Vimeo/direct/local/demo
 
 Legacy lessons migrate additively on read/save, retaining IDs, sections and learning artifacts. The existing `source`, YouTube-only `videoId` and readable `transcriptSource` label remain compatible; new `mediaSource` and `transcript` contracts carry the normalized identity and provenance.
 
-A no-op `LinkedTranscriptRepository` and future `GeneratedTranscriptProvider` contract establish the sequence: resolve identity → transcript lookup → provider captions → user transcript now → future approved-audio generation → validate → persist/reuse with explicit visibility. No D1/R2/KV shared transcript storage, hosted AI subtitle generation or remote media download exists. User transcripts remain private/browser-local.
+A production native D1 `LinkedTranscriptRepository` with a no-op Next development fallback and future `GeneratedTranscriptProvider` contract establish the sequence: resolve identity → transcript lookup → provider captions → user transcript now → future approved-audio generation → validate → persist/reuse with explicit visibility. D1 now stores eligible system/provider transcripts and validated quizzes/difficulty derived from matching trusted hosted transcripts. Hosted AI subtitle generation and remote media download remain unimplemented. See [storage](docs/storage.md). User transcripts remain private/browser-local.
 
 See [media sources](docs/media-sources.md) for exact contracts, migrations, extraction security/limitations, supported URLs/formats and deterministic tests. Practice continues to consume normalized `MediaHandle` operations; provider-specific code stays in adapters. The current user-requested source expansion does not reorder the remaining roadmap below.
 
@@ -410,7 +414,7 @@ After the higher-priority learning loop exists, improve source flexibility:
 - global subtitle offset controls;
 - bilingual subtitle alignment;
 - browser-playable direct media URLs and controlled Vimeo embeds (implemented);
-- versioned separation of `MediaSource` and `TranscriptSource` (implemented; future shared storage/generation remain contracts only).
+- versioned separation of `MediaSource` and `TranscriptSource` (implemented; D1 shared content caching exists, future subtitle generation remains a contract only).
 
 Local media remains a first-class privacy/cost-friendly path. Do not promise arbitrary streaming-site support.
 
@@ -526,7 +530,7 @@ The bundled demo is independent of inference. Canonical Cloudflare production us
 
 ### Content difficulty is an estimate
 
-Bounded samples can miss unusual sections and distant references. Caption-derived speech pace depends on spelling and timing, not measured morae or audio activity; its thresholds are product heuristics. Semantic quality needs real-lesson evaluation. Native inference already underway may continue after the request timeout. Estimates remain local with no cross-device/shared cache. See [content difficulty limitations](docs/content-difficulty.md).
+Bounded samples can miss unusual sections and distant references. Caption-derived speech pace depends on spelling and timing, not measured morae or audio activity; its thresholds are product heuristics. Semantic quality needs real-lesson evaluation. Native inference already underway may continue after the request timeout. Estimates have browser L1 caching and D1 L2 reuse for trusted hosted transcripts; learner data remains local without cross-device sync. See [content difficulty limitations](docs/content-difficulty.md).
 
 ### Translation server cache is in-memory
 

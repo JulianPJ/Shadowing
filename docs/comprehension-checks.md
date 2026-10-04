@@ -58,7 +58,7 @@ The application still rejects:
 - evidence text that does not exactly match the supplied lesson transcript;
 - too few or too many questions.
 
-Validated quizzes are cached against the existing transcript SHA-256 fingerprint. Retakes remain separate UUID-based attempts and application code performs all scoring.
+Validated quizzes retain browser L1 caching against the existing transcript SHA-256 fingerprint. Production adds D1 L2 reuse only after matching a validated hosted system transcript. Shared identity includes contentKey + transcriptKey + artifact type + schema version + generator version (`quiz-content-v1`). Hits bypass Workers AI; storage failures preserve generation and successful responses. See [shared storage](storage.md). Retakes remain separate UUID-based browser-local attempts and application code performs all scoring.
 
 The exact bundled demo retains its authored deterministic quiz and bypasses inference.
 
