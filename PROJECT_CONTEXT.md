@@ -535,7 +535,7 @@ Future agents should verify before proposing work. At this snapshot, the followi
 
 ### Translation service is best-effort
 
-MyMemory is keyless/free and may have quota/quality limits. Production verification encountered HTTP 429 daily quota exhaustion on shared Worker egress. Translation failure must never block shadowing.
+Canonical production translation depends on Workers AI Qwen and can still fail, time out or be temporarily busy; failures remain retryable and must never block shadowing. MyMemory is retained only as the keyless local/non-Cloudflare fallback and may have quota/quality limits.
 
 ### No hosted user progress
 
