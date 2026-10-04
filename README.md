@@ -22,7 +22,7 @@ npm run build
 npm start
 ```
 
-No environment variables are required for the demo, subtitle import, local direct caption retrieval, or translation. Production automatic captions use the configured authenticated relay with a direct fallback. [.env.example](.env.example) documents the server settings; [production caption operations](docs/production-captions.md) covers deployment and health checks.
+No environment variables are required for the demo, subtitle import, or local direct caption retrieval. Production automatic captions use the configured authenticated relay with a direct fallback, and production on-demand translation requires the server-only `DEEPL_AUTH_KEY` secret. [.env.example](.env.example) documents the server settings; [production caption operations](docs/production-captions.md) covers deployment and health checks.
 
 ## Features and practice flow
 
@@ -96,7 +96,7 @@ With subtitle import, media stays in the browser. After a full refresh, the tran
 
 ## Translation, storage, and privacy
 
-Demo translations are authored, and imported translations are used when supplied. In canonical Cloudflare production, other sections request Japanese-to-English translation from **Workers AI Qwen3-30B-A3B** only when revealed. Hibiki sends the current Japanese section plus at most one neighboring section on each side as bounded context; Qwen is instructed to translate only the current section, preserve names/titles, and run in no-think mode. Responses are cached in the browser and a bounded in-memory server cache. MyMemory remains a keyless local/non-Cloudflare fallback.
+Demo translations are authored, and imported translations are used when supplied. In canonical Cloudflare production, other sections request Japanese-to-English translation from **DeepL** only when revealed. The current section is the only billable translation text; Hibiki sends at most one neighboring Japanese section on each side through DeepL's context field to improve disambiguation without translating that context. API Free keys use `api-free.deepl.com`; Pro keys use `api.deepl.com`. Responses are cached in the browser and a bounded in-memory server cache. MyMemory remains a keyless local/non-Cloudflare fallback.
 
 Translation failures show a retryable message and do not prevent playback. The reveal button returns to a usable state after a failure instead of remaining stuck open. Another implementation can replace `TranslationProvider`.
 
