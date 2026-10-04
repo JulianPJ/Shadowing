@@ -2,7 +2,7 @@
 
 > **Purpose:** persistent product and engineering context for future development.
 >
-> **Current snapshot:** 2026-10-04, production runs on Cloudflare Workers with the caption relay path verified and roadmap priorities #1–#3 implemented. Hosted AI is split by task: Clef Flash provides full-transcript difficulty classification and only assists quiz routing for very large transcripts; ordinary comprehension checks and on-demand Japanese→English translation use Qwen3-30B-A3B. Translation runs in no-think mode with only the current section plus bounded neighboring context. Local learner progress is deployed. The next roadmap item is #4, polish / monetisation.
+> **Current snapshot:** 2026-10-04, production runs on Cloudflare Workers with the caption relay path verified and roadmap priorities #1–#3 implemented. Hosted AI is split by task: Clef Flash provides full-transcript difficulty classification and only assists quiz routing for very large transcripts; ordinary comprehension checks use Qwen3-30B-A3B. On-demand Japanese→English translation uses DeepL with only the current section translated and bounded neighboring Japanese supplied as context. Local learner progress is deployed. The next roadmap item is #4, polish / monetisation.
 >
 > **Deployment target:** Cloudflare Workers via vinext. Cloudflare is the canonical hosted environment for this project; do not assume Vercel.
 
@@ -192,7 +192,7 @@ Typical target length is roughly 2–8 seconds, but natural language boundaries 
 
 English is lazy and hidden by default.
 
-Canonical production translation uses the existing native Workers AI binding with `@cf/qwen/qwen3-30b-a3b-fp8` for Japanese→English. When the learner explicitly reveals a translation, the app sends the current Japanese section plus at most one neighboring section on each side as bounded context. Qwen is instructed to translate only the current section, preserve names/titles, return only English, and run with `/no_think`; results are cached in the browser and in a bounded server-memory cache. Imported/authored translations bypass inference. MyMemory remains a keyless local/non-Cloudflare fallback only. Translation failure is retryable and never blocks shadowing.
+Canonical production translation uses the DeepL text-translation API with a server-only `DEEPL_AUTH_KEY`. When the learner explicitly reveals a translation, the current Japanese section is sent as the text to translate and at most one neighboring Japanese section on each side is supplied through DeepL's context field. Context is not returned as translated text and is not counted toward billed translation characters. API Free keys (suffix `:fx`) use `https://api-free.deepl.com`; other keys use `https://api.deepl.com`. Results are cached in the browser and in a bounded server-memory cache. Imported/authored translations bypass the API. MyMemory remains a keyless local/non-Cloudflare fallback only. Translation failure is retryable and never blocks shadowing.
 
 ### Persistence
 
@@ -315,7 +315,7 @@ Server-only settings are `YOUTUBE_CAPTION_RELAY_URL` and `YOUTUBE_CAPTION_RELAY_
 
 Production verification has exercised real Japanese-caption videos through the deployed Worker and browser flow. Do not spend roadmap time re-investigating caption egress unless monitoring or a reproducible user report shows a new regression. Use [production caption operations](docs/production-captions.md) for deployment, health checks and troubleshooting.
 
-MyMemory translation remains best-effort and independent from caption preparation. Translation failure must not block shadowing.
+DeepL translation is independent from caption preparation. Translation failure must not block shadowing.
 
 ---
 
@@ -535,7 +535,7 @@ Future agents should verify before proposing work. At this snapshot, the followi
 
 ### Translation service is best-effort
 
-Canonical production translation depends on Workers AI Qwen and can still fail, time out or be temporarily busy; failures remain retryable and must never block shadowing. MyMemory is retained only as the keyless local/non-Cloudflare fallback and may have quota/quality limits.
+Canonical production translation depends on DeepL and can still fail, time out, hit rate limits, or exhaust account quota; failures remain retryable and must never block shadowing. MyMemory is retained only as the keyless local/non-Cloudflare fallback and may have quota/quality limits.
 
 ### No hosted user progress
 
