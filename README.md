@@ -43,7 +43,7 @@ Available functionality:
 - Microphone recording and A/B listening. Starting one playback source pauses the other. Recordings are limited to 60 seconds and cleared when changing sections or leaving the player.
 - Locally saved transcripts, last section, mode/speed, bookmarks, cached translations, and current-section translation visibility. The home screen displays the three most recent lessons from a history of up to eight.
 - Responsive desktop/mobile layouts, locally served Japanese fonts, keyboard focus styles, modal focus management, and reduced-motion support.
-- Optional estimated content difficulty: approximate JLPT range, vocabulary, grammar, caption-derived speech pace and conversational complexity, with bounded transcript evidence and local reuse. See [calculation, Workers AI setup and persistence](docs/content-difficulty.md).
+- Optional estimated content difficulty: full-transcript approximate JLPT band, vocabulary, grammar, caption-derived speech pace and conversational complexity, with local reuse. See [classification, Workers AI setup and persistence](docs/content-difficulty.md).
 
 | Shortcut | Action |
 | --- | --- |
@@ -96,15 +96,15 @@ With subtitle import, media stays in the browser. After a full refresh, the tran
 
 ## Translation, storage, and privacy
 
-Demo translations are authored, and imported translations are used when supplied. Other sections request Japanese-to-English translation from **MyMemory** only when revealed. The current sentence is sent through the app's API to that external service. Responses are cached in the browser and a bounded in-memory server cache.
+Demo translations are authored, and imported translations are used when supplied. In canonical Cloudflare production, other sections request Japanese-to-English translation from **Workers AI M2M100** only when revealed. Only the current Japanese section is sent. Responses are cached in the browser and a bounded in-memory server cache. MyMemory remains a keyless local/non-Cloudflare fallback.
 
-The keyless service has quotas and variable quality. Failures show a retryable message and do not prevent playback. See [MyMemory's API documentation](https://mymemory.translated.net/doc/spec.php). Another implementation can replace `TranslationProvider`.
+Translation failures show a retryable message and do not prevent playback. The reveal button returns to a usable state after a failure instead of remaining stuck open. Another implementation can replace `TranslationProvider`.
 
-Practice data lives in browser `localStorage`, scoped to the current origin/browser/device. There are no accounts, hosted database, or cross-device synchronization. Clearing site storage removes saved practice data. Recordings stay in memory and are neither uploaded nor persisted. YouTube requests and requested MyMemory translations require network access. Optional Whisper transcription sends selected media directly to the configured local service.
+Practice data lives in browser `localStorage`, scoped to the current origin/browser/device. There are no accounts, hosted database, or cross-device synchronization. Clearing site storage removes saved practice data. Recordings stay in memory and are neither uploaded nor persisted. YouTube requests and requested automatic translations require network access. Optional Whisper transcription sends selected media directly to the configured local service.
 
 Recording requires a browser with `MediaRecorder`, a microphone, permission, and **HTTPS or localhost**. Denied permission shows a recovery message while playback remains available.
 
-Requesting a difficulty estimate sends the Japanese transcript through the app API; only bounded samples reach the analysis provider. Cached estimates stay on this device. The bundled demo uses authored data.
+Requesting a difficulty estimate sends only the normalized Japanese transcript through the app API. The decision classifier covers the full transcript, chunking only when the script exceeds the safe per-request budget. Cached estimates stay on this device. The bundled demo uses authored data.
 
 ## Optional local Whisper transcription
 
@@ -241,4 +241,4 @@ Caption/translation API routes require server support, so this is not a static G
 
 The app provides practice tools, not a pronunciation evaluator. **Pronunciation scoring is not implemented**; `PronunciationAnalysisProvider` is only an extension interface. Recordings are not saved/exported, and practice data does not sync across devices. Free caption and translation services can fail or impose limits; the bundled demo and subtitle import provide alternatives.
 
-The current product priority is the post-video learning loop: comprehension testing, content difficulty analysis, and a persistent learner profile. Content-source/file-upload expansion comes later in the ordered roadmap. [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) is the product and engineering source of truth.
+The current product priority after comprehension testing, content difficulty analysis, and the local learner profile is the polish / monetisation layer. Content-source/file-upload expansion comes later in the ordered roadmap. [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) is the product and engineering source of truth.
