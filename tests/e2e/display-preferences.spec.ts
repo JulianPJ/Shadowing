@@ -122,7 +122,11 @@ test('Studio and Furigana preserve quiz answers, difficulty, identity and bounde
   expect(studioLayout.current.left).toBeGreaterThan(studioLayout.media.right - 2);
   expect(Math.abs(studioLayout.current.top - studioLayout.media.top)).toBeLessThan(3);
   expect(studioLayout.transcript.top).toBeGreaterThan(studioLayout.media.bottom);
+  expect(studioLayout.transcript.height).toBeLessThanOrEqual(720);
   expect(studioLayout.quiz.top).toBeGreaterThan(studioLayout.media.bottom); expect(studioLayout.difficulty.top).toBeGreaterThan(studioLayout.media.bottom);
+  const transcriptOverflow = await page.locator('.transcript-scroll').evaluate(element => ({ clientHeight: element.clientHeight, scrollHeight: element.scrollHeight, overflowY: getComputedStyle(element).overflowY }));
+  expect(transcriptOverflow.overflowY).toBe('auto');
+  expect(transcriptOverflow.scrollHeight).toBeGreaterThan(transcriptOverflow.clientHeight);
   for (const selector of ['.transcript-card', '.difficulty-card', '.quiz-card']) { await page.locator(selector).scrollIntoViewIfNeeded(); await expect(page.locator(selector)).toBeVisible(); }
   await page.getByRole('button', { name: 'Replay relevant section' }).click();
   await expect(page.locator('.media-frame')).toBeInViewport();
@@ -160,8 +164,7 @@ test('Studio desktop/mobile/tablet, long ruby text, translations and screenshots
   expect(video!.width / video!.height).toBeGreaterThanOrEqual(16 / 9 - 0.02);
   expect(current!.x).toBeGreaterThan(video!.x + video!.width - 2);
   expect(Math.abs(current!.y - video!.y)).toBeLessThan(3);
-  await expect(page.getByTestId('studio-upcoming')).toBeVisible();
-  await expect(page.locator('.studio-upcoming-row')).not.toHaveCount(0);
+  await expect(page.getByTestId('current-japanese')).toBeVisible();
   await furigana(page).click();
   await expect(page.locator('#current-japanese ruby')).not.toHaveCount(0);
   await page.setViewportSize({ width: 1366, height: 768 });
@@ -169,8 +172,12 @@ test('Studio desktop/mobile/tablet, long ruby text, translations and screenshots
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.screenshot({ path: 'artifacts/studio-desktop-ruby.png', fullPage: true });
   await page.screenshot({ path: 'artifacts/studio-desktop-viewport.png' });
+  const currentBeforeTranslation = await page.locator('.current-card').boundingBox();
   await page.getByRole('button', { name: 'Reveal translation T' }).click();
   await expect(page.locator('#current-translation')).toBeVisible();
+  const currentAfterTranslation = await page.locator('.current-card').boundingBox();
+  expect(Math.abs(currentAfterTranslation!.height - currentBeforeTranslation!.height)).toBeLessThan(3);
+  expect((await page.locator('#current-translation').boundingBox())!.height).toBeLessThanOrEqual(180);
   await page.screenshot({ path: 'artifacts/studio-desktop-ruby-translation.png', fullPage: true });
   await page.evaluate(lesson => {
     lesson.id = 'long-display-test'; lesson.segments[0].japanese = '日本語を勉強しています。今日は天気がいいですね。食べました。大丈夫です。'.repeat(8);
