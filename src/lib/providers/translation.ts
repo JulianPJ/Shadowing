@@ -1,5 +1,8 @@
 import type { TranslationProvider } from '../types';
 import { cleanText } from '../segmentation';
+import { object } from '../quiz';
+import { runWorkersAi, WORKERS_AI_TRANSLATION_MODEL, type WorkersAiBindingLike } from './workers-ai';
+
 function chunks(text: string): string[] {
   const parts: string[] = []; let part = '';
   for (const char of text) {
@@ -9,6 +12,8 @@ function chunks(text: string): string[] {
   if (part) parts.push(part);
   return parts;
 }
+
+// Keyless fallback for local/non-Cloudflare development only.
 export const myMemoryTranslation: TranslationProvider = {
   name: 'MyMemory',
   async translate(japanese, signal) {
@@ -26,3 +31,21 @@ export const myMemoryTranslation: TranslationProvider = {
     return translated.join(' ');
   },
 };
+
+export function createWorkersAiTranslationProvider(ai: WorkersAiBindingLike): TranslationProvider {
+  return {
+    name: 'Workers AI',
+    async translate(japanese, signal) {
+      const activeSignal = signal ?? new AbortController().signal;
+      const response = await runWorkersAi<unknown>(ai, WORKERS_AI_TRANSLATION_MODEL, {
+        text: japanese,
+        source_lang: 'japanese',
+        target_lang: 'english',
+      }, activeSignal);
+      const raw = object(response);
+      const translated = raw.translated_text;
+      if (typeof translated !== 'string' || !translated.trim() || translated.length > 10000) throw new Error('Invalid translation response.');
+      return cleanText(translated);
+    },
+  };
+}
