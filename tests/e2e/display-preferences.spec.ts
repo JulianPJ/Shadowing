@@ -115,9 +115,14 @@ test('Studio and Furigana preserve quiz answers, difficulty, identity and bounde
   expect(await sourceText(page, '.quiz-feedback blockquote')).toBe(questions.questions[0].evidence.quote);
   await expect(page.locator('.quiz-option.chosen')).toHaveCount(1);
   expect(await page.evaluate(() => Object.fromEntries(Object.entries(localStorage).filter(([key]) => /quiz|difficulty|completion|lesson:demo/.test(key))))).toEqual(artifacts);
-  const positions = await page.evaluate(() => ['.media-frame', '.player-settings', '.current-card', '.recording-panel', '.transcript-card', '.quiz-card', '.difficulty-card'].map(selector => document.querySelector(selector)!.getBoundingClientRect().top + scrollY));
-  expect(positions.slice(0, 5)).toEqual([...positions.slice(0, 5)].sort((a, b) => a - b));
-  expect(positions[5]).toBeGreaterThan(positions[4]); expect(positions[6]).toBeGreaterThan(positions[4]);
+  const studioLayout = await page.evaluate(() => {
+    const rect = (selector: string) => document.querySelector(selector)!.getBoundingClientRect().toJSON();
+    return { media: rect('.media-frame'), current: rect('.current-card'), transcript: rect('.transcript-card'), quiz: rect('.quiz-card'), difficulty: rect('.difficulty-card') };
+  });
+  expect(studioLayout.current.left).toBeGreaterThan(studioLayout.media.right - 2);
+  expect(Math.abs(studioLayout.current.top - studioLayout.media.top)).toBeLessThan(3);
+  expect(studioLayout.transcript.top).toBeGreaterThan(studioLayout.media.bottom);
+  expect(studioLayout.quiz.top).toBeGreaterThan(studioLayout.media.bottom); expect(studioLayout.difficulty.top).toBeGreaterThan(studioLayout.media.bottom);
   for (const selector of ['.transcript-card', '.difficulty-card', '.quiz-card']) { await page.locator(selector).scrollIntoViewIfNeeded(); await expect(page.locator(selector)).toBeVisible(); }
   await page.getByRole('button', { name: 'Replay relevant section' }).click();
   await expect(page.locator('.media-frame')).toBeInViewport();
@@ -150,10 +155,13 @@ test('Studio desktop/mobile/tablet, long ruby text, translations and screenshots
   await page.screenshot({ path: 'artifacts/normal-desktop.png', fullPage: true });
   await studio(page).click();
   await page.screenshot({ path: 'artifacts/studio-desktop-plain.png', fullPage: true });
-  const video = await page.locator('.media-frame').boundingBox(), main = await page.locator('.practice-main').boundingBox();
-  expect(video!.width / main!.width).toBeGreaterThan(0.95);
-  expect(video!.width / video!.height).toBeGreaterThanOrEqual(21 / 9 - 0.01);
-  expect((await page.locator('.current-card').boundingBox())!.y).toBeLessThan(1000);
+  const video = await page.locator('.media-frame').boundingBox(), main = await page.locator('.practice-main').boundingBox(), current = await page.locator('.current-card').boundingBox();
+  expect(video!.width / main!.width).toBeGreaterThan(0.68);
+  expect(video!.width / video!.height).toBeGreaterThanOrEqual(16 / 9 - 0.02);
+  expect(current!.x).toBeGreaterThan(video!.x + video!.width - 2);
+  expect(Math.abs(current!.y - video!.y)).toBeLessThan(3);
+  await expect(page.getByTestId('studio-upcoming')).toBeVisible();
+  await expect(page.locator('.studio-upcoming-row')).not.toHaveCount(0);
   await furigana(page).click();
   await expect(page.locator('#current-japanese ruby')).not.toHaveCount(0);
   await page.setViewportSize({ width: 1366, height: 768 });
