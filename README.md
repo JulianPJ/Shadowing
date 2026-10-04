@@ -216,12 +216,12 @@ Configure Workers Builds with these commands:
 | Setting | Value |
 | --- | --- |
 | Build command | `npm run build:vinext` |
-| Deploy command | `npx cf deploy --prebuilt` |
+| Deploy command | `npm run deploy:vinext` (migrate D1, then deploy) |
 | Node.js version | 24.x |
 
 The app uses vinext's Workers Cache adapter for page responses. Practice data remains in the browser. Automatic captions additionally use `shadowing-caption-relay`, a separate Worker with a SQLite Durable Object coordinating an authenticated outbound WebSocket. It does not store lessons or user progress. No R2 bucket, paid caption API, tunnel subscription, or video hosting is introduced. The relay host must remain online; see [setup, secrets, health checks and limitations](docs/production-captions.md). `--prebuilt` reuses the output from the build command.
 
-For a local build and deployment, sign in to Cloudflare and run `npm run deploy:vinext`.
+For a local build and deployment, sign in to Cloudflare, run `npm run build:vinext`, then `npm run deploy:vinext`. The deploy script applies committed D1 migrations first and stops on failure.
 
 ### Local Next.js build
 
