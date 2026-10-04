@@ -38,6 +38,10 @@ Qwen normally produces five Japanese multiple-choice questions with:
 - a concise English explanation;
 - exact transcript evidence.
 
+Question generation is explicitly content-first. Segment IDs and window boundaries are application metadata only and must never appear in learner-facing questions, options or explanations. The prompt prioritizes main ideas, important details, reasons/causes, speaker intent or viewpoint, meaningful sequence, and directly supported inference. Vocabulary/grammar/reference questions are allowed only when they test an important expression in context rather than serving as filler.
+
+The generator is also told to avoid trivial questions about greetings, self-introductions, podcast names, timestamps, section numbers, or other incidental transcript structure unless such information is genuinely central to the lesson.
+
 For complete-transcript input, evidence can use any 1–24 consecutive supplied segments. For selected-window input, evidence must stay inside one supplied expanded window. Application code maps validated segment IDs back to local timestamps for replay; the model never invents timestamps.
 
 The application performs a deterministic minimum-content check before inference. Once a transcript passes that check, Qwen is instructed to produce 3–7 questions rather than return an empty quiz. If an upstream model nevertheless returns `{"questions":[]}`, Hibiki treats that as a malformed generation result, not as proof that a substantial transcript was insufficient.
