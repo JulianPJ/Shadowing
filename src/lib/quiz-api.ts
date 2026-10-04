@@ -20,7 +20,7 @@ export async function handleQuizRequest(request: Request, provider?: QuizGenerat
   }
 
   try {
-    const signal = AbortSignal.any([request.signal, AbortSignal.timeout(35000)]);
+    const signal = AbortSignal.any([request.signal, AbortSignal.timeout(45000)]);
     const quiz = provider
       ? await generateLessonQuiz(lesson, signal, provider)
       : await generateLessonQuiz(lesson, signal);
