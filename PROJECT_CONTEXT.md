@@ -2,7 +2,7 @@
 
 > **Purpose:** persistent product and engineering context for future development.
 >
-> **Current snapshot:** 2026-10-04, production runs on Cloudflare Workers with the caption relay path verified and roadmap priorities #1–#3 implemented. Hosted AI is split by task: Clef Flash provides cheap typed decisions for full-transcript difficulty classification and quiz-window selection, Qwen3-30B-A3B generates the final comprehension questions, and M2M100 handles production Japanese→English translation. Local learner progress is deployed. The next roadmap item is #4, polish / monetisation.
+> **Current snapshot:** 2026-10-04, production runs on Cloudflare Workers with the caption relay path verified and roadmap priorities #1–#3 implemented. Hosted AI is split by task: Clef Flash provides full-transcript difficulty classification and only assists quiz routing for very large transcripts; ordinary comprehension checks send the complete compact transcript directly to Qwen3-30B-A3B. M2M100 handles production Japanese→English translation. Local learner progress is deployed. The next roadmap item is #4, polish / monetisation.
 >
 > **Deployment target:** Cloudflare Workers via vinext. Cloudflare is the canonical hosted environment for this project; do not assume Vercel.
 
@@ -128,7 +128,7 @@ The practice experience already includes:
 
 Priority #1 is implemented in the repository. Finishing Shadowing practice or reaching the end in Continuous mode reveals an optional short comprehension check, with Japanese multiple-choice questions, immediate explanations, deterministic scores and replayable transcript evidence. Existing playback remains available on generation failure. Evidence replay uses the same media adapter, spans normalized sections, pauses at the evidence end and returns to the question without losing answers.
 
-`POST /api/quiz` uses a replaceable `QuizGenerationProvider`. Canonical Cloudflare production first evaluates consecutive transcript windows across the lesson with `@cf/cloudflare/clef-flash`, preserving broad lesson coverage and selecting the strongest/self-contained material with question-type diversity. Only those `{ id, japanese }` windows go to `@cf/qwen/qwen3-30b-a3b-fp8` for one generation pass; there is no regeneration loop. No timestamps, media metadata or learner data are sent to either model. Questions/options and exact evidence references/quotes are validated strictly, and application code maps validated segment IDs back to timestamps. No quiz API-key secrets are required.
+`POST /api/quiz` uses a replaceable `QuizGenerationProvider`. Canonical Cloudflare production routes transcripts at a conservative 12,000 non-whitespace Japanese-character ceiling: normal lessons send the complete `{ id, japanese }` transcript directly to `@cf/qwen/qwen3-30b-a3b-fp8`; only larger lessons use `@cf/cloudflare/clef-flash` to score anchors across the full lesson before expanding selected anchors to broader coherent regions for one Qwen generation pass. There is no regeneration loop. No timestamps, media metadata or learner data are sent to either model. Questions/options and exact evidence references/quotes are validated strictly, and application code maps validated segment IDs back to timestamps. Model-returned empty quizzes on otherwise substantial transcripts are treated as malformed generation rather than mislabeled as insufficient content. No quiz API-key secrets are required.
 
 Validated quizzes are reused for a matching lesson/transcript SHA-256 fingerprint. Draft answers, completion and versioned UUID-based attempts persist through the existing local storage helpers. Attempt history includes lesson/video/quiz identity, score, total questions, per-question answers/correctness/evidence and start/update/completion timestamps for future account/profile sync. This adds no accounts or learner-profile system. See [comprehension checks](docs/comprehension-checks.md) for setup, limits and the persistence contract.
 
@@ -275,7 +275,7 @@ Important files:
 | `src/lib/providers/difficulty.ts` | Clef Flash full-coverage typed classification and authored demo estimate |
 | `src/lib/difficulty-api.ts`, `src/app/api/difficulty/route.ts` | bounded, independent difficulty API shared with the canonical Worker |
 | `src/components/lesson-difficulty.tsx` | lazy compact difficulty classifications and retry |
-| `src/lib/providers/quiz.ts` | Clef Flash window selection, Qwen generation and authored demo quiz |
+| `src/lib/providers/quiz.ts` | direct full-transcript Qwen routing for normal lessons, Clef-assisted selection for very large lessons, and authored demo quiz |
 | `src/components/comprehension-quiz.tsx` | optional lesson quiz, feedback, replay and results |
 | `src/app/api/quiz/route.ts` | bounded, recoverable quiz-generation route |
 | `src/app/api/prepare/route.ts` | streamed YouTube preparation route |
@@ -543,7 +543,7 @@ Progress is local to the current browser/origin. This is intentional for now, bu
 
 ### Comprehension generation needs server configuration
 
-The bundled demo is independent of inference. Canonical Cloudflare production uses the native `AI` binding; standard Next.js development may use the existing optional chat-completions adapter. Requests are bounded at 2,000 normalized sections / 60,000 Japanese characters; longer or unsuitable transcripts show a recoverable message. Structural/evidence checks cannot prove the semantic correctness of every model-generated question. Quiz results remain local and do not yet sync to an account.
+The bundled demo is independent of inference. Canonical Cloudflare production uses the native `AI` binding; standard Next.js development may use the existing optional chat-completions adapter. API input remains bounded at 2,000 normalized sections / 60,000 Japanese characters. Qwen has a 32,768-token context window, so the production router deliberately uses a much lower 12,000-character direct-input ceiling and introduces Clef-assisted selection above that point rather than approaching the hard context limit. Structural/evidence checks cannot prove the semantic correctness of every model-generated question. Quiz results remain local and do not yet sync to an account.
 
 ### Content difficulty is an estimate
 
