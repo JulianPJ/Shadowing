@@ -61,7 +61,7 @@ test('editing the same stored lesson invalidates cached analysis and generates f
   const custom = { ...demo, id: 'difficulty-custom', source: 'upload' as const, mediaUrl: undefined };
   const old = await createDifficultyAnalysis(authored, custom); let calls = 0;
   await page.addInitScript(({ custom, old }) => { if (!localStorage.getItem('hibiki:v1:lesson:difficulty-custom')) { localStorage.setItem('hibiki:v1:lesson:difficulty-custom', JSON.stringify(custom)); localStorage.setItem('hibiki:v1:difficulty:difficulty-custom', JSON.stringify(old)); } }, { custom, old });
-  await page.route('**/api/difficulty', async route => { calls++; const input = route.request().postDataJSON(); return route.fulfill({ json: { analysis: await createDifficultyAnalysis(authored, input) } }); });
+  await page.route('**/api/difficulty', async route => { calls++; const input = route.request().postDataJSON().lesson; return route.fulfill({ json: { analysis: await createDifficultyAnalysis(authored, input) } }); });
   await page.goto('/practice/difficulty-custom'); await expect(page.getByTestId('lesson-difficulty').locator('dl')).toContainText('N5–N4'); expect(calls).toBe(0);
   await page.evaluate(() => { const value = JSON.parse(localStorage.getItem('hibiki:v1:lesson:difficulty-custom')!); value.segments[0].japanese += '静かな朝です。'; localStorage.setItem('hibiki:v1:lesson:difficulty-custom', JSON.stringify(value)); });
   await page.reload();

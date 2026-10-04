@@ -30,7 +30,7 @@ For normal lessons the entire Japanese transcript is one decision state. To avoi
 
 ## Persistence
 
-The result remains transcript-keyed through the existing SHA-256 fingerprint. Existing sampled difficulty caches are invalidated because the deterministic coverage strategy is now version 2 and requires full coverage.
+The result retains browser L1 caching through the existing SHA-256 fingerprint. Production adds D1 L2 reuse only after matching a trusted hosted system transcript. Shared identity includes contentKey + transcriptKey + artifact type + schema version + generator version (`difficulty-fullcoverage-v1`). Hits bypass inference; JSON, full coverage and deterministic speech metrics are revalidated. See [shared storage](storage.md). Existing sampled difficulty caches remain invalidated by coverage strategy version 2.
 
 The stored record still exposes compact numeric dimension levels for learner-progress aggregation, but it no longer stores generated evidence examples. Opening progress never triggers inference.
 

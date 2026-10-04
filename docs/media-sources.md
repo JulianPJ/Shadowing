@@ -59,15 +59,15 @@ SRT, WebVTT, JSON, ASS and SSA share Cue validation. ASS/SSA read `[Events]` Dia
 
 Local audio/video selection uses media MIME categories plus common extension hints, including MP4/M4V, WebM, MOV, MP3/M4A/AAC, WAV, OGG/OGA/OGV and FLAC. The 250 MB bound remains. The browser decides decoding support and supplies a clean playback error; no transcoding or universal codec support is promised.
 
-## Future boundaries (no backend implemented)
+## Hosted transcript storage and future generation
 
-[linked-transcripts.ts](../src/lib/linked-transcripts.ts) defines `LinkedTranscriptRepository.lookup({ contentKey, language })` / `save(StoredTranscript)` and a no-op implementation: lookup always misses, save performs no work. `StoredTranscript` carries schema/content/media/language/source identity, normalized cues, transcript hash, timestamp, explicit visibility and optional generator/model/owner metadata. A real repository must enforce visibility/access policy; user-supplied transcripts must stay private by default. There is no D1/R2/KV shared transcript or artifact cache.
+[linked-transcripts.ts](../src/lib/linked-transcripts.ts) defines `LinkedTranscriptRepository.lookup({ contentKey, language })` / `save(StoredTranscript)`, a native D1 production implementation, and a no-op ordinary Next development fallback. `StoredTranscript` carries schema/content/media/language/source identity, normalized cues, transcript hash, timestamp, explicit visibility and optional generator/model/owner metadata. A real repository must enforce visibility/access policy; user-supplied transcripts must stay private by default. D1 stores provider captions with system visibility and trusted derived quiz/difficulty artifacts. Stored media identity excludes playback URLs, Vimeo hashes and signed queries. See [storage and migration workflow](storage.md).
 
 `GeneratedTranscriptProvider.transcribe(LinkedMediaSource, AbortSignal)` is a contract only; there is no working remote AI transcription path, audio download or Generate subtitles button.
 
 ```text
 resolve linked media identity
-  → shared transcript repository (currently always a miss)
+  → D1 shared transcript repository (no-op in ordinary Next development)
   → provider Japanese captions (YouTube only today)
   → unavailable: offer a user transcript now
   → FUTURE: generate through an approved audio-access path
@@ -76,10 +76,10 @@ resolve linked media identity
   → reuse subject to access policy
 ```
 
-The current non-YouTube browser path enters user import immediately; a future repository integration will extend that path at the same boundary. Hosted storage, accounts and AI generation are not implemented by this refactor.
+The current non-YouTube browser path enters user import immediately; provider acquisition for these sources remains future work. The production preparation API can reuse an eligible stored linked transcript at the repository boundary. Hosted shared content storage is implemented. Accounts, hosted learner persistence and AI subtitle generation remain unimplemented.
 
 ## Verification
 
 [media.test.ts](../tests/media.test.ts) covers provider URLs, unsafe input, content identities, ASS/SSA/SRT/VTT/JSON, transcript metadata, migration, size bounds, no-caption versus infrastructure failures and ordered Vimeo controls. [media.spec.ts](../tests/e2e/media.spec.ts) covers the generic homepage, YouTube preparation, no-caption continuation, direct media with ASS/SSA on mobile, timestamped TXT, inert public-source/metadata extraction and the real Vimeo SDK through a mocked iframe message boundary. Deterministic tests require no live provider calls.
 
-Verified: 94 unit tests; all 35 Playwright tests on Next.js production and built Cloudflare/local workerd; typecheck, lint, Next build and vinext/Cloudflare build. Lint retains four pre-existing unused-code warnings. Local Worker verification uses an ignored, isolated Wrangler configuration with the built bundle/assets and production compatibility flags, omitting remote inference and secrets. The production configuration is unchanged.
+Verified: 94 unit tests; all 35 Playwright tests on Next.js production and built Cloudflare/local workerd; typecheck, lint, Next build and vinext/Cloudflare build. Lint retains four pre-existing unused-code warnings. Local Worker verification uses an ignored, isolated Wrangler configuration with the built bundle/assets and production compatibility flags, omitting remote inference and secrets. Production now also binds HIBIKI_DB; see storage verification for the subsequent persistence phase.
