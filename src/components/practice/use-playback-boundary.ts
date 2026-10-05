@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useMemo } from 'react';
 import { createSectionLookup } from '@/lib/section-lookup';
+import { lessonMedia } from '@/lib/media';
 import type { Lesson, Mode, PlaybackState, QuizEvidence } from '@/lib/types';
 import { type MediaHandle } from '../media-player';
 import type { Dispatch, RefObject, SetStateAction } from 'react';
@@ -14,6 +15,7 @@ type BoundaryOptions = {
   segment: Segment;
   lesson: Lesson;
   duration: number;
+  speed: number;
   resetTranslation: () => void;
   replayRange: QuizEvidence | null;
   media: RefObject<MediaHandle | null>;
@@ -32,6 +34,7 @@ export function usePlaybackBoundary({
   segment,
   lesson,
   duration,
+  speed,
   resetTranslation,
   replayRange,
   media,
@@ -49,9 +52,33 @@ export function usePlaybackBoundary({
   useEffect(() => {
     if (!ready || !isPlaying) return;
     let frame = 0;
-    const tick = () => {
+    let stopped = false;
+    let youtubeBoundaryTimer: number | null = null;
+    const stopShadowing = () => {
+      if (stopped) return;
       const adapter = media.current;
       if (!adapter) return;
+      stopped = true;
+      adapter.pause();
+      setElapsed(segment.end);
+      setStatus('your-turn');
+      setPracticeCount((n) => n + 1);
+    };
+    const adapter = media.current;
+    if (!adapter) return;
+    const sourceType = lessonMedia(lesson).type;
+    if (mode === 'shadowing' && sourceType === 'youtube') {
+      const current = adapter.time();
+      const safeSpeed = Number.isFinite(speed) && speed > 0 ? speed : 1;
+      const remaining = segment.end - current;
+      if (Number.isFinite(remaining) && remaining > -1.25) {
+        const delayMs = Math.max(0, (remaining / safeSpeed) * 1000 - 80);
+        youtubeBoundaryTimer = window.setTimeout(stopShadowing, delayMs);
+      }
+    }
+    const tick = () => {
+      const adapter = media.current;
+      if (!adapter || stopped) return;
       const time = adapter.time();
       if (seeking.current) {
         if (Math.abs(time - seeking.current.target) < 1.2 || Date.now() > seeking.current.deadline)
@@ -73,10 +100,7 @@ export function usePlaybackBoundary({
       const match = sectionAt(time);
       if (mode === 'shadowing') {
         if (time >= segment.end - 0.025 && time < segment.end + 1.25) {
-          adapter.pause();
-          setElapsed(segment.end);
-          setStatus('your-turn');
-          setPracticeCount((n) => n + 1);
+          stopShadowing();
           return;
         }
         if (match >= 0 && match !== index) {
@@ -100,6 +124,7 @@ export function usePlaybackBoundary({
     document.addEventListener('visibilitychange', visibility);
     return () => {
       clearInterval(interval);
+      if (youtubeBoundaryTimer !== null) window.clearTimeout(youtubeBoundaryTimer);
       document.removeEventListener('visibilitychange', visibility);
     };
   }, [
@@ -110,6 +135,7 @@ export function usePlaybackBoundary({
     segment.end,
     lesson.segments,
     duration,
+    speed,
     resetTranslation,
     replayRange,
     sectionAt,
