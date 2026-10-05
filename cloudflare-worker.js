@@ -15,6 +15,16 @@ import { createYoutubeCaptions } from './src/lib/providers/transcription';
 import { createWorkersAiTranscriptionProvider } from './src/lib/providers/ai-transcription';
 import { handleTranscriptionRequest } from './src/lib/transcription-api';
 import {
+  applyShadowingRateLimit,
+  handleShadowingFeedbackRequest,
+  handleShadowingSummaryRequest,
+  handleShadowingTranscriptionRequest,
+} from './src/lib/shadowing-api';
+import {
+  createWorkersAiShadowingFeedbackProvider,
+  createWorkersAiShadowingTranscriptionProvider,
+} from './src/lib/providers/shadowing';
+import {
   createD1LinkedTranscriptRepository,
   linkedTranscripts,
 } from './src/lib/linked-transcripts';
@@ -84,6 +94,22 @@ const worker = {
 
     if (url.pathname === '/api/transcribe' && request.method === 'POST') {
       return handleTranscriptionRequest(request, createWorkersAiTranscriptionProvider(env.AI));
+    }
+
+    if (url.pathname.startsWith('/api/shadowing/') && request.method === 'POST') {
+      const limited = await applyShadowingRateLimit(request, env.SHADOWING_RATE_LIMIT);
+      if (limited) return limited;
+      if (url.pathname === '/api/shadowing/transcribe')
+        return handleShadowingTranscriptionRequest(
+          request,
+          createWorkersAiShadowingTranscriptionProvider(env.AI),
+        );
+      const feedback = createWorkersAiShadowingFeedbackProvider(env.AI);
+      if (url.pathname === '/api/shadowing/feedback')
+        return handleShadowingFeedbackRequest(request, feedback);
+      if (url.pathname === '/api/shadowing/summary')
+        return handleShadowingSummaryRequest(request, feedback);
+      return Response.json({ error: 'Shadowing analysis endpoint not found.' }, { status: 404 });
     }
 
     if (url.pathname === '/demo.mp4' && ['GET', 'HEAD'].includes(request.method)) {
