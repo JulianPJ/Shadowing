@@ -14,6 +14,7 @@ import { resolveMediaLink } from '@/lib/media-discovery';
 import { MEDIA_ACCEPT, validateMediaFile } from '@/lib/media';
 import { createImportedLesson } from '@/lib/import-lesson';
 import { localWhisper } from '@/lib/providers/local-whisper';
+import { transcribeMediaFile } from '@/lib/transcription-client';
 import type { Lesson, ResolvedMedia } from '@/lib/types';
 
 export function ImportDialog({
@@ -37,6 +38,7 @@ export function ImportDialog({
   const [url, setUrl] = useState(initialUrl);
   const [resolved, setResolved] = useState(initialResolved);
   const [file, setFile] = useState<File | null>(null);
+  const [generationFile, setGenerationFile] = useState<File | null>(null);
   const [text, setText] = useState('');
   const [subtitleName, setSubtitleName] = useState('');
   const [error, setError] = useState('');
@@ -64,6 +66,15 @@ export function ImportDialog({
       setError('This transcript file could not be read. Choose it again.');
     }
   }
+  async function generateSubtitles(file: File, signal: AbortSignal) {
+    const timedSignal = AbortSignal.any([signal, AbortSignal.timeout(300000)]);
+    if (process.env.NEXT_PUBLIC_WHISPER_URL) {
+      const result = await localWhisper.transcribe(file, timedSignal);
+      return { ...result, provider: 'Local Whisper' };
+    }
+    return transcribeMediaFile(file, timedSignal);
+  }
+
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setError('');
@@ -76,24 +87,24 @@ export function ImportDialog({
       if (selected) setResolved(selected);
       if (kind === 'upload' && !file) throw new Error('Choose an audio or video file first.');
       if (kind === 'upload' && file) validateMediaFile(file);
+      if (kind === 'link' && generationFile) validateMediaFile(generationFile);
       let cues;
       let source = 'Imported subtitles';
       let transcriptType: 'user-upload' | 'user-paste' | 'generated' = subtitleName
         ? 'user-upload'
         : 'user-paste';
       if (text.trim()) cues = parseSubtitles(text);
-      else if (kind === 'upload' && file && process.env.NEXT_PUBLIC_WHISPER_URL) {
-        source = 'Local Whisper';
+      else {
+        const mediaForTranscription = kind === 'upload' ? file : generationFile;
+        if (!mediaForTranscription)
+          throw new Error(
+            'Add Japanese subtitles, or choose an audio/video file so Hibiki can generate them.',
+          );
+        const result = await generateSubtitles(mediaForTranscription, controller.signal);
+        source = result.provider || 'Cloudflare Whisper large-v3-turbo';
         transcriptType = 'generated';
-        const result = await localWhisper.transcribe(
-          file,
-          AbortSignal.any([controller.signal, AbortSignal.timeout(300000)]),
-        );
         cues = result.cues;
-      } else
-        throw new Error(
-          'Add Japanese SRT, VTT, ASS, SSA, JSON, or timestamped TXT. Plain text needs timings.',
-        );
+      }
       const lesson = await createImportedLesson({
         resolved: selected,
         fileName: kind === 'upload' ? file?.name : undefined,
@@ -134,7 +145,7 @@ export function ImportDialog({
       </p>
       {transcriptUnavailable ? (
         <p className="small" role="status">
-          No Japanese subtitles were found automatically. Add your own transcript to continue.
+          No Japanese subtitles were found automatically. Add your own transcript, or attach the video/audio below and Hibiki can generate Japanese subtitles.
         </p>
       ) : null}
       <div className="segmented-control import-tabs">
@@ -230,12 +241,31 @@ export function ImportDialog({
           rows={5}
           maxLength={2000000}
         />
-        {kind === 'upload' && process.env.NEXT_PUBLIC_WHISPER_URL ? (
+        {kind === 'link' ? (
+          <label className="field-label">
+            Generate subtitles from audio
+            <span className="small muted">
+              Optional · attach the matching audio/video file if this link has no usable subtitles.
+              AI generation currently accepts files up to 32 MB.
+            </span>
+            <span className="subtitle-upload">
+              <Upload size={17} />
+              {generationFile ? generationFile.name : 'Choose audio or video for AI subtitles'}
+              <input
+                aria-label="Audio or video for subtitle generation"
+                type="file"
+                accept={MEDIA_ACCEPT}
+                onChange={(event) => setGenerationFile(event.target.files?.[0] ?? null)}
+              />
+            </span>
+          </label>
+        ) : (
           <p className="small muted">
-            Without subtitles, this file will be sent to your configured local Whisper service.
-            First use may take a few minutes.
+            Leave the transcript blank and Hibiki will generate timed Japanese subtitles from this
+            media with {process.env.NEXT_PUBLIC_WHISPER_URL ? 'your local Whisper service' : 'Cloudflare Whisper'}.
+            AI generation currently accepts files up to 32 MB.
           </p>
-        ) : null}
+        )}
         {error ? (
           <div role="alert" className="error-message">
             {error}
