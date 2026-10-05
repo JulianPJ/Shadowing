@@ -40,6 +40,9 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps --no-shell chromium
 
+      - name: Run unit and integration tests
+        run: npm test
+
       - name: Build application
         run: npm run build
 

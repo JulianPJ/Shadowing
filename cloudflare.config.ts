@@ -17,7 +17,8 @@ export const worker = defineWorker({
     IMAGES: bindings.images(),
     AI: bindings.ai(),
     HIBIKI_DB: bindings.d1({ id: 'cf88fe7d-16bb-4f58-8839-2b27718a7847' }),
-    // Keep account routes release-gated until email sender secrets are configured and verified.
+    // Better Auth must have one canonical production origin for trusted callbacks and secure cookies.
+    AUTH_BASE_URL: bindings.text('https://shadowing.julianpopovskijones.workers.dev'),
     AUTH_SECRET: bindings.secret(),
     GOOGLE_CLIENT_ID: bindings.secret(),
     GOOGLE_CLIENT_SECRET: bindings.secret(),

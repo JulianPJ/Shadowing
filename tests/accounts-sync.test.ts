@@ -115,6 +115,39 @@ before(async () => {
   ];
 });
 after(() => mf.dispose());
+test('email delivery endpoints fail clearly before account creation when mail is unavailable', async () => {
+  const authWithoutMail = createAuth(db, env);
+  const response = await handleAuthRequest(
+    request(
+      '/api/auth/sign-up/email',
+      {
+        email: 'unconfigured-mail@example.com',
+        password: 'a long test password',
+        name: 'Learner',
+        callbackURL: '/account',
+      },
+      '',
+      '192.0.2.99',
+    ),
+    authWithoutMail,
+    env,
+  );
+  assert.equal(response.status, 503);
+  assert.deepEqual(await response.json(), {
+    code: 'EMAIL_SERVICE_UNAVAILABLE',
+    message: 'Email authentication is awaiting email service setup.',
+  });
+  assert.equal(
+    (
+      await db
+        .prepare('SELECT COUNT(*) n FROM "user" WHERE email=?')
+        .bind('unconfigured-mail@example.com')
+        .first<{ n: number }>()
+    )?.n,
+    0,
+  );
+});
+
 test('framework email registration, verification, persistent session and sign in', async () => {
   for (const [email, ip] of [
     ['a@example.com', '192.0.2.1'],

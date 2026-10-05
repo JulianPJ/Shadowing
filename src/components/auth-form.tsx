@@ -68,11 +68,13 @@ export function AuthForm({ screen = 'sign-in' }: { screen?: 'sign-in' | 'registe
     setBusy(false);
   }
   const title =
-    screen === 'register'
-      ? 'Make room for your progress'
-      : screen === 'reset'
-        ? 'Reset your password'
-        : 'Welcome back';
+      screen === 'register'
+        ? 'Make room for your progress'
+        : screen === 'reset'
+          ? 'Reset your password'
+          : 'Welcome back',
+    emailActionNeedsDelivery = screen === 'register' || (screen === 'reset' && !token),
+    emailActionUnavailable = emailActionNeedsDelivery && !account.emailEnabled;
   return (
     <main className="account-screen">
       <Link className="eyebrow" href="/">
@@ -140,7 +142,7 @@ export function AuthForm({ screen = 'sign-in' }: { screen?: 'sign-in' | 'registe
             />
           </label>
         ) : null}
-        <button className="button primary full-width" disabled={busy}>
+        <button className="button primary full-width" disabled={busy || emailActionUnavailable}>
           {busy
             ? 'Please wait…'
             : screen === 'register'
@@ -152,8 +154,14 @@ export function AuthForm({ screen = 'sign-in' }: { screen?: 'sign-in' | 'registe
                 : 'Sign in'}
         </button>
       </form>
+      {emailActionUnavailable ? (
+        <p className="small muted" role="status">
+          Email {screen === 'register' ? 'sign-up' : 'password reset'} is awaiting email service
+          setup. You can use Google sign-in or keep practicing without an account.
+        </p>
+      ) : null}
       {message ? <p role="status">{message}</p> : null}
-      {screen === 'sign-in' && email ? (
+      {screen === 'sign-in' && email && account.emailEnabled ? (
         <button
           className="button"
           disabled={busy}
