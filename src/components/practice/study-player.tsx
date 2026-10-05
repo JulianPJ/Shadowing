@@ -287,7 +287,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
 
   useEffect(() => () => shadowingSummaryRequest.current?.abort(), []);
 
-    usePlaybackBoundary({
+  usePlaybackBoundary({
     ready,
     isPlaying,
     mode,
