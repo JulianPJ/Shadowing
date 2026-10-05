@@ -170,7 +170,11 @@ export function loadShadowingSession(lesson: Pick<Lesson, 'id' | 'segments'>): S
         !!analysis &&
         Number.isInteger(analysis.score) &&
         analysis.score >= 0 &&
-        analysis.score <= 100
+        analysis.score <= 100 &&
+        typeof analysis.targetText === 'string' &&
+        typeof analysis.recognizedText === 'string' &&
+        Array.isArray(analysis.suggestions) &&
+        analysis.suggestions.every((suggestion) => typeof suggestion === 'string')
       );
     });
   } catch {
