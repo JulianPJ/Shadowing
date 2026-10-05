@@ -85,6 +85,7 @@ export function VoiceRecorder({
       return;
     }
     analysisRequest.current?.abort();
+    setAnalysing(false);
     const id = ++requestId.current;
     setRequesting(true);
     audio.current?.pause();
