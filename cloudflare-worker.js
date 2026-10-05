@@ -23,7 +23,7 @@ import {
 export * from 'vinext/server/fetch-handler';
 
 // Preserve vinext's response-stage exports/cache integration; adapt only Cloudflare-specific runtime paths.
-/** @typedef {import('cf/config').InferEnv<typeof import('./cloudflare.config').worker>} WorkerEnv */
+/** @typedef {import('cf/config').InferEnv<typeof import('./cloudflare.config').worker> & import('./src/lib/auth/server').AuthEnvironment} WorkerEnv */
 const worker = {
   /**
    * @param {Request} request
