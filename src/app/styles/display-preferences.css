@@ -46,7 +46,10 @@
 .quiz-option > span:nth-child(2) {
   min-width: 0;
 }
-/* Studio Mode is an immersive split workspace: media dominates, current + upcoming stay beside it. */
+.practice-current-stack {
+  display: contents;
+}
+/* Studio Mode is an immersive split workspace: media dominates, current + recording stay beside it. */
 body.studio-active {
   background: #101310;
 }
@@ -123,12 +126,23 @@ body.studio-active .site-footer {
   background: #000;
   box-shadow: 0 18px 55px #0008;
 }
-.studio-mode .current-card {
+.studio-mode .practice-current-stack {
   grid-column: 2;
   grid-row: 1;
-  height: 100%;
-  max-height: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  max-height: calc(100vh - 122px);
   overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #566259 transparent;
+}
+.studio-mode .current-card {
+  height: auto;
+  max-height: none;
+  overflow: visible;
+  flex: 0 0 auto;
   padding: 18px 17px 16px;
   border: 1px solid #313a33;
   border-radius: 8px;
@@ -244,7 +258,6 @@ body.studio-active .site-footer {
   border-color: #303832;
   color: #e7ece7;
 }
-.studio-mode .recording-panel,
 .studio-mode .completion-card,
 .studio-mode .evidence-banner,
 .studio-mode .reattach,
@@ -256,8 +269,12 @@ body.studio-active .site-footer {
   grid-column: 1 / -1;
 }
 .studio-mode .recording-panel {
-  padding: 16px 0 0;
-  border-color: #303832;
+  flex: 0 0 auto;
+  padding: 14px 17px 16px;
+  border: 1px solid #313a33;
+  border-radius: 8px;
+  background: #171b18;
+  color: #f1efe8;
 }
 .studio-mode .recording-panel audio {
   filter: invert(0.88) hue-rotate(180deg);
@@ -391,6 +408,9 @@ body.studio-active .site-footer {
     flex-direction: column;
     gap: 0;
     margin-top: 21px;
+  }
+  .studio-mode .practice-current-stack {
+    display: contents;
   }
   .studio-mode .media-frame {
     order: 0;
