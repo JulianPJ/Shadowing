@@ -66,6 +66,20 @@ function mockProvider(): ShadowingFeedbackProvider {
   };
 }
 
+test('header-only Whisper VTT is classified as no speech rather than malformed', async () => {
+  const provider = createWorkersAiShadowingProvider({
+    async run(model) {
+      assert.equal(model, SHADOWING_WHISPER_MODEL);
+      return { text: '', vtt: 'WEBVTT\n\n' };
+    },
+  });
+  await assert.rejects(
+    () => provider.transcribe(new Uint8Array([1, 2, 3]), new AbortController().signal),
+    (error: unknown) =>
+      error instanceof ShadowingProviderError && error.code === 'no-speech',
+  );
+});
+
 test('transcription endpoint validates origin, audio type, duration and size before inference', async () => {
   let calls = 0;
   const provider = mockProvider();
