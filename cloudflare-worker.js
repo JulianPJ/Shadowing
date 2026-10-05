@@ -14,6 +14,12 @@ import { createPrepareHandler } from './src/lib/prepare';
 import { createYoutubeCaptions } from './src/lib/providers/transcription';
 import { createWorkersAiTranscriptionProvider } from './src/lib/providers/ai-transcription';
 import { handleTranscriptionRequest } from './src/lib/transcription-api';
+import { createWorkersAiShadowingProvider } from './src/lib/providers/shadowing';
+import {
+  handleShadowingTranscriptionRequest,
+  handleShadowingFeedbackRequest,
+  handleShadowingSummaryRequest,
+} from './src/lib/shadowing-api';
 import {
   createD1LinkedTranscriptRepository,
   linkedTranscripts,
@@ -84,6 +90,16 @@ const worker = {
 
     if (url.pathname === '/api/transcribe' && request.method === 'POST') {
       return handleTranscriptionRequest(request, createWorkersAiTranscriptionProvider(env.AI));
+    }
+
+    if (url.pathname.startsWith('/api/shadowing/') && request.method === 'POST') {
+      const provider = createWorkersAiShadowingProvider(env.AI);
+      if (url.pathname === '/api/shadowing/transcribe')
+        return handleShadowingTranscriptionRequest(request, provider);
+      if (url.pathname === '/api/shadowing/feedback')
+        return handleShadowingFeedbackRequest(request, provider);
+      if (url.pathname === '/api/shadowing/summary')
+        return handleShadowingSummaryRequest(request, provider);
     }
 
     if (url.pathname === '/demo.mp4' && ['GET', 'HEAD'].includes(request.method)) {
