@@ -215,7 +215,9 @@ test('shadowing analysis is explicit, scores one recording, and shows aggregate 
   await page.getByRole('button', { name: 'Analyse attempt', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Shadowing Match' })).toBeVisible();
   await expect(page.locator('.shadowing-score')).toHaveText('100');
-  await expect(page.getByText(demo.segments[0].japanese, { exact: true })).toHaveCount(2);
+  await expect(
+    page.locator('.shadowing-result').getByText(demo.segments[0].japanese, { exact: true }),
+  ).toHaveCount(2);
   expect(transcriptions).toBe(1);
   expect(feedbackCalls).toBe(1);
 
