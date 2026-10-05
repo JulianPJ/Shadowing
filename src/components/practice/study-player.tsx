@@ -110,6 +110,8 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
   const recordCompletion = progress.complete;
   const recordShadowingScore = useCallback(
     (analysis: ShadowingScoreAnalysis) => {
+      setShadowingSummary(null);
+      shadowingSummaryRequest.current?.abort();
       const entry: ScoredShadowingSection = {
         sectionId: segment.id,
         attemptId:
@@ -267,8 +269,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
       })
       .catch(() => {
         if (!controller.signal.aborted) setShadowingSummary(fallback);
-      })
-      .finally(() => undefined);
+      });
     return () => controller.abort();
   }, [finished, overallShadowing, shadowingScores]);
 
