@@ -60,6 +60,54 @@ test('listen → automatic pause → repeat → next; translation, speed, contin
   await expect(page.getByRole('combobox', { name: 'Playback speed' })).toHaveValue('1.25');
   expect(errors).toEqual([]);
 });
+test('playback offset shifts authored pause and navigation timing', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      'hibiki:v1:preferences',
+      JSON.stringify({
+        mode: 'shadowing',
+        speed: 1,
+        translation: false,
+        studioMode: false,
+        furigana: false,
+        playbackOffsetMs: 400,
+      }),
+    );
+  });
+  await openDemo(page);
+  await expect(page.getByRole('button', { name: 'Reset playback timing offset' })).toHaveText(
+    '+400 ms',
+  );
+  await page.getByRole('button', { name: 'Listen', exact: true }).click();
+  await expect(page.getByTestId('playback-state')).toContainText('LISTEN CLOSELY');
+
+  await page.locator('video').evaluate(
+    (video: HTMLVideoElement, end: number) => {
+      video.currentTime = end + 0.1;
+    },
+    demo.segments[0].end,
+  );
+  await page.waitForTimeout(120);
+  await expect(page.getByTestId('playback-state')).toContainText('LISTEN CLOSELY');
+
+  await page.locator('video').evaluate(
+    (video: HTMLVideoElement, end: number) => {
+      video.currentTime = end + 0.45;
+    },
+    demo.segments[0].end,
+  );
+  await expect(page.getByTestId('playback-state')).toContainText('YOUR TURN');
+  const stoppedAt = await page
+    .locator('video')
+    .evaluate((video: HTMLVideoElement) => video.currentTime);
+  expect(stoppedAt).toBeGreaterThan(demo.segments[0].end + 0.3);
+
+  await page.getByRole('button', { name: 'Next section', exact: true }).click();
+  await expect
+    .poll(() => page.locator('video').evaluate((video: HTMLVideoElement) => video.currentTime))
+    .toBeGreaterThan(demo.segments[1].start + 0.3);
+});
+
 test('real MediaRecorder captures and replays; native replay stops the recording playback', async ({
   page,
   context,
