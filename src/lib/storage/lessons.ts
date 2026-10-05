@@ -1,6 +1,6 @@
 import type { Lesson } from '../types';
 import { migrateLesson, lessonMedia } from '../media';
-import { readStorage, writeStorage, writeStorageIfChanged } from './browser';
+import { readStorage, writeStorage, writeStorageIfChanged, storageAccount } from './browser';
 export type StudyRecord = { lesson: Lesson; index: number; updatedAt: number };
 
 // Local object URLs survive client-side navigation, but intentionally not a full refresh.
@@ -22,6 +22,9 @@ export function rememberMedia(id: string, url: string) {
 }
 
 export function saveLesson(lesson: Lesson, index: number) {
+  if (!storageAccount()) writeStorage(`lesson-visibility:${lesson.id}`, 'anonymous');
+  else if (!readStorage(`lesson:${lesson.id}`, null))
+    writeStorage(`lesson-visibility:${lesson.id}`, 'account-only');
   lesson = migrateLesson(lesson);
   const local = lessonMedia(lesson).type === 'local';
   if (local && lesson.mediaUrl) rememberMedia(lesson.id, lesson.mediaUrl);

@@ -24,8 +24,13 @@ import { resolveMediaLink } from '@/lib/media-discovery';
 import { needsUserTranscript } from '@/lib/linked-transcripts';
 import { recentLessons, saveLesson, type StudyRecord } from '@/lib/storage';
 import type { Lesson, ResolvedMedia } from '@/lib/types';
+import { accountLessons } from '@/lib/sync/client';
+import type { SyncedLesson } from '@/lib/sync/types';
+import { useAccount } from './account';
 
 export function Home() {
+  const account = useAccount();
+  const [remoteRecent, setRemoteRecent] = useState<SyncedLesson[]>([]);
   const router = useRouter();
   const [url, setUrl] = useState('');
   const [help, setHelp] = useState(false);
@@ -45,6 +50,18 @@ export function Home() {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setRecent(history.filter((item) => item?.lesson?.segments?.length).slice(0, 3));
     return () => abort.current?.abort();
+  }, []);
+  useEffect(() => {
+    const refresh = () => {
+      setRecent(recentLessons().slice(0, 3));
+      setRemoteRecent(
+        accountLessons()
+          .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+          .slice(0, 3),
+      );
+    };
+    window.addEventListener('hibiki:sync-hydrated', refresh);
+    return () => window.removeEventListener('hibiki:sync-hydrated', refresh);
   }, []);
   function openLesson(lesson: Lesson) {
     saveLesson(lesson, 0);
@@ -286,11 +303,13 @@ export function Home() {
             <span className="demo-note">Built-in sample · Japanese synthetic voice · no setup</span>
           </div>
         </section>
-        {recent.length ? (
+        {recent.length || remoteRecent.length ? (
           <section className="recent-section">
             <div className="section-heading">
               <h2>Pick up where you left off</h2>
-              <span className="small muted">Saved on this device</span>
+              <span className="small muted">
+                {account.user ? 'Your account and this device' : 'Saved on this device'}
+              </span>
             </div>
             <div className="recent-grid">
               {recent.map((item) => (
@@ -312,6 +331,27 @@ export function Home() {
                   <ArrowUpRight size={17} />
                 </Link>
               ))}
+              {remoteRecent
+                .filter((r) => !recent.some((l) => l.lesson.id === r.lesson.lessonId))
+                .map((r) => (
+                  <Link
+                    href={`/practice/${encodeURIComponent(r.lesson.lessonId)}`}
+                    className="recent-card"
+                    key={r.id}
+                  >
+                    <span className="recent-icon">
+                      <Headphones size={20} />
+                    </span>
+                    <div>
+                      <strong>{r.lesson.title}</strong>
+                      <span>
+                        Section {r.position + 1} of {r.lesson.segmentCount}
+                        {!r.mediaAvailable ? ' · Reattach media or transcript' : ''}
+                      </span>
+                    </div>
+                    <ArrowUpRight size={17} />
+                  </Link>
+                ))}
             </div>
           </section>
         ) : null}

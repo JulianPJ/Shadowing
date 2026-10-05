@@ -2,6 +2,8 @@
 
 > **Purpose:** persistent product and engineering context for future development.
 >
+> **Account update:** Better Auth accounts and eligible learner sync are implemented. Production D1 migrations and auth/Google secrets are configured; deployment awaits email sender secrets and real-provider smoke checks. Anonymous practice and shared-content trust remain unchanged. See `docs/accounts-and-sync-verification.md`.
+>
 > **Current snapshot:** 2026-10-04, production runs on Cloudflare Workers with the caption relay path verified and roadmap priorities #1–#3 implemented. Hosted AI is split by task: Clef Flash provides full-transcript difficulty classification and only assists quiz routing for very large transcripts; ordinary comprehension checks use Qwen3-30B-A3B. On-demand Japanese→English translation uses DeepL with only the current section translated and bounded neighboring Japanese supplied as context. Local learner progress is deployed. The next roadmap item is #4, polish / monetisation.
 >
 > **Deployment target:** Cloudflare Workers via vinext. Cloudflare is the canonical hosted environment for this project; do not assume Vercel.
@@ -223,7 +225,7 @@ Current learner progress remains browser-local:
 - versioned local learner-history sessions and compact retention archives, independent of the eight recent lessons;
 - deterministic learner-profile aggregation and validated compact content-difficulty references.
 
-There is no account system, hosted user database, or cross-device sync.
+Accounts and local-first learner sync are now implemented using Better Auth 1.7.7 and native D1. Email/password requires verification, Google uses explicit linking, and first sign-in asks before importing anonymous history. Production migrations are applied and auth/Google secrets are configured. Deployment awaits email sender secrets and real-provider smoke verification. Billing, subscriptions, analytics and saved vocabulary remain unimplemented. See [accounts and sync](docs/accounts-and-sync.md) and [release verification](docs/accounts-and-sync-verification.md).
 
 ### Demo
 
@@ -258,7 +260,8 @@ Current stack:
 - Cloudflare Workers deployment via vinext/Vite;
 - Workers Cache adapter for page responses;
 - native Cloudflare D1 for shared linked transcripts and trusted quiz/difficulty artifacts;
-- browser `localStorage` for anonymous learner/practice persistence.
+- browser `localStorage` for anonymous learner/practice persistence and per-account offline caches;
+- Better Auth 1.7.7 with native D1 for accounts, identity linking and local-first learner sync.
 
 Important files:
 
@@ -406,10 +409,7 @@ The first version may remain local-first, but choose data contracts that can lat
 
 ## 4. Polish / monetisation layer
 
-Only after retention signals justify it, add:
-- accounts;
-- cross-device sync;
-- durable hosted persistence;
+Accounts, cross-device sync and durable learner persistence are implemented in code with production configuration/smoke gates outstanding. Billing is outside this account task. Remaining polish/monetisation work, only after retention signals justify it:
 - analytics;
 - sensible free/premium limits;
 - premium features;
@@ -530,17 +530,17 @@ Future agents should verify before proposing work. At this snapshot, the followi
 
 Canonical production translation depends on DeepL and can still fail, time out, hit rate limits, or exhaust account quota; failures remain retryable and must never block shadowing. MyMemory is retained only as the keyless local/non-Cloudflare fallback and may have quota/quality limits.
 
-### No hosted user progress
+### Accounts and hosted learner sync
 
-Progress is local to the current browser/origin. This is intentional for now, but later personalization across devices will require accounts/storage.
+Anonymous learner data stays browser-local. Authenticated users additionally synchronize eligible learner state to D1. Local writes remain immediate and offline-safe. Private transcripts, playback URLs, translations, media and recordings stay local. Production email/Google secrets and real-provider smoke verification remain deployment gates; see [accounts and sync](docs/accounts-and-sync.md).
 
 ### Comprehension generation needs server configuration
 
-The bundled demo is independent of inference. Canonical Cloudflare production uses the native `AI` binding; standard Next.js development may use the existing optional chat-completions adapter. API input remains bounded at 2,000 normalized sections / 60,000 Japanese characters. Qwen has a 32,768-token context window, so the production router deliberately uses a much lower 12,000-character direct-input ceiling and introduces Clef-assisted selection above that point rather than approaching the hard context limit. Structural/evidence checks cannot prove the semantic correctness of every model-generated question. Quiz results remain local and do not yet sync to an account.
+The bundled demo is independent of inference. Canonical Cloudflare production uses the native `AI` binding; standard Next.js development may use the existing optional chat-completions adapter. API input remains bounded at 2,000 normalized sections / 60,000 Japanese characters. Qwen has a 32,768-token context window, so the production router deliberately uses a much lower 12,000-character direct-input ceiling and introduces Clef-assisted selection above that point rather than approaching the hard context limit. Structural/evidence checks cannot prove the semantic correctness of every model-generated question. Quiz answer history syncs for accounts without private evidence text. Scores are recomputed where the trusted shared quiz is available; private/evicted quizzes remain explicitly self-reported.
 
 ### Content difficulty is an estimate
 
-Full-transcript classification avoids sparse sampling, but chunked analysis can still miss distant relationships between chunks. Caption-derived speech pace depends on spelling and timing, not measured morae or audio activity; its thresholds are product heuristics. Semantic quality needs real-lesson evaluation. Native inference already underway may continue after the request timeout. Estimates have browser L1 caching and D1 L2 reuse for trusted hosted transcripts; learner data remains local without cross-device sync. See [content difficulty limitations](docs/content-difficulty.md).
+Full-transcript classification avoids sparse sampling, but chunked analysis can still miss distant relationships between chunks. Caption-derived speech pace depends on spelling and timing, not measured morae or audio activity; its thresholds are product heuristics. Semantic quality needs real-lesson evaluation. Native inference already underway may continue after the request timeout. Estimates have browser L1 caching and D1 L2 reuse for trusted hosted transcripts; anonymous learner data remains local; accounts sync compact learner/difficulty references. See [content difficulty limitations](docs/content-difficulty.md).
 
 ### Translation server cache is in-memory
 

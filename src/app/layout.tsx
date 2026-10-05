@@ -3,6 +3,7 @@ import '@fontsource-variable/dm-sans';
 import '@fontsource/noto-sans-jp/400.css';
 import '@fontsource/noto-sans-jp/500.css';
 import './globals.css';
+import { AccountBridge } from '@/components/account';
 export const metadata: Metadata = {
   title: 'Hibiki — Find your Japanese rhythm',
   description:
@@ -12,7 +13,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        {children}
+        <AccountBridge />
+      </body>
     </html>
   );
 }

@@ -9,6 +9,7 @@ import { readStorage, loadPreferences, loadLesson, getLiveMedia } from '@/lib/st
 import { lessonMedia, migrateLesson } from '@/lib/media';
 import { Header, Footer, HelpDialog } from './chrome';
 import { StudyPlayer, type Session } from './practice/study-player';
+import { restoreAccountLesson, subscribeSync, syncStatus } from '@/lib/sync/client';
 export function Practice({ lessonId }: { lessonId: string }) {
   const [session, setSession] = useState<Session | null>(null);
   const [missing, setMissing] = useState(false);
@@ -16,11 +17,31 @@ export function Practice({ lessonId }: { lessonId: string }) {
   /* Browser-only lesson persistence requires a one-time sync after hydration. */
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
+    let disposed = false;
+    const restore = () => {
+      if (lessonId === 'demo' || loadLesson(lessonId)) return;
+      if (syncStatus().state === 'saved')
+        void restoreAccountLesson(lessonId).then((lesson) => {
+          if (lesson && !disposed) {
+            setSession({
+              lesson,
+              index: readStorage(`position:${lessonId}`, 0),
+              preferences: loadPreferences(),
+            });
+            setMissing(false);
+          }
+        });
+    };
+    const unsubscribe = subscribeSync(restore);
+    restore();
     try {
       const lesson = lessonId === 'demo' ? migrateLesson(demoData as Lesson) : loadLesson(lessonId);
       if (!lesson || !lesson.segments?.length) {
         setMissing(true);
-        return;
+        return () => {
+          disposed = true;
+          unsubscribe();
+        };
       }
       if (lessonMedia(lesson).type === 'local') lesson.mediaUrl = getLiveMedia(lesson.id);
       validateCues(lesson.segments);
@@ -33,6 +54,10 @@ export function Practice({ lessonId }: { lessonId: string }) {
     } catch {
       setMissing(true);
     }
+    return () => {
+      disposed = true;
+      unsubscribe();
+    };
   }, [lessonId]);
   /* eslint-enable react-hooks/set-state-in-effect */
   return (
