@@ -161,15 +161,16 @@ export function loadShadowingSession(lesson: Pick<Lesson, 'id' | 'segments'>): S
     return value.filter((item): item is ScoredShadowingSection => {
       if (!item || typeof item !== 'object') return false;
       const section = item as Partial<ScoredShadowingSection>;
+      const analysis = section.analysis;
       return (
         typeof section.sectionId === 'string' &&
         ids.has(section.sectionId) &&
         typeof section.attemptId === 'string' &&
         typeof section.scoredAt === 'string' &&
-        !!section.analysis &&
-        Number.isInteger(section.analysis.score) &&
-        section.analysis.score >= 0 &&
-        section.analysis.score <= 100
+        !!analysis &&
+        Number.isInteger(analysis.score) &&
+        analysis.score >= 0 &&
+        analysis.score <= 100
       );
     });
   } catch {
