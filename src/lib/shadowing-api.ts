@@ -145,7 +145,8 @@ function validAlignment(value: unknown): value is ShadowingAlignmentOperation[] 
 }
 
 export function validateShadowingAnalysis(value: unknown): ShadowingScoreAnalysis {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid analysis');
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    throw new Error('Invalid analysis');
   const item = value as Record<string, unknown>;
   if (
     item.schemaVersion !== 1 ||
@@ -161,22 +162,79 @@ export function validateShadowingAnalysis(value: unknown): ShadowingScoreAnalysi
     !finiteScore(item.contentScore) ||
     !finiteScore(item.timingScore) ||
     typeof item.contentSimilarity !== 'number' ||
+    !Number.isFinite(item.contentSimilarity) ||
+    item.contentSimilarity < 0 ||
+    item.contentSimilarity > 1 ||
     typeof item.timingSimilarity !== 'number' ||
+    !Number.isFinite(item.timingSimilarity) ||
+    item.timingSimilarity < 0 ||
+    item.timingSimilarity > 1 ||
     typeof item.targetDuration !== 'number' ||
+    !Number.isFinite(item.targetDuration) ||
+    item.targetDuration <= 0 ||
     typeof item.speechDuration !== 'number' ||
+    !Number.isFinite(item.speechDuration) ||
+    item.speechDuration <= 0 ||
     typeof item.durationRatio !== 'number' ||
+    !Number.isFinite(item.durationRatio) ||
+    item.durationRatio <= 0 ||
     !['faster', 'close', 'slower'].includes(String(item.pace)) ||
-    !validAlignment(item.alignment)
+    !validAlignment(item.alignment) ||
+    !Array.isArray(item.suggestions)
   )
     throw new Error('Invalid analysis');
-  for (const key of ['matches', 'deletions', 'substitutions', 'insertions', 'targetUnits', 'recognizedUnits']) {
-    const value = item[key];
-    if (typeof value !== 'number' || !Number.isInteger(value) || value < 0)
-      throw new Error('Invalid analysis');
-  }
-  return item as unknown as ShadowingScoreAnalysis;
-}
 
+  const integers: Record<string, number> = {};
+  for (const key of [
+    'matches',
+    'deletions',
+    'substitutions',
+    'insertions',
+    'targetUnits',
+    'recognizedUnits',
+  ]) {
+    const number = item[key];
+    if (typeof number !== 'number' || !Number.isInteger(number) || number < 0)
+      throw new Error('Invalid analysis');
+    integers[key] = number;
+  }
+  const suggestions = item.suggestions
+    .filter((suggestion): suggestion is string => typeof suggestion === 'string')
+    .map((suggestion) => suggestion.trim())
+    .filter(Boolean);
+  if (
+    suggestions.length !== item.suggestions.length ||
+    suggestions.length < 1 ||
+    suggestions.length > 3 ||
+    suggestions.some((suggestion) => suggestion.length > 500)
+  )
+    throw new Error('Invalid analysis');
+
+  return {
+    schemaVersion: 1,
+    targetText: item.targetText,
+    recognizedText: item.recognizedText,
+    targetReading: item.targetReading,
+    recognizedReading: item.recognizedReading,
+    score: item.score,
+    contentScore: item.contentScore,
+    timingScore: item.timingScore,
+    contentSimilarity: item.contentSimilarity,
+    timingSimilarity: item.timingSimilarity,
+    targetDuration: item.targetDuration,
+    speechDuration: item.speechDuration,
+    durationRatio: item.durationRatio,
+    pace: item.pace as ShadowingScoreAnalysis['pace'],
+    alignment: item.alignment,
+    matches: integers.matches,
+    deletions: integers.deletions,
+    substitutions: integers.substitutions,
+    insertions: integers.insertions,
+    targetUnits: integers.targetUnits,
+    recognizedUnits: integers.recognizedUnits,
+    suggestions,
+  };
+}
 export async function handleShadowingFeedbackRequest(
   request: Request,
   provider: ShadowingFeedbackProvider,
@@ -210,19 +268,77 @@ export async function handleShadowingFeedbackRequest(
 }
 
 function validateAggregate(value: unknown): ShadowingAggregate {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid aggregate');
-  const aggregate = value as Record<string, unknown>;
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    throw new Error('Invalid aggregate');
+  const item = value as Record<string, unknown>;
+  const integerKeys = [
+    'scoredSections',
+    'totalSections',
+    'deletions',
+    'substitutions',
+    'insertions',
+    'fasterSections',
+    'slowerSections',
+    'closePaceSections',
+  ] as const;
+  const integers: Record<(typeof integerKeys)[number], number> = {
+    scoredSections: 0,
+    totalSections: 0,
+    deletions: 0,
+    substitutions: 0,
+    insertions: 0,
+    fasterSections: 0,
+    slowerSections: 0,
+    closePaceSections: 0,
+  };
+  for (const key of integerKeys) {
+    const number = item[key];
+    if (typeof number !== 'number' || !Number.isInteger(number) || number < 0)
+      throw new Error('Invalid aggregate');
+    integers[key] = number;
+  }
   if (
-    !finiteScore(aggregate.score) ||
-    !Number.isInteger(aggregate.scoredSections) ||
-    !Number.isInteger(aggregate.totalSections) ||
-    Number(aggregate.scoredSections) < 1 ||
-    Number(aggregate.totalSections) < Number(aggregate.scoredSections)
+    !finiteScore(item.score) ||
+    !finiteScore(item.averageContentScore) ||
+    !finiteScore(item.averageTimingScore) ||
+    integers.scoredSections < 1 ||
+    integers.totalSections < integers.scoredSections
   )
     throw new Error('Invalid aggregate');
-  return value as ShadowingAggregate;
-}
 
+  const ranked = (raw: unknown) => {
+    if (!Array.isArray(raw) || raw.length > 3) throw new Error('Invalid aggregate');
+    return raw.map((entry) => {
+      if (!entry || typeof entry !== 'object' || Array.isArray(entry))
+        throw new Error('Invalid aggregate');
+      const row = entry as Record<string, unknown>;
+      if (
+        typeof row.sectionId !== 'string' ||
+        !row.sectionId ||
+        row.sectionId.length > 250 ||
+        !finiteScore(row.score)
+      )
+        throw new Error('Invalid aggregate');
+      return { sectionId: row.sectionId, score: row.score };
+    });
+  };
+
+  return {
+    score: item.score,
+    scoredSections: integers.scoredSections,
+    totalSections: integers.totalSections,
+    averageContentScore: item.averageContentScore,
+    averageTimingScore: item.averageTimingScore,
+    deletions: integers.deletions,
+    substitutions: integers.substitutions,
+    insertions: integers.insertions,
+    fasterSections: integers.fasterSections,
+    slowerSections: integers.slowerSections,
+    closePaceSections: integers.closePaceSections,
+    lowestSections: ranked(item.lowestSections),
+    highestSections: ranked(item.highestSections),
+  };
+}
 function validateScoredSections(value: unknown): ScoredShadowingSection[] {
   if (!Array.isArray(value) || !value.length || value.length > 500) throw new Error('Invalid sections');
   const unique = new Set<string>();
