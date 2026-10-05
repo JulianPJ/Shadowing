@@ -116,7 +116,19 @@ export async function shadowingAttemptFeedback(
 
 export async function shadowingSessionSummary(signals: ShadowingSummarySignals, signal: AbortSignal) {
   try {
-    const { fingerprint: _fingerprint, ...summarySignals } = signals;
+    const summarySignals: Omit<ShadowingSummarySignals, 'fingerprint'> = {
+      score: signals.score,
+      scoredSections: signals.scoredSections,
+      totalSections: signals.totalSections,
+      averageContentScore: signals.averageContentScore,
+      averageTimingScore: signals.averageTimingScore,
+      pace: signals.pace,
+      commonDeletions: signals.commonDeletions,
+      commonAdditions: signals.commonAdditions,
+      commonSubstitutions: signals.commonSubstitutions,
+      highest: signals.highest,
+      lowest: signals.lowest,
+    };
     const response = await fetch('/api/shadowing/summary', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
