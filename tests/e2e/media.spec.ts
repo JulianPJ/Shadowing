@@ -100,8 +100,9 @@ test('no-captions → own transcript retains link, identity, title and author wi
   await expect(page.getByRole('dialog').getByLabel('Video link', { exact: true })).toHaveValue(
     `https://youtu.be/${id}`,
   );
+  await page.getByRole('button', { name: 'Upload own subtitles', exact: true }).click();
   await page.getByLabel('Paste timestamped transcript').fill(transcript);
-  await page.getByRole('button', { name: 'Start practicing', exact: true }).click();
+  await page.getByRole('button', { name: 'Generate subtitles & start', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Captionless video' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Listen', exact: true })).toBeEnabled();
   const lesson = await page.evaluate(
@@ -147,6 +148,11 @@ test('captionless link generates subtitles from attached media while preserving 
   });
   await startLink(page, videoUrl);
   await expect(page.getByRole('dialog')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Upload own subtitles', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Auto-generate subtitles', exact: true })).toBeVisible();
+  expect(transcriptions).toBe(0);
+  await page.getByRole('button', { name: 'Auto-generate subtitles', exact: true }).click();
+  expect(transcriptions).toBe(0);
   await page.getByLabel('Audio or video for subtitle generation').setInputFiles({
     name: 'captionless-source.mp4',
     mimeType: 'video/mp4',
@@ -200,6 +206,7 @@ for (const extension of ['ass', 'ssa'])
     await startLink(page, link);
     await expect(page.getByRole('dialog')).toBeVisible();
     await expect(page.getByLabel('Video link', { exact: true })).toHaveValue(link);
+    await page.getByRole('button', { name: 'Upload own subtitles', exact: true }).click();
     await page.getByLabel('Japanese subtitle file').setInputFiles({
       name: `lesson.${extension}`,
       mimeType: 'text/plain',
@@ -230,6 +237,7 @@ test('manual video-link import accepts timed TXT and rejects untimed text withou
   await page.goto('/');
   await page.getByRole('button', { name: 'Import media or subtitles' }).click();
   await page.getByLabel('Video link', { exact: true }).fill(`${baseURL}/demo.mp4`);
+  await page.getByRole('button', { name: 'Upload own subtitles', exact: true }).click();
   await page.getByLabel('Paste timestamped transcript').fill('こんにちは。');
   await page.getByRole('button', { name: 'Start practicing' }).click();
   await expect(page.getByRole('dialog').getByRole('alert')).toContainText(
@@ -270,6 +278,7 @@ test('public page discovery extracts media and metadata inertly, exposes the lin
     await page.evaluate(() => (window as unknown as { pwned?: boolean }).pwned),
   ).toBeUndefined();
   expect(forbidden).toBe(0);
+  await page.getByRole('button', { name: 'Upload own subtitles', exact: true }).click();
   await page.getByLabel('Paste timestamped transcript').fill(transcript);
   await page.getByRole('button', { name: 'Start practicing' }).click();
   await expect(page.getByRole('heading', { name: 'Extracted Japanese video' })).toBeVisible();
@@ -388,6 +397,7 @@ test('expanded local media selection reports browser decoding errors cleanly', a
     mimeType: 'audio/flac',
     buffer: Buffer.from('not a valid encoded audio file'),
   });
+  await page.getByRole('button', { name: 'Upload own subtitles', exact: true }).click();
   await page.getByLabel('Paste timestamped transcript').fill(transcript);
   await page.getByRole('button', { name: 'Start practicing' }).click();
   await expect(page.locator('.media-error')).toContainText('could not decode the selected media');
@@ -420,6 +430,7 @@ test('Vimeo adapter exercises real SDK message boundary with mocked embedded pla
   );
   await startLink(page, 'https://vimeo.com/123456');
   await expect(page.getByRole('dialog')).toBeVisible();
+  await page.getByRole('button', { name: 'Upload own subtitles', exact: true }).click();
   await page.getByLabel('Paste timestamped transcript').fill(transcript);
   await page.getByRole('button', { name: 'Start practicing' }).click();
   await expect(page.getByRole('button', { name: 'Listen', exact: true })).toBeEnabled();
