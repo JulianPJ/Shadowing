@@ -100,6 +100,7 @@ test('imported local media and SRT play, pause, translate and recover on refresh
   await page.getByRole('button', { name: 'Import media or subtitles' }).click();
   await page.getByRole('button', { name: 'Own media', exact: true }).click();
   await page.getByLabel('Audio or video file').setInputFiles(path.resolve('public/demo.mp4'));
+  await page.getByRole('button', { name: 'Upload own subtitles', exact: true }).click();
   await page.getByLabel('Japanese subtitle file').setInputFiles(path.resolve('public/demo.vtt'));
   await page.getByRole('button', { name: 'Start practicing' }).click();
   await expect(page.getByRole('button', { name: 'Listen', exact: true })).toBeEnabled();
