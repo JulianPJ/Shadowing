@@ -144,18 +144,53 @@ const STORAGE_PREFIX = 'hibiki:shadowing:v1:';
 function validResult(value: unknown): value is ShadowingSectionResult {
   if (!value || typeof value !== 'object') return false;
   const r = value as Partial<ShadowingSectionResult>;
+  const score = (v: unknown) =>
+    typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= 100;
+  const finite = (v: unknown) => typeof v === 'number' && Number.isFinite(v);
+  const strings = (v: unknown, maxItems = 500) =>
+    Array.isArray(v) &&
+    v.length <= maxItems &&
+    v.every((item) => typeof item === 'string' && item.length <= 220);
   return (
     r.schemaVersion === 1 &&
     typeof r.sectionId === 'string' &&
-    typeof r.score === 'number' &&
-    Number.isInteger(r.score) &&
-    r.score >= 0 &&
-    r.score <= 100 &&
-    typeof r.contentScore === 'number' &&
-    typeof r.timingScore === 'number' &&
+    !!r.sectionId &&
+    r.sectionId.length <= 200 &&
+    score(r.score) &&
+    score(r.contentScore) &&
+    score(r.timingScore) &&
+    finite(r.contentSimilarity) &&
+    finite(r.timingSimilarity) &&
+    finite(r.referenceDurationSeconds) &&
+    (r.referenceDurationSeconds as number) > 0 &&
+    finite(r.recordingDurationSeconds) &&
+    (r.recordingDurationSeconds as number) > 0 &&
+    finite(r.relativeSpeakingSpeed) &&
+    (r.relativeSpeakingSpeed as number) > 0 &&
+    (r.normalization === 'reading' || r.normalization === 'orthographic') &&
     typeof r.targetText === 'string' &&
+    r.targetText.length <= 5000 &&
     typeof r.recognizedText === 'string' &&
-    Array.isArray(r.suggestions)
+    r.recognizedText.length <= 5000 &&
+    typeof r.targetReading === 'string' &&
+    typeof r.recognizedReading === 'string' &&
+    Array.isArray(r.alignment) &&
+    r.alignment.length <= 500 &&
+    strings(r.missing) &&
+    strings(r.additions) &&
+    Array.isArray(r.substitutions) &&
+    r.substitutions.length <= 500 &&
+    r.substitutions.every(
+      (item) =>
+        item &&
+        typeof item.expected === 'string' &&
+        item.expected.length <= 20 &&
+        typeof item.heard === 'string' &&
+        item.heard.length <= 20,
+    ) &&
+    strings(r.suggestions, 3) &&
+    typeof r.attemptedAt === 'string' &&
+    Number.isFinite(Date.parse(r.attemptedAt))
   );
 }
 
