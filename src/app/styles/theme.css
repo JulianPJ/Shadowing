@@ -325,3 +325,31 @@
     height: 34px;
   }
 }
+
+
+:root[data-theme='dark'] .shadowing-match,
+:root[data-theme='dark'] .shadowing-overall {
+  border-color: #43513f;
+  background: #1d251e;
+}
+:root[data-theme='dark'] .shadowing-match-heading,
+:root[data-theme='dark'] .shadowing-suggestions,
+:root[data-theme='dark'] .shadowing-overall-feedback {
+  border-color: #354136;
+}
+:root[data-theme='dark'] .shadowing-match-heading strong,
+:root[data-theme='dark'] .shadowing-overall-score strong {
+  color: #b7d2a6;
+}
+:root[data-theme='dark'] .shadowing-match-heading > span,
+:root[data-theme='dark'] .shadowing-match-copy span,
+:root[data-theme='dark'] .shadowing-suggestions > span,
+:root[data-theme='dark'] .shadowing-overall-feedback span,
+:root[data-theme='dark'] .shadowing-overall-score p {
+  color: #9da99a;
+}
+:root[data-theme='dark'] .shadowing-match-copy p,
+:root[data-theme='dark'] .shadowing-suggestions ul,
+:root[data-theme='dark'] .shadowing-overall-feedback p {
+  color: #c0cabc;
+}
