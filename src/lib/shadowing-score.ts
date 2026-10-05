@@ -109,13 +109,6 @@ export function moraUnits(text: string): string[] {
   return units;
 }
 
-function operationCost(operation: ShadowingAlignmentOperation['type']) {
-  if (operation === 'insertion') return SHADOWING_INSERTION_COST;
-  if (operation === 'deletion') return SHADOWING_DELETION_COST;
-  if (operation === 'substitution') return SHADOWING_SUBSTITUTION_COST;
-  return 0;
-}
-
 export function alignPronunciation(
   target: readonly string[],
   heard: readonly string[],
