@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { AudioLines, ArrowUpRight, X, Headphones, Mic, Repeat2, Keyboard } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { AccountEntry } from './account';
+import { ThemeToggle } from './theme-toggle';
 
 export function Header({ onHelp, player = false }: { onHelp: () => void; player?: boolean }) {
   return (
@@ -33,6 +34,7 @@ export function Header({ onHelp, player = false }: { onHelp: () => void; player?
               'How it works'
             )}
           </button>
+          <ThemeToggle />
           <Link className="nav-demo" href={player ? '/' : '/practice/demo'}>
             {player ? 'New practice' : 'Try a practice'}
             <ArrowUpRight size={15} />
