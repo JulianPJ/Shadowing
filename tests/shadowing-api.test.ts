@@ -98,12 +98,39 @@ test('shadowing transcription API rejects cross-origin, non-audio, tiny audio, a
   const tiny = await handleShadowingTranscriptionRequest(
     new Request('https://hibiki.example/api/shadowing/transcribe', {
       method: 'POST',
-      headers: { 'Content-Type': 'audio/webm' },
+      headers: { 'Content-Type': 'audio/webm', 'X-Hibiki-Recording-Duration': '0.5' },
       body: new Uint8Array(64),
     }),
     provider,
   );
   assert.equal(tiny.status, 422);
+  assert.equal((await tiny.json()).code, 'audio-empty');
+
+  const oversized = await handleShadowingTranscriptionRequest(
+    new Request('https://hibiki.example/api/shadowing/transcribe', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'audio/webm',
+        'Content-Length': String(8 * 1024 * 1024 + 1),
+        'X-Hibiki-Recording-Duration': '30',
+      },
+      body: new Uint8Array(512),
+    }),
+    provider,
+  );
+  assert.equal(oversized.status, 413);
+  assert.equal((await oversized.json()).code, 'audio-too-large');
+
+  const tooLong = await handleShadowingTranscriptionRequest(
+    new Request('https://hibiki.example/api/shadowing/transcribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'audio/webm', 'X-Hibiki-Recording-Duration': '66' },
+      body: new Uint8Array(512),
+    }),
+    provider,
+  );
+  assert.equal(tooLong.status, 422);
+  assert.equal((await tooLong.json()).code, 'audio-duration');
 
   const silence = await handleShadowingTranscriptionRequest(
     new Request('https://hibiki.example/api/shadowing/transcribe', {
