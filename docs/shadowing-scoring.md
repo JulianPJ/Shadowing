@@ -69,7 +69,7 @@ The exact V1 formula is:
 
 Content and timing sub-scores are also rounded to whole-number percentages for display/debugging.
 
-No score is returned for missing target speech, invalid timing, less than 0.35 seconds of recognized speech, or an attempt that is both under 25% of the target duration and under 20% of the target pronunciation units.
+No score is returned for missing target speech, invalid timing, less than 0.35 seconds of recognized speech, an attempt that is both under 25% of the target duration and under 20% of the target pronunciation units, or extreme repetitive/overlong recognition that is too unreliable to compare.
 
 ## Retakes and aggregate
 
@@ -90,7 +90,7 @@ Session state is stored under a key derived from the lesson ID plus a determinis
 - Raw audio is never written to D1, R2, localStorage, sessionStorage, or application logs.
 - Per-attempt Qwen feedback receives only target/recognized text and deterministic structured signals.
 - End-of-video Qwen feedback receives only structured section results and aggregate signals, never audio.
-- Audio requests are same-origin, `audio/*` only, and bounded to 8 MB.
+- Audio requests are same-origin, `audio/*` only, bounded to 8 MB, and the captured attempt must be between 0.2 and 65 seconds.
 - JSON feedback/summary bodies and field sizes are bounded.
 - The Worker uses a Cloudflare rate-limit binding for shadowing AI endpoints.
 - The client permits one in-flight analysis for a recorder and aborts superseded work.
