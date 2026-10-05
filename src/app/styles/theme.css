@@ -248,6 +248,34 @@
 :root[data-theme='dark'] .recording-audio audio {
   color-scheme: dark;
 }
+:root[data-theme='dark'] .recording-analysis-actions > span,
+:root[data-theme='dark'] .shadowing-score-label,
+:root[data-theme='dark'] .shadowing-suggestions ul,
+:root[data-theme='dark'] .shadowing-summary-grid p {
+  color: var(--muted);
+}
+:root[data-theme='dark'] .shadowing-result,
+:root[data-theme='dark'] .shadowing-completion {
+  border-color: #3e4b3c;
+  background: #1c241d;
+}
+:root[data-theme='dark'] .shadowing-comparison dd {
+  color: #d5ddd0;
+}
+:root[data-theme='dark'] .shadowing-comparison dt,
+:root[data-theme='dark'] .shadowing-suggestions > strong,
+:root[data-theme='dark'] .shadowing-summary-grid strong {
+  color: #9ca997;
+}
+:root[data-theme='dark'] .shadowing-completion-heading h2 {
+  color: #c2d3bb;
+}
+:root[data-theme='dark'] .shadowing-completion-heading h2 span {
+  color: #8fa08a;
+}
+:root[data-theme='dark'] .shadowing-summary-grid > div {
+  border-color: #334033;
+}
 :root[data-theme='dark'] .player-footnote {
   border-color: var(--line);
 }
