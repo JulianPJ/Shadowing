@@ -17,7 +17,7 @@ export const worker = defineWorker({
     IMAGES: bindings.images(),
     AI: bindings.ai(),
     SHADOWING_AI_RATE_LIMIT: bindings.rateLimit({
-      namespace: 'shadowing-ai-v1',
+      namespace: '19001',
       simple: { limit: 6, period: 60 },
     }),
     HIBIKI_DB: bindings.d1({ id: 'cf88fe7d-16bb-4f58-8839-2b27718a7847' }),
