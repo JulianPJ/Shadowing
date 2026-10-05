@@ -756,3 +756,131 @@
   font-size: 9px;
   color: #86976f;
 }
+
+
+.shadowing-analyse-button {
+  margin-top: 10px;
+  min-height: 34px;
+  font-size: 10px;
+  gap: 7px;
+}
+.shadowing-match {
+  margin-top: 15px;
+  border: 1px solid #dce4d3;
+  border-radius: 9px;
+  background: #f8faf3;
+  padding: 15px;
+}
+.shadowing-match-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+  border-bottom: 1px solid #e4e9dc;
+  padding-bottom: 12px;
+}
+.shadowing-match-heading > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.shadowing-match-heading strong {
+  font-size: 34px;
+  line-height: 1;
+  font-weight: 500;
+  color: #627a50;
+  font-variant-numeric: tabular-nums;
+}
+.shadowing-match-heading > span {
+  font-size: 8px;
+  color: #9ba58f;
+}
+.shadowing-match-copy {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  padding: 13px 0;
+}
+.shadowing-match-copy span,
+.shadowing-suggestions > span,
+.shadowing-overall-feedback span {
+  display: block;
+  font-size: 8px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: #9ca58f;
+  margin-bottom: 5px;
+}
+.shadowing-match-copy p {
+  font-size: 12px;
+  line-height: 1.8;
+  color: #66715c;
+  overflow-wrap: anywhere;
+}
+.shadowing-suggestions {
+  border-top: 1px solid #e4e9dc;
+  padding-top: 11px;
+}
+.shadowing-suggestions ul {
+  margin: 0;
+  padding-left: 17px;
+  color: #747f6a;
+  font-size: 10px;
+  line-height: 1.8;
+}
+.shadowing-match > .text-button {
+  margin-top: 10px;
+  font-size: 9px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.shadowing-overall {
+  margin-top: 14px;
+  border: 1px solid #c6d5b5;
+  background: #f3f7eb;
+  border-radius: 10px;
+  padding: 18px;
+}
+.shadowing-overall-score {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  gap: 4px 14px;
+}
+.shadowing-overall-score > .small-label {
+  grid-column: 1;
+}
+.shadowing-overall-score strong {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  font-size: 30px;
+  font-weight: 500;
+  color: #647f50;
+  font-variant-numeric: tabular-nums;
+}
+.shadowing-overall-score strong small {
+  font-size: 12px;
+  font-weight: 400;
+}
+.shadowing-overall-score p {
+  grid-column: 1;
+  font-size: 9px;
+  color: #8d9a7c;
+}
+.shadowing-overall > .small {
+  margin-top: 13px;
+}
+.shadowing-overall-feedback {
+  border-top: 1px solid #dce5d1;
+  margin-top: 14px;
+  padding-top: 13px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 17px;
+}
+.shadowing-overall-feedback p {
+  color: #74816a;
+  font-size: 10px;
+  line-height: 1.75;
+}
