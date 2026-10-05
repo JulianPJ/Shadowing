@@ -1,6 +1,7 @@
 'use client';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import {
+  adjustYoutubePauseCompensation,
   createBoundaryTimeEstimator,
   createSectionLookup,
   sectionPlaybackEnd,
@@ -55,10 +56,20 @@ export function usePlaybackBoundary({
   );
   const playbackEnd = sectionPlaybackEnd(lesson.segments, index);
   const sourceType = lessonMedia(lesson).type;
-  const boundaryLead = shadowingBoundaryLead(sourceType, speed);
+  const youtubePauseCompensationMs = useRef(0);
+  const settleTimer = useRef<number | null>(null);
+  const boundaryRun = useRef(0);
+
+  useEffect(
+    () => () => {
+      if (settleTimer.current !== null) window.clearTimeout(settleTimer.current);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!ready || !isPlaying) return;
+    const run = ++boundaryRun.current;
     let frame = 0;
     const estimateTime = createBoundaryTimeEstimator(sourceType, speed);
     const tick = () => {
@@ -87,11 +98,47 @@ export function usePlaybackBoundary({
       // Detect user seeking with the native controls as well as advancing playback.
       const match = sectionAt(time);
       if (mode === 'shadowing') {
-        // YouTube pause commands are asynchronous. The boundary estimator keeps cached iframe
-        // timestamps moving between provider samples, then this small lead absorbs command latency.
+        // YouTube pause commands are asynchronous. Keep cached iframe timestamps moving and learn
+        // any residual overshoot so later sections arm earlier on this exact player/session.
+        const boundaryLead = shadowingBoundaryLead(
+          sourceType,
+          speed,
+          youtubePauseCompensationMs.current,
+        );
         if (time >= playbackEnd - boundaryLead && time < playbackEnd + 1.25) {
+          const boundary = playbackEnd;
+          const pauseRequestedAt = performance.now();
           adapter.pause();
-          setElapsed(playbackEnd);
+          if (sourceType === 'youtube') {
+            if (settleTimer.current !== null) window.clearTimeout(settleTimer.current);
+            const settle = () => {
+              if (boundaryRun.current !== run) return;
+              const current = media.current;
+              if (!current) return;
+              const waitedMs = performance.now() - pauseRequestedAt;
+              if (current.isPlaying() && waitedMs < 600) {
+                settleTimer.current = window.setTimeout(settle, 20);
+                return;
+              }
+              settleTimer.current = null;
+              if (current.isPlaying()) return;
+              const pausedTime = current.time();
+              if (!Number.isFinite(pausedTime)) return;
+              youtubePauseCompensationMs.current = adjustYoutubePauseCompensation(
+                youtubePauseCompensationMs.current,
+                pausedTime - boundary,
+                speed,
+              );
+              // Most prepared lessons are contiguous. Park any late YouTube pause on the exact
+              // section edge so Continue never has to visibly rewind into the next sentence.
+              if (pausedTime > boundary + 0.02) {
+                current.seek(boundary);
+                seeking.current = { target: boundary, deadline: Date.now() + 1500 };
+              }
+            };
+            settleTimer.current = window.setTimeout(settle, 20);
+          }
+          setElapsed(boundary);
           setStatus('your-turn');
           setPracticeCount((n) => n + 1);
           return;
@@ -133,7 +180,6 @@ export function usePlaybackBoundary({
     speed,
     playbackEnd,
     sourceType,
-    boundaryLead,
     resetTranslation,
     replayRange,
     sectionAt,

@@ -2,6 +2,8 @@ import type { MediaSource, Segment } from './types';
 
 const DEFAULT_BOUNDARY_LEAD_SECONDS = 0.025;
 const YOUTUBE_PAUSE_COMMAND_LEAD_MS = 55;
+const YOUTUBE_MAX_EXTRA_PAUSE_LEAD_MS = 220;
+const YOUTUBE_MAX_BOUNDARY_LEAD_SECONDS = 0.35;
 const YOUTUBE_MAX_STALE_SAMPLE_MS = 350;
 const YOUTUBE_SEEK_RESET_SECONDS = 0.5;
 
@@ -87,14 +89,47 @@ export function createBoundaryTimeEstimator(sourceType: MediaSource['type'], spe
 }
 
 /**
+ * Learn the residual YouTube pause overshoot in wall-clock milliseconds. Positive boundary error
+ * means playback stopped late and needs more lead next time; negative error reduces prior lead.
+ */
+export function adjustYoutubePauseCompensation(
+  currentExtraMs: number,
+  boundaryErrorSeconds: number,
+  speed: number,
+) {
+  const safeCurrent =
+    Number.isFinite(currentExtraMs) && currentExtraMs > 0
+      ? Math.min(currentExtraMs, YOUTUBE_MAX_EXTRA_PAUSE_LEAD_MS)
+      : 0;
+  if (!Number.isFinite(boundaryErrorSeconds)) return safeCurrent;
+  const safeSpeed = Number.isFinite(speed) && speed > 0 ? speed : 1;
+  const wallClockErrorMs = (boundaryErrorSeconds / safeSpeed) * 1000;
+  return Math.max(
+    0,
+    Math.min(YOUTUBE_MAX_EXTRA_PAUSE_LEAD_MS, safeCurrent + wallClockErrorMs),
+  );
+}
+
+/**
  * YouTube iframe pause commands cross a postMessage boundary, so send the command slightly early.
  * Scale the media-time lead by playback speed to keep the wall-clock allowance roughly constant.
  */
-export function shadowingBoundaryLead(sourceType: MediaSource['type'], speed: number) {
+export function shadowingBoundaryLead(
+  sourceType: MediaSource['type'],
+  speed: number,
+  extraPauseLeadMs = 0,
+) {
   if (sourceType !== 'youtube') return DEFAULT_BOUNDARY_LEAD_SECONDS;
   const safeSpeed = Number.isFinite(speed) && speed > 0 ? speed : 1;
+  const safeExtra =
+    Number.isFinite(extraPauseLeadMs) && extraPauseLeadMs > 0
+      ? Math.min(extraPauseLeadMs, YOUTUBE_MAX_EXTRA_PAUSE_LEAD_MS)
+      : 0;
   return Math.max(
     0.03,
-    Math.min(0.08, (YOUTUBE_PAUSE_COMMAND_LEAD_MS / 1000) * safeSpeed),
+    Math.min(
+      YOUTUBE_MAX_BOUNDARY_LEAD_SECONDS,
+      ((YOUTUBE_PAUSE_COMMAND_LEAD_MS + safeExtra) / 1000) * safeSpeed,
+    ),
   );
 }

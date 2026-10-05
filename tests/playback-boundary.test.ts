@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
+  adjustYoutubePauseCompensation,
   createBoundaryTimeEstimator,
   shadowingBoundaryLead,
 } from '../src/lib/section-lookup';
@@ -45,4 +46,20 @@ test('non-YouTube boundary time always uses the provider-reported time', () => {
   assert.equal(estimate(3, 1_000), 3);
   assert.equal(estimate(3, 2_000), 3);
   assert.equal(estimate(2.5, 3_000), 2.5);
+});
+
+
+test('YouTube boundary lead learns residual overshoot without affecting other media', () => {
+  near(adjustYoutubePauseCompensation(0, 0.12, 1), 120);
+  near(shadowingBoundaryLead('youtube', 1, 120), 0.175);
+  near(shadowingBoundaryLead('youtube', 1.25, 120), 0.21875);
+  near(adjustYoutubePauseCompensation(120, -0.04, 1), 80);
+  near(shadowingBoundaryLead('demo', 1, 200), 0.025);
+});
+
+test('YouTube pause compensation is bounded and speed-normalized', () => {
+  near(adjustYoutubePauseCompensation(0, 0.1, 0.5), 200);
+  near(adjustYoutubePauseCompensation(200, 0.2, 1), 220);
+  near(adjustYoutubePauseCompensation(80, -0.2, 1), 0);
+  near(adjustYoutubePauseCompensation(50, Number.NaN, 1), 50);
 });
