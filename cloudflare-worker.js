@@ -112,6 +112,7 @@ const worker = {
     }
 
     if (url.pathname.startsWith('/api/shadowing/') && request.method === 'POST') {
+      if (await shadowingRateLimited(request, env)) return shadowingRateLimitResponse();
       const provider = createWorkersAiShadowingProvider(env.AI);
       if (url.pathname === '/api/shadowing/transcribe')
         return handleShadowingTranscriptionRequest(request, provider);
