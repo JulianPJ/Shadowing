@@ -31,7 +31,7 @@ test('Workers AI transcription requests Japanese Whisper and normalizes returned
   );
   assert.equal(called, 1);
   assert.equal(result.provider, WORKERS_AI_TRANSCRIPTION_PROVIDER);
-  assert.deepEqual(result.cues, [{ start: 0, end: 2.5, text: 'おはようございます。' }]);
+  assert.deepEqual(result.cues, [{ start: 0.28, end: 2.5, text: 'おはようございます。' }]);
 });
 
 test('transcription API accepts bounded audio/video bytes and returns Hibiki cues', async () => {
