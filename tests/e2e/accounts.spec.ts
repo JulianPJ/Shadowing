@@ -262,3 +262,35 @@ test('two devices sync preferences, bookmarks, completion and retakes; offline e
     await b.close();
   }
 });
+
+
+test('auth screens expose configured providers without offering unavailable email delivery', async ({
+  page,
+  context,
+}) => {
+  await context.route('**/api/account/me', (route) =>
+    route.fulfill({
+      json: { user: null, googleEnabled: true, emailEnabled: false },
+    }),
+  );
+
+  await page.goto('/register');
+  await expect(page.getByRole('button', { name: 'Continue with Google' })).toBeEnabled();
+  await expect(page.getByText('Google sign-in is awaiting configuration.')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Create account' })).toBeDisabled();
+  await expect(page.getByRole('status')).toContainText(
+    'Email sign-up is awaiting email service setup.',
+  );
+
+  await page.goto('/reset-password');
+  await expect(page.getByRole('button', { name: 'Send password link' })).toBeDisabled();
+  await expect(page.getByRole('status')).toContainText(
+    'Email password reset is awaiting email service setup.',
+  );
+
+  await page.goto('/sign-in');
+  await expect(page.getByRole('button', { name: 'Continue with Google' })).toBeEnabled();
+  await page.getByLabel('Email').fill('learner@example.com');
+  await expect(page.getByRole('button', { name: 'Sign in' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Resend verification email' })).toHaveCount(0);
+});
