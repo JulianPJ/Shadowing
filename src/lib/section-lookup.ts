@@ -2,6 +2,8 @@ import type { MediaSource, Segment } from './types';
 
 const DEFAULT_BOUNDARY_LEAD_SECONDS = 0.025;
 const YOUTUBE_PAUSE_COMMAND_LEAD_MS = 55;
+const YOUTUBE_MAX_STALE_SAMPLE_MS = 350;
+const YOUTUBE_SEEK_RESET_SECONDS = 0.5;
 
 /** Preserve the playback predicate, including its 20 ms lead-in and gap behaviour. */
 export function createSectionLookup(segments: Segment[], duration: number) {
@@ -38,6 +40,50 @@ export function sectionPlaybackEnd(segments: Segment[], index: number) {
   return typeof nextStart === 'number' && Number.isFinite(nextStart) && nextStart > section.start
     ? Math.min(section.end, nextStart)
     : section.end;
+}
+
+/**
+ * YouTube's iframe API can repeat the same cached currentTime across several fast polls. During
+ * active playback, interpolate only across that short stale interval so boundary detection keeps
+ * wall-clock pace. Fresh provider samples correct the estimate, while seeks reset it immediately.
+ */
+export function createBoundaryTimeEstimator(sourceType: MediaSource['type'], speed: number) {
+  const safeSpeed = Number.isFinite(speed) && speed > 0 ? speed : 1;
+  let lastReported: number | null = null;
+  let anchorEstimate = 0;
+  let anchorAt = 0;
+
+  return (reportedTime: number, nowMs: number) => {
+    if (
+      sourceType !== 'youtube' ||
+      !Number.isFinite(reportedTime) ||
+      !Number.isFinite(nowMs)
+    )
+      return reportedTime;
+
+    if (lastReported === null) {
+      lastReported = reportedTime;
+      anchorEstimate = reportedTime;
+      anchorAt = nowMs;
+      return reportedTime;
+    }
+
+    const elapsedMs = Math.max(0, Math.min(nowMs - anchorAt, YOUTUBE_MAX_STALE_SAMPLE_MS));
+    const projected = anchorEstimate + (elapsedMs / 1000) * safeSpeed;
+    if (Math.abs(reportedTime - lastReported) < 0.001) return projected;
+
+    const wentBackwards = reportedTime < lastReported - 0.05;
+    const jumpedForward = reportedTime > projected + YOUTUBE_SEEK_RESET_SECONDS;
+    lastReported = reportedTime;
+    anchorAt = nowMs;
+    if (wentBackwards || jumpedForward) {
+      anchorEstimate = reportedTime;
+      return reportedTime;
+    }
+
+    anchorEstimate = Math.max(reportedTime, projected);
+    return anchorEstimate;
+  };
 }
 
 /**
