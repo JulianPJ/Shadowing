@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useMemo } from 'react';
 import {
+  createBoundaryTimeEstimator,
   createSectionLookup,
   sectionPlaybackEnd,
   shadowingBoundaryLead,
@@ -53,20 +54,26 @@ export function usePlaybackBoundary({
     [lesson.segments, duration],
   );
   const playbackEnd = sectionPlaybackEnd(lesson.segments, index);
-  const boundaryLead = shadowingBoundaryLead(lessonMedia(lesson).type, speed);
+  const sourceType = lessonMedia(lesson).type;
+  const boundaryLead = shadowingBoundaryLead(sourceType, speed);
 
   useEffect(() => {
     if (!ready || !isPlaying) return;
     let frame = 0;
+    const estimateTime = createBoundaryTimeEstimator(sourceType, speed);
     const tick = () => {
       const adapter = media.current;
       if (!adapter) return;
-      const time = adapter.time();
+      const reportedTime = adapter.time();
       if (seeking.current) {
-        if (Math.abs(time - seeking.current.target) < 1.2 || Date.now() > seeking.current.deadline)
+        if (
+          Math.abs(reportedTime - seeking.current.target) < 1.2 ||
+          Date.now() > seeking.current.deadline
+        )
           seeking.current = null;
         else return;
       }
+      const time = estimateTime(reportedTime, performance.now());
       if (replayRange) {
         if (time >= replayRange.end - 0.025) {
           adapter.pause();
@@ -80,8 +87,8 @@ export function usePlaybackBoundary({
       // Detect user seeking with the native controls as well as advancing playback.
       const match = sectionAt(time);
       if (mode === 'shadowing') {
-        // YouTube pause commands are asynchronous. Arm the current section slightly early so
-        // audible playback stops at its boundary instead of leaking into the next sentence.
+        // YouTube pause commands are asynchronous. The boundary estimator keeps cached iframe
+        // timestamps moving between provider samples, then this small lead absorbs command latency.
         if (time >= playbackEnd - boundaryLead && time < playbackEnd + 1.25) {
           adapter.pause();
           setElapsed(playbackEnd);
@@ -125,6 +132,7 @@ export function usePlaybackBoundary({
     duration,
     speed,
     playbackEnd,
+    sourceType,
     boundaryLead,
     resetTranslation,
     replayRange,
