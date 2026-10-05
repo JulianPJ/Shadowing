@@ -182,6 +182,45 @@ test('silence/no recognised speech returns retry state rather than a score', asy
   assert.equal((await response.json()).code, 'no-speech');
 });
 
+test('Qwen receives deterministic pace band instead of reinterpreting raw speed', async () => {
+  let sent: Record<string, unknown> | undefined;
+  const provider = createWorkersAiShadowingProvider({
+    async run(model, input) {
+      assert.notEqual(model, SHADOWING_WHISPER_MODEL);
+      sent = input;
+      return { response: { suggestions: ['Keep the ending audible.'] } };
+    },
+  });
+  await provider.feedback(
+    {
+      targetText: '今日は天気がいいですね',
+      recognizedText: '今日は天気がいいです',
+      alignment: [{ type: 'deletion', expected: 'ね' }],
+      missing: ['ね'],
+      substitutions: [],
+      additions: [],
+      contentScore: 91,
+      timingScore: 94,
+      score: 92,
+      relativeSpeakingSpeed: 0.96,
+    },
+    new AbortController().signal,
+  );
+  const messages = sent?.messages;
+  assert.ok(Array.isArray(messages));
+  const user = messages.find(
+    (message): message is { role: string; content: string } =>
+      !!message &&
+      typeof message === 'object' &&
+      (message as { role?: unknown }).role === 'user' &&
+      typeof (message as { content?: unknown }).content === 'string',
+  );
+  assert.ok(user);
+  const payload = JSON.parse(user.content.replace('\n/no_think', '')) as Record<string, unknown>;
+  assert.equal(payload.pace, 'close');
+  assert.equal('relativeSpeakingSpeed' in payload, false);
+});
+
 test('Qwen feedback receives but cannot replace the deterministic score', async () => {
   const response = await handleShadowingFeedbackRequest(
     new Request('https://hibiki.example/api/shadowing/feedback', {

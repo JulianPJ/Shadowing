@@ -143,6 +143,14 @@ function grouped(
   return groups;
 }
 
+export type ShadowingPaceBand = 'faster' | 'slower' | 'close';
+
+export function shadowingPaceBand(relativeSpeakingSpeed: number): ShadowingPaceBand {
+  if (relativeSpeakingSpeed > 1.18) return 'faster';
+  if (relativeSpeakingSpeed < 0.85) return 'slower';
+  return 'close';
+}
+
 export function timingSimilarity(recordingDurationSeconds: number, referenceDurationSeconds: number) {
   const ratio = recordingDurationSeconds / referenceDurationSeconds;
   const deviation = Math.abs(Math.log(ratio));
@@ -256,9 +264,10 @@ export function fallbackShadowingSuggestions(analysis: ShadowingAttemptAnalysis)
   else if (analysis.additions.length)
     suggestions.push('A few extra sounds were recognised. Aim for the same compact phrasing as the reference.');
 
-  if (analysis.relativeSpeakingSpeed > 1.18)
+  const pace = shadowingPaceBand(analysis.relativeSpeakingSpeed);
+  if (pace === 'faster')
     suggestions.push('Your attempt was faster than the reference. Give each phrase a little more space.');
-  else if (analysis.relativeSpeakingSpeed < 0.85)
+  else if (pace === 'slower')
     suggestions.push('Your attempt was slower than the reference. Try carrying the rhythm through the whole section.');
   else if (analysis.timingScore >= 90)
     suggestions.push('Your overall pacing was close to the reference timing.');

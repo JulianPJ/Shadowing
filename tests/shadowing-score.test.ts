@@ -4,6 +4,7 @@ import {
   SHADOWING_SCORE_CONSTANTS,
   ShadowingScoreError,
   scoreShadowingAttempt,
+  shadowingPaceBand,
   type ShadowingSectionResult,
 } from '../src/lib/shadowing-score';
 import {
@@ -84,6 +85,13 @@ test('vastly short recording is invalid before a misleading score can be produce
     (error) => error instanceof ShadowingScoreError && error.code === 'recording-too-short',
   );
   assert.equal(SHADOWING_SCORE_CONSTANTS.minimumDurationRatio, 0.25);
+});
+
+test('pace feedback bands do not over-correct near-reference attempts', () => {
+  assert.equal(shadowingPaceBand(0.96), 'close');
+  assert.equal(shadowingPaceBand(1.04), 'close');
+  assert.equal(shadowingPaceBand(0.84), 'slower');
+  assert.equal(shadowingPaceBand(1.19), 'faster');
 });
 
 test('much faster and much slower recordings receive symmetric timing penalties', () => {
