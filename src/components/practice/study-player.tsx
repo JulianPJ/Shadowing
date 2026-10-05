@@ -626,46 +626,48 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
               </select>
             </label>
           </div>
-          <CurrentSection
-            recording={recording}
-            status={status}
-            stateLabel={stateLabel}
-            segment={segment}
-            furigana={furigana}
-            revealed={revealed}
-            translating={translating}
-            revealTranslation={revealTranslation}
-            isFavorite={isFavorite}
-            toggleFavorite={toggleFavorite}
-            translation={translation}
-            translationProvider={translationProvider}
-            translationError={translationError}
-            setTranslationError={setTranslationError}
-            percent={percent}
-            ready={ready}
-            index={index}
-            navigate={navigate}
-            replaySection={replaySection}
-            mode={mode}
-            isPlaying={isPlaying}
-            togglePlayback={togglePlayback}
-            continuePractice={continuePractice}
-            lastIndex={lesson.segments.length - 1}
-          />
+          <div className="practice-current-stack">
+            <CurrentSection
+              recording={recording}
+              status={status}
+              stateLabel={stateLabel}
+              segment={segment}
+              furigana={furigana}
+              revealed={revealed}
+              translating={translating}
+              revealTranslation={revealTranslation}
+              isFavorite={isFavorite}
+              toggleFavorite={toggleFavorite}
+              translation={translation}
+              translationProvider={translationProvider}
+              translationError={translationError}
+              setTranslationError={setTranslationError}
+              percent={percent}
+              ready={ready}
+              index={index}
+              navigate={navigate}
+              replaySection={replaySection}
+              mode={mode}
+              isPlaying={isPlaying}
+              togglePlayback={togglePlayback}
+              continuePractice={continuePractice}
+              lastIndex={lesson.segments.length - 1}
+            />
 
-          <VoiceRecorder
-            key={segment.id}
-            enabled={ready && !isPlaying}
-            nativePlaying={isPlaying}
-            onBeforeRecord={pauseForRecording}
-            onRecording={setRecording}
-            onAttempt={() => recordSignal(segment, 'recording-attempt')}
-            analysis={currentShadowingResult}
-            analyzing={scoringSection === segment.id}
-            analysisError={scoringError}
-            onAnalyze={analyzeShadowing}
-            onNewRecording={() => setScoringError('')}
-          />
+            <VoiceRecorder
+              key={segment.id}
+              enabled={ready && !isPlaying}
+              nativePlaying={isPlaying}
+              onBeforeRecord={pauseForRecording}
+              onRecording={setRecording}
+              onAttempt={() => recordSignal(segment, 'recording-attempt')}
+              analysis={currentShadowingResult}
+              analyzing={scoringSection === segment.id}
+              analysisError={scoringError}
+              onAnalyze={analyzeShadowing}
+              onNewRecording={() => setScoringError('')}
+            />
+          </div>
           {finished && shadowingAggregate ? (
             <ShadowingCompletion
               aggregate={shadowingAggregate}
