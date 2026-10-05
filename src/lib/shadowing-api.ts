@@ -102,17 +102,16 @@ function validateFeedbackInput(value: unknown): ShadowingFeedbackInput {
   };
 }
 
-function validateSummarySignals(value: unknown): ShadowingSummarySignals {
+function validateSummarySignals(
+  value: unknown,
+): Omit<ShadowingSummarySignals, 'fingerprint'> {
   if (!value || typeof value !== 'object') throw new Error('Invalid summary');
   const raw = value as Record<string, unknown>;
   for (const field of ['score', 'averageContentScore', 'averageTimingScore'] as const)
     if (!finite(raw[field], 0, 100)) throw new Error('Invalid aggregate score');
   if (
     !finite(raw.scoredSections, 1, 10_000) ||
-    !finite(raw.totalSections, raw.scoredSections as number, 10_000) ||
-    typeof raw.fingerprint !== 'string' ||
-    !raw.fingerprint ||
-    raw.fingerprint.length > 100_000
+    !finite(raw.totalSections, raw.scoredSections as number, 10_000)
   )
     throw new Error('Invalid aggregate coverage');
   const pace = raw.pace as Record<string, unknown>;
@@ -181,7 +180,6 @@ function validateSummarySignals(value: unknown): ShadowingSummarySignals {
     totalSections: Math.round(raw.totalSections as number),
     averageContentScore: Math.round(raw.averageContentScore as number),
     averageTimingScore: Math.round(raw.averageTimingScore as number),
-    fingerprint: raw.fingerprint,
     pace: {
       faster: Math.round(pace.faster as number),
       slower: Math.round(pace.slower as number),
@@ -287,7 +285,7 @@ export async function handleShadowingSummaryRequest(
   provider: ShadowingFeedbackProvider,
 ) {
   if (!sameOrigin(request)) return json({ error: 'Open shadowing feedback from your lesson.' }, 403);
-  let input: ShadowingSummarySignals;
+  let input: Omit<ShadowingSummarySignals, 'fingerprint'>;
   try {
     input = validateSummarySignals(await readBoundedJson(request, 40_000));
   } catch {
