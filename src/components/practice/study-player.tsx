@@ -63,6 +63,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
   const media = useRef<MediaHandle>(null);
 
   const seeking = useRef<{ target: number; deadline: number } | null>(null);
+  const navigationRun = useRef(0);
 
   const segment = lesson.segments[index];
   const isPlaying = status === 'listening';
@@ -147,20 +148,35 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
       const next = Math.min(Math.max(nextIndex, 0), lesson.segments.length - 1);
       const target = lesson.segments[next];
       if (!evidenceReplay) recordSignal(target, 'navigate');
-      media.current?.pause();
-      media.current?.seek(target.start);
-      seeking.current = { target: target.start, deadline: Date.now() + 4000 };
+      const run = ++navigationRun.current;
+      const adapter = media.current;
+      adapter?.pause();
       setIndex(next);
       setElapsed(target.start);
-      setStatus(play ? 'listening' : 'ready');
+      setStatus(play ? 'paused' : 'ready');
       setFinished(false);
       setPlaybackError('');
       if (next !== index) resetTranslation();
-      if (play)
-        void media.current?.play().catch(() => {
+      void (async () => {
+        if (!adapter) return;
+        if (adapter.seekSettled) {
+          seeking.current = null;
+          await adapter.seekSettled(target.start);
+        } else {
+          adapter.seek(target.start);
+          seeking.current = { target: target.start, deadline: Date.now() + 4000 };
+        }
+        if (navigationRun.current !== run) return;
+        if (!play) return;
+        setStatus('listening');
+        try {
+          await adapter.play();
+        } catch {
+          if (navigationRun.current !== run) return;
           setStatus('paused');
           setPlaybackError('Playback didn’t start. Press play inside the video, then try again.');
-        });
+        }
+      })();
     },
     [lesson.segments, index, resetTranslation, recordSignal],
   );
@@ -218,6 +234,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
     segment,
     lesson,
     duration,
+    speed,
     resetTranslation,
     replayRange,
     media,
