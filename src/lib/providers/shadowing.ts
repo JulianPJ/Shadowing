@@ -1,5 +1,6 @@
 import { Buffer } from 'node:buffer';
 import { parseSubtitles } from '../subtitles';
+import type { Cue } from '../types';
 import { object } from '../transcript-validation';
 import type { ShadowingAggregate, ShadowingScoreAnalysis, ScoredShadowingSection } from '../shadowing-score';
 import {
@@ -11,6 +12,7 @@ import { parseChatCompletion } from './quiz/chat';
 
 export const WORKERS_AI_SHADOWING_TRANSCRIPTION_MODEL = '@cf/openai/whisper-large-v3-turbo';
 export const WORKERS_AI_SHADOWING_FEEDBACK_MODEL = WORKERS_AI_GENERATIVE_MODEL;
+export const WORKERS_AI_SHADOWING_TRANSCRIPTION_PROVIDER = 'Cloudflare Whisper large-v3-turbo';
 
 export type ShadowingTranscription = {
   recognizedText: string;
@@ -45,7 +47,7 @@ export function createWorkersAiShadowingTranscriptionProvider(
   ai: WorkersAiBindingLike,
 ): ShadowingTranscriptionProvider {
   return {
-    name: 'Cloudflare Whisper large-v3-turbo',
+    name: WORKERS_AI_SHADOWING_TRANSCRIPTION_PROVIDER,
     async transcribe(bytes, signal) {
       const response = await runWorkersAi<WhisperResult>(
         ai,
@@ -64,7 +66,7 @@ export function createWorkersAiShadowingTranscriptionProvider(
         signal,
       );
       const text = typeof response?.text === 'string' ? response.text.trim() : '';
-      let cues = [];
+      let cues: Cue[] = [];
       if (typeof response?.vtt === 'string' && response.vtt.trim()) {
         try {
           cues = parseSubtitles(response.vtt);
@@ -79,7 +81,7 @@ export function createWorkersAiShadowingTranscriptionProvider(
           speechDuration: 0,
           speechStart: 0,
           speechEnd: 0,
-          provider: this.name,
+          provider: WORKERS_AI_SHADOWING_TRANSCRIPTION_PROVIDER,
         };
       const speechStart = Math.max(0, cues[0].start);
       const speechEnd = Math.max(speechStart, cues.at(-1)!.end);
@@ -88,7 +90,7 @@ export function createWorkersAiShadowingTranscriptionProvider(
         speechDuration: Math.max(0, speechEnd - speechStart),
         speechStart,
         speechEnd,
-        provider: this.name,
+        provider: WORKERS_AI_SHADOWING_TRANSCRIPTION_PROVIDER,
       };
     },
   };
