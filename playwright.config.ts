@@ -1,4 +1,5 @@
 import { defineConfig } from '@playwright/test';
+
 export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: false,
@@ -7,6 +8,7 @@ export default defineConfig({
   expect: { timeout: 15000 },
   use: {
     baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000',
+    channel: process.env.CI ? 'chromium' : undefined,
     viewport: { width: 1440, height: 1000 },
     trace: 'retain-on-failure',
     launchOptions: {
