@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import demo from '../src/data/demo.json';
 import type { Lesson, Segment } from '../src/lib/types';
-import { createSectionLookup } from '../src/lib/section-lookup';
+import {\n  createSectionLookup,\n  sectionPlaybackEnd,\n  shadowingBoundaryLead,\n} from '../src/lib/section-lookup';
 import { BodyLimitError, readBoundedText } from '../src/lib/http-body';
 import { saveLesson, loadLesson, recentLessons } from '../src/lib/storage';
 import { installMemoryStorage } from './helpers/memory-storage';
@@ -40,6 +40,24 @@ test('indexed playback matches the original predicate at boundaries, gaps and le
       assert.equal(lookup(time), original, `Lookup at ${time}`);
     }
   }
+});
+
+test('shadowing boundaries stop before overlapping next sections and compensate YouTube pause latency', () => {
+  const overlapping: Segment[] = [
+    { id: 'a', start: 0, end: 2.2, japanese: '最初' },
+    { id: 'b', start: 2, end: 4, japanese: '次' },
+  ];
+  const gapped: Segment[] = [
+    { id: 'a', start: 0, end: 1.8, japanese: '最初' },
+    { id: 'b', start: 2, end: 4, japanese: '次' },
+  ];
+  assert.equal(sectionPlaybackEnd(overlapping, 0), 2);
+  assert.equal(sectionPlaybackEnd(gapped, 0), 1.8);
+  assert.equal(sectionPlaybackEnd(overlapping, 1), 4);
+  assert.equal(shadowingBoundaryLead('demo', 1), 0.025);
+  assert.equal(shadowingBoundaryLead('youtube', 0.5), 0.03);
+  assert.equal(shadowingBoundaryLead('youtube', 1), 0.055);
+  assert.equal(shadowingBoundaryLead('youtube', 1.25), 0.06875);
 });
 
 test('shared reader preserves split Japanese UTF-8 and cancels oversized bodies before consuming more', async () => {
