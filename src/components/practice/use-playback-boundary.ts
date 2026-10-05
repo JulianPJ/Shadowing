@@ -1,10 +1,16 @@
 'use client';
 import { useEffect, useMemo } from 'react';
-import { createSectionLookup } from '@/lib/section-lookup';
+import {
+  createSectionLookup,
+  sectionPlaybackEnd,
+  shadowingBoundaryLead,
+} from '@/lib/section-lookup';
+import { lessonMedia } from '@/lib/media';
 import type { Lesson, Mode, PlaybackState, QuizEvidence } from '@/lib/types';
 import { type MediaHandle } from '../media-player';
 import type { Dispatch, RefObject, SetStateAction } from 'react';
 import type { Segment } from '@/lib/types';
+
 type BoundaryOptions = {
   ready: boolean;
   isPlaying: boolean;
@@ -13,6 +19,7 @@ type BoundaryOptions = {
   segment: Segment;
   lesson: Lesson;
   duration: number;
+  speed: number;
   resetTranslation: () => void;
   replayRange: QuizEvidence | null;
   media: RefObject<MediaHandle | null>;
@@ -22,6 +29,7 @@ type BoundaryOptions = {
   setPracticeCount: Dispatch<SetStateAction<number>>;
   setIndex: Dispatch<SetStateAction<number>>;
 };
+
 export function usePlaybackBoundary({
   ready,
   isPlaying,
@@ -30,6 +38,7 @@ export function usePlaybackBoundary({
   segment,
   lesson,
   duration,
+  speed,
   resetTranslation,
   replayRange,
   media,
@@ -43,6 +52,9 @@ export function usePlaybackBoundary({
     () => createSectionLookup(lesson.segments, duration),
     [lesson.segments, duration],
   );
+  const playbackEnd = sectionPlaybackEnd(lesson.segments, index);
+  const boundaryLead = shadowingBoundaryLead(lessonMedia(lesson).type, speed);
+
   useEffect(() => {
     if (!ready || !isPlaying) return;
     let frame = 0;
@@ -68,10 +80,11 @@ export function usePlaybackBoundary({
       // Detect user seeking with the native controls as well as advancing playback.
       const match = sectionAt(time);
       if (mode === 'shadowing') {
-        // Check the armed section's boundary before considering the next section.
-        if (time >= segment.end - 0.025 && time < segment.end + 1.25) {
+        // YouTube pause commands are asynchronous. Arm the current section slightly early so
+        // audible playback stops at its boundary instead of leaking into the next sentence.
+        if (time >= playbackEnd - boundaryLead && time < playbackEnd + 1.25) {
           adapter.pause();
-          setElapsed(segment.end);
+          setElapsed(playbackEnd);
           setStatus('your-turn');
           setPracticeCount((n) => n + 1);
           return;
@@ -86,7 +99,9 @@ export function usePlaybackBoundary({
       }
       if (++frame % 5 === 0) setElapsed(time);
     };
-    const interval = window.setInterval(tick, 35);
+    // 20 ms keeps the pause command comfortably ahead of a YouTube iframe boundary without
+    // running a full animation-frame loop for the duration of the lesson.
+    const interval = window.setInterval(tick, 20);
     // Avoid running past a section when a background tab throttles the timing loop.
     const visibility = () => {
       if (document.hidden && mode === 'shadowing') {
@@ -105,8 +120,12 @@ export function usePlaybackBoundary({
     mode,
     index,
     segment.end,
+    lesson,
     lesson.segments,
     duration,
+    speed,
+    playbackEnd,
+    boundaryLead,
     resetTranslation,
     replayRange,
     sectionAt,
