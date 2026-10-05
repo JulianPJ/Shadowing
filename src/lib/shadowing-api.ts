@@ -170,7 +170,9 @@ export function validateShadowingAnalysis(value: unknown): ShadowingScoreAnalysi
   )
     throw new Error('Invalid analysis');
   for (const key of ['matches', 'deletions', 'substitutions', 'insertions', 'targetUnits', 'recognizedUnits']) {
-    if (!Number.isInteger(item[key]) || Number(item[key]) < 0) throw new Error('Invalid analysis');
+    const value = item[key];
+    if (typeof value !== 'number' || !Number.isInteger(value) || value < 0)
+      throw new Error('Invalid analysis');
   }
   return item as unknown as ShadowingScoreAnalysis;
 }
