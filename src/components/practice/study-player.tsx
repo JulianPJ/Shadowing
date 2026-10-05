@@ -27,6 +27,7 @@ import {
 } from '@/lib/storage';
 import { lessonMedia, sourceLabel, MEDIA_ACCEPT, validateMediaFile } from '@/lib/media';
 import { timestamp } from '@/lib/youtube';
+import { sectionPlaybackEnd } from '@/lib/section-lookup';
 import { MediaPlayer, type MediaHandle } from '../media-player';
 import { VoiceRecorder } from '../voice-recorder';
 import { ComprehensionQuiz } from '../comprehension-quiz';
@@ -94,9 +95,10 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
   const isFavorite = favorites.includes(segment.id);
 
   const duration = lesson.segments.at(-1)!.end;
+  const playbackEnd = sectionPlaybackEnd(lesson.segments, index);
   const percent = Math.min(
     100,
-    Math.max(0, ((elapsed - segment.start) / (segment.end - segment.start)) * 100),
+    Math.max(0, ((elapsed - segment.start) / (playbackEnd - segment.start)) * 100),
   );
   const stateLabel = recording
     ? 'RECORDING'
@@ -179,7 +181,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
       (status === 'your-turn' ||
         status === 'complete' ||
         status === 'ready' ||
-        media.current!.time() >= segment.end - 0.08)
+        media.current!.time() >= playbackEnd - 0.08)
     ) {
       navigate(index);
       return;
@@ -194,7 +196,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
       setStatus('paused');
       setPlaybackError('Playback didn’t start. Try the play button inside the video.');
     });
-  }, [isPlaying, mode, status, segment.end, navigate, index]);
+  }, [isPlaying, mode, status, playbackEnd, navigate, index]);
   const continuePractice = useCallback(() => {
     if (index === lesson.segments.length - 1) {
       media.current?.pause();
@@ -218,6 +220,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
     segment,
     lesson,
     duration,
+    speed,
     resetTranslation,
     replayRange,
     media,
