@@ -37,6 +37,13 @@ test('display defaults, lazy assets, Studio playback continuity, navigation and 
   await expect(furigana(page)).toHaveAttribute('aria-pressed', 'false');
   await expect(page.locator('ruby')).toHaveCount(0);
   await expect(page.getByRole('combobox', { name: 'Playback speed' })).toHaveValue('0.75');
+  const offset = page.getByRole('button', { name: 'Reset playback timing offset' });
+  await expect(offset).toHaveText('0 ms');
+  for (let i = 0; i < 7; i++)
+    await page
+      .getByRole('button', { name: 'Shift playback timing 50 milliseconds later' })
+      .click();
+  await expect(offset).toHaveText('+350 ms');
   await expect(page.getByRole('button', { name: 'Continuous', exact: true })).toHaveAttribute(
     'aria-pressed',
     'true',
@@ -53,6 +60,8 @@ test('display defaults, lazy assets, Studio playback continuity, navigation and 
   });
   await studio(page).click();
   await expect(page.locator('.practice-main')).toHaveClass(/studio-mode/);
+  await expect(offset).toBeVisible();
+  await expect(offset).toHaveText('+350 ms');
   const after = await page.locator('video').evaluate((v: HTMLVideoElement) => ({
     time: v.currentTime,
     paused: v.paused,
@@ -98,6 +107,9 @@ test('display defaults, lazy assets, Studio playback continuity, navigation and 
   await page.reload();
   await expect(studio(page)).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('combobox', { name: 'Playback speed' })).toHaveValue('0.75');
+  await expect(page.getByRole('button', { name: 'Reset playback timing offset' })).toHaveText(
+    '+350 ms',
+  );
 });
 
 test('ruby on current/transcript, canonical search/copy bases/storage and preference persistence', async ({
