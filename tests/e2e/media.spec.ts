@@ -113,6 +113,57 @@ test('no-captions → own transcript retains link, identity, title and author wi
   expect(lesson.transcript.type).toBe('user-paste');
   expect(requests).toBe(1);
 });
+test('captionless link generates subtitles from attached media while preserving link identity', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await mockYouTube(page);
+  await page.route('**/api/prepare', (route) =>
+    route.fulfill({
+      contentType: 'application/x-ndjson',
+      body:
+        JSON.stringify({
+          code: 'no-japanese-captions',
+          error: 'This video has no Japanese captions.',
+          resolved: resolvedYoutube,
+        }) + '\n',
+    }),
+  );
+  let transcriptions = 0;
+  await page.route('**/api/transcribe', async (route) => {
+    transcriptions++;
+    expect(route.request().headers()['content-type']).toContain('video/mp4');
+    expect(route.request().postDataBuffer()?.byteLength).toBeGreaterThan(1000);
+    return route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        cues: [
+          { start: 0, end: 3.5, text: '今日はいい天気ですね。' },
+          { start: 4, end: 7, text: '日本語を練習します。' },
+        ],
+        provider: 'Cloudflare Whisper large-v3-turbo',
+      }),
+    });
+  });
+  await startLink(page, videoUrl);
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await page.getByLabel('Audio or video for subtitle generation').setInputFiles({
+    name: 'captionless-source.mp4',
+    mimeType: 'video/mp4',
+    buffer: fs.readFileSync('public/demo.mp4'),
+  });
+  await page.getByRole('button', { name: 'Start practicing', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Captionless video' })).toBeVisible();
+  const lesson = await page.evaluate(
+    (key) => JSON.parse(localStorage.getItem(key)!),
+    `hibiki:v1:lesson:youtube-${id}`,
+  );
+  expect(transcriptions).toBe(1);
+  expect(lesson.mediaSource.contentKey).toBe(`youtube:${id}`);
+  expect(lesson.transcript.type).toBe('generated');
+  expect(lesson.transcript.provider).toBe('Cloudflare Whisper large-v3-turbo');
+});
+
 test('infrastructure failures keep retry/recovery available without opening a no-caption dialog', async ({
   page,
 }) => {
