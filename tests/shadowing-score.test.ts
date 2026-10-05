@@ -120,6 +120,19 @@ test('vastly incomplete short attempt is invalid instead of receiving a misleadi
   if (!result.valid) assert.equal(result.reason, 'too-short');
 });
 
+test('extreme repetitive recognition is rejected as unreliable rather than scored', () => {
+  const result = scoreShadowingAttempt({
+    targetText: '今日は天気です。',
+    recognizedText: 'あ'.repeat(80),
+    targetReading: 'きょうはてんきです',
+    recognizedReading: 'あ'.repeat(80),
+    targetDuration: 4,
+    speechDuration: 4,
+  });
+  assert.equal(result.valid, false);
+  if (!result.valid) assert.equal(result.reason, 'unreliable-recognition');
+});
+
 test('much faster and much slower speech receive symmetric timing penalties', () => {
   const fast = valid('今日は天気がいいですね。', '今日は天気がいいですね。', 4, 2);
   const slow = valid('今日は天気がいいですね。', '今日は天気がいいですね。', 4, 8);
