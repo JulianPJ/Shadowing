@@ -481,6 +481,135 @@
   margin-top: 12px;
   line-height: 1.8;
 }
+.recording-analysis-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+}
+.recording-analysis-actions > span {
+  flex: 1;
+  font-size: 8px;
+  line-height: 1.6;
+  color: #abb19d;
+}
+.shadowing-analyze-button {
+  flex: 0 0 auto;
+  font-size: 10px;
+  min-height: 34px;
+  border-color: #d8dfd1;
+}
+.shadowing-result {
+  margin-top: 16px;
+  border: 1px solid #dde5d7;
+  border-radius: 10px;
+  background: #f8faf4;
+  padding: 17px;
+}
+.shadowing-result-heading,
+.shadowing-completion-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+.shadowing-result-heading h3 {
+  margin: 3px 0 0;
+  font-size: 17px;
+  font-weight: 550;
+}
+.shadowing-score {
+  font-family: var(--font-jp), sans-serif;
+  font-size: 35px;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--accent);
+}
+.shadowing-score-label {
+  margin: 7px 0 15px;
+  font-size: 11px;
+  color: #78846e;
+}
+.shadowing-comparison {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+.shadowing-comparison > div {
+  display: grid;
+  gap: 3px;
+}
+.shadowing-comparison dt,
+.shadowing-suggestions > strong,
+.shadowing-summary-grid strong {
+  font-size: 8px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: #9ba38e;
+}
+.shadowing-comparison dd {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.8;
+  color: #4e5a48;
+}
+.shadowing-suggestions {
+  margin-top: 14px;
+}
+.shadowing-suggestions ul {
+  margin: 7px 0 0;
+  padding-left: 18px;
+  color: #687361;
+  font-size: 10px;
+  line-height: 1.75;
+}
+.shadowing-retry {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 10px;
+  font-size: 9px;
+}
+.shadowing-completion {
+  margin: 14px 0;
+  padding: 19px;
+  border: 1px solid #dce7d6;
+  border-radius: 11px;
+  background: #f5f9f1;
+}
+.shadowing-completion-heading {
+  color: #829276;
+}
+.shadowing-completion-heading h2 {
+  margin: 4px 0 0;
+  font-size: 30px;
+  font-weight: 550;
+  color: #53634c;
+}
+.shadowing-completion-heading h2 span {
+  font-size: 13px;
+  font-weight: 450;
+  color: #91a087;
+}
+.shadowing-completion > .small {
+  margin: 7px 0 0;
+}
+.shadowing-summary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-top: 15px;
+}
+.shadowing-summary-grid > div {
+  border-top: 1px solid #e2e9dc;
+  padding-top: 11px;
+}
+.shadowing-summary-grid p {
+  margin: 6px 0 0;
+  color: #697461;
+  font-size: 10px;
+  line-height: 1.75;
+}
 .player-footnote {
   display: flex;
   align-items: center;
