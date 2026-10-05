@@ -249,13 +249,19 @@ body.studio-active .site-footer {
   background: #303a33;
   color: #fff;
 }
-.studio-mode .speed-control {
+.studio-mode .speed-control,
+.studio-mode .offset-control {
   color: #aeb7ae;
 }
-.studio-mode .speed-control select {
+.studio-mode .speed-control select,
+.studio-mode .offset-control > button {
   background: #181d19;
   border-color: #303832;
   color: #e7ece7;
+}
+.studio-mode .offset-control > button:hover:not(:disabled) {
+  background: #242b25;
+  border-color: #465149;
 }
 .studio-mode .completion-card,
 .studio-mode .evidence-banner,
