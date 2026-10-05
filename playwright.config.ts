@@ -6,7 +6,7 @@ export default defineConfig({
   timeout: 45000,
   expect: { timeout: 15000 },
   use: {
-    baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000',
+    baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000',\n    channel: process.env.CI ? 'chromium' : undefined,
     viewport: { width: 1440, height: 1000 },
     trace: 'retain-on-failure',
     launchOptions: {
