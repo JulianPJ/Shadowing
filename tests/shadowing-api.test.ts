@@ -14,11 +14,11 @@ import {
 import type { ShadowingSummarySignals } from '../src/lib/shadowing-session';
 
 test('Whisper scoring transcription is Japanese/VAD and never receives the target sentence as a prompt', async () => {
-  let seen: Record<string, unknown> | null = null;
+  const seen: Record<string, unknown>[] = [];
   const provider = createWorkersAiShadowingProvider({
     async run(model, input) {
       if (model === SHADOWING_WHISPER_MODEL) {
-        seen = input;
+        seen.push(input);
         return {
           text: '今日は天気がいいです',
           vtt: 'WEBVTT\n\n00:00.000 --> 00:02.000\n今日は天気がいいです',
@@ -32,12 +32,14 @@ test('Whisper scoring transcription is Japanese/VAD and never receives the targe
     new AbortController().signal,
   );
   assert.equal(result.recognizedText, '今日は天気がいいです');
-  assert.equal(seen?.language, 'ja');
-  assert.equal(seen?.task, 'transcribe');
-  assert.equal(seen?.vad_filter, true);
-  assert.equal(seen?.condition_on_previous_text, false);
-  assert.equal('initial_prompt' in seen!, false);
-  assert.equal('prefix' in seen!, false);
+  const whisperInput = seen[0];
+  assert.ok(whisperInput);
+  assert.equal(whisperInput.language, 'ja');
+  assert.equal(whisperInput.task, 'transcribe');
+  assert.equal(whisperInput.vad_filter, true);
+  assert.equal(whisperInput.condition_on_previous_text, false);
+  assert.equal('initial_prompt' in whisperInput, false);
+  assert.equal('prefix' in whisperInput, false);
 });
 
 function mockProvider(): ShadowingFeedbackProvider {
