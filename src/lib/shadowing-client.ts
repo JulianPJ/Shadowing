@@ -116,10 +116,11 @@ export async function shadowingAttemptFeedback(
 
 export async function shadowingSessionSummary(signals: ShadowingSummarySignals, signal: AbortSignal) {
   try {
+    const { fingerprint: _fingerprint, ...summarySignals } = signals;
     const response = await fetch('/api/shadowing/summary', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(signals),
+      body: JSON.stringify(summarySignals),
       signal: AbortSignal.any([signal, AbortSignal.timeout(30_000)]),
     });
     const result = await jsonResponse<{ wentWell: string; keepWorking: string }>(response);
