@@ -187,8 +187,11 @@ export async function handleAuthRequest(request: Request, auth: HibikiAuth, env:
       !authMailConfigured.has(auth)
     )
       return Response.json(
-        { error: 'Email authentication is awaiting email service setup.' },
-        { status: 503 },
+        {
+          code: 'EMAIL_SERVICE_UNAVAILABLE',
+          message: 'Email authentication is awaiting email service setup.',
+        },
+        { status: 503, headers: { 'Cache-Control': 'no-store' } },
       );
   }
   const response = await auth.handler(request);
