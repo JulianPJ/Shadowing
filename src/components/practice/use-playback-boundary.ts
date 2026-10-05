@@ -14,6 +14,7 @@ type BoundaryOptions = {
   segment: Segment;
   lesson: Lesson;
   duration: number;
+  playbackOffsetMs: number;
   resetTranslation: () => void;
   replayRange: QuizEvidence | null;
   media: RefObject<MediaHandle | null>;
@@ -32,6 +33,7 @@ export function usePlaybackBoundary({
   segment,
   lesson,
   duration,
+  playbackOffsetMs,
   resetTranslation,
   replayRange,
   media,
@@ -52,12 +54,18 @@ export function usePlaybackBoundary({
     const tick = () => {
       const adapter = media.current;
       if (!adapter) return;
-      const time = adapter.time();
+      const mediaTime = adapter.time();
       if (seeking.current) {
-        if (Math.abs(time - seeking.current.target) < 1.2 || Date.now() > seeking.current.deadline)
+        if (
+          Math.abs(mediaTime - seeking.current.target) < 1.2 ||
+          Date.now() > seeking.current.deadline
+        )
           seeking.current = null;
         else return;
       }
+      // Convert provider time back onto the authored transcript timeline. A positive offset means
+      // every authored section begins/ends later in the media; a negative value shifts it earlier.
+      const time = mediaTime - playbackOffsetMs / 1000;
       if (replayRange) {
         if (time >= replayRange.end - 0.025) {
           adapter.pause();
@@ -110,6 +118,7 @@ export function usePlaybackBoundary({
     segment.end,
     lesson.segments,
     duration,
+    playbackOffsetMs,
     resetTranslation,
     replayRange,
     sectionAt,

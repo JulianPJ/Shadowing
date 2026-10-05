@@ -1,4 +1,5 @@
 import { readStorage, writeStorage, storageAccount } from '../storage/browser';
+import { loadPreferences } from '../storage/preferences';
 import { availableLesson } from '../learner/bookmarks';
 import { loadLearnerHistory } from '../learner/persistence';
 import { loadQuizHistory } from '../learner/quiz-history';
@@ -10,7 +11,16 @@ export async function hydrateSync(data: SyncData) {
   const owner = storageAccount();
   if (data.preferences) {
     const { updatedAt, mode, speed, studioMode, furigana } = data.preferences;
-    writeStorage('preferences', { mode, speed, studioMode, furigana, translation: false });
+    // Timing alignment is intentionally device-local: preserve it when account preferences hydrate.
+    const { playbackOffsetMs } = loadPreferences();
+    writeStorage('preferences', {
+      mode,
+      speed,
+      studioMode,
+      furigana,
+      playbackOffsetMs,
+      translation: false,
+    });
     writeStorage('sync:preferences-date', updatedAt);
   }
   // Reconstruct the existing learner domain, keeping UUIDs and distinct retakes.

@@ -17,6 +17,10 @@ export type { StudyRecord } from './storage/lessons';
 export {
   loadPreferences,
   loadFavorites,
+  normalizePlaybackOffsetMs,
+  PLAYBACK_OFFSET_MIN_MS,
+  PLAYBACK_OFFSET_MAX_MS,
+  PLAYBACK_OFFSET_STEP_MS,
   TRANSLATION_CACHE_VERSION,
   translationCacheKey,
   loadTranslationCache,

@@ -23,6 +23,9 @@ import {
   lessonCompleted,
   loadFavorites,
   loadPreferences,
+  PLAYBACK_OFFSET_MIN_MS,
+  PLAYBACK_OFFSET_MAX_MS,
+  PLAYBACK_OFFSET_STEP_MS,
   type Preferences,
 } from '@/lib/storage';
 import { lessonMedia, sourceLabel, MEDIA_ACCEPT, validateMediaFile } from '@/lib/media';
@@ -59,6 +62,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
   const [index, setIndex] = useState(session.index);
   const [mode, setMode] = useState<Mode>(session.preferences.mode);
   const [speed, setSpeed] = useState(session.preferences.speed);
+  const [playbackOffsetMs, setPlaybackOffsetMs] = useState(session.preferences.playbackOffsetMs);
   const [studioMode, setStudioMode] = useState(session.preferences.studioMode);
   const [furigana, setFurigana] = useState(session.preferences.furigana);
   const [status, setStatus] = useState<PlaybackState>('ready');
@@ -91,6 +95,11 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
 
   const segment = lesson.segments[index];
   const isPlaying = status === 'listening';
+  const playbackOffsetSeconds = playbackOffsetMs / 1000;
+  const mediaTimeFor = useCallback(
+    (transcriptTime: number) => Math.max(0, transcriptTime + playbackOffsetSeconds),
+    [playbackOffsetSeconds],
+  );
   const shadowingAggregate = useMemo(
     () => aggregateShadowingScores(shadowingScores, lesson.segments.length),
     [shadowingScores, lesson.segments.length],
@@ -104,7 +113,10 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
     shadowingSignals && shadowingScores.summary?.fingerprint === shadowingSignals.fingerprint
       ? shadowingScores.summary
       : undefined;
-  const readPlaybackTime = useCallback(() => media.current?.time() ?? 0, []);
+  const readPlaybackTime = useCallback(
+    () => Math.max(0, (media.current?.time() ?? 0) - playbackOffsetSeconds),
+    [playbackOffsetSeconds],
+  );
   const progress = usePracticeProgress(
     lesson,
     {
@@ -150,6 +162,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
       const prefs = loadPreferences();
       setMode(prefs.mode);
       setSpeed(prefs.speed);
+      setPlaybackOffsetMs(prefs.playbackOffsetMs);
       setStudioMode(prefs.studioMode);
       setFurigana(prefs.furigana);
       setFavorites(loadFavorites(lesson));
@@ -162,8 +175,15 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
     saveLesson(lesson, index);
   }, [lesson, index]);
   useEffect(() => {
-    writeStorage('preferences', { mode, speed, translation: false, studioMode, furigana });
-  }, [mode, speed, studioMode, furigana]);
+    writeStorage('preferences', {
+      mode,
+      speed,
+      playbackOffsetMs,
+      translation: false,
+      studioMode,
+      furigana,
+    });
+  }, [mode, speed, playbackOffsetMs, studioMode, furigana]);
   useEffect(() => {
     document.body.classList.toggle('studio-active', studioMode);
     return () => document.body.classList.remove('studio-active');
@@ -225,9 +245,10 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
       const next = Math.min(Math.max(nextIndex, 0), lesson.segments.length - 1);
       const target = lesson.segments[next];
       if (!evidenceReplay) recordSignal(target, 'navigate');
+      const mediaTarget = mediaTimeFor(target.start);
       media.current?.pause();
-      media.current?.seek(target.start);
-      seeking.current = { target: target.start, deadline: Date.now() + 4000 };
+      media.current?.seek(mediaTarget);
+      seeking.current = { target: mediaTarget, deadline: Date.now() + 4000 };
       setIndex(next);
       setElapsed(target.start);
       setStatus(play ? 'listening' : 'ready');
@@ -240,7 +261,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
           setPlaybackError('Playback didn’t start. Press play inside the video, then try again.');
         });
     },
-    [lesson.segments, index, resetTranslation, recordSignal],
+    [lesson.segments, index, resetTranslation, recordSignal, mediaTimeFor],
   );
   const replaySection = useCallback(() => {
     recordSignal(segment, 'replay');
@@ -257,7 +278,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
       (status === 'your-turn' ||
         status === 'complete' ||
         status === 'ready' ||
-        media.current!.time() >= segment.end - 0.08)
+        media.current!.time() - playbackOffsetSeconds >= segment.end - 0.08)
     ) {
       navigate(index);
       return;
@@ -272,7 +293,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
       setStatus('paused');
       setPlaybackError('Playback didn’t start. Try the play button inside the video.');
     });
-  }, [isPlaying, mode, status, segment.end, navigate, index]);
+  }, [isPlaying, mode, status, segment.end, navigate, index, playbackOffsetSeconds]);
   const continuePractice = useCallback(() => {
     if (index === lesson.segments.length - 1) {
       media.current?.pause();
@@ -296,6 +317,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
     segment,
     lesson,
     duration,
+    playbackOffsetMs,
     resetTranslation,
     replayRange,
     media,
@@ -563,7 +585,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
           <MediaPlayer
             ref={media}
             lesson={lesson}
-            initialTime={lesson.segments[session.index].start}
+            initialTime={mediaTimeFor(lesson.segments[session.index].start)}
             speed={speed}
             onReady={onReady}
             onPlaying={onPlaying}
@@ -612,19 +634,62 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
                 Continuous
               </button>
             </div>
-            <label className="speed-control">
-              Speed
-              <select
-                aria-label="Playback speed"
-                value={speed}
-                onChange={(event) => setSpeed(Number(event.target.value))}
+            <div className="playback-adjustments">
+              <label className="speed-control">
+                Speed
+                <select
+                  aria-label="Playback speed"
+                  value={speed}
+                  onChange={(event) => setSpeed(Number(event.target.value))}
+                >
+                  <option value="0.5">0.5×</option>
+                  <option value="0.75">0.75×</option>
+                  <option value="1">1×</option>
+                  <option value="1.25">1.25×</option>
+                </select>
+              </label>
+              <div
+                className="offset-control"
+                role="group"
+                aria-label="Playback timing offset"
+                title="Positive shifts section timing later; negative shifts it earlier. Select the value to reset."
               >
-                <option value="0.5">0.5×</option>
-                <option value="0.75">0.75×</option>
-                <option value="1">1×</option>
-                <option value="1.25">1.25×</option>
-              </select>
-            </label>
+                <span>Offset</span>
+                <button
+                  type="button"
+                  aria-label="Shift playback timing 50 milliseconds earlier"
+                  disabled={playbackOffsetMs <= PLAYBACK_OFFSET_MIN_MS}
+                  onClick={() =>
+                    setPlaybackOffsetMs((value) =>
+                      Math.max(PLAYBACK_OFFSET_MIN_MS, value - PLAYBACK_OFFSET_STEP_MS),
+                    )
+                  }
+                >
+                  −
+                </button>
+                <button
+                  type="button"
+                  className="offset-value"
+                  aria-label="Reset playback timing offset"
+                  onClick={() => setPlaybackOffsetMs(0)}
+                >
+                  {playbackOffsetMs > 0 ? '+' : ''}
+                  {playbackOffsetMs} ms
+                </button>
+                <button
+                  type="button"
+                  aria-label="Shift playback timing 50 milliseconds later"
+                  disabled={playbackOffsetMs >= PLAYBACK_OFFSET_MAX_MS}
+                  onClick={() =>
+                    setPlaybackOffsetMs((value) =>
+                      Math.min(PLAYBACK_OFFSET_MAX_MS, value + PLAYBACK_OFFSET_STEP_MS),
+                    )
+                  }
+                >
+                  +
+                </button>
+              </div>
+            </div>
           </div>
           <div className="practice-current-stack">
             <CurrentSection
