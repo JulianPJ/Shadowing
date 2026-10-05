@@ -1,4 +1,7 @@
-import type { Segment } from './types';
+import type { MediaSource, Segment } from './types';
+
+const DEFAULT_BOUNDARY_LEAD_SECONDS = 0.025;
+const YOUTUBE_PAUSE_COMMAND_LEAD_MS = 55;
 
 /** Preserve the playback predicate, including its 20 ms lead-in and gap behaviour. */
 export function createSectionLookup(segments: Segment[], duration: number) {
@@ -22,4 +25,30 @@ export function createSectionLookup(segments: Segment[], duration: number) {
       ? low
       : -1;
   };
+}
+
+/**
+ * The next section's start is the hard playback boundary when legacy/provider timings overlap.
+ * This prevents shadowing playback from entering speech that belongs to the following section.
+ */
+export function sectionPlaybackEnd(segments: Segment[], index: number) {
+  const section = segments[index];
+  if (!section) return 0;
+  const nextStart = segments[index + 1]?.start;
+  return typeof nextStart === 'number' && Number.isFinite(nextStart) && nextStart > section.start
+    ? Math.min(section.end, nextStart)
+    : section.end;
+}
+
+/**
+ * YouTube iframe pause commands cross a postMessage boundary, so send the command slightly early.
+ * Scale the media-time lead by playback speed to keep the wall-clock allowance roughly constant.
+ */
+export function shadowingBoundaryLead(sourceType: MediaSource['type'], speed: number) {
+  if (sourceType !== 'youtube') return DEFAULT_BOUNDARY_LEAD_SECONDS;
+  const safeSpeed = Number.isFinite(speed) && speed > 0 ? speed : 1;
+  return Math.max(
+    0.03,
+    Math.min(0.08, (YOUTUBE_PAUSE_COMMAND_LEAD_MS / 1000) * safeSpeed),
+  );
 }
