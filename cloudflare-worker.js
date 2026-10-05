@@ -32,6 +32,10 @@ export * from 'vinext/server/fetch-handler';
 
 // Preserve vinext's response-stage exports/cache integration; adapt only Cloudflare-specific runtime paths.
 /** @typedef {import('cf/config').InferEnv<typeof import('./cloudflare.config').worker> & import('./src/lib/auth/server').AuthEnvironment} WorkerEnv */
+/**
+ * @param {Request} request
+ * @param {WorkerEnv} env
+ */
 async function shadowingRateLimited(request, env) {
   const route = new URL(request.url).pathname;
   const client = request.headers.get('cf-connecting-ip') || 'unknown';
