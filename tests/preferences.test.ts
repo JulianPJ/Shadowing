@@ -53,6 +53,7 @@ test('corrupt or malformed preferences use strict safe defaults', () => {
       translation: false,
       studioMode: false,
       furigana: false,
+      playbackOffsetMs: 0,
     });
   }
 });
