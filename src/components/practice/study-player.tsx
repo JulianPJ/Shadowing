@@ -168,7 +168,6 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
         }
         if (navigationRun.current !== run) return;
         if (!play) return;
-        setStatus('listening');
         try {
           await adapter.play();
         } catch {
