@@ -20,6 +20,8 @@ export function ThemeToggle() {
   const [theme, setTheme] = useState<Theme>('light');
 
   useEffect(() => {
+    // The root theme is applied before hydration; this only synchronizes the control label/icon.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTheme(activeTheme());
   }, []);
 
