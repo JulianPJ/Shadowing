@@ -316,3 +316,21 @@ export function withShadowingSuggestions(
     .slice(0, 3);
   return clean.length ? { ...analysis, suggestions: clean } : analysis;
 }
+
+
+export function shadowingSummaryFallback(aggregate: ShadowingAggregate) {
+  const whatWentWell =
+    aggregate.averageContentScore >= 85 && aggregate.closePaceSections >= aggregate.scoredSections / 2
+      ? 'Your speech was generally recognised accurately and your pacing stayed close to the source.'
+      : aggregate.averageContentScore >= aggregate.averageTimingScore
+        ? 'Recognition was the stronger part of this session, with several sections matching the target closely.'
+        : 'Your timing was the stronger part of this session, with several attempts staying close to the speaker’s pace.';
+  let keepWorkingOn = 'Keep repeating the lowest-scoring sections and aim for a complete, steady match.';
+  if (aggregate.deletions + aggregate.substitutions > aggregate.insertions && aggregate.deletions + aggregate.substitutions > 0)
+    keepWorkingOn = 'Some target sounds were missed or recognised differently. Replay the lowest-scoring sections and keep each mora clear.';
+  if (aggregate.slowerSections > aggregate.closePaceSections)
+    keepWorkingOn = 'Several attempts were slower than the source. Keep the wording clear while moving with the speaker’s rhythm.';
+  else if (aggregate.fasterSections > aggregate.closePaceSections)
+    keepWorkingOn = 'Several attempts were faster than the source. Ease back slightly and settle into the speaker’s timing.';
+  return { whatWentWell, keepWorkingOn };
+}
