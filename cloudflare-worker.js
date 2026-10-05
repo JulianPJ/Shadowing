@@ -14,6 +14,12 @@ import { createPrepareHandler } from './src/lib/prepare';
 import { createYoutubeCaptions } from './src/lib/providers/transcription';
 import { createWorkersAiTranscriptionProvider } from './src/lib/providers/ai-transcription';
 import { handleTranscriptionRequest } from './src/lib/transcription-api';
+import { createWorkersAiShadowingProvider } from './src/lib/providers/shadowing';
+import {
+  handleShadowingTranscriptionRequest,
+  handleShadowingFeedbackRequest,
+  handleShadowingSummaryRequest,
+} from './src/lib/shadowing-api';
 import {
   createD1LinkedTranscriptRepository,
   linkedTranscripts,
@@ -26,6 +32,29 @@ export * from 'vinext/server/fetch-handler';
 
 // Preserve vinext's response-stage exports/cache integration; adapt only Cloudflare-specific runtime paths.
 /** @typedef {import('cf/config').InferEnv<typeof import('./cloudflare.config').worker> & import('./src/lib/auth/server').AuthEnvironment} WorkerEnv */
+/**
+ * @param {Request} request
+ * @param {WorkerEnv} env
+ */
+async function shadowingRateLimited(request, env) {
+  const route = new URL(request.url).pathname;
+  const client = request.headers.get('cf-connecting-ip') || 'unknown';
+  try {
+    const result = await env.SHADOWING_AI_RATE_LIMIT.limit({ key: `${route}:${client}` });
+    return !result.success;
+  } catch {
+    // Fail closed: an unavailable limiter must not turn into unbounded paid AI usage.
+    return true;
+  }
+}
+
+function shadowingRateLimitResponse() {
+  return Response.json(
+    { code: 'rate-limited', error: 'Too many shadowing analyses. Wait a moment and try again.' },
+    { status: 429, headers: { 'Cache-Control': 'no-store', 'Retry-After': '60' } },
+  );
+}
+
 const worker = {
   /**
    * @param {Request} request
@@ -84,6 +113,17 @@ const worker = {
 
     if (url.pathname === '/api/transcribe' && request.method === 'POST') {
       return handleTranscriptionRequest(request, createWorkersAiTranscriptionProvider(env.AI));
+    }
+
+    if (url.pathname.startsWith('/api/shadowing/') && request.method === 'POST') {
+      if (await shadowingRateLimited(request, env)) return shadowingRateLimitResponse();
+      const provider = createWorkersAiShadowingProvider(env.AI);
+      if (url.pathname === '/api/shadowing/transcribe')
+        return handleShadowingTranscriptionRequest(request, provider);
+      if (url.pathname === '/api/shadowing/feedback')
+        return handleShadowingFeedbackRequest(request, provider);
+      if (url.pathname === '/api/shadowing/summary')
+        return handleShadowingSummaryRequest(request, provider);
     }
 
     if (url.pathname === '/demo.mp4' && ['GET', 'HEAD'].includes(request.method)) {

@@ -145,3 +145,96 @@ test('invalid URL, shortcut typing guard, bookmarks, search, and mobile layout',
   );
   await page.screenshot({ path: 'artifacts/player-mobile.png', fullPage: true });
 });
+
+test('shadowing analysis is explicit, scores one recording, and shows aggregate at completion', async ({
+  page,
+  context,
+}) => {
+  await context.grantPermissions(['microphone']);
+  let transcriptions = 0;
+  let feedbackCalls = 0;
+  let summaryCalls = 0;
+
+  await page.route('**/api/shadowing/transcribe', async (route) => {
+    transcriptions++;
+    expect(route.request().headers()['content-type']).toContain('audio/');
+    expect(Number(route.request().headers()['x-hibiki-recording-duration-ms'])).toBeGreaterThan(1900);
+    return route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        recognizedText: demo.segments[0].japanese,
+        speechStart: 0,
+        speechEnd: demo.segments[0].end - demo.segments[0].start,
+        provider: 'Cloudflare Whisper large-v3-turbo',
+      }),
+    });
+  });
+  await page.route('**/api/shadowing/feedback', async (route) => {
+    feedbackCalls++;
+    const input = route.request().postDataJSON();
+    expect(input.score).toBe(100);
+    expect(input.targetText).toBe(demo.segments[0].japanese);
+    expect(input.recognizedText).toBe(demo.segments[0].japanese);
+    return route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        suggestions: [
+          'Your speech was recognised very close to the target wording.',
+          'Your overall pacing was close to the reference timing.',
+        ],
+        provider: 'Qwen',
+      }),
+    });
+  });
+  await page.route('**/api/shadowing/summary', async (route) => {
+    summaryCalls++;
+    const input = route.request().postDataJSON();
+    expect(input.score).toBe(100);
+    expect(input.scoredSections).toBe(1);
+    expect(input.totalSections).toBe(demo.segments.length);
+    return route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        wentWell: 'Your speech was recognised accurately and your pacing matched the reference.',
+        keepWorking: 'Keep applying the same clear rhythm across more sections.',
+        provider: 'Qwen',
+      }),
+    });
+  });
+
+  await openDemo(page);
+  await page.getByRole('button', { name: 'Record yourself', exact: true }).click();
+  await page.waitForTimeout(2200);
+  await page.getByRole('button', { name: 'Stop recording' }).click();
+  await expect(page.getByRole('button', { name: 'Analyse attempt', exact: true })).toBeVisible();
+
+  expect(transcriptions).toBe(0);
+  expect(feedbackCalls).toBe(0);
+  await expect(page.getByText('Analysing sends only this recording to Cloudflare AI')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Analyse attempt', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Shadowing Match' })).toBeVisible();
+  await expect(page.locator('.shadowing-score')).toHaveText('100');
+  await expect(
+    page.locator('.shadowing-result').getByText(demo.segments[0].japanese, { exact: true }),
+  ).toHaveCount(2);
+  expect(transcriptions).toBe(1);
+  expect(feedbackCalls).toBe(1);
+
+  const stored = await page.evaluate(() =>
+    JSON.parse(sessionStorage.getItem('hibiki:shadowing:v1:demo') || 'null'),
+  );
+  expect(stored.sections['segment-1'].score).toBe(100);
+  expect(Object.keys(stored.sections)).toEqual(['segment-1']);
+
+  await page.getByTestId('transcript-13').click();
+  await expect(page.getByTestId('current-japanese')).toHaveText(demo.segments[13].japanese);
+  await expect(page.getByTestId('playback-state')).toContainText('YOUR TURN');
+  await page.getByRole('button', { name: 'Finish practice', exact: true }).click();
+
+  await expect(page.getByRole('heading', { name: '100 / 100' })).toBeVisible();
+  await expect(page.getByText(`Scored 1 of ${demo.segments.length} shadowing sections`)).toBeVisible();
+  await expect(page.getByText('You made a little progress today.')).toBeVisible();
+  await expect(page.getByText('Your speech was recognised accurately and your pacing matched the reference.')).toBeVisible();
+  expect(summaryCalls).toBe(1);
+});

@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { Mic, Square, Trash2, LoaderCircle } from 'lucide-react';
+import { Mic, Square, Trash2, LoaderCircle, Sparkles, RotateCcw } from 'lucide-react';
+import { shadowingScoreLabel, type ShadowingSectionResult } from '@/lib/shadowing-score';
 
 export function VoiceRecorder({
   enabled,
@@ -8,25 +9,40 @@ export function VoiceRecorder({
   onBeforeRecord,
   onRecording,
   onAttempt,
+  analysis,
+  analyzing = false,
+  analysisError = '',
+  onAnalyze,
+  onNewRecording,
 }: {
   enabled: boolean;
   nativePlaying: boolean;
   onBeforeRecord: () => void;
   onRecording: (active: boolean) => void;
   onAttempt?: () => void;
+  analysis?: ShadowingSectionResult;
+  analyzing?: boolean;
+  analysisError?: string;
+  onAnalyze?: (recording: Blob, durationSeconds: number) => Promise<boolean>;
+  onNewRecording?: () => void;
 }) {
   const [recording, setRecording] = useState(false);
   const [requesting, setRequesting] = useState(false);
   const [recorded, setRecorded] = useState('');
+  const [recordedDuration, setRecordedDuration] = useState(0);
+  const [analyzedCurrent, setAnalyzedCurrent] = useState(false);
   const [error, setError] = useState('');
   const [seconds, setSeconds] = useState(0);
   const audio = useRef<HTMLAudioElement>(null);
   const recorder = useRef<MediaRecorder | null>(null);
+  const recordedBlob = useRef<Blob | null>(null);
+  const recordingStartedAt = useRef(0);
   const stream = useRef<MediaStream | null>(null);
   const objectUrl = useRef('');
   const mounted = useRef(false);
   const requestId = useRef(0);
   const callback = useRef(onRecording);
+
   useEffect(() => {
     callback.current = onRecording;
   }, [onRecording]);
@@ -42,6 +58,7 @@ export function VoiceRecorder({
       if (recorder.current?.state === 'recording') recorder.current.stop();
       stream.current?.getTracks().forEach((track) => track.stop());
       if (objectUrl.current) URL.revokeObjectURL(objectUrl.current);
+      recordedBlob.current = null;
       callback.current(false);
     };
   }, []);
@@ -54,8 +71,10 @@ export function VoiceRecorder({
       clearTimeout(max);
     };
   }, [recording]);
+
   async function start() {
     setError('');
+    onNewRecording?.();
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
       setError(
         'Recording needs HTTPS or localhost and a browser with microphone support. You can still shadow aloud.',
@@ -92,9 +111,13 @@ export function VoiceRecorder({
         media.getTracks().forEach((track) => track.stop());
         if (!mounted.current) return;
         if (objectUrl.current) URL.revokeObjectURL(objectUrl.current);
-        const url = URL.createObjectURL(new Blob(chunks, { type: instance.mimeType }));
+        const blob = new Blob(chunks, { type: instance.mimeType || mimeType || 'audio/webm' });
+        const url = URL.createObjectURL(blob);
         objectUrl.current = url;
+        recordedBlob.current = blob;
         setRecorded(url);
+        setRecordedDuration(Math.max(0, (performance.now() - recordingStartedAt.current) / 1000));
+        setAnalyzedCurrent(false);
         setRecording(false);
         callback.current(false);
       };
@@ -104,6 +127,7 @@ export function VoiceRecorder({
         setRecording(false);
         callback.current(false);
       };
+      recordingStartedAt.current = performance.now();
       instance.start();
       onAttempt?.();
       setSeconds(0);
@@ -123,6 +147,22 @@ export function VoiceRecorder({
       if (mounted.current && id === requestId.current) setRequesting(false);
     }
   }
+
+  async function analyze() {
+    if (!recordedBlob.current || !onAnalyze || analyzing || analyzedCurrent) return;
+    const ok = await onAnalyze(recordedBlob.current, recordedDuration);
+    if (mounted.current && ok) setAnalyzedCurrent(true);
+  }
+
+  function clearRecording() {
+    if (recorded) URL.revokeObjectURL(recorded);
+    objectUrl.current = '';
+    recordedBlob.current = null;
+    setRecorded('');
+    setRecordedDuration(0);
+    setAnalyzedCurrent(false);
+  }
+
   return (
     <div className={`recording-panel ${recording ? 'is-recording' : ''}`}>
       <div className="recording-top">
@@ -132,13 +172,13 @@ export function VoiceRecorder({
             {recording
               ? `Recording · 0:${String(seconds).padStart(2, '0')}`
               : recorded
-                ? 'Listen to your voice, then compare with the original.'
+                ? 'Listen back, or analyse this attempt against the section.'
                 : 'Say it aloud. Record it if you like.'}
           </span>
         </div>
         <button
           className={`button record-button ${recording ? 'recording' : ''}`}
-          disabled={(!enabled && !recording) || requesting}
+          disabled={(!enabled && !recording) || requesting || analyzing}
           onClick={() => (recording ? recorder.current?.stop() : void start())}
         >
           {recording ? (
@@ -159,6 +199,7 @@ export function VoiceRecorder({
           )}
         </button>
       </div>
+
       {requesting ? (
         <button
           className="text-button small"
@@ -170,27 +211,93 @@ export function VoiceRecorder({
           Cancel microphone request
         </button>
       ) : null}
+
       {recorded ? (
-        <div className="recording-audio">
-          <audio
-            ref={audio}
-            src={recorded}
-            controls
-            aria-label="Your recorded attempt"
-            onPlay={onBeforeRecord}
-          />
-          <button
-            className="icon-button"
-            aria-label="Delete your recording"
-            onClick={() => {
-              URL.revokeObjectURL(recorded);
-              objectUrl.current = '';
-              setRecorded('');
-            }}
-          >
-            <Trash2 size={16} />
+        <>
+          <div className="recording-audio">
+            <audio
+              ref={audio}
+              src={recorded}
+              controls
+              aria-label="Your recorded attempt"
+              onPlay={onBeforeRecord}
+            />
+            <button className="icon-button" aria-label="Delete your recording" onClick={clearRecording}>
+              <Trash2 size={16} />
+            </button>
+          </div>
+          {onAnalyze ? (
+            <div className="recording-analysis-actions">
+              <button
+                className="button shadowing-analyze-button"
+                disabled={analyzing || analyzedCurrent}
+                onClick={() => void analyze()}
+              >
+                {analyzing ? (
+                  <>
+                    <LoaderCircle className="spin" size={15} />
+                    Analysing…
+                  </>
+                ) : analyzedCurrent ? (
+                  <>
+                    <Sparkles size={15} />
+                    Attempt analysed
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={15} />
+                    Analyse attempt
+                  </>
+                )}
+              </button>
+              <span>
+                Analysing sends only this recording to Cloudflare AI for transcription. Hibiki does
+                not save the recording server-side.
+              </span>
+            </div>
+          ) : null}
+        </>
+      ) : null}
+
+      {analysis ? (
+        <section className="shadowing-result" aria-labelledby="shadowing-match-title">
+          <div className="shadowing-result-heading">
+            <div>
+              <span className="small-label">LATEST SCORED ATTEMPT</span>
+              <h3 id="shadowing-match-title">Shadowing Match</h3>
+            </div>
+            <strong className="shadowing-score">{analysis.score}</strong>
+          </div>
+          <p className="shadowing-score-label">{shadowingScoreLabel(analysis.score)}</p>
+          <dl className="shadowing-comparison">
+            <div>
+              <dt>Target</dt>
+              <dd lang="ja">{analysis.targetText}</dd>
+            </div>
+            <div>
+              <dt>Heard</dt>
+              <dd lang="ja">{analysis.recognizedText}</dd>
+            </div>
+          </dl>
+          <div className="shadowing-suggestions">
+            <strong>Suggestions</strong>
+            <ul>
+              {analysis.suggestions.map((suggestion, index) => (
+                <li key={index}>{suggestion}</li>
+              ))}
+            </ul>
+          </div>
+          <button className="text-button shadowing-retry" disabled={!enabled || analyzing} onClick={() => void start()}>
+            <RotateCcw size={14} />
+            Try again
           </button>
-        </div>
+        </section>
+      ) : null}
+
+      {analysisError ? (
+        <p className="small recording-error" role="alert">
+          {analysisError}
+        </p>
       ) : null}
       {error ? (
         <p className="small recording-error" role="alert">
@@ -198,7 +305,8 @@ export function VoiceRecorder({
         </p>
       ) : null}
       <span className="recording-privacy">
-        Only on this device. Cleared when you change sections.
+        Recordings stay in this browser unless you explicitly choose Analyse attempt, and are cleared
+        when you change sections.
       </span>
     </div>
   );

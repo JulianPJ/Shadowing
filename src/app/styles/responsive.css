@@ -742,6 +742,20 @@
   .recording-top > div {
     max-width: 100%;
   }
+  .recording-analysis-actions {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .shadowing-analyze-button {
+    width: 100%;
+  }
+  .shadowing-summary-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .shadowing-score {
+    font-size: 31px;
+  }
   .practice-controls .button {
     font-size: 11px;
     padding: 10px;

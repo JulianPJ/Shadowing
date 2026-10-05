@@ -1,7 +1,7 @@
 'use client';
 import { CurrentSection } from './current-section';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -31,6 +31,22 @@ import { MediaPlayer, type MediaHandle } from '../media-player';
 import { VoiceRecorder } from '../voice-recorder';
 import { ComprehensionQuiz } from '../comprehension-quiz';
 import { LessonDifficulty } from '../lesson-difficulty';
+import { ShadowingCompletion } from '../shadowing-completion';
+import { transcriptRevision } from '@/lib/transcript';
+import {
+  aggregateShadowingScores,
+  loadShadowingSession,
+  saveShadowingSession,
+  shadowingSummarySignals,
+  upsertShadowingSection,
+} from '@/lib/shadowing-session';
+import {
+  deterministicShadowingAnalysis,
+  shadowingAttemptFeedback,
+  shadowingSessionSummary,
+  transcribeShadowingRecording,
+  validateShadowingRecordingBeforeUpload,
+} from '@/lib/shadowing-client';
 
 import { usePracticeProgress } from '../use-practice-progress';
 import { useSectionTranslation } from './use-section-translation';
@@ -38,6 +54,7 @@ import { usePlaybackBoundary } from './use-playback-boundary';
 import { TranscriptPanel } from './transcript-panel';
 export type Session = { lesson: Lesson; index: number; preferences: Preferences };
 export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () => void }) {
+  const shadowingRevision = transcriptRevision(session.lesson);
   const [lesson, setLesson] = useState(session.lesson);
   const [index, setIndex] = useState(session.index);
   const [mode, setMode] = useState<Mode>(session.preferences.mode);
@@ -49,6 +66,14 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
   const [recording, setRecording] = useState(false);
   const [playbackError, setPlaybackError] = useState('');
   const [elapsed, setElapsed] = useState(lesson.segments[session.index].start);
+  const [shadowingScores, setShadowingScores] = useState(() =>
+    loadShadowingSession(session.lesson.id, shadowingRevision),
+  );
+  const [scoringSection, setScoringSection] = useState<string | null>(null);
+  const [scoringError, setScoringError] = useState('');
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const scoreAbort = useRef<AbortController | null>(null);
+  const summaryAbort = useRef<AbortController | null>(null);
 
   const [favorites, setFavorites] = useState<string[]>(() => loadFavorites(lesson));
 
@@ -66,6 +91,19 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
 
   const segment = lesson.segments[index];
   const isPlaying = status === 'listening';
+  const shadowingAggregate = useMemo(
+    () => aggregateShadowingScores(shadowingScores, lesson.segments.length),
+    [shadowingScores, lesson.segments.length],
+  );
+  const shadowingSignals = useMemo(
+    () => shadowingSummarySignals(shadowingScores, lesson.segments.length),
+    [shadowingScores, lesson.segments.length],
+  );
+  const currentShadowingResult = shadowingScores.sections[segment.id];
+  const currentShadowingSummary =
+    shadowingSignals && shadowingScores.summary?.fingerprint === shadowingSignals.fingerprint
+      ? shadowingScores.summary
+      : undefined;
   const readPlaybackTime = useCallback(() => media.current?.time() ?? 0, []);
   const progress = usePracticeProgress(
     lesson,
@@ -137,9 +175,49 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
   useEffect(() => {
     writeStorage(`favorites:${lesson.id}`, favorites);
   }, [lesson.id, favorites]);
+  useEffect(
+    () => () => {
+      scoreAbort.current?.abort();
+      summaryAbort.current?.abort();
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (!finished || !shadowingSignals) return;
+    if (shadowingScores.summary?.fingerprint === shadowingSignals.fingerprint) return;
+    if (summaryAbort.current) return;
+    const controller = new AbortController();
+    summaryAbort.current = controller;
+    setSummaryLoading(true);
+    void shadowingSessionSummary(shadowingSignals, controller.signal)
+      .then((summary) => {
+        if (controller.signal.aborted) return;
+        setShadowingScores((current) => {
+          const next = {
+            ...current,
+            summary: { ...summary, fingerprint: shadowingSignals.fingerprint },
+          };
+          saveShadowingSession(next);
+          return next;
+        });
+      })
+      .finally(() => {
+        if (summaryAbort.current === controller) summaryAbort.current = null;
+        if (!controller.signal.aborted) setSummaryLoading(false);
+      });
+    return () => controller.abort();
+  }, [finished, shadowingSignals, shadowingScores.summary?.fingerprint]);
 
   const navigate = useCallback(
     (nextIndex: number, play = true, evidenceReplay = false) => {
+      scoreAbort.current?.abort();
+      scoreAbort.current = null;
+      setScoringSection(null);
+      setScoringError('');
+      summaryAbort.current?.abort();
+      summaryAbort.current = null;
+      setSummaryLoading(false);
       if (!evidenceReplay) {
         setReplayRange(null);
         replayResumeIndex.current = null;
@@ -333,6 +411,76 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
       isFavorite ? current.filter((id) => id !== segment.id) : [...current, segment.id],
     );
   };
+  const analyzeShadowing = useCallback(
+    async (recordingBlob: Blob, recordingDurationSeconds: number) => {
+      if (scoreAbort.current) return false;
+      const target = segment;
+      const referenceDurationSeconds = (target.end - target.start) / speed;
+      try {
+        validateShadowingRecordingBeforeUpload(recordingDurationSeconds, referenceDurationSeconds);
+      } catch (error) {
+        setScoringError(error instanceof Error ? error.message : 'Try recording the full section again.');
+        return false;
+      }
+
+      const controller = new AbortController();
+      scoreAbort.current = controller;
+      setScoringSection(target.id);
+      setScoringError('');
+      try {
+        const transcription = await transcribeShadowingRecording(
+          recordingBlob,
+          recordingDurationSeconds,
+          controller.signal,
+        );
+        const recognizedSpeechDurationSeconds = Math.max(
+          0,
+          transcription.speechEnd - transcription.speechStart,
+        );
+        const analysis = await deterministicShadowingAnalysis({
+          targetText: target.japanese,
+          recognizedText: transcription.recognizedText,
+          referenceDurationSeconds,
+          recordingDurationSeconds: recognizedSpeechDurationSeconds,
+        });
+        const suggestions = await shadowingAttemptFeedback(analysis, controller.signal);
+        if (controller.signal.aborted) return false;
+        const result = {
+          ...analysis,
+          sectionId: target.id,
+          attemptedAt: new Date().toISOString(),
+          suggestions,
+        };
+        summaryAbort.current?.abort();
+        summaryAbort.current = null;
+        setSummaryLoading(false);
+        setShadowingScores((current) => {
+          const next = upsertShadowingSection(
+            current,
+            lesson.id,
+            shadowingRevision,
+            result,
+          );
+          saveShadowingSession(next);
+          return next;
+        });
+        return true;
+      } catch (error) {
+        if (!controller.signal.aborted)
+          setScoringError(
+            error instanceof Error
+              ? error.message
+              : 'This attempt could not be analysed. Your previous valid score is unchanged.',
+          );
+        return false;
+      } finally {
+        if (scoreAbort.current === controller) scoreAbort.current = null;
+        if (!controller.signal.aborted) setScoringSection(null);
+      }
+    },
+    [lesson.id, segment, shadowingRevision, speed],
+  );
+
   function reattach(file: File | undefined) {
     if (!file) return;
     try {
@@ -512,7 +660,19 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
             onBeforeRecord={pauseForRecording}
             onRecording={setRecording}
             onAttempt={() => recordSignal(segment, 'recording-attempt')}
+            analysis={currentShadowingResult}
+            analyzing={scoringSection === segment.id}
+            analysisError={scoringError}
+            onAnalyze={analyzeShadowing}
+            onNewRecording={() => setScoringError('')}
           />
+          {finished && shadowingAggregate ? (
+            <ShadowingCompletion
+              aggregate={shadowingAggregate}
+              summary={currentShadowingSummary}
+              loading={summaryLoading}
+            />
+          ) : null}
           {finished ? (
             <div className="completion-card" role="status">
               <span>

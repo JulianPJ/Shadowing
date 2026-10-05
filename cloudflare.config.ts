@@ -16,6 +16,10 @@ export const worker = defineWorker({
     ASSETS: bindings.assets(),
     IMAGES: bindings.images(),
     AI: bindings.ai(),
+    SHADOWING_AI_RATE_LIMIT: bindings.rateLimit({
+      namespace: 'shadowing-ai-v1',
+      simple: { limit: 6, period: 60 },
+    }),
     HIBIKI_DB: bindings.d1({ id: 'cf88fe7d-16bb-4f58-8839-2b27718a7847' }),
     // Better Auth must have one canonical production origin for trusted callbacks and secure cookies.
     AUTH_BASE_URL: bindings.text('https://shadowing.julianpopovskijones.workers.dev'),
