@@ -102,7 +102,7 @@ export async function handleShadowingTranscriptionRequest(
       speechDuration: result.speechDuration,
       provider: result.provider,
     });
-  } catch (error) {
+  } catch {
     console.warn(
       JSON.stringify({
         event: 'shadowing-transcription-failed',
