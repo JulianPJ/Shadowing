@@ -86,6 +86,97 @@ test('real MediaRecorder captures and replays; native replay stops the recording
   await page.getByRole('button', { name: 'Next section', exact: true }).click();
   await expect(page.getByLabel('Your recorded attempt')).toHaveCount(0);
 });
+
+test('explicit shadowing analysis scores one recording and shows covered aggregate at completion', async ({
+  page,
+  context,
+}) => {
+  await context.grantPermissions(['microphone']);
+  let transcriptionRequests = 0;
+  let feedbackRequests = 0;
+  let summaryRequests = 0;
+
+  await page.route('**/api/shadowing/transcribe', async (route) => {
+    transcriptionRequests++;
+    expect(route.request().headers()['content-type']).toContain('audio/');
+    expect(route.request().postDataBuffer()?.byteLength).toBeGreaterThan(256);
+    return route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        recognizedText: demo.segments[0].japanese,
+        speechDuration: demo.segments[0].end - demo.segments[0].start,
+        provider: 'mock Whisper',
+      }),
+    });
+  });
+  await page.route('**/api/shadowing/feedback', async (route) => {
+    feedbackRequests++;
+    const payload = route.request().postDataJSON();
+    expect(payload.analysis.score).toBe(100);
+    return route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        suggestions: ['Very close. Keep the same wording and rhythm.'],
+      }),
+    });
+  });
+  await page.route('**/api/shadowing/summary', async (route) => {
+    summaryRequests++;
+    const payload = route.request().postDataJSON();
+    expect(payload.aggregate.score).toBe(100);
+    expect(payload.aggregate.scoredSections).toBe(1);
+    expect(payload.sections).toHaveLength(1);
+    return route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        summary: {
+          whatWentWell: 'Recognition and timing matched this scored section closely.',
+          keepWorkingOn: 'Score more sections to build a broader picture of the video.',
+        },
+      }),
+    });
+  });
+
+  await openDemo(page);
+  await page.getByRole('button', { name: 'Record yourself', exact: true }).click();
+  await page.waitForTimeout(1200);
+  await page.getByRole('button', { name: 'Stop recording' }).click();
+  await expect(page.getByRole('button', { name: 'Analyse attempt', exact: true })).toBeVisible();
+  expect(transcriptionRequests).toBe(0);
+  expect(feedbackRequests).toBe(0);
+  await expect(page.locator('.recording-privacy')).toContainText(
+    'sends this attempt to Cloudflare AI',
+  );
+
+  await page.getByRole('button', { name: 'Analyse attempt', exact: true }).click();
+  await expect(page.getByTestId('shadowing-match')).toContainText('100');
+  await expect(page.getByTestId('shadowing-match')).toContainText(demo.segments[0].japanese);
+  await expect(page.getByTestId('shadowing-match')).toContainText(
+    'Very close. Keep the same wording and rhythm.',
+  );
+  expect(transcriptionRequests).toBe(1);
+  expect(feedbackRequests).toBe(1);
+
+  await page.getByTestId('transcript-14').click();
+  await expect(page.getByTestId('playback-state')).toContainText('YOUR TURN');
+  await page.getByRole('button', { name: 'Finish practice', exact: true }).click();
+
+  const overall = page.getByTestId('shadowing-overall');
+  await expect(overall).toContainText('100 / 100');
+  await expect(overall).toContainText('Scored 1 of 14 shadowing sections');
+  await expect(overall).toContainText('Recognition and timing matched');
+  expect(summaryRequests).toBe(1);
+});
+
+test('finishing without analysing a recording does not show a zero shadowing score', async ({ page }) => {
+  await openDemo(page);
+  await page.getByTestId('transcript-14').click();
+  await expect(page.getByTestId('playback-state')).toContainText('YOUR TURN');
+  await page.getByRole('button', { name: 'Finish practice', exact: true }).click();
+  await expect(page.getByTestId('shadowing-overall')).toHaveCount(0);
+  await expect(page.locator('.completion-card')).toBeVisible();
+});
+
 test('denied microphone permission offers recovery without blocking playback', async ({ page }) => {
   await openDemo(page);
   await page.getByRole('button', { name: 'Record yourself', exact: true }).click();
