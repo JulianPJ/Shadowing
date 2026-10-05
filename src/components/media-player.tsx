@@ -10,7 +10,6 @@ export interface MediaHandle {
   play(): Promise<void>;
   pause(): void;
   seek(time: number): void;
-  seekSettled?(time: number): Promise<void>;
   time(): number;
   setSpeed(speed: number): void;
   isPlaying(): boolean;
