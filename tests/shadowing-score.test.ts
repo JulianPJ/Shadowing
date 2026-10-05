@@ -36,7 +36,7 @@ function score(target: string, heard: string, targetDuration = 4, speechDuration
 function valid(target: string, heard: string, targetDuration = 4, speechDuration = 4) {
   const result = score(target, heard, targetDuration, speechDuration);
   assert.equal(result.valid, true);
-  if (!result.valid) throw new Error(result.message);
+  if (!result.valid) throw new Error('Expected a valid shadowing score.');
   return result.analysis;
 }
 function section(sectionId: string, scoreValue: number): ScoredShadowingSection {
