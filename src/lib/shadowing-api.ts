@@ -111,9 +111,57 @@ function validateSummarySignals(value: unknown): ShadowingSummarySignals {
     !finite(pace.close, 0, 10_000)
   )
     throw new Error('Invalid pace summary');
-  const compact = (value: unknown) => {
+  const countList = (value: unknown) => {
     if (!Array.isArray(value) || value.length > 8) throw new Error('Invalid aggregate list');
-    return value;
+    return value.map((item) => {
+      if (!item || typeof item !== 'object') throw new Error('Invalid aggregate item');
+      const rawItem = item as Record<string, unknown>;
+      if (
+        typeof rawItem.value !== 'string' ||
+        !rawItem.value ||
+        rawItem.value.length > 80 ||
+        !finite(rawItem.count, 1, 10_000)
+      )
+        throw new Error('Invalid aggregate count');
+      return { value: rawItem.value, count: Math.round(rawItem.count as number) };
+    });
+  };
+  const substitutionList = (value: unknown) => {
+    if (!Array.isArray(value) || value.length > 8) throw new Error('Invalid substitution list');
+    return value.map((item) => {
+      if (!item || typeof item !== 'object') throw new Error('Invalid substitution item');
+      const rawItem = item as Record<string, unknown>;
+      if (
+        typeof rawItem.expected !== 'string' ||
+        !rawItem.expected ||
+        rawItem.expected.length > 20 ||
+        typeof rawItem.heard !== 'string' ||
+        !rawItem.heard ||
+        rawItem.heard.length > 20 ||
+        !finite(rawItem.count, 1, 10_000)
+      )
+        throw new Error('Invalid substitution count');
+      return {
+        expected: rawItem.expected,
+        heard: rawItem.heard,
+        count: Math.round(rawItem.count as number),
+      };
+    });
+  };
+  const rankedList = (value: unknown) => {
+    if (!Array.isArray(value) || value.length > 3) throw new Error('Invalid ranked list');
+    return value.map((item) => {
+      if (!item || typeof item !== 'object') throw new Error('Invalid ranked item');
+      const rawItem = item as Record<string, unknown>;
+      if (
+        typeof rawItem.sectionId !== 'string' ||
+        !rawItem.sectionId ||
+        rawItem.sectionId.length > 200 ||
+        !finite(rawItem.score, 0, 100)
+      )
+        throw new Error('Invalid ranked score');
+      return { sectionId: rawItem.sectionId, score: Math.round(rawItem.score as number) };
+    });
   };
   return {
     score: Math.round(raw.score as number),
@@ -127,11 +175,11 @@ function validateSummarySignals(value: unknown): ShadowingSummarySignals {
       slower: Math.round(pace.slower as number),
       close: Math.round(pace.close as number),
     },
-    commonDeletions: compact(raw.commonDeletions) as ShadowingSummarySignals['commonDeletions'],
-    commonAdditions: compact(raw.commonAdditions) as ShadowingSummarySignals['commonAdditions'],
-    commonSubstitutions: compact(raw.commonSubstitutions) as ShadowingSummarySignals['commonSubstitutions'],
-    highest: compact(raw.highest) as ShadowingSummarySignals['highest'],
-    lowest: compact(raw.lowest) as ShadowingSummarySignals['lowest'],
+    commonDeletions: countList(raw.commonDeletions),
+    commonAdditions: countList(raw.commonAdditions),
+    commonSubstitutions: substitutionList(raw.commonSubstitutions),
+    highest: rankedList(raw.highest),
+    lowest: rankedList(raw.lowest),
   };
 }
 
