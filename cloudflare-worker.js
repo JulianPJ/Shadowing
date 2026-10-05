@@ -32,6 +32,25 @@ export * from 'vinext/server/fetch-handler';
 
 // Preserve vinext's response-stage exports/cache integration; adapt only Cloudflare-specific runtime paths.
 /** @typedef {import('cf/config').InferEnv<typeof import('./cloudflare.config').worker> & import('./src/lib/auth/server').AuthEnvironment} WorkerEnv */
+async function shadowingRateLimited(request, env) {
+  const route = new URL(request.url).pathname;
+  const client = request.headers.get('cf-connecting-ip') || 'unknown';
+  try {
+    const result = await env.SHADOWING_AI_RATE_LIMIT.limit({ key: `${route}:${client}` });
+    return !result.success;
+  } catch {
+    // Fail closed: an unavailable limiter must not turn into unbounded paid AI usage.
+    return true;
+  }
+}
+
+function shadowingRateLimitResponse() {
+  return Response.json(
+    { code: 'rate-limited', error: 'Too many shadowing analyses. Wait a moment and try again.' },
+    { status: 429, headers: { 'Cache-Control': 'no-store', 'Retry-After': '60' } },
+  );
+}
+
 const worker = {
   /**
    * @param {Request} request
