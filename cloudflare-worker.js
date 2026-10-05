@@ -12,6 +12,8 @@ import { handleTranslationRequest } from './src/lib/translation-api';
 import { createDeepLTranslationProvider } from './src/lib/providers/translation';
 import { createPrepareHandler } from './src/lib/prepare';
 import { createYoutubeCaptions } from './src/lib/providers/transcription';
+import { createWorkersAiTranscriptionProvider } from './src/lib/providers/ai-transcription';
+import { handleTranscriptionRequest } from './src/lib/transcription-api';
 import {
   createD1LinkedTranscriptRepository,
   linkedTranscripts,
@@ -78,6 +80,10 @@ const worker = {
         ),
         repository: storage.transcripts,
       })(request);
+    }
+
+    if (url.pathname === '/api/transcribe' && request.method === 'POST') {
+      return handleTranscriptionRequest(request, createWorkersAiTranscriptionProvider(env.AI));
     }
 
     if (url.pathname === '/demo.mp4' && ['GET', 'HEAD'].includes(request.method)) {
