@@ -49,6 +49,7 @@ export type ShadowingInvalidReason =
   | 'empty-target'
   | 'no-speech'
   | 'too-short'
+  | 'unreliable-recognition'
   | 'invalid-timing';
 
 export type ShadowingScoreResult =
@@ -230,6 +231,12 @@ export function scoreShadowingAttempt(input: {
 
   const { cost, operations } = alignPronunciation(target, heard);
   const contentSimilarity = clamp(1 - cost / target.length);
+  if (heard.length > Math.max(target.length * 4, target.length + 40) && contentSimilarity < 0.25)
+    return {
+      valid: false,
+      reason: 'unreliable-recognition',
+      message: 'The transcription was too different or repetitive to score reliably. Please try again.',
+    };
   const timing = timingSimilarity(durationRatio);
   const contentScore = Math.round(contentSimilarity * 100);
   const timingScore = Math.round(timing * 100);
