@@ -109,6 +109,7 @@ export async function shadowingAttemptFeedback(
     if (!Array.isArray(result.suggestions) || !result.suggestions.length) throw new Error('No feedback');
     return result.suggestions.slice(0, 3);
   } catch {
+    if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
     return fallbackShadowingSuggestions(analysis);
   }
 }
@@ -129,6 +130,7 @@ export async function shadowingSessionSummary(signals: ShadowingSummarySignals, 
       keepWorking: result.keepWorking.trim(),
     };
   } catch {
+    if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
     return fallbackShadowingSummary(signals);
   }
 }
