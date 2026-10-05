@@ -56,12 +56,13 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
   const [status, setStatus] = useState<PlaybackState>('ready');
   const [ready, setReady] = useState(false);
   const [recording, setRecording] = useState(false);
-  const [shadowingScores, setShadowingScores] = useState<ScoredShadowingSection[]>([]);
+  const [shadowingScores, setShadowingScores] = useState<ScoredShadowingSection[]>(() =>
+    loadShadowingSession(session.lesson),
+  );
   const [shadowingSummary, setShadowingSummary] = useState<{
     whatWentWell: string;
     keepWorkingOn: string;
   } | null>(null);
-  const [shadowingSummaryLoading, setShadowingSummaryLoading] = useState(false);
   const shadowingSummaryRequest = useRef<AbortController | null>(null);
   const [playbackError, setPlaybackError] = useState('');
   const [elapsed, setElapsed] = useState(lesson.segments[session.index].start);
@@ -147,13 +148,6 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
         'your-turn': 'YOUR TURN',
         complete: 'WELL PRACTICED',
       }[status];
-  useEffect(() => {
-    setShadowingScores(loadShadowingSession(lesson));
-    setShadowingSummary(null);
-    setShadowingSummaryLoading(false);
-    shadowingSummaryRequest.current?.abort();
-  }, [lesson.id, lesson.segments]);
-
   useEffect(() => {
     const hydrate = () => {
       const prefs = loadPreferences();
@@ -259,14 +253,9 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
 
   useEffect(() => {
     shadowingSummaryRequest.current?.abort();
-    if (!finished || !overallShadowing) {
-      setShadowingSummaryLoading(false);
-      if (!finished) setShadowingSummary(null);
-      return;
-    }
+    if (!finished || !overallShadowing) return;
     const controller = new AbortController();
     shadowingSummaryRequest.current = controller;
-    setShadowingSummaryLoading(true);
     const fallback = shadowingSummaryFallback(overallShadowing);
     void requestShadowingSummary(
       overallShadowing,
@@ -279,9 +268,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
       .catch(() => {
         if (!controller.signal.aborted) setShadowingSummary(fallback);
       })
-      .finally(() => {
-        if (!controller.signal.aborted) setShadowingSummaryLoading(false);
-      });
+      .finally(() => undefined);
     return () => controller.abort();
   }, [finished, overallShadowing, shadowingScores]);
 
@@ -408,7 +395,6 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
     clearShadowingSession(lesson);
     setShadowingScores([]);
     setShadowingSummary(null);
-    setShadowingSummaryLoading(false);
     shadowingSummaryRequest.current?.abort();
     navigate(0, false);
   }, [lesson, navigate]);
@@ -610,7 +596,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
                   Scored {overallShadowing.scoredSections} of {overallShadowing.totalSections} shadowing sections
                 </p>
               </div>
-              {shadowingSummaryLoading && !shadowingSummary ? (
+              {!shadowingSummary ? (
                 <p className="small muted">Preparing your shadowing summary…</p>
               ) : shadowingSummary ? (
                 <div className="shadowing-overall-feedback">
