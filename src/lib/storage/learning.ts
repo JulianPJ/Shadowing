@@ -11,14 +11,15 @@ import {
   validateHistory,
 } from '../learner-progress';
 import type { LearnerHistory } from '../learner-types';
-import { reportStorageFailure, readStorage, writeStorage } from './browser';
+import { reportStorageFailure, readStorage, writeStorage, storageAccount } from './browser';
 export function writeLearnerHistory(history: LearnerHistory, protectedId?: string) {
   const existing = readStorage<{ schemaVersion?: unknown } | null>('learner-history', null);
   if (existing && typeof existing.schemaVersion === 'number' && existing.schemaVersion !== 1) {
     reportStorageFailure();
     return false;
   }
-  const compact = compactHistory(history, protectedId);
+  // Preserve immutable IDs in account caches; remote hydration must not double-count archives.
+  const compact = storageAccount() ? history : compactHistory(history, protectedId);
   if (
     compact.archives.length > ARCHIVE_LIMIT ||
     JSON.stringify(compact).length * 2 > HISTORY_BYTE_LIMIT

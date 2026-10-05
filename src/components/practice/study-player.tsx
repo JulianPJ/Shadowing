@@ -22,6 +22,7 @@ import {
   completeLesson,
   lessonCompleted,
   loadFavorites,
+  loadPreferences,
   type Preferences,
 } from '@/lib/storage';
 import { lessonMedia, sourceLabel, MEDIA_ACCEPT, validateMediaFile } from '@/lib/media';
@@ -106,6 +107,19 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
         'your-turn': 'YOUR TURN',
         complete: 'WELL PRACTICED',
       }[status];
+  useEffect(() => {
+    const hydrate = () => {
+      const prefs = loadPreferences();
+      setMode(prefs.mode);
+      setSpeed(prefs.speed);
+      setStudioMode(prefs.studioMode);
+      setFurigana(prefs.furigana);
+      setFavorites(loadFavorites(lesson));
+      setCompleted(lessonCompleted(lesson));
+    };
+    window.addEventListener('hibiki:sync-hydrated', hydrate);
+    return () => window.removeEventListener('hibiki:sync-hydrated', hydrate);
+  }, [lesson]);
   useEffect(() => {
     saveLesson(lesson, index);
   }, [lesson, index]);

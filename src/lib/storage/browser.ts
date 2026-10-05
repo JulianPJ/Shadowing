@@ -1,6 +1,37 @@
 export const PREFIX = 'hibiki:v1:';
 
 const unsaved = new Map<string, unknown>();
+// This is a cache selector, never authentication proof. Only /account/me enables remote writes.
+let account: string | null = (() => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const value = JSON.parse(localStorage.getItem(PREFIX + 'active-account') ?? 'null');
+    return typeof value === 'string' && /^[\w-]{1,200}$/.test(value) ? value : null;
+  } catch {
+    return null;
+  }
+})();
+export function storageAccount() {
+  return account;
+}
+const owned = (key: string) =>
+  /^(preferences$|history$|learner-history$|learner-migration|position:|favorites:|completion:|quiz-attempt|sync:)/.test(
+    key,
+  );
+function physicalKey(key: string) {
+  return account && owned(key) ? `account:${account}:${key}` : key;
+}
+export function setStorageAccount(next: string | null) {
+  if (account === next) return;
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event('hibiki:account-changing'));
+  account = next;
+  try {
+    localStorage.setItem(PREFIX + 'active-account', JSON.stringify(next));
+  } catch {
+    /* Keep the current visit usable. */
+  }
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event('hibiki:account-change'));
+}
 
 let storageFailed = false;
 
@@ -23,10 +54,17 @@ export function storageKeys(): string[] {
   } catch {
     reportStorageFailure();
   }
-  return [...keys];
+  return [...keys].flatMap((key) => {
+    if (key.startsWith('account:')) {
+      const prefix = `account:${account}:`;
+      return account && key.startsWith(prefix) ? [key.slice(prefix.length)] : [];
+    }
+    return account && owned(key) ? [] : [key];
+  });
 }
 
 export function readStorage<T>(key: string, fallback: T): T {
+  key = physicalKey(key);
   if (unsaved.has(key)) return structuredClone(unsaved.get(key)) as T;
   try {
     const value = localStorage.getItem(PREFIX + key);
@@ -37,6 +75,16 @@ export function readStorage<T>(key: string, fallback: T): T {
 }
 
 function persistStorage(key: string, value: unknown, onlyIfChanged: boolean) {
+  const logicalKey = key;
+  key = physicalKey(key);
+  const previous = readStorage(logicalKey, null);
+  const changed = JSON.stringify(previous) !== JSON.stringify(value);
+  const notify = () => {
+    if (changed && typeof window !== 'undefined')
+      window.dispatchEvent(
+        new CustomEvent('hibiki:local-write', { detail: { key: logicalKey, previous, value } }),
+      );
+  };
   try {
     const serialized = JSON.stringify(value);
     if (onlyIfChanged && !unsaved.has(key)) {
@@ -48,10 +96,12 @@ function persistStorage(key: string, value: unknown, onlyIfChanged: boolean) {
     }
     localStorage.setItem(PREFIX + key, serialized);
     unsaved.delete(key);
+    notify();
     return true;
   } catch {
     unsaved.set(key, structuredClone(value));
     reportStorageFailure();
+    notify();
     return false; /* Playback still works. */
   }
 }

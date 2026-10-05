@@ -6,6 +6,7 @@ import { ArrowRight } from 'lucide-react';
 import { Header, Footer, HelpDialog } from './chrome';
 import { identityKey } from '@/lib/learner-progress';
 import { timestamp } from '@/lib/youtube';
+import { useAccount } from './account';
 
 function practiceTime(seconds: number) {
   if (seconds < 60) return seconds > 0 ? 'Less than a minute' : 'No time recorded yet';
@@ -22,6 +23,7 @@ function activityDate(value: string) {
       });
 }
 export function LearnerProgress() {
+  const account = useAccount();
   const { profile, available, warning } = useLearnerProfile();
   const [help, setHelp] = useState(false);
   return (
@@ -31,8 +33,9 @@ export function LearnerProgress() {
         <span className="eyebrow">YOUR PRACTICE, OVER TIME</span>
         <h1>Your progress</h1>
         <p className="progress-intro">
-          Saved on this device, in this browser. A history of your practice and the moments you
-          returned to.
+          {account.user
+            ? 'Your account progress, saved locally as you practise and synced across devices.'
+            : 'Saved on this device, in this browser. A history of your practice and the moments you returned to.'}
         </p>
         {warning ? (
           <p className="error-message" role="status">

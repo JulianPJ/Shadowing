@@ -1,6 +1,6 @@
 # Shared content storage
 
-Cloudflare D1 is Hibiki's canonical shared structured store and the planned primary relational database for future application data. It uses native `env.HIBIKI_DB`, injected by `cloudflare-worker.js`; request handlers never use D1 REST or database tokens. `cloudflare.config.ts` uses the installed `cf/config` API: `bindings.d1({ name, id })`.
+Cloudflare D1 is Hibiki's primary production application database, including the shared content cache and authenticated accounts/learner state. It uses native `env.HIBIKI_DB`, injected by `cloudflare-worker.js`; request handlers never use D1 REST or database tokens. `cloudflare.config.ts` uses the installed `cf/config` API: `bindings.d1({ name, id })`.
 
 Production database: `hibiki`, ID `cf88fe7d-16bb-4f58-8839-2b27718a7847`, account `faa2e940eaa3b7c4077ed18f34b4e653`, binding `HIBIKI_DB` on Worker `shadowing`.
 
@@ -35,7 +35,7 @@ The storage-safe media representation contains schema/content identity, media ty
 
 D1 lookup/save failures log safe `d1.transcript.lookup_failed`, `d1.transcript.save_failed`, `d1.artifact.lookup_failed` or `d1.artifact.save_failed` events, with artifact type where useful. No exception message, transcript, quiz, URL, relay/DeepL secret or learner history is logged by storage code. Provider acquisition/inference proceeds on failures, and successful results are returned even if persistence fails. D1 is an optimization, not a prerequisite for playback.
 
-All anonymous learner data stays browser-local: lessons, positions, recent lessons, preferences, reveal state, favorites, translation cache, completion, quiz/difficulty L1, `loadQuizAttempt`/`saveQuizAttempt`, learner history, practice sessions and archives. No existing localStorage is uploaded, invalidated or migrated to D1. Browser recordings remain local/in-memory.
+Anonymous learner data stays browser-local. Authenticated users additionally synchronize eligible learner state to D1; see [accounts, privacy, tables, merge rules and setup](accounts-and-sync.md). Anonymous keys include: lessons, positions, recent lessons, preferences, reveal state, favorites, translation cache, completion, quiz/difficulty L1, `loadQuizAttempt`/`saveQuizAttempt`, learner history, practice sessions and archives. Existing anonymous localStorage is uploaded only as eligible compact metadata after an explicit first-sign-in import choice. Private transcript/media/translation payloads are never uploaded or invalidated. Browser recordings remain local/in-memory.
 
 ## Migration and deployment workflow
 
@@ -62,8 +62,8 @@ The connected Cloudflare build trigger uses `npm run deploy:vinext`, which expan
 
 ## Future application data
 
-Later phases can add users/authentication identities, sessions, subscriptions/entitlements, lesson progress, practice sessions, quiz attempts, saved vocabulary, pronunciation results and preferences. Application-owned records should reference a stable internal Hibiki user ID. Evaluate a then-current D1-compatible auth layer (for example Better Auth), supporting email, Google sign-in and account linking, and let it own its framework-specific auth tables. None are created here; no bespoke password system or anonymous fake user ID exists.
+Later phases can add users/authentication identities, sessions, subscriptions/entitlements, lesson progress, practice sessions, quiz attempts, saved vocabulary, pronunciation results and preferences. Application-owned records should reference a stable internal Hibiki user ID. Evaluate a then-current D1-compatible auth layer (for example Better Auth), supporting email, Google sign-in and account linking, and let it own its framework-specific auth tables. Accounts and learner tables are now added through `0002_auth.sql` and `0003_user_sync.sql`; see [accounts and sync](accounts-and-sync.md). There is no bespoke password system or anonymous fake user ID.
 
 Payment processors remain authoritative for subscriptions; D1 can hold entitlement metadata, never card details. The transcript contract leaves room for owner-specific private storage and future authenticated retrieval, but this repository does not upload it.
 
-Concurrent cache misses can both infer before saving; uniqueness prevents duplicate logical rows. Future single-flight could use a Durable Object coordinator keyed by contentKey + transcriptKey + artifactType to share one inference among waiters. No such coordinator, additional storage service, accounts, billing, hosted learner sync, vocabulary saving, pronunciation persistence, remote media downloads or AI subtitle generation is implemented in this phase.
+Concurrent cache misses can both infer before saving; uniqueness prevents duplicate logical rows. Future single-flight could use a Durable Object coordinator keyed by contentKey + transcriptKey + artifactType to share one inference among waiters. No such coordinator, additional storage service, billing, vocabulary saving, pronunciation persistence, remote media downloads or AI subtitle generation is implemented in this phase. Accounts and eligible learner sync are implemented separately as documented above.

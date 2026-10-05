@@ -9,6 +9,7 @@ import {
 } from '@/lib/learner-storage';
 import { progressStorageFailed } from '@/lib/storage';
 import type { LearnerProfile } from '@/lib/learner-types';
+import { accountBookmarks } from '@/lib/sync/client';
 
 export function useLearnerProfile() {
   const [profile, setProfile] = useState<LearnerProfile | null>(null);
@@ -33,6 +34,21 @@ export function useLearnerProfile() {
               ...history.archives.map((a) => a.lesson),
             ];
             const bookmarks = await currentBookmarks(identities, history);
+            for (const remote of accountBookmarks()) {
+              let snapshot = bookmarks.find(
+                (b) => identityKey(b.lesson) === identityKey(remote.lesson),
+              );
+              if (!snapshot) {
+                snapshot = { lesson: remote.lesson, sections: [] };
+                bookmarks.push(snapshot);
+              }
+              if (!snapshot.sections.some((s) => s.sectionId === remote.sectionId))
+                snapshot.sections.push({
+                  sectionId: remote.sectionId,
+                  start: remote.start,
+                  end: remote.end,
+                });
+            }
             const next = aggregateProfile(
               history,
               loadQuizHistory(),
@@ -61,9 +77,14 @@ export function useLearnerProfile() {
       if (event.key === null || event.key.startsWith('hibiki:v1:')) void refresh();
     };
     window.addEventListener('storage', change);
+    const synced = () => void refresh();
+    window.addEventListener('hibiki:sync-hydrated', synced);
+    window.addEventListener('hibiki:account-change', synced);
     return () => {
       active = false;
       window.removeEventListener('storage', change);
+      window.removeEventListener('hibiki:sync-hydrated', synced);
+      window.removeEventListener('hibiki:account-change', synced);
     };
   }, []);
   return { profile, available, warning };

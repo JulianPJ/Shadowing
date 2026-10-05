@@ -1,5 +1,10 @@
 'use client';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { storageAccount } from '@/lib/storage/browser';
+const subscribeAccount = (callback: () => void) => {
+  window.addEventListener('hibiki:account-change', callback);
+  return () => window.removeEventListener('hibiki:account-change', callback);
+};
 import type { Lesson, Segment } from '@/lib/types';
 import type { PracticeSession } from '@/lib/learner-types';
 import {
@@ -40,6 +45,7 @@ export function usePracticeProgress(
   },
   readPlaybackTime: () => number,
 ) {
+  const scope = useSyncExternalStore(subscribeAccount, storageAccount, () => null);
   const initial = useRef(lesson);
   const mediaTime = useRef(readPlaybackTime);
   const controller = useRef<Controller | null>(null);
@@ -97,7 +103,7 @@ export function usePracticeProgress(
       token(session.id);
     }
     function flush(end = false) {
-      if (!session) return;
+      if (!session || storageAccount() !== scope) return;
       add(clock.sample(performance.now()));
       if (end) session.endedAt = session.updatedAt;
       if (checkpoint.flush(performance.now(), () => savePracticeSession(session!)) === false)
@@ -170,6 +176,11 @@ export function usePracticeProgress(
       setWarning(true);
     }
     window.addEventListener('hibiki:storage-warning', warningEvent);
+    const accountChanging = () => {
+      flush(true);
+      controller.current = null;
+    };
+    window.addEventListener('hibiki:account-changing', accountChanging);
     void (async () => {
       await migrateLearnerHistory();
       const key = await transcriptKey(initial.current);
@@ -214,8 +225,9 @@ export function usePracticeProgress(
       window.removeEventListener('pagehide', pagehide);
       window.removeEventListener('pageshow', pageshow);
       window.removeEventListener('hibiki:storage-warning', warningEvent);
+      window.removeEventListener('hibiki:account-changing', accountChanging);
     };
-  }, []);
+  }, [scope]);
   useEffect(() => {
     send((c) =>
       c.update({ playing: state.playing, recording: state.recording, excluded: state.excluded }),

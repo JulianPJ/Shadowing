@@ -6,6 +6,7 @@ import { Miniflare, convertV4MiniflareOptions, Response } from 'miniflare';
 
 const root = path.resolve('.cloudflare/output/v0/workers/default/bundle');
 let captions = 0;
+const emails = [];
 const cues = Array.from({ length: 6 }, (_, i) => ({
   start: i * 8,
   end: i * 8 + 7,
@@ -23,11 +24,19 @@ const options = convertV4MiniflareOptions({
       d1Databases: { HIBIKI_DB: 'runtime-test' },
       serviceBindings: { AI: 'ai-mock' },
       bindings: {
+        AUTH_BASE_URL: 'https://example.com',
+        AUTH_SECRET: 'deterministic-worker-test-secret-32-characters',
+        RESEND_API_KEY: 'mock-email-key',
+        AUTH_EMAIL_FROM: 'Hibiki <noreply@example.com>',
         YOUTUBE_CAPTION_RELAY_URL: 'https://relay.example',
         YOUTUBE_CAPTION_RELAY_TOKEN: 'mock-test-token',
       },
       outboundService: async (request) => {
         const url = new URL(request.url);
+        if (url.hostname === 'api.resend.com') {
+          emails.push(await request.json());
+          return Response.json({ id: 'mock-message' });
+        }
         if (url.hostname === 'www.youtube.com' && url.pathname === '/oembed')
           return Response.json({ title: 'Runtime fixture', author_name: 'Mock provider' });
         if (url.hostname === 'relay.example' && url.pathname === '/captions') {
@@ -80,13 +89,94 @@ options.workers[0].config.manifest = { mainModule: 'index.js', modulesRoot: root
 const mf = new Miniflare(options);
 try {
   const db = await mf.getD1Database('HIBIKI_DB', 'shadowing');
-  const migration = await readFile('migrations/0001_shared_content.sql', 'utf8');
-  await db.batch(
-    migration
-      .split(';')
-      .map((s) => s.trim())
-      .filter(Boolean)
-      .map((s) => db.prepare(s)),
+  for (const file of (await readdir('migrations')).sort()) {
+    const migration = await readFile(`migrations/${file}`, 'utf8');
+    await db.batch(
+      migration
+        .split(';')
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .map((s) => db.prepare(s)),
+    );
+  }
+  const register = await mf.dispatchFetch('https://example.com/api/auth/sign-up/email', {
+    method: 'POST',
+    headers: {
+      Origin: 'https://example.com',
+      'Content-Type': 'application/json',
+      'cf-connecting-ip': '192.0.2.10',
+    },
+    body: JSON.stringify({
+      email: 'runtime@example.com',
+      password: 'runtime test password',
+      name: 'Runtime learner',
+      callbackURL: '/account',
+    }),
+  });
+  assert.equal(register.status, 200, `Worker registration failed (status ${register.status})`);
+  for (let i = 0; i < 50 && !emails.length; i++)
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  assert.equal(emails.length, 1);
+  const link = emails[0].text.slice(emails[0].text.indexOf('https://'));
+  const verification = await mf.dispatchFetch(link, { redirect: 'manual' });
+  assert.equal(verification.status, 302);
+  const cookie = verification.headers
+    .getSetCookie()
+    .map((c) => c.split(';')[0])
+    .join('; ');
+  assert.ok(cookie.includes('session_token='));
+  const me = await mf.dispatchFetch('https://example.com/api/account/me', {
+    headers: { Cookie: cookie },
+  });
+  const identity = await me.json();
+  assert.equal(identity.user.email, 'runtime@example.com');
+  const sync = {
+    preferences: {
+      schemaVersion: 1,
+      mode: 'continuous',
+      speed: 0.75,
+      studioMode: true,
+      furigana: true,
+      updatedAt: new Date().toISOString(),
+    },
+    lessons: [],
+    sessions: [],
+    attempts: [],
+    bookmarks: [],
+    difficulties: [],
+    archives: [],
+  };
+  const saved = await mf.dispatchFetch('https://example.com/api/sync/push', {
+    method: 'POST',
+    headers: { Cookie: cookie, Origin: 'https://example.com', 'Content-Type': 'application/json' },
+    body: JSON.stringify(sync),
+  });
+  assert.equal(saved.status, 200);
+  assert.equal(
+    (
+      await db
+        .prepare('SELECT furigana FROM user_preferences WHERE user_id=?')
+        .bind(identity.user.id)
+        .first()
+    ).furigana,
+    1,
+  );
+  const signedOut = await mf.dispatchFetch('https://example.com/api/auth/sign-out', {
+    method: 'POST',
+    headers: { Cookie: cookie, Origin: 'https://example.com', 'Content-Type': 'application/json' },
+    body: '{}',
+  });
+  assert.equal(signedOut.status, 200);
+  assert.equal(
+    (
+      await mf.dispatchFetch('https://example.com/api/sync/bootstrap', {
+        headers: { Cookie: cookie },
+      })
+    ).status,
+    401,
+  );
+  console.log(
+    'Built Worker + D1: framework password hashing, email verification, cookie session, learner sync and sign-out passed with mocked email delivery.',
   );
   let lesson;
   for (let i = 0; i < 2; i++) {

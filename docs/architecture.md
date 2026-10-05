@@ -14,6 +14,9 @@ Hibiki runs on Cloudflare Workers via vinext. Standard Next.js is also supported
 | Progress page loading and cross-tab refresh | `src/components/use-learner-profile.ts` |
 | Learner validation, sessions, retention, aggregation, migration | `src/lib/learner/` |
 | Browser persistence, lessons, preferences, learning records | `src/lib/storage/` |
+| Framework-owned authentication, cookie sessions and local Next adapter | `src/lib/auth/` |
+| Account sync contract, validation, merge, D1 repository and browser hydration | `src/lib/sync/` |
+| Optional account UI and first-login import prompt | `src/components/account.tsx`, `src/components/auth-form.tsx` |
 | Transcript validation and identity | `src/lib/transcript.ts`, `src/lib/transcript-validation.ts`, `src/lib/hash.ts` |
 | Quiz questions, documents and attempts | `src/lib/quiz/` |
 | Quiz configuration, prompts, selection and provider adapters | `src/lib/providers/quiz/` |

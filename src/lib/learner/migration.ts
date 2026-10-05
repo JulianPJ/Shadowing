@@ -13,6 +13,7 @@ import type { LearnerHistory } from '../learner-types';
 import { loadLearnerHistory, savePracticeSession } from './persistence';
 import { loadQuizHistory } from './quiz-history';
 import { availableLesson } from './bookmarks';
+import { storageAccount } from '../storage/browser';
 export async function legacyId(key: string) {
   const hex = await sha256(`hibiki-legacy-v1:${key}`);
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
@@ -22,6 +23,8 @@ export async function legacyId(key: string) {
 // up old data not encountered before; deterministic IDs and a per-revision marker
 // prevent fabrication or duplicate backfill. No legacy active time is invented.
 export async function migrateLearnerHistory(): Promise<LearnerHistory> {
+  // Account caches must never backfill from unrelated anonymous/private lessons.
+  if (storageAccount()) return loadLearnerHistory();
   const ids = new Set(
     storageKeys()
       .filter((k) => k.startsWith('lesson:'))
@@ -45,6 +48,7 @@ export async function migrateLearnerHistory(): Promise<LearnerHistory> {
   if (storageKeys().some((k) => /^(completion|favorites|position|reveal):demo(?:$|:)/.test(k)))
     ids.add('demo');
   for (const id of ids) {
+    if (readStorage(`lesson-visibility:${id}`, null) === 'account-only') continue;
     const lesson = availableLesson(id);
     if (!lesson) continue;
     const key = await transcriptKey(lesson),
