@@ -32,6 +32,7 @@ export function VoiceRecorder({
   const [requesting, setRequesting] = useState(false);
   const [recorded, setRecorded] = useState('');
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
+  const [recordedDuration, setRecordedDuration] = useState(0);
   const [error, setError] = useState('');
   const [analysisError, setAnalysisError] = useState('');
   const [analysing, setAnalysing] = useState(false);
@@ -44,6 +45,7 @@ export function VoiceRecorder({
   const mounted = useRef(false);
   const requestId = useRef(0);
   const analysisRequest = useRef<AbortController | null>(null);
+  const recordingStartedAt = useRef(0);
   const callback = useRef(onRecording);
 
   useEffect(() => {
@@ -121,6 +123,11 @@ export function VoiceRecorder({
         objectUrl.current = url;
         setRecorded(url);
         setRecordedBlob(blob);
+        setRecordedDuration(
+          recordingStartedAt.current
+            ? Math.max(0, (performance.now() - recordingStartedAt.current) / 1000)
+            : 0,
+        );
         setRecording(false);
         callback.current(false);
       };
@@ -130,6 +137,7 @@ export function VoiceRecorder({
         setRecording(false);
         callback.current(false);
       };
+      recordingStartedAt.current = performance.now();
       instance.start();
       onAttempt?.();
       setSeconds(0);
@@ -160,6 +168,7 @@ export function VoiceRecorder({
     try {
       const transcription = await transcribeShadowingRecording(
         recordedBlob,
+        recordedDuration,
         AbortSignal.any([controller.signal, AbortSignal.timeout(60000)]),
       );
       const scored = await scoreRecognizedShadowing(
@@ -197,6 +206,7 @@ export function VoiceRecorder({
     objectUrl.current = '';
     setRecorded('');
     setRecordedBlob(null);
+    setRecordedDuration(0);
     setAnalysisError('');
     setAnalysing(false);
   }
