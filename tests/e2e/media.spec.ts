@@ -102,7 +102,7 @@ test('no-captions → own transcript retains link, identity, title and author wi
   );
   await page.getByRole('button', { name: 'Upload own subtitles', exact: true }).click();
   await page.getByLabel('Paste timestamped transcript').fill(transcript);
-  await page.getByRole('button', { name: 'Generate subtitles & start', exact: true }).click();
+  await page.getByRole('button', { name: 'Start practicing', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Captionless video' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Listen', exact: true })).toBeEnabled();
   const lesson = await page.evaluate(
@@ -158,7 +158,8 @@ test('captionless link generates subtitles from attached media while preserving 
     mimeType: 'video/mp4',
     buffer: fs.readFileSync('public/demo.mp4'),
   });
-  await page.getByRole('button', { name: 'Start practicing', exact: true }).click();
+  expect(transcriptions).toBe(0);
+  await page.getByRole('button', { name: 'Generate subtitles & start', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Captionless video' })).toBeVisible();
   const lesson = await page.evaluate(
     (key) => JSON.parse(localStorage.getItem(key)!),
