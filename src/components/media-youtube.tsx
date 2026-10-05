@@ -93,6 +93,26 @@ export const YouTubeMedia = forwardRef<MediaHandle, MediaPlayerProps>(function Y
       seek(time) {
         youtube.current?.seekTo(time, true);
       },
+      async seekSettled(time) {
+        const player = youtube.current;
+        if (!player) return;
+        player.seekTo(time, true);
+        const startedAt = performance.now();
+        await new Promise<void>((resolve) => {
+          const check = () => {
+            const current = player.getCurrentTime();
+            if (
+              Math.abs(current - time) < 0.06 ||
+              performance.now() - startedAt >= 900
+            ) {
+              resolve();
+              return;
+            }
+            window.setTimeout(check, 20);
+          };
+          window.setTimeout(check, 20);
+        });
+      },
       time() {
         return youtube.current?.getCurrentTime() ?? 0;
       },
