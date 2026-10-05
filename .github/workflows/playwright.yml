@@ -45,14 +45,15 @@ jobs:
 
       - name: Start application
         run: |
-          npm start > /tmp/hibiki-next.log 2>&1 &
-          echo $! > /tmp/hibiki-next.pid
+          mkdir -p artifacts
+          npm start > artifacts/next-server.log 2>&1 &
+          echo $! > artifacts/next-server.pid
 
       - name: Wait for application
         shell: bash
         run: |
           for attempt in {1..90}; do
-            if curl --fail --silent --show-error http://127.0.0.1:3000/ > /dev/null; then
+            if curl --fail --silent --show-error http://localhost:3000/ > /dev/null; then
               exit 0
             fi
             sleep 1
@@ -73,6 +74,5 @@ jobs:
             test-results/
             playwright-report/
             artifacts/
-            /tmp/hibiki-next.log
           if-no-files-found: ignore
           retention-days: 7
