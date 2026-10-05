@@ -108,7 +108,7 @@ test('shadowing transcription API rejects cross-origin, non-audio, tiny audio, a
   const silence = await handleShadowingTranscriptionRequest(
     new Request('https://hibiki.example/api/shadowing/transcribe', {
       method: 'POST',
-      headers: { 'Content-Type': 'audio/webm' },
+      headers: { 'Content-Type': 'audio/webm', 'X-Hibiki-Recording-Duration': '1.5' },
       body: new Uint8Array(512),
     }),
     provider,
