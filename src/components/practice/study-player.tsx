@@ -113,7 +113,10 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
     shadowingSignals && shadowingScores.summary?.fingerprint === shadowingSignals.fingerprint
       ? shadowingScores.summary
       : undefined;
-  const readPlaybackTime = useCallback(() => media.current?.time() ?? 0, []);
+  const readPlaybackTime = useCallback(
+    () => Math.max(0, (media.current?.time() ?? 0) - playbackOffsetSeconds),
+    [playbackOffsetSeconds],
+  );
   const progress = usePracticeProgress(
     lesson,
     {
