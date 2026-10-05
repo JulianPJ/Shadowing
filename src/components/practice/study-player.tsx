@@ -149,9 +149,21 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
       const next = Math.min(Math.max(nextIndex, 0), lesson.segments.length - 1);
       const target = lesson.segments[next];
       if (!evidenceReplay) recordSignal(target, 'navigate');
+      const currentTime = media.current?.time();
+      const alreadyAtNextBoundary =
+        !evidenceReplay &&
+        status === 'your-turn' &&
+        next === index + 1 &&
+        typeof currentTime === 'number' &&
+        Number.isFinite(currentTime) &&
+        Math.abs(currentTime - target.start) < 0.04;
       media.current?.pause();
-      media.current?.seek(target.start);
-      seeking.current = { target: target.start, deadline: Date.now() + 4000 };
+      if (alreadyAtNextBoundary) {
+        seeking.current = null;
+      } else {
+        media.current?.seek(target.start);
+        seeking.current = { target: target.start, deadline: Date.now() + 4000 };
+      }
       setIndex(next);
       setElapsed(target.start);
       setStatus(play ? 'listening' : 'ready');
@@ -164,7 +176,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
           setPlaybackError('Playback didn’t start. Press play inside the video, then try again.');
         });
     },
-    [lesson.segments, index, resetTranslation, recordSignal],
+    [lesson.segments, index, status, resetTranslation, recordSignal],
   );
   const replaySection = useCallback(() => {
     recordSignal(segment, 'replay');
