@@ -34,18 +34,27 @@ async function responseJson<T>(response: Response): Promise<T & { error?: string
   }
 }
 
-export async function transcribeShadowingRecording(blob: Blob, signal: AbortSignal) {
+export async function transcribeShadowingRecording(
+  blob: Blob,
+  recordedDuration: number,
+  signal: AbortSignal,
+) {
   if (!blob.size) throw new Error('Record the section before analysing it.');
   if (blob.size > SHADOWING_RECORDING_LIMIT)
     throw new Error('That recording is too large to analyse. Record the section again.');
   if (blob.type && !blob.type.startsWith('audio/'))
     throw new Error('This recording format is not supported for analysis.');
+  if (!Number.isFinite(recordedDuration) || recordedDuration < 0.2)
+    throw new Error('That recording was too short to analyse. Try the full section again.');
+  if (recordedDuration > 65)
+    throw new Error('Recordings longer than one minute cannot be analysed. Record the section again.');
   const response = await fetch('/api/shadowing/transcribe', {
     method: 'POST',
     signal,
     headers: {
       'Content-Type': blob.type || 'audio/webm',
       'X-Hibiki-Shadowing': 'attempt',
+      'X-Hibiki-Recording-Duration': recordedDuration.toFixed(3),
     },
     body: blob,
   });
