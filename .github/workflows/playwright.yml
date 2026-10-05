@@ -22,14 +22,14 @@ jobs:
     timeout-minutes: 25
     env:
       CI: true
-      PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
+      PLAYWRIGHT_BASE_URL: http://localhost:3000
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Use Node.js 24
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: npm
@@ -38,7 +38,7 @@ jobs:
         run: npm ci
 
       - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps --no-shell chromium
 
       - name: Build application
         run: npm run build
@@ -58,7 +58,7 @@ jobs:
             sleep 1
           done
           echo "Application did not become ready in time."
-          cat /tmp/hibiki-next.log || true
+          cat artifacts/next-server.log || true
           exit 1
 
       - name: Run Playwright tests
@@ -66,7 +66,7 @@ jobs:
 
       - name: Upload Playwright artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: playwright-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
