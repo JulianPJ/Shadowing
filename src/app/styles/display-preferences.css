@@ -129,20 +129,19 @@ body.studio-active .site-footer {
 .studio-mode .practice-current-stack {
   grid-column: 2;
   grid-row: 1;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
   gap: 10px;
   min-width: 0;
+  height: 100%;
   max-height: calc(100vh - 122px);
-  overflow: auto;
-  scrollbar-width: thin;
-  scrollbar-color: #566259 transparent;
+  overflow: hidden;
 }
 .studio-mode .current-card {
   height: auto;
+  min-height: 0;
   max-height: none;
-  overflow: visible;
-  flex: 0 0 auto;
+  overflow: auto;
   padding: 18px 17px 16px;
   border: 1px solid #313a33;
   border-radius: 8px;
@@ -269,12 +268,16 @@ body.studio-active .site-footer {
   grid-column: 1 / -1;
 }
 .studio-mode .recording-panel {
-  flex: 0 0 auto;
+  min-height: 0;
+  max-height: min(390px, 46vh);
+  overflow: auto;
   padding: 14px 17px 16px;
   border: 1px solid #313a33;
   border-radius: 8px;
   background: #171b18;
   color: #f1efe8;
+  scrollbar-width: thin;
+  scrollbar-color: #566259 transparent;
 }
 .studio-mode .recording-panel audio {
   filter: invert(0.88) hue-rotate(180deg);
