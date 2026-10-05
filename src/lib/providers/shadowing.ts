@@ -133,23 +133,32 @@ export function createWorkersAiShadowingProvider(
           'Shadowing analysis is unavailable right now. Your recording was not saved.',
         );
       }
+      const rawText = typeof result.text === 'string' ? result.text.trim() : '';
+      const rawVtt = typeof result.vtt === 'string' ? result.vtt.trim() : '';
+      // Whisper can legitimately return a header-only WebVTT document for silence.
+      // Treat that as no speech before parseSubtitles rejects the empty cue set.
+      if (!rawText && (!rawVtt || !rawVtt.includes('-->')))
+        throw new ShadowingProviderError(
+          'no-speech',
+          'No meaningful Japanese speech was recognised. Try again a little closer to the microphone.',
+        );
+
       let cues;
       try {
-        cues = typeof result.vtt === 'string' && result.vtt.trim() ? parseSubtitles(result.vtt) : [];
+        cues = rawVtt ? parseSubtitles(rawVtt) : [];
       } catch {
         throw new ShadowingProviderError(
           'malformed',
           'The recording could not be transcribed reliably. Please try again.',
         );
       }
-      const recognizedText =
-        typeof result.text === 'string' && result.text.trim()
-          ? result.text.trim()
-          : cues.map((cue) => cue.text).join('');
+      const recognizedText = rawText || cues.map((cue) => cue.text).join('');
       if (!recognizedText || !cues.length)
         throw new ShadowingProviderError(
-          'no-speech',
-          'No meaningful Japanese speech was recognised. Try again a little closer to the microphone.',
+          rawText ? 'malformed' : 'no-speech',
+          rawText
+            ? 'The recording could not be transcribed reliably. Please try again.'
+            : 'No meaningful Japanese speech was recognised. Try again a little closer to the microphone.',
         );
       return {
         recognizedText: recognizedText.slice(0, 5000),
