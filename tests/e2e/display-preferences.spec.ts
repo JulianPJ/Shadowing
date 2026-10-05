@@ -269,11 +269,15 @@ test('Studio desktop/mobile/tablet, long ruby text, translations and screenshots
   await page.screenshot({ path: 'artifacts/studio-desktop-plain.png', fullPage: true });
   const video = await page.locator('.media-frame').boundingBox(),
     main = await page.locator('.practice-main').boundingBox(),
-    current = await page.locator('.current-card').boundingBox();
+    current = await page.locator('.current-card').boundingBox(),
+    recording = await page.locator('.recording-panel').boundingBox();
   expect(video!.width / main!.width).toBeGreaterThan(0.68);
   expect(video!.width / video!.height).toBeGreaterThanOrEqual(16 / 9 - 0.02);
   expect(current!.x).toBeGreaterThan(video!.x + video!.width - 2);
   expect(Math.abs(current!.y - video!.y)).toBeLessThan(3);
+  expect(Math.abs(recording!.x - current!.x)).toBeLessThan(3);
+  expect(Math.abs(recording!.width - current!.width)).toBeLessThan(3);
+  expect(recording!.y).toBeGreaterThanOrEqual(current!.y + current!.height - 2);
   await expect(page.getByTestId('current-japanese')).toBeVisible();
   await furigana(page).click();
   await expect(page.locator('#current-japanese ruby')).not.toHaveCount(0);
