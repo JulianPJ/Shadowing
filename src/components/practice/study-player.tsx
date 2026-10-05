@@ -433,11 +433,15 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
           recordingDurationSeconds,
           controller.signal,
         );
+        const recognizedSpeechDurationSeconds = Math.max(
+          0,
+          transcription.speechEnd - transcription.speechStart,
+        );
         const analysis = await deterministicShadowingAnalysis({
           targetText: target.japanese,
           recognizedText: transcription.recognizedText,
           referenceDurationSeconds,
-          recordingDurationSeconds,
+          recordingDurationSeconds: recognizedSpeechDurationSeconds,
         });
         const suggestions = await shadowingAttemptFeedback(analysis, controller.signal);
         if (controller.signal.aborted) return false;
