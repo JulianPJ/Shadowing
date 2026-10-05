@@ -16,7 +16,7 @@ export const worker = defineWorker({
     ASSETS: bindings.assets(),
     IMAGES: bindings.images(),
     AI: bindings.ai(),
-    HIBIKI_DB: bindings.d1({ name: 'hibiki', id: 'cf88fe7d-16bb-4f58-8839-2b27718a7847' }),
+    HIBIKI_DB: bindings.d1({ id: 'cf88fe7d-16bb-4f58-8839-2b27718a7847' }),
     DEEPL_AUTH_KEY: bindings.secret(),
     YOUTUBE_CAPTION_RELAY_URL: bindings.secret(),
     YOUTUBE_CAPTION_RELAY_TOKEN: bindings.secret(),
