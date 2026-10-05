@@ -24,7 +24,7 @@ function exactAnalysis(): ShadowingScoreAnalysis {
     speechDuration: 4,
   });
   assert.equal(result.valid, true);
-  if (!result.valid) throw new Error(result.message);
+  if (!result.valid) throw new Error('Expected a valid shadowing score.');
   return result.analysis;
 }
 
