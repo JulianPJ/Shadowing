@@ -23,6 +23,18 @@ function sameOrigin(request: Request) {
   return !origin || origin === new URL(request.url).origin;
 }
 
+function looksLikeAudio(bytes: Uint8Array<ArrayBuffer>, type: string) {
+  const ascii = (start: number, end: number) =>
+    String.fromCharCode(...bytes.slice(start, end));
+  if (type === 'audio/webm')
+    return bytes.length >= 4 && bytes[0] === 0x1a && bytes[1] === 0x45 && bytes[2] === 0xdf && bytes[3] === 0xa3;
+  if (type === 'audio/ogg') return bytes.length >= 4 && ascii(0, 4) === 'OggS';
+  if (type === 'audio/wav')
+    return bytes.length >= 12 && ascii(0, 4) === 'RIFF' && ascii(8, 12) === 'WAVE';
+  if (type === 'audio/mp4') return bytes.length >= 12 && ascii(4, 8) === 'ftyp';
+  return false;
+}
+
 function finite(value: unknown, min: number, max: number) {
   return typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max;
 }
@@ -212,6 +224,11 @@ export async function handleShadowingTranscriptionRequest(
     throw error;
   }
   if (!bytes.byteLength) return json({ code: 'empty-audio', error: 'Record the section first.' }, 400);
+  if (!looksLikeAudio(bytes, type))
+    return json(
+      { code: 'invalid-audio', error: 'This recording could not be read as supported audio.' },
+      415,
+    );
 
   const started = Date.now();
   try {
