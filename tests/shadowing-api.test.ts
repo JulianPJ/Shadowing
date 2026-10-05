@@ -13,6 +13,8 @@ import {
 } from '../src/lib/providers/shadowing';
 import type { ShadowingSummarySignals } from '../src/lib/shadowing-session';
 
+const webmHeader = new Uint8Array([0x1a, 0x45, 0xdf, 0xa3, 0x9f, 0x42]);
+
 test('Whisper scoring transcription is Japanese/VAD and never receives the target sentence as a prompt', async () => {
   const seen: Record<string, unknown>[] = [];
   const provider = createWorkersAiShadowingProvider({
@@ -79,7 +81,7 @@ test('transcription endpoint validates origin, audio type, duration and size bef
         'Content-Type': 'audio/webm',
         'X-Hibiki-Recording-Duration-Ms': '2000',
       },
-      body: new Uint8Array([1, 2, 3]),
+      body: webmHeader,
     }),
     wrapped,
   );
@@ -91,7 +93,7 @@ test('transcription endpoint validates origin, audio type, duration and size bef
         'Content-Type': 'audio/webm',
         'X-Hibiki-Recording-Duration-Ms': '200',
       },
-      body: new Uint8Array([1, 2, 3]),
+      body: webmHeader,
     }),
     wrapped,
   );
@@ -108,6 +110,19 @@ test('transcription endpoint validates origin, audio type, duration and size bef
     wrapped,
   );
   assert.equal(badType.status, 415);
+  const mislabeled = await handleShadowingTranscriptionRequest(
+    new Request('https://hibiki.example/api/shadowing/transcribe', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'audio/webm',
+        'X-Hibiki-Recording-Duration-Ms': '2000',
+      },
+      body: new Uint8Array([1, 2, 3, 4]),
+    }),
+    wrapped,
+  );
+  assert.equal(mislabeled.status, 415);
+  assert.equal((await mislabeled.json()).code, 'invalid-audio');
   assert.equal(calls, 0);
 });
 
@@ -119,7 +134,7 @@ test('successful recording returns only structured transcription metadata', asyn
         'Content-Type': 'audio/webm;codecs=opus',
         'X-Hibiki-Recording-Duration-Ms': '2000',
       },
-      body: new Uint8Array([1, 2, 3]),
+      body: webmHeader,
     }),
     mockProvider(),
   );
@@ -145,7 +160,7 @@ test('silence/no recognised speech returns retry state rather than a score', asy
         'Content-Type': 'audio/webm',
         'X-Hibiki-Recording-Duration-Ms': '2000',
       },
-      body: new Uint8Array([1, 2, 3]),
+      body: webmHeader,
     }),
     provider,
   );
