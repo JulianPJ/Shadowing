@@ -39,7 +39,7 @@ export type ShadowingFeedbackProvider = {
   transcribe(bytes: Uint8Array<ArrayBuffer>, signal: AbortSignal): Promise<ShadowingTranscription>;
   feedback(input: ShadowingFeedbackInput, signal: AbortSignal): Promise<string[]>;
   summary(
-    input: ShadowingSummarySignals,
+    input: Omit<ShadowingSummarySignals, 'fingerprint'>,
     signal: AbortSignal,
   ): Promise<{ wentWell: string; keepWorking: string }>;
 };
