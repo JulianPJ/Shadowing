@@ -1,7 +1,7 @@
 'use client';
 import { CurrentSection } from './current-section';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -36,6 +36,15 @@ import { usePracticeProgress } from '../use-practice-progress';
 import { useSectionTranslation } from './use-section-translation';
 import { usePlaybackBoundary } from './use-playback-boundary';
 import { TranscriptPanel } from './transcript-panel';
+import type { ScoredShadowingSection, ShadowingScoreAnalysis } from '@/lib/shadowing-score';
+import { shadowingSummaryFallback } from '@/lib/shadowing-score';
+import {
+  clearShadowingSession,
+  loadShadowingSession,
+  requestShadowingSummary,
+  saveShadowingSession,
+  shadowingAggregate,
+} from '@/lib/shadowing-client';
 export type Session = { lesson: Lesson; index: number; preferences: Preferences };
 export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () => void }) {
   const [lesson, setLesson] = useState(session.lesson);
@@ -47,6 +56,13 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
   const [status, setStatus] = useState<PlaybackState>('ready');
   const [ready, setReady] = useState(false);
   const [recording, setRecording] = useState(false);
+  const [shadowingScores, setShadowingScores] = useState<ScoredShadowingSection[]>([]);
+  const [shadowingSummary, setShadowingSummary] = useState<{
+    whatWentWell: string;
+    keepWorkingOn: string;
+  } | null>(null);
+  const [shadowingSummaryLoading, setShadowingSummaryLoading] = useState(false);
+  const shadowingSummaryRequest = useRef<AbortController | null>(null);
   const [playbackError, setPlaybackError] = useState('');
   const [elapsed, setElapsed] = useState(lesson.segments[session.index].start);
 
@@ -91,7 +107,31 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
     setTranslationError,
   } = useSectionTranslation(lesson, index, session.index, recordSignal);
   const recordCompletion = progress.complete;
+  const recordShadowingScore = useCallback(
+    (analysis: ShadowingScoreAnalysis) => {
+      const entry: ScoredShadowingSection = {
+        sectionId: segment.id,
+        attemptId:
+          typeof crypto !== 'undefined' && 'randomUUID' in crypto
+            ? crypto.randomUUID()
+            : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        scoredAt: new Date().toISOString(),
+        analysis,
+      };
+      setShadowingScores((current) => {
+        const next = [...current.filter((value) => value.sectionId !== segment.id), entry];
+        saveShadowingSession(lesson, next);
+        return next;
+      });
+    },
+    [lesson, segment.id],
+  );
   const isFavorite = favorites.includes(segment.id);
+  const currentShadowingScore = shadowingScores.find((value) => value.sectionId === segment.id);
+  const overallShadowing = useMemo(
+    () => shadowingAggregate(lesson, shadowingScores),
+    [lesson, shadowingScores],
+  );
 
   const duration = lesson.segments.at(-1)!.end;
   const percent = Math.min(
@@ -107,6 +147,13 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
         'your-turn': 'YOUR TURN',
         complete: 'WELL PRACTICED',
       }[status];
+  useEffect(() => {
+    setShadowingScores(loadShadowingSession(lesson));
+    setShadowingSummary(null);
+    setShadowingSummaryLoading(false);
+    shadowingSummaryRequest.current?.abort();
+  }, [lesson.id, lesson.segments]);
+
   useEffect(() => {
     const hydrate = () => {
       const prefs = loadPreferences();
@@ -210,7 +257,37 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
     navigate(index + 1);
   }, [index, lesson, navigate, recordCompletion]);
 
-  usePlaybackBoundary({
+  useEffect(() => {
+    shadowingSummaryRequest.current?.abort();
+    if (!finished || !overallShadowing) {
+      setShadowingSummaryLoading(false);
+      if (!finished) setShadowingSummary(null);
+      return;
+    }
+    const controller = new AbortController();
+    shadowingSummaryRequest.current = controller;
+    setShadowingSummaryLoading(true);
+    const fallback = shadowingSummaryFallback(overallShadowing);
+    void requestShadowingSummary(
+      overallShadowing,
+      shadowingScores,
+      AbortSignal.any([controller.signal, AbortSignal.timeout(20000)]),
+    )
+      .then((summary) => {
+        if (!controller.signal.aborted) setShadowingSummary(summary);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setShadowingSummary(fallback);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setShadowingSummaryLoading(false);
+      });
+    return () => controller.abort();
+  }, [finished, overallShadowing, shadowingScores]);
+
+  useEffect(() => () => shadowingSummaryRequest.current?.abort(), []);
+
+    usePlaybackBoundary({
     ready,
     isPlaying,
     mode,
@@ -327,6 +404,14 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
     media.current?.pause();
     setStatus('your-turn');
   }, []);
+  const restartPractice = useCallback(() => {
+    clearShadowingSession(lesson);
+    setShadowingScores([]);
+    setShadowingSummary(null);
+    setShadowingSummaryLoading(false);
+    shadowingSummaryRequest.current?.abort();
+    navigate(0, false);
+  }, [lesson, navigate]);
   const toggleFavorite = () => {
     recordSignal(segment, 'bookmark');
     setFavorites((current) =>
@@ -509,10 +594,38 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
             key={segment.id}
             enabled={ready && !isPlaying}
             nativePlaying={isPlaying}
+            target={segment}
+            initialAnalysis={currentShadowingScore?.analysis}
             onBeforeRecord={pauseForRecording}
             onRecording={setRecording}
             onAttempt={() => recordSignal(segment, 'recording-attempt')}
+            onScored={recordShadowingScore}
           />
+          {finished && overallShadowing ? (
+            <section className="shadowing-overall" data-testid="shadowing-overall" aria-live="polite">
+              <div className="shadowing-overall-score">
+                <span className="small-label">SHADOWING SCORE</span>
+                <strong>{overallShadowing.score} <small>/ 100</small></strong>
+                <p>
+                  Scored {overallShadowing.scoredSections} of {overallShadowing.totalSections} shadowing sections
+                </p>
+              </div>
+              {shadowingSummaryLoading && !shadowingSummary ? (
+                <p className="small muted">Preparing your shadowing summary…</p>
+              ) : shadowingSummary ? (
+                <div className="shadowing-overall-feedback">
+                  <div>
+                    <span>What went well</span>
+                    <p>{shadowingSummary.whatWentWell}</p>
+                  </div>
+                  <div>
+                    <span>Keep working on</span>
+                    <p>{shadowingSummary.keepWorkingOn}</p>
+                  </div>
+                </div>
+              ) : null}
+            </section>
+          ) : null}
           {finished ? (
             <div className="completion-card" role="status">
               <span>
@@ -522,7 +635,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
                 <strong>You made a little progress today.</strong>
                 <p>Every repetition helps the rhythm feel more familiar.</p>
               </div>
-              <button className="text-button" onClick={() => navigate(0, false)}>
+              <button className="text-button" onClick={restartPractice}>
                 Practice again
                 <RotateCcw size={14} />
               </button>
