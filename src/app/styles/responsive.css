@@ -1,0 +1,786 @@
+@media (min-width: 1500px) {
+  .header-inner {
+    max-width: 1310px;
+  }
+  .home-main,
+  .practice-main,
+  .site-footer {
+    max-width: 1238px;
+  }
+  .hero {
+    padding: 80px 0 67px;
+  }
+  .hero h1 {
+    font-size: 64px;
+  }
+  .demo-section {
+    min-height: 320px;
+  }
+  .demo-copy {
+    padding: 37px 45px;
+  }
+  .demo-copy h2 {
+    font-size: 32px;
+  }
+  .practice-grid {
+    grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
+  }
+  .current-card h2 {
+    font-size: 29px;
+  }
+  .transcript-card {
+    height: 900px;
+  }
+  .row-content > [lang='ja'] {
+    font-size: 13px;
+  }
+}
+@media (max-width: 1200px) {
+  .home-main,
+  .practice-main {
+    margin: 0 36px;
+  }
+  .site-footer {
+    margin: 0 36px;
+  }
+  .demo-copy {
+    padding: 29px;
+  }
+  .practice-grid {
+    gap: 22px;
+  }
+  .practice-title h1 {
+    font-size: 34px;
+  }
+  .current-card {
+    padding: 20px;
+  }
+  .current-card h2 {
+    font-size: 24px;
+  }
+  .recording-top {
+    gap: 10px;
+  }
+  .record-button {
+    padding: 8px;
+    font-size: 9px;
+  }
+  .recording-hint {
+    font-size: 9px;
+  }
+  .transcript-card {
+    min-height: 540px;
+  }
+  .transcript-heading {
+    padding: 23px 20px 14px;
+  }
+  .transcript-tools {
+    margin: 0 20px 16px;
+  }
+  .transcript-row {
+    gap: 10px;
+    padding: 13px 10px;
+  }
+  .rhythm-grid > div {
+    padding: 0 27px;
+  }
+}
+@media (max-width: 900px) {
+  .hero h1 {
+    font-size: 48px;
+  }
+  .home-main,
+  .practice-main {
+    margin: 0 26px;
+  }
+  .header-inner {
+    padding: 0 26px;
+  }
+  .site-footer {
+    margin: 0 26px;
+  }
+  .demo-copy h2 {
+    font-size: 26px;
+  }
+  .demo-copy {
+    padding: 25px;
+  }
+  .demo-copy p {
+    font-size: 11px;
+  }
+  .demo-note {
+    font-size: 8px;
+  }
+  .lesson-tags {
+    gap: 9px;
+    font-size: 9px;
+  }
+  .lesson-tags span + span {
+    padding-left: 9px;
+  }
+  .practice-grid {
+    gap: 18px;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  }
+  .current-card {
+    padding: 17px 17px 13px;
+  }
+  .current-card h2 {
+    font-size: 21px;
+    line-height: 1.85;
+  }
+  .practice-controls {
+    gap: 6px;
+  }
+  .practice-controls .button {
+    padding: 10px;
+    font-size: 10px;
+  }
+  .practice-controls .icon-button {
+    width: 29px;
+  }
+  .key-hint {
+    display: none;
+  }
+  .segmented-control button {
+    padding: 6px 9px;
+    font-size: 9px;
+  }
+  .speed-control {
+    gap: 5px;
+    font-size: 9px;
+  }
+  .speed-control select {
+    padding: 7px;
+    font-size: 10px;
+  }
+  .current-heading {
+    gap: 8px;
+  }
+  .state-badge {
+    font-size: 7px;
+    letter-spacing: 0.6px;
+    padding: 5px;
+  }
+  .section-time {
+    font-size: 8px;
+  }
+  .recording-top {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .recording-hint {
+    font-size: 10px;
+  }
+  .record-button {
+    font-size: 10px;
+  }
+  .transcript-heading {
+    padding: 19px 17px 13px;
+  }
+  .transcript-heading .eyebrow {
+    font-size: 7px;
+  }
+  .transcript-tools {
+    margin: 0 16px 13px;
+  }
+  .transcript-scroll {
+    padding: 0 7px;
+  }
+  .row-content > [lang='ja'] {
+    font-size: 11px;
+  }
+  .transcript-bottom {
+    padding: 14px;
+    font-size: 7px;
+  }
+  .transcript-row {
+    gap: 8px;
+    padding: 13px 8px;
+  }
+  .recent-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .recent-grid .recent-card:last-child:nth-child(3) {
+    display: none;
+  }
+  .rhythm-grid > div {
+    padding: 0 20px;
+  }
+  .rhythm-grid p {
+    font-size: 10px;
+  }
+  .rhythm-grid h3 {
+    font-size: 13px;
+  }
+  .practice-title h1 {
+    font-size: 30px;
+  }
+  .practice-title p {
+    font-size: 10px;
+  }
+}
+@media (max-width: 700px) {
+  .site-header {
+    height: 70px;
+  }
+  .header-inner {
+    padding: 0 22px;
+  }
+  .brand {
+    font-size: 22px;
+  }
+  .brand-mark {
+    width: 31px;
+    height: 31px;
+    border-radius: 10px;
+  }
+  .brand-mark svg {
+    width: 19px;
+  }
+  .brand-japanese {
+    font-size: 12px;
+    margin-left: 9px;
+    padding-left: 9px;
+  }
+  .site-header nav {
+    gap: 18px;
+    font-size: 10px;
+  }
+  .nav-link {
+    font-size: 10px;
+  }
+  .nav-demo {
+    gap: 5px;
+  }
+  .home-main,
+  .practice-main {
+    margin: 0 22px;
+  }
+  .hero {
+    padding: 42px 0 35px;
+  }
+  .hero-tag {
+    font-size: 9px;
+  }
+  .hero h1 {
+    font-size: 39px;
+    letter-spacing: -1.4px;
+    margin: 24px 0 17px;
+  }
+  .hero-description {
+    font-size: 12px;
+    line-height: 1.9;
+  }
+  .desktop-break {
+    display: none;
+  }
+  .start-card {
+    margin-top: 25px;
+    padding: 17px 16px 13px;
+    border-radius: 10px;
+  }
+  .input-label {
+    font-size: 10px;
+    margin-bottom: 10px;
+  }
+  .url-input-wrap {
+    flex-wrap: wrap;
+    padding: 9px 10px;
+    gap: 9px;
+  }
+  .url-input-wrap input {
+    font-size: 11px;
+    height: 31px;
+    width: calc(100% - 36px);
+    flex: auto;
+  }
+  .url-input-wrap .youtube-icon {
+    width: 19px;
+  }
+  .start-button {
+    width: 100%;
+    min-height: 40px;
+    margin-top: 3px;
+    font-size: 11px;
+  }
+  .input-meta {
+    font-size: 8px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .input-meta .text-button {
+    font-size: 9px;
+  }
+  .input-meta > span svg {
+    width: 11px;
+  }
+  .demo-section {
+    grid-template-columns: 1fr;
+  }
+  .demo-art {
+    min-height: 225px;
+  }
+  .demo-art img {
+    transform: scale(1.05);
+  }
+  .demo-art-play {
+    width: 54px;
+    height: 54px;
+    top: 55%;
+  }
+  .demo-art-play svg {
+    width: 21px;
+  }
+  .demo-copy {
+    padding: 26px;
+  }
+  .demo-copy h2 {
+    font-size: 29px;
+  }
+  .demo-copy p {
+    font-size: 12px;
+    max-width: 100%;
+  }
+  .lesson-tags {
+    font-size: 10px;
+    gap: 12px;
+  }
+  .lesson-tags span + span {
+    padding-left: 12px;
+  }
+  .demo-note {
+    font-size: 9px;
+  }
+  .demo-button {
+    font-size: 12px;
+    min-height: 41px;
+    margin-top: 20px;
+  }
+  .rhythm-section {
+    padding: 35px 0 29px;
+  }
+  .section-heading > .small {
+    display: none;
+  }
+  .rhythm-grid {
+    grid-template-columns: 1fr;
+    gap: 24px;
+    margin-top: 23px;
+  }
+  .rhythm-grid > div,
+  .rhythm-grid > div:first-child,
+  .rhythm-grid > div:last-child {
+    padding: 0 0 22px 63px;
+    min-height: 66px;
+    border: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .rhythm-grid > div:last-child {
+    border: 0;
+    padding-bottom: 0;
+  }
+  .rhythm-grid .step-icon {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 43px;
+    height: 43px;
+  }
+  .rhythm-grid .step-number {
+    font-size: 16px;
+    margin-top: -4px;
+  }
+  .rhythm-grid h3 {
+    font-size: 14px;
+    margin: 0 0 5px;
+  }
+  .rhythm-grid p {
+    font-size: 11px;
+    max-width: 95%;
+    line-height: 1.8;
+  }
+  .home-signoff {
+    padding: 28px 0 38px;
+  }
+  .home-signoff span {
+    font-size: 14px;
+    letter-spacing: 2.5px;
+  }
+  .site-footer {
+    font-size: 9px;
+    margin: 0 22px;
+    padding: 21px 0;
+  }
+  .site-footer [lang='ja'] {
+    font-size: 8px;
+    letter-spacing: 1px;
+  }
+  .recent-section {
+    padding-top: 30px;
+  }
+  .recent-grid {
+    grid-template-columns: 1fr;
+    gap: 9px;
+  }
+  .recent-card {
+    padding: 13px 16px;
+  }
+  .recent-section h2 {
+    font-size: 14px;
+  }
+  .recent-card strong {
+    font-size: 12px;
+  }
+  .recent-card div span {
+    font-size: 9px;
+  }
+  .recent-grid .recent-card:last-child:nth-child(3) {
+    display: flex;
+  }
+  .prepare-stages {
+    font-size: 8px;
+    gap: 5px;
+  }
+  .prepare-stages > span {
+    gap: 4px;
+  }
+  .prepare-stages > span > span {
+    width: 15px;
+    height: 15px;
+    font-size: 8px;
+  }
+  .prepare-top {
+    font-size: 10px;
+  }
+  .practice-main {
+    padding-top: 21px;
+  }
+  .practice-breadcrumb {
+    font-size: 9px;
+    gap: 8px;
+  }
+  .private-label {
+    display: none;
+  }
+  .practice-title {
+    margin: 22px 0 23px;
+    gap: 15px;
+    align-items: flex-end;
+  }
+  .practice-title .eyebrow {
+    font-size: 8px;
+    letter-spacing: 1.1px;
+  }
+  .practice-title h1 {
+    font-size: 29px;
+    margin: 8px 0;
+    line-height: 1.2;
+  }
+  .practice-title p {
+    font-size: 9px;
+    gap: 7px;
+    flex-wrap: wrap;
+  }
+  .practice-progress {
+    min-width: 70px;
+  }
+  .practice-progress > span:first-child {
+    font-size: 21px;
+  }
+  .practice-progress > span:first-child > span {
+    font-size: 10px;
+  }
+  .practice-progress .small {
+    font-size: 8px;
+  }
+  .practice-grid {
+    grid-template-columns: 1fr;
+    gap: 25px;
+  }
+  .media-frame {
+    border-radius: 10px;
+  }
+  .current-card {
+    padding: 20px 21px 15px;
+  }
+  .current-card h2 {
+    font-size: 24px;
+    line-height: 1.95;
+    margin: 20px 0;
+    min-height: 80px;
+  }
+  .player-settings {
+    padding: 14px 0 16px;
+  }
+  .segmented-control button {
+    font-size: 10px;
+    padding: 7px 12px;
+  }
+  .speed-control {
+    font-size: 10px;
+    gap: 8px;
+  }
+  .speed-control select {
+    font-size: 11px;
+    padding: 7px 9px;
+  }
+  .state-badge {
+    font-size: 8px;
+    letter-spacing: 0.9px;
+    padding: 5px 7px;
+  }
+  .section-time {
+    font-size: 9px;
+  }
+  .translation-button {
+    font-size: 11px;
+    min-height: 36px;
+  }
+  .practice-controls {
+    gap: 8px;
+  }
+  .practice-controls .button {
+    font-size: 12px;
+    min-height: 44px;
+    padding: 11px 14px;
+  }
+  .practice-controls .icon-button {
+    height: 44px;
+    width: 33px;
+  }
+  .turn-instruction {
+    font-size: 10px;
+    line-height: 1.9;
+    margin-top: 13px;
+  }
+  .recording-panel {
+    padding-top: 22px;
+  }
+  .recording-top {
+    flex-direction: row;
+    align-items: center;
+  }
+  .recording-top > div {
+    max-width: 55%;
+  }
+  .recording-hint {
+    font-size: 10px;
+    line-height: 1.7;
+  }
+  .recording-top .small-label {
+    font-size: 8px;
+  }
+  .record-button {
+    font-size: 10px;
+    padding: 10px;
+    min-height: 39px;
+  }
+  .recording-privacy {
+    font-size: 9px;
+    margin-top: 9px;
+  }
+  .recording-audio audio {
+    height: 40px;
+  }
+  .player-footnote {
+    font-size: 8px;
+    padding: 12px 0;
+    margin-top: 12px;
+  }
+  .player-footnote .text-button {
+    font-size: 9px;
+  }
+  .transcript-card {
+    position: static;
+    height: 520px;
+    min-height: 0;
+    max-height: none;
+    border-radius: 10px;
+  }
+  .transcript-heading {
+    padding: 22px 22px 15px;
+  }
+  .transcript-heading .eyebrow {
+    font-size: 8px;
+  }
+  .transcript-heading h2 {
+    font-size: 18px;
+  }
+  .transcript-tools {
+    margin: 0 22px 15px;
+  }
+  .transcript-search {
+    padding: 9px 10px;
+  }
+  .transcript-search input {
+    font-size: 11px;
+  }
+  .transcript-tools .icon-button {
+    height: 34px;
+    width: 34px;
+  }
+  .transcript-scroll {
+    padding: 0 10px;
+  }
+  .transcript-row {
+    padding: 15px 12px;
+    gap: 12px;
+  }
+  .row-content > [lang='ja'] {
+    font-size: 13px;
+    line-height: 1.95;
+  }
+  .row-time {
+    font-size: 9px;
+  }
+  .row-number {
+    font-size: 10px;
+  }
+  .transcript-bottom {
+    font-size: 9px;
+    padding: 17px 20px;
+  }
+  .practice-signoff {
+    padding: 27px 0;
+  }
+  .help-dialog,
+  .import-dialog {
+    padding: 27px 23px;
+  }
+  .help-dialog h2,
+  .import-dialog h2 {
+    font-size: 27px;
+    padding-right: 15px;
+  }
+  .help-steps {
+    gap: 15px;
+  }
+  .help-steps strong {
+    font-size: 11px;
+  }
+  .help-steps span {
+    font-size: 10px;
+  }
+  .shortcut-grid {
+    font-size: 10px;
+    padding: 14px;
+    gap: 13px;
+  }
+  .shortcut-grid > div {
+    gap: 9px;
+  }
+  .import-tabs button {
+    font-size: 10px;
+    padding: 8px 11px;
+  }
+  .media-error {
+    padding: 12px;
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    font-size: 10px;
+  }
+  .media-error .button {
+    font-size: 9px;
+    padding: 6px 8px;
+  }
+  .completion-card {
+    flex-wrap: wrap;
+  }
+  .completion-card .text-button {
+    margin-left: 44px;
+    font-size: 10px;
+  }
+  .empty-screen {
+    padding: 65px 22px;
+  }
+  .empty-screen h1 {
+    font-size: 30px;
+  }
+}
+@media (max-width: 390px) {
+  .home-main,
+  .practice-main {
+    margin: 0 16px;
+  }
+  .header-inner {
+    padding: 0 16px;
+  }
+  .site-header nav {
+    gap: 12px;
+  }
+  .brand-japanese {
+    display: none;
+  }
+  .hero h1 {
+    font-size: 34px;
+  }
+  .hero-tag {
+    font-size: 8px;
+  }
+  .demo-copy {
+    padding: 23px;
+  }
+  .lesson-tags {
+    font-size: 9px;
+    gap: 8px;
+  }
+  .lesson-tags span + span {
+    padding-left: 8px;
+  }
+  .current-card {
+    padding: 17px;
+  }
+  .current-card h2 {
+    font-size: 22px;
+  }
+  .recording-top {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .recording-top > div {
+    max-width: 100%;
+  }
+  .practice-controls .button {
+    font-size: 11px;
+    padding: 10px;
+  }
+  .practice-title h1 {
+    font-size: 26px;
+  }
+  .practice-title .eyebrow {
+    font-size: 7px;
+  }
+  .site-footer {
+    margin: 0 16px;
+  }
+  .help-steps {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .help-steps > div {
+    display: grid;
+    grid-template-columns: 28px 1fr;
+    gap: 2px 10px;
+  }
+  .help-steps span {
+    grid-column: 2;
+  }
+  .shortcut-grid {
+    grid-template-columns: 1fr;
+  }
+  .import-tabs button {
+    font-size: 9px;
+    padding: 7px 8px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *:before,
+  *:after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}

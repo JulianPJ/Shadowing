@@ -1,0 +1,12 @@
+{
+  "overall": "n5_n4",
+  "vocabulary": "elementary",
+  "grammar": "elementary",
+  "conversation": "beginner",
+  "confidence": {
+    "overall": 0.55,
+    "vocabulary": 0.62,
+    "grammar": 0.58,
+    "conversation": 0.66
+  }
+}

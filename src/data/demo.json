@@ -1,0 +1,108 @@
+{
+  "id": "demo",
+  "title": "A quiet morning",
+  "author": "Hibiki Listening Studio",
+  "source": "demo",
+  "mediaUrl": "/demo.mp4",
+  "transcriptSource": "Original studio script · Japanese synthetic voice",
+  "segments": [
+    {
+      "id": "segment-1",
+      "start": 0,
+      "end": 7.882,
+      "japanese": "おはようございます。今日は、私の朝の過ごし方を紹介します。",
+      "translation": "Good morning. Today I’ll share how I spend my mornings."
+    },
+    {
+      "id": "segment-2",
+      "start": 8.132,
+      "end": 12.15,
+      "japanese": "毎朝、七時ごろに起きます。",
+      "translation": "I wake up around seven every morning."
+    },
+    {
+      "id": "segment-3",
+      "start": 12.4,
+      "end": 18.002,
+      "japanese": "まず、窓を開けて、新鮮な空気を吸います。",
+      "translation": "First, I open the window and breathe in the fresh air."
+    },
+    {
+      "id": "segment-4",
+      "start": 18.252,
+      "end": 22.774,
+      "japanese": "朝の静かな時間が、とても好きです。",
+      "translation": "I really like the quiet hours of the morning."
+    },
+    {
+      "id": "segment-5",
+      "start": 23.024,
+      "end": 27.57,
+      "japanese": "それから、温かいコーヒーを入れます。",
+      "translation": "Then I make a hot cup of coffee."
+    },
+    {
+      "id": "segment-6",
+      "start": 27.82,
+      "end": 33.014,
+      "japanese": "コーヒーを飲みながら、今日の予定を考えます。",
+      "translation": "While drinking my coffee, I think about my plans for the day."
+    },
+    {
+      "id": "segment-7",
+      "start": 33.264,
+      "end": 38.626,
+      "japanese": "天気がいい日は、近くの公園を散歩します。",
+      "translation": "On sunny days, I take a walk in the nearby park."
+    },
+    {
+      "id": "segment-8",
+      "start": 38.876,
+      "end": 43.542,
+      "japanese": "公園には、大きな木がたくさんあります。",
+      "translation": "There are lots of big trees in the park."
+    },
+    {
+      "id": "segment-9",
+      "start": 43.792,
+      "end": 48.482,
+      "japanese": "鳥の声を聞くと、気持ちが落ち着きます。",
+      "translation": "Hearing the birds helps me feel calm."
+    },
+    {
+      "id": "segment-10",
+      "start": 48.732,
+      "end": 53.974,
+      "japanese": "家に帰ったら、簡単な朝ごはんを作ります。",
+      "translation": "When I get home, I make a simple breakfast."
+    },
+    {
+      "id": "segment-11",
+      "start": 54.224,
+      "end": 59.538,
+      "japanese": "パンと卵、それに季節の果物を食べます。",
+      "translation": "I eat bread and eggs, along with some seasonal fruit."
+    },
+    {
+      "id": "segment-12",
+      "start": 59.788,
+      "end": 64.598,
+      "japanese": "皆さんは、どんな朝を過ごしていますか。",
+      "translation": "How do you spend your mornings?"
+    },
+    {
+      "id": "segment-13",
+      "start": 64.848,
+      "end": 70.93,
+      "japanese": "忙しい日も、少しだけ自分の時間を作ってみてください。",
+      "translation": "Even on busy days, try making a little time for yourself."
+    },
+    {
+      "id": "segment-14",
+      "start": 71.18,
+      "end": 75.582,
+      "japanese": "それでは、今日も素敵な一日を。",
+      "translation": "Well then, have a wonderful day today."
+    }
+  ]
+}

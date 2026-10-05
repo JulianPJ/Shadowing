@@ -1,0 +1,218 @@
+// Deterministic integration check of the actual production bundle in local workerd.
+import assert from 'node:assert/strict';
+import { readFile, readdir } from 'node:fs/promises';
+import path from 'node:path';
+import { Miniflare, convertV4MiniflareOptions, Response } from 'miniflare';
+
+const root = path.resolve('.cloudflare/output/v0/workers/default/bundle');
+let captions = 0;
+const emails = [];
+const cues = Array.from({ length: 6 }, (_, i) => ({
+  start: i * 8,
+  end: i * 8 + 7,
+  text: `今日は日本語の勉強について詳しく話します。毎日練習すると少しずつ上手になります。${i}。`,
+}));
+const options = convertV4MiniflareOptions({
+  workers: [
+    {
+      name: 'shadowing',
+      modules: true,
+      scriptPath: path.join(root, 'index.js'),
+      modulesRoot: root,
+      compatibilityDate: '2026-10-03',
+      compatibilityFlags: ['nodejs_compat', 'global_fetch_strictly_public'],
+      d1Databases: { HIBIKI_DB: 'runtime-test' },
+      serviceBindings: { AI: 'ai-mock' },
+      bindings: {
+        AUTH_BASE_URL: 'https://example.com',
+        AUTH_SECRET: 'deterministic-worker-test-secret-32-characters',
+        RESEND_API_KEY: 'mock-email-key',
+        AUTH_EMAIL_FROM: 'Hibiki <noreply@example.com>',
+        YOUTUBE_CAPTION_RELAY_URL: 'https://relay.example',
+        YOUTUBE_CAPTION_RELAY_TOKEN: 'mock-test-token',
+      },
+      outboundService: async (request) => {
+        const url = new URL(request.url);
+        if (url.hostname === 'api.resend.com') {
+          emails.push(await request.json());
+          return Response.json({ id: 'mock-message' });
+        }
+        if (url.hostname === 'www.youtube.com' && url.pathname === '/oembed')
+          return Response.json({ title: 'Runtime fixture', author_name: 'Mock provider' });
+        if (url.hostname === 'relay.example' && url.pathname === '/captions') {
+          captions++;
+          if (captions > 1) throw new Error('Caption acquisition must be bypassed');
+          return Response.json({
+            videoId: 'IJ6R4u05ppw',
+            language: 'ja',
+            cues,
+            provider: 'mock-captions',
+          });
+        }
+        throw new Error('Unmocked network access');
+      },
+    },
+    {
+      name: 'ai-mock',
+      modules: true,
+      compatibilityDate: '2026-10-03',
+      script: `import { WorkerEntrypoint } from 'cloudflare:workers';
+      let calls = {quiz:0,difficulty:0};
+      export default class extends WorkerEntrypoint {
+        async fetch() { return Response.json(calls); }
+        async run(model,input) {
+          if (model.includes('qwen')) {
+            if (++calls.quiz > 1) throw new Error('Quiz inference must be bypassed');
+            const content=input.messages.find(m=>m.role==='user').content;
+            const segments=JSON.parse(content.slice(content.indexOf('{'),content.lastIndexOf('}')+1)).segments;
+            return {response:{questions:segments.slice(0,3).map((s,i)=>({kind:'detail',question:'何について話しますか'+i+'？',options:['日本語','英語','数学','料理'],correctIndex:0,explanation:'The speaker discusses Japanese practice.',evidence:{segmentIds:[s.id]}}))}};
+          }
+          if (++calls.difficulty > 1) throw new Error('Difficulty inference must be bypassed');
+          return {answers:Object.fromEntries(Object.entries({overall:'n4_n3',vocabulary:'intermediate',grammar:'elementary',conversation:'intermediate'}).map(([key,choice])=>[key,{type:'choice',choice,confidence:0.5,probabilities:{[choice]:1}}]))};
+        }
+      }`,
+    },
+  ],
+});
+const modules = {};
+for (const file of await readdir(root, { recursive: true, withFileTypes: true })) {
+  if (!file.isFile()) continue;
+  const absolute = path.join(file.parentPath, file.name);
+  const name = path.relative(root, absolute).replaceAll('\\', '/');
+  const type = name.endsWith('.js') ? 'esm' : name.endsWith('.json') ? 'json' : 'data';
+  modules[name] = {
+    type,
+    contents: await readFile(absolute, type === 'data' ? undefined : 'utf8'),
+  };
+}
+options.workers[0].config.manifest = { mainModule: 'index.js', modulesRoot: root, modules };
+const mf = new Miniflare(options);
+try {
+  const db = await mf.getD1Database('HIBIKI_DB', 'shadowing');
+  for (const file of (await readdir('migrations')).sort()) {
+    const migration = await readFile(`migrations/${file}`, 'utf8');
+    await db.batch(
+      migration
+        .split(';')
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .map((s) => db.prepare(s)),
+    );
+  }
+  const register = await mf.dispatchFetch('https://example.com/api/auth/sign-up/email', {
+    method: 'POST',
+    headers: {
+      Origin: 'https://example.com',
+      'Content-Type': 'application/json',
+      'cf-connecting-ip': '192.0.2.10',
+    },
+    body: JSON.stringify({
+      email: 'runtime@example.com',
+      password: 'runtime test password',
+      name: 'Runtime learner',
+      callbackURL: '/account',
+    }),
+  });
+  assert.equal(register.status, 200, `Worker registration failed (status ${register.status})`);
+  for (let i = 0; i < 50 && !emails.length; i++)
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  assert.equal(emails.length, 1);
+  const link = emails[0].text.slice(emails[0].text.indexOf('https://'));
+  const verification = await mf.dispatchFetch(link, { redirect: 'manual' });
+  assert.equal(verification.status, 302);
+  const cookie = verification.headers
+    .getSetCookie()
+    .map((c) => c.split(';')[0])
+    .join('; ');
+  assert.ok(cookie.includes('session_token='));
+  const me = await mf.dispatchFetch('https://example.com/api/account/me', {
+    headers: { Cookie: cookie },
+  });
+  const identity = await me.json();
+  assert.equal(identity.user.email, 'runtime@example.com');
+  const sync = {
+    preferences: {
+      schemaVersion: 1,
+      mode: 'continuous',
+      speed: 0.75,
+      studioMode: true,
+      furigana: true,
+      updatedAt: new Date().toISOString(),
+    },
+    lessons: [],
+    sessions: [],
+    attempts: [],
+    bookmarks: [],
+    difficulties: [],
+    archives: [],
+  };
+  const saved = await mf.dispatchFetch('https://example.com/api/sync/push', {
+    method: 'POST',
+    headers: { Cookie: cookie, Origin: 'https://example.com', 'Content-Type': 'application/json' },
+    body: JSON.stringify(sync),
+  });
+  assert.equal(saved.status, 200);
+  assert.equal(
+    (
+      await db
+        .prepare('SELECT furigana FROM user_preferences WHERE user_id=?')
+        .bind(identity.user.id)
+        .first()
+    ).furigana,
+    1,
+  );
+  const signedOut = await mf.dispatchFetch('https://example.com/api/auth/sign-out', {
+    method: 'POST',
+    headers: { Cookie: cookie, Origin: 'https://example.com', 'Content-Type': 'application/json' },
+    body: '{}',
+  });
+  assert.equal(signedOut.status, 200);
+  assert.equal(
+    (
+      await mf.dispatchFetch('https://example.com/api/sync/bootstrap', {
+        headers: { Cookie: cookie },
+      })
+    ).status,
+    401,
+  );
+  console.log(
+    'Built Worker + D1: framework password hashing, email verification, cookie session, learner sync and sign-out passed with mocked email delivery.',
+  );
+  let lesson;
+  for (let i = 0; i < 2; i++) {
+    const response = await mf.dispatchFetch('https://example.com/api/prepare', {
+      method: 'POST',
+      body: JSON.stringify({ url: 'https://youtu.be/IJ6R4u05ppw' }),
+    });
+    const last = JSON.parse((await response.text()).trim().split('\n').at(-1));
+    assert.equal(last.stage, 'done');
+    lesson = last.lesson;
+  }
+  assert.equal(captions, 1);
+  for (const endpoint of ['quiz', 'difficulty']) {
+    let first;
+    for (let i = 0; i < 2; i++) {
+      const response = await mf.dispatchFetch(`https://example.com/api/${endpoint}`, {
+        method: 'POST',
+        body: JSON.stringify({ lesson, content: { contentKey: lesson.mediaSource.contentKey } }),
+      });
+      assert.equal(response.status, 200, `${endpoint} failed: ${await response.clone().text()}`);
+      assert.equal(response.headers.get('X-Hibiki-Cache'), i ? 'hit' : 'miss');
+      const payload = await response.json();
+      if (i) assert.deepEqual(payload, first);
+      else first = payload;
+    }
+  }
+  const ai = await mf.getWorker('ai-mock');
+  assert.deepEqual(await (await ai.fetch('https://example.com/counts')).json(), {
+    quiz: 1,
+    difficulty: 1,
+  });
+  assert.equal((await db.prepare('SELECT COUNT(*) AS n FROM linked_transcripts').first()).n, 1);
+  assert.equal((await db.prepare('SELECT COUNT(*) AS n FROM generated_artifacts').first()).n, 2);
+  console.log(
+    'Built Worker + local D1: prepare, quiz, difficulty each miss/save/hit; caption/AI providers called exactly once.',
+  );
+} finally {
+  await mf.dispose();
+}

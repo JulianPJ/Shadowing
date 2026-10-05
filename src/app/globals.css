@@ -1,0 +1,11 @@
+/* Import order preserves the existing cascade, including responsive overrides. */
+@import './styles/base.css';
+@import './styles/home-import.css';
+@import './styles/practice.css';
+@import './styles/responsive.css';
+@import './styles/practice-layout.css';
+@import './styles/progress.css';
+@import './styles/difficulty.css';
+@import './styles/quiz.css';
+@import './styles/display-preferences.css';
+@import './styles/account.css';
