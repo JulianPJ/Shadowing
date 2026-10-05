@@ -1,12 +1,26 @@
 import type { Lesson, Mode } from '../types';
 import { readStorage } from './browser';
+export const PLAYBACK_OFFSET_MIN_MS = -2000;
+export const PLAYBACK_OFFSET_MAX_MS = 2000;
+export const PLAYBACK_OFFSET_STEP_MS = 50;
+
 export type Preferences = {
   mode: Mode;
   speed: number;
   translation: boolean;
   studioMode: boolean;
   furigana: boolean;
+  playbackOffsetMs: number;
 };
+
+export function normalizePlaybackOffsetMs(value: unknown) {
+  return typeof value === 'number' &&
+    Number.isFinite(value) &&
+    value >= PLAYBACK_OFFSET_MIN_MS &&
+    value <= PLAYBACK_OFFSET_MAX_MS
+    ? Math.round(value)
+    : 0;
+}
 
 export function loadPreferences(): Preferences {
   const raw = readStorage<Partial<Preferences> | null>('preferences', null);
@@ -16,6 +30,7 @@ export function loadPreferences(): Preferences {
     translation: false,
     studioMode: raw?.studioMode === true,
     furigana: raw?.furigana === true,
+    playbackOffsetMs: normalizePlaybackOffsetMs(raw?.playbackOffsetMs),
   };
 }
 
