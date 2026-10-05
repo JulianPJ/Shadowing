@@ -2,7 +2,7 @@
 
 > **Purpose:** persistent product and engineering context for future development.
 >
-> **Account update:** Better Auth accounts and eligible learner sync are implemented; production activation requires email/Google configuration and real-provider smoke checks. Anonymous practice and shared-content trust remain unchanged. See `docs/accounts-and-sync.md`.
+> **Account update:** Better Auth accounts and eligible learner sync are implemented. Production D1 migrations and auth/Google secrets are configured; deployment awaits email sender secrets and real-provider smoke checks. Anonymous practice and shared-content trust remain unchanged. See `docs/accounts-and-sync-verification.md`.
 >
 > **Current snapshot:** 2026-10-04, production runs on Cloudflare Workers with the caption relay path verified and roadmap priorities #1–#3 implemented. Hosted AI is split by task: Clef Flash provides full-transcript difficulty classification and only assists quiz routing for very large transcripts; ordinary comprehension checks use Qwen3-30B-A3B. On-demand Japanese→English translation uses DeepL with only the current section translated and bounded neighboring Japanese supplied as context. Local learner progress is deployed. The next roadmap item is #4, polish / monetisation.
 >
@@ -225,7 +225,7 @@ Current learner progress remains browser-local:
 - versioned local learner-history sessions and compact retention archives, independent of the eight recent lessons;
 - deterministic learner-profile aggregation and validated compact content-difficulty references.
 
-Accounts and local-first learner sync are now implemented using Better Auth 1.7.7 and native D1. Email/password requires verification, Google uses explicit linking, and first sign-in asks before importing anonymous history. Account activation awaits production email sender/Google secrets and real-provider smoke verification. Billing, subscriptions, analytics and saved vocabulary remain unimplemented. See [accounts and sync](docs/accounts-and-sync.md).
+Accounts and local-first learner sync are now implemented using Better Auth 1.7.7 and native D1. Email/password requires verification, Google uses explicit linking, and first sign-in asks before importing anonymous history. Production migrations are applied and auth/Google secrets are configured. Deployment awaits email sender secrets and real-provider smoke verification. Billing, subscriptions, analytics and saved vocabulary remain unimplemented. See [accounts and sync](docs/accounts-and-sync.md) and [release verification](docs/accounts-and-sync-verification.md).
 
 ### Demo
 
