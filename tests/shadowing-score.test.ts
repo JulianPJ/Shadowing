@@ -93,7 +93,6 @@ test('completely different sentence scores low rather than being treated as inva
 
 test('empty recognition and silence are invalid and produce no score', () => {
   const empty = score('今日は天気がいいです。', '', 4, 0);
-  assert.deepEqual(empty.valid && empty.analysis.score, false);
   assert.equal(empty.valid, false);
   if (!empty.valid) assert.equal(empty.reason, 'no-speech');
 
