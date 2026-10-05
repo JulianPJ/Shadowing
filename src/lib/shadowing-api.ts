@@ -64,6 +64,12 @@ export async function handleShadowingTranscriptionRequest(
   const type = request.headers.get('content-type')?.split(';', 1)[0].trim().toLowerCase() || '';
   if (!type.startsWith('audio/'))
     return noStore({ code: 'audio-type', error: 'Record an audio attempt before analysing.' }, 415);
+  const recordedDuration = Number(request.headers.get('x-hibiki-recording-duration'));
+  if (!Number.isFinite(recordedDuration) || recordedDuration < 0.2 || recordedDuration > 65)
+    return noStore(
+      { code: 'audio-duration', error: 'Record a complete attempt of one minute or less before analysing.' },
+      422,
+    );
   const length = Number(request.headers.get('content-length'));
   if (Number.isFinite(length) && length > SHADOWING_AUDIO_LIMIT)
     return noStore({ code: 'audio-too-large', error: 'That recording is too large to analyse. Record the section again.' }, 413);
@@ -90,6 +96,11 @@ export async function handleShadowingTranscriptionRequest(
           code: 'no-speech',
           error: 'No meaningful Japanese speech was recognised. Please record the section again.',
         },
+        422,
+      );
+    if (result.speechDuration > 65)
+      return noStore(
+        { code: 'audio-duration', error: 'The recognised speech was too long for one shadowing section. Please try again.' },
         422,
       );
     if (result.recognizedText.length > 4000)
