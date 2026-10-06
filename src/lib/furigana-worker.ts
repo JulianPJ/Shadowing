@@ -1,58 +1,101 @@
-import { annotateJapanese, type MorphologicalToken } from './japanese-readings';
+import type { MorphologicalToken } from './japanese-readings';
 
-type Tokenizer = { tokenize: (text: string) => MorphologicalToken[] };
+type LinderaToken = {
+  surface?: string;
+  wordId?: number;
+  details?: string[];
+  toJSON?: () => {
+    surface?: string;
+    wordId?: number;
+    details?: string[];
+  };
+};
+
+type LinderaTokenizer = {
+  tokenize: (text: string) => LinderaToken[];
+};
+
+type LinderaModule = {
+  default: () => Promise<unknown>;
+  TokenizerBuilder: new () => {
+    setDictionary: (dictionary: string) => void;
+    setMode: (mode: string) => void;
+    build: () => LinderaTokenizer;
+  };
+};
+
 type WorkerRequest = {
   id: number;
-  text: string;
-  kind?: 'readings' | 'morphology';
+  texts: string[];
 };
+
 const scope = globalThis as unknown as {
-  importScripts: (url: string) => void;
-  kuromoji: {
-    builder: (options: { dicPath: string }) => {
-      build: (done: (error: unknown, tokenizer: Tokenizer) => void) => void;
-    };
-  };
   onmessage: (event: MessageEvent<WorkerRequest>) => void;
   postMessage: (value: unknown) => void;
 };
-let tokenizer: Promise<Tokenizer> | undefined;
-function loadTokenizer() {
-  return (tokenizer ??= new Promise<Tokenizer>((resolve, reject) => {
-    scope.importScripts('/furigana/v1/kuromoji.js');
-    scope.kuromoji
-      .builder({ dicPath: '/furigana/v1/dict/' })
-      .build((error, value) => (error ? reject(error) : resolve(value)));
-  }));
+
+let tokenizer: Promise<LinderaTokenizer> | undefined;
+
+function detail(value: unknown) {
+  return typeof value === 'string' && value && value !== '*' && value !== 'UNK'
+    ? value
+    : undefined;
 }
-function safeMorphology(token: MorphologicalToken): MorphologicalToken {
+
+function morphology(token: LinderaToken): MorphologicalToken {
+  const raw = token.toJSON?.() ?? token;
+  const details = Array.isArray(raw.details) ? raw.details : [];
+  const surface = typeof raw.surface === 'string' ? raw.surface : '';
+  const basicForm = detail(details[6]);
+  const reading = detail(details[7]);
+  const pronunciation = detail(details[8]);
+  const pos = detail(details[0]);
+  const known = !!(basicForm || reading || pronunciation) && pos !== 'UNK';
+
   return {
-    surface_form: token.surface_form,
-    ...(token.reading ? { reading: token.reading } : {}),
-    ...(token.word_type ? { word_type: token.word_type } : {}),
-    ...(token.basic_form ? { basic_form: token.basic_form } : {}),
-    ...(token.pos ? { pos: token.pos } : {}),
-    ...(token.pos_detail_1 ? { pos_detail_1: token.pos_detail_1 } : {}),
-    ...(token.pos_detail_2 ? { pos_detail_2: token.pos_detail_2 } : {}),
-    ...(token.pos_detail_3 ? { pos_detail_3: token.pos_detail_3 } : {}),
-    ...(token.conjugated_type ? { conjugated_type: token.conjugated_type } : {}),
-    ...(token.conjugated_form ? { conjugated_form: token.conjugated_form } : {}),
-    ...(token.pronunciation ? { pronunciation: token.pronunciation } : {}),
+    surface_form: surface,
+    word_type: known ? 'KNOWN' : 'UNKNOWN',
+    ...(basicForm ? { basic_form: basicForm } : {}),
+    ...(reading ? { reading } : {}),
+    ...(pronunciation ? { pronunciation } : {}),
+    ...(pos ? { pos } : {}),
+    ...(detail(details[1]) ? { pos_detail_1: detail(details[1]) } : {}),
+    ...(detail(details[2]) ? { pos_detail_2: detail(details[2]) } : {}),
+    ...(detail(details[3]) ? { pos_detail_3: detail(details[3]) } : {}),
+    ...(detail(details[4]) ? { conjugated_type: detail(details[4]) } : {}),
+    ...(detail(details[5]) ? { conjugated_form: detail(details[5]) } : {}),
   };
 }
-scope.onmessage = async ({ data: { id, text, kind = 'readings' } }) => {
+
+async function loadTokenizer() {
+  return (tokenizer ??= (async () => {
+    // Keep the prebuilt Rust/WASM package outside the Next/vinext server bundle.
+    // prepare-furigana.mjs copies the package next to this worker as static assets.
+    const moduleUrl = '/furigana/v2/lindera_wasm.js';
+    const lindera = (await import(moduleUrl)) as LinderaModule;
+    await lindera.default();
+    const builder = new lindera.TokenizerBuilder();
+    builder.setDictionary('embedded://ipadic');
+    builder.setMode('normal');
+    return builder.build();
+  })());
+}
+
+scope.onmessage = async ({ data: { id, texts } }) => {
   try {
+    if (!Array.isArray(texts) || texts.some((text) => typeof text !== 'string'))
+      throw new Error('Invalid Japanese analysis request.');
+
     const parser = await loadTokenizer();
-    const analyzed = parser.tokenize(text);
-    scope.postMessage({
-      id,
-      kind,
-      tokens:
-        kind === 'morphology'
-          ? analyzed.map(safeMorphology)
-          : annotateJapanese(text, analyzed),
+    const batches = texts.map((text) => {
+      const analyzed = parser.tokenize(text).map(morphology);
+      if (analyzed.map((token) => token.surface_form).join('') !== text)
+        throw new Error('Japanese tokenizer did not preserve source text.');
+      return analyzed;
     });
+    scope.postMessage({ id, batches, engine: 'lindera-wasm' });
   } catch {
-    scope.postMessage({ id, kind, error: true });
+    // The client transparently retries the same batch in the Kuromoji fallback worker.
+    scope.postMessage({ id, error: true, engine: 'lindera-wasm' });
   }
 };

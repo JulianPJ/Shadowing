@@ -67,7 +67,8 @@
     "sharp": "^0.35.5",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3",
-    "vite": "^8.3.0"
+    "vite": "^8.3.0",
+    "lindera-wasm-web-ipadic": "2.0.0"
   },
   "dependencies": {
     "@cloudflare/workers-response-store": "^1.0.1",
