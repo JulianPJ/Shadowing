@@ -1,4 +1,3 @@
-import type { D1Database } from './d1';
 import type { HibikiAuth } from './auth/server';
 
 export type AccessPlan = 'free' | 'pro';
@@ -22,6 +21,13 @@ export const PRO_FEATURES: readonly ProFeature[] = [
 export interface AccessRepository {
   plan(userId: string): Promise<AccessPlan>;
 }
+export interface AccessStatement {
+  bind(...values: (string | number | null)[]): AccessStatement;
+  first<T>(): Promise<T | null>;
+}
+export interface AccessDatabase {
+  prepare(sql: string): AccessStatement;
+}
 
 export const freeAccess: AccessRepository = {
   async plan() {
@@ -29,7 +35,7 @@ export const freeAccess: AccessRepository = {
   },
 };
 
-export function createD1AccessRepository(db: D1Database): AccessRepository {
+export function createD1AccessRepository(db: AccessDatabase): AccessRepository {
   return {
     async plan(userId) {
       const row = await db
