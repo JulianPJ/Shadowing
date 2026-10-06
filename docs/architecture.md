@@ -54,6 +54,7 @@ Use Node 24, as declared in `package.json`. Install dependencies with `npm ci`; 
 | Playback or persistence | Existing browser tests plus `tests/refactoring.test.ts` |
 | Next.js integration | `npm run build`; start with `npm start`, then `npm run test:e2e` |
 | Canonical Cloudflare runtime | `npm run build:vinext`, `npm run test:d1:runtime`; browser tests against local preview |
+| Local D1 migration ledger / ownership | `npm run test:d1:migrations`; real persisted D1 with explicit runtime disposal |
 | Caption relay | Included in `typecheck`; `npm run build:caption-relay` for bundling |
 
 Browser tests use `PLAYWRIGHT_BASE_URL` (default `http://localhost:3000`). Set `PLAYWRIGHT_CHROME_PATH` to an installed Chrome executable when Playwright's bundled browser is unavailable. D1 unit and built-runtime tests use local storage and mocked providers, without contacting live AI/caption services.

@@ -76,7 +76,7 @@ jobs:
 
       - name: Apply local D1 migrations
         timeout-minutes: 2
-        run: npm run db:migrate:local && npm run db:migrations:local
+        run: npm run test:d1:migrations
 
       - name: Build canonical Worker
         run: npm run build:vinext
