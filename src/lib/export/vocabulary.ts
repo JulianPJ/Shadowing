@@ -12,6 +12,7 @@ export type VocabularyExportRow = {
   start: number;
   end: number;
   decks: string;
+  tags: string;
 };
 export function vocabularyRows(
   entries: DictionaryEntry[],
@@ -27,6 +28,7 @@ export function vocabularyRows(
     sourceUrl: externalReplay(e) ?? '',
     start: e.source.start,
     end: e.source.end,
+    tags: e.tags?.map((t) => t.name).join('; ') ?? '',
     decks: review.memberships
       .filter((m) => m.entryId === e.id)
       .map((m) => review.decks.find((d) => d.id === m.deckId)?.name ?? '')
@@ -52,6 +54,7 @@ export function vocabularyCsv(rows: VocabularyExportRow[]) {
     'start',
     'end',
     'decks',
+    'tags',
   ];
   return (
     '\uFEFF' +
@@ -60,5 +63,31 @@ export function vocabularyCsv(rows: VocabularyExportRow[]) {
       ...rows.map((r) => columns.map((k) => cell(r[k])).join(',')),
     ].join('\r\n') +
     '\r\n'
+  );
+}
+
+/** Anki-compatible plain TSV: one record per line, formula protection preserved. */
+export function vocabularyTsv(rows: VocabularyExportRow[]) {
+  const columns: (keyof VocabularyExportRow)[] = [
+    'term',
+    'reading',
+    'translation',
+    'sourceSentence',
+    'sourceTranslation',
+    'lessonTitle',
+    'sourceUrl',
+    'start',
+    'end',
+    'decks',
+    'tags',
+  ];
+  const safe = (value: string | number) => {
+    let text = String(value).replaceAll('\t', ' ').replaceAll('\r', ' ').replaceAll('\n', ' ');
+    if (/^[\s\u0000-\u001f]*[=+@-]/.test(text)) text = "'" + text;
+    return text;
+  };
+  return (
+    [columns.join('\t'), ...rows.map((r) => columns.map((k) => safe(r[k])).join('\t'))].join('\n') +
+    '\n'
   );
 }

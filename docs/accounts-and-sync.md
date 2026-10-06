@@ -1,5 +1,7 @@
 # Accounts and learner sync
 
+Phase A.2 adds Free descriptive tags behind the same account/origin/expected-account boundary. Tags and vocabulary edits require a connection; review/deck writes keep the durable local-first outbox. Paginated dictionary and exact-ID review hydration share the existing account namespace, with a bounded record cache rather than an assumed complete dictionary array. Migration 0008 adds ownership-safe tag memberships; scheduling and shared-content trust are unchanged. See [query/cache contracts](retention-implementation.md).
+
 Retention update (6 October 2026): Personal Dictionary, basic decks, Daily Review and CSV export are available to verified Free and Pro accounts. Dictionary saves retain their existing explicit account-context consent; review/deck state writes locally first and retries through `/api/review` under the same session/origin/expected-account boundary. These records reference dictionary IDs and do not enter the shared content cache. Migration `0007_retention.sql` adds owner-scoped decks, memberships and versioned schedules. See [the retention contract](retention-implementation.md). Existing AI and topic-vocabulary Pro enforcement remains.
 
 Hibiki uses **Better Auth 1.7.7**, pinned in `package.json`. D1 remains the primary production application database. Anonymous learner data stays browser-local. Authenticated users additionally synchronize eligible learner state to D1. Core practice does not require an account. Billing, subscriptions and saved vocabulary remain unimplemented.

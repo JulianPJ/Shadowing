@@ -19,6 +19,7 @@ export async function localAccountHandler(request: Request) {
     services.dictionary,
     services.access,
     services.review,
+    services.tags,
   )(request);
 }
 

@@ -17,6 +17,9 @@ Hibiki runs on Cloudflare Workers via vinext. Standard Next.js is also supported
 | Framework-owned authentication, cookie sessions and local Next adapter | `src/lib/auth/` |
 | Account sync contract, validation, merge, D1 repository and browser hydration | `src/lib/sync/` |
 | Dictionary identity/context and safe replay links | `src/lib/dictionary/` |
+| Dictionary cursor/filter and exact-ID queries, account-scoped record cache | `src/lib/dictionary/query.ts`, `repository.ts`, `cache.ts`, `client.ts` |
+| Descriptive tags, ownership, limits and connected edits | `src/lib/tags/`, `src/components/tag-controls.tsx` |
+| Composed completion recap and explainable revisit evidence | `src/components/lesson-completion-summary.tsx`, `src/lib/lesson-completion.ts` |
 | Collections and entry memberships | `src/lib/decks/`, `src/lib/review/repository.ts` |
 | Pure scheduling, local review outbox and authenticated D1 review | `src/lib/review-scheduler.ts`, `src/lib/review/` |
 | Exportable vocabulary rows and spreadsheet-safe CSV | `src/lib/export/vocabulary.ts` |
@@ -54,6 +57,10 @@ Use Node 24, as declared in `package.json`. Install dependencies with `npm ci`; 
 | Caption relay | Included in `typecheck`; `npm run build:caption-relay` for bundling |
 
 Browser tests use `PLAYWRIGHT_BASE_URL` (default `http://localhost:3000`). Set `PLAYWRIGHT_CHROME_PATH` to an installed Chrome executable when Playwright's bundled browser is unavailable. D1 unit and built-runtime tests use local storage and mocked providers, without contacting live AI/caption services.
+
+`npm run start:vinext:test` serves the built Worker at port 3001 with remote bindings and persistent state disabled. Run the full browser suite with `PLAYWRIGHT_BASE_URL=http://localhost:3001`. CI now verifies both production runtimes, local migrations and the built native Worker/D1 boundary on the same PR head. Focused retention checks: `tests/retention-scale.test.ts` (650 real D1 entries and populated upgrade), `tests/dictionary-cache.test.ts`, `tests/lesson-completion.test.ts`, and `tests/e2e/retention-polish.spec.ts` (806-word browser export/offline hydration).
+
+Interactive dictionary consumers must use `page()` or `byIds()`. Full traversal is an explicit export/compatibility operation, never the Daily Review join or lesson recap default. Cache and query contracts live in [retention](retention-implementation.md). Scheduling remains in `review/`; tags never own or copy schedules. The completion component composes domain outputs without adding player state or AI generation effects.
 
 `npm run format` provides reproducible formatting. Generated assets, build output, lockfiles and authored demo data are excluded. Formatting increases physical line counts; evaluate simplification by ownership and duplicated logic rather than line count alone.
 

@@ -62,7 +62,7 @@ async function connect(
     remote.data = mergeSync(remote.data, data);
     await route.fulfill({ json: { ok: true } });
   });
-  await context.route('**/api/dictionary', async (route) => {
+  await context.route('**/api/dictionary*', async (route) => {
     if (route.request().method() === 'GET') {
       await route.fulfill({ json: { entries: remote.dictionary } });
       return;

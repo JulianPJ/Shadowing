@@ -1,8 +1,8 @@
 'use client';
 import Link from 'next/link';
 import { ExternalLink, Play, Trash2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { listDictionary, removeDictionary } from '@/lib/dictionary/client';
+import { useEffect, useState, useMemo, useRef } from 'react';
+import { listDictionary, dictionaryPage, removeDictionary } from '@/lib/dictionary/client';
 import type { DictionaryEntry } from '@/lib/dictionary/types';
 import { timestamp } from '@/lib/youtube';
 import { useAccount } from './account';
@@ -10,13 +10,38 @@ import { useReview } from './use-review';
 import { ReviewEntryActions } from './review-entry-actions';
 import { changeReview } from '@/lib/review/client';
 import { dueReviews } from '@/lib/review-scheduler';
-import { vocabularyCsv, vocabularyRows } from '@/lib/export/vocabulary';
+import { vocabularyCsv, vocabularyTsv, vocabularyRows } from '@/lib/export/vocabulary';
 import { externalReplay } from '@/lib/dictionary/replay';
+import { TagControls } from './tag-controls';
+import { listTags, changeTags } from '@/lib/tags/client';
+import type { Tag } from '@/lib/tags/types';
 
 export function PersonalDictionary() {
   const account = useAccount();
+  return <DictionaryContent key={account.user?.id ?? 'anonymous'} />;
+}
+
+function DictionaryContent() {
+  const account = useAccount();
   const review = useReview();
   const [deck, setDeck] = useState('all');
+  const [tag, setTag] = useState('all'),
+    [tagData, setTagData] = useState<{ owner: string; tags: Tag[] } | null>(null);
+  const tags = tagData && tagData.owner === account.user?.id ? tagData.tags : [];
+  const generation = useRef(0);
+  const [term, setTerm] = useState(''),
+    [search, setSearch] = useState('');
+  const [nextCursor, setNextCursor] = useState<string | null>(null),
+    [busy, setBusy] = useState(false),
+    [offline, setOffline] = useState(false);
+  const query = useMemo(
+    () => ({
+      ...(deck !== 'all' ? { deckId: deck } : {}),
+      ...(tag !== 'all' ? { tagId: tag } : {}),
+      ...(search ? { term: search } : {}),
+    }),
+    [deck, tag, search],
+  );
   const [deckName, setDeckName] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
   const [loaded, setLoaded] = useState<{
@@ -31,22 +56,52 @@ export function PersonalDictionary() {
     const userId = account.user?.id;
     if (!userId) return;
     let active = true;
-    void listDictionary()
-      .then((entries) => {
-        if (active) setLoaded({ userId, entries, error: '' });
+    const paginationGeneration = generation;
+    paginationGeneration.current++;
+    const load = () =>
+      void dictionaryPage(query)
+        .then((page) => {
+          if (active) {
+            setLoaded({ userId, entries: page.entries, error: '' });
+            setNextCursor(page.nextCursor);
+            setOffline(!!page.offline);
+          }
+        })
+        .catch((reason) => {
+          if (active)
+            setLoaded({
+              userId,
+              entries: [],
+              error: reason instanceof Error ? reason.message : 'Your dictionary is unavailable.',
+            });
+        });
+    load();
+    const refresh = () => {
+      load();
+      void listTags()
+        .then((value) => {
+          if (active) {
+            setTagData({ owner: userId, tags: value });
+            if (query.tagId && !value.some((t) => t.id === query.tagId)) setTag('all');
+          }
+        })
+        .catch(() => {});
+    };
+    void listTags()
+      .then((value) => {
+        if (active) {
+          setTagData({ owner: userId, tags: value });
+          if (query.tagId && !value.some((t) => t.id === query.tagId)) setTag('all');
+        }
       })
-      .catch((reason) => {
-        if (active)
-          setLoaded({
-            userId,
-            entries: [],
-            error: reason instanceof Error ? reason.message : 'Your dictionary is unavailable.',
-          });
-      });
+      .catch(() => {});
+    window.addEventListener('hibiki:dictionary-change', refresh);
     return () => {
       active = false;
+      paginationGeneration.current++;
+      window.removeEventListener('hibiki:dictionary-change', refresh);
     };
-  }, [account.user?.id, account.user?.plan]);
+  }, [account.user?.id, query]);
 
   const entries = account.user && loaded?.userId === account.user.id ? loaded.entries : [];
   const loading = Boolean(account.user && loaded?.userId !== account.user.id);
@@ -60,24 +115,67 @@ export function PersonalDictionary() {
       review.data.memberships.some((m) => m.deckId === deck && m.entryId === e.id),
   );
   const chosen = selected.filter((id) => entries.some((e) => e.id === id));
-  function exportWords() {
-    const blob = new Blob(
-      [
-        vocabularyCsv(
-          vocabularyRows(
-            chosen.length ? entries.filter((e) => chosen.includes(e.id)) : visible,
-            review.data,
-          ),
-        ),
-      ],
-      { type: 'text/csv;charset=utf-8' },
-    );
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = 'hibiki-words.csv';
-    anchor.click();
-    URL.revokeObjectURL(url);
+  async function loadMore() {
+    if (!nextCursor || busy || !account.user) return;
+    const userId = account.user.id,
+      epoch = generation.current;
+    setBusy(true);
+    setActionError('');
+    try {
+      const page = await dictionaryPage({ ...query, cursor: nextCursor }, true);
+      if (epoch !== generation.current) return;
+      setLoaded((current) =>
+        current?.userId === userId
+          ? {
+              ...current,
+              entries: [
+                ...new Map([...current.entries, ...page.entries].map((e) => [e.id, e])).values(),
+              ],
+            }
+          : current,
+      );
+      setNextCursor(page.nextCursor);
+    } catch (e) {
+      setActionError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function exportWords(
+    scope: 'selected' | 'filtered' | 'all',
+    format: 'csv' | 'tsv' = 'csv',
+  ) {
+    setBusy(true);
+    setActionError('');
+    try {
+      const values =
+        scope === 'selected'
+          ? entries.filter((e) => chosen.includes(e.id))
+          : await listDictionary(scope === 'filtered' ? query : {});
+      const rows = vocabularyRows(values, review.data),
+        blob = new Blob([format === 'csv' ? vocabularyCsv(rows) : vocabularyTsv(rows)], {
+          type:
+            format === 'csv' ? 'text/csv;charset=utf-8' : 'text/tab-separated-values;charset=utf-8',
+        });
+      const url = URL.createObjectURL(blob),
+        anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = 'hibiki-words.' + format;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setActionError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function tagEntries(tagId: string, ids: string[], remove = false) {
+    setActionError('');
+    try {
+      await changeTags({ action: 'membership', tagId, entryIds: ids, remove });
+    } catch (e) {
+      setActionError((e as Error).message);
+    }
   }
 
   async function remove(entry: DictionaryEntry) {
@@ -109,7 +207,7 @@ export function PersonalDictionary() {
         </div>
         {account.user ? (
           <span className="dictionary-count">
-            {termCount} {termCount === 1 ? 'term' : 'terms'}
+            {termCount} {termCount === 1 ? 'term' : 'terms'} loaded
           </span>
         ) : null}
       </div>
@@ -129,6 +227,47 @@ export function PersonalDictionary() {
               ))}
             </select>
           </label>
+          <label>
+            Filter by tag{' '}
+            <select value={tag} onChange={(e) => setTag(e.target.value)}>
+              <option value="all">All tags</option>
+              {tags.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              setSearch(term.trim());
+            }}
+          >
+            <label>
+              Find exact term{' '}
+              <input value={term} maxLength={120} onChange={(e) => setTerm(e.target.value)} />
+            </label>
+            <button className="button small-button">Find</button>
+            {search ? (
+              <button
+                type="button"
+                className="text-button"
+                onClick={() => {
+                  setSearch('');
+                  setTerm('');
+                }}
+              >
+                Clear search
+              </button>
+            ) : null}
+          </form>
+          <TagControls
+            tags={tags}
+            selected={chosen}
+            onApply={(tagId) => void tagEntries(tagId, chosen)}
+            onError={setActionError}
+          />
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -210,9 +349,19 @@ export function PersonalDictionary() {
           <button
             className="text-button"
             disabled={!visible.length && !chosen.length}
-            onClick={exportWords}
+            onClick={() => void exportWords(chosen.length ? 'selected' : 'filtered')}
           >
-            Export {chosen.length ? 'selected' : 'visible'} CSV
+            Export {chosen.length ? 'selected' : 'filtered'} CSV
+          </button>
+          <button className="text-button" disabled={busy} onClick={() => void exportWords('all')}>
+            Export entire dictionary CSV
+          </button>
+          <button
+            className="text-button"
+            disabled={busy}
+            onClick={() => void exportWords(chosen.length ? 'selected' : 'filtered', 'tsv')}
+          >
+            Export {chosen.length ? 'selected' : 'filtered'} TSV
           </button>
         </section>
       ) : null}
@@ -257,6 +406,35 @@ export function PersonalDictionary() {
                   <strong>{entry.translation}</strong>
                 </div>
                 <ReviewEntryActions entryId={entry.id} data={review.data} />
+                <div className="entry-tags" aria-label={`Tags for ${entry.term}`}>
+                  {entry.tags?.map((t) => (
+                    <button
+                      className="tag-chip"
+                      key={t.id}
+                      onClick={() => void tagEntries(t.id, [entry.id], true)}
+                      aria-label={`Remove tag ${t.name} from ${entry.term}`}
+                    >
+                      {t.name} ×
+                    </button>
+                  ))}
+                  <label>
+                    + tag{' '}
+                    <select
+                      aria-label={`Add tag to ${entry.term}`}
+                      value=""
+                      onChange={(e) => void tagEntries(e.target.value, [entry.id])}
+                    >
+                      <option value="">Choose tag</option>
+                      {tags
+                        .filter((t) => !entry.tags?.some((current) => current.id === t.id))
+                        .map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.name}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                </div>
                 <div className="dictionary-entry-context">
                   <p lang="ja">{entry.sourceSentence}</p>
                   <p>{entry.sourceSentenceTranslation}</p>
@@ -302,6 +480,16 @@ export function PersonalDictionary() {
           </Link>
         </section>
       )}
+      {nextCursor ? (
+        <button className="button" disabled={busy} onClick={() => void loadMore()}>
+          {busy ? 'Loading…' : 'Load more'}
+        </button>
+      ) : null}
+      {offline ? (
+        <p role="status">
+          Offline · showing cached words on this device. Full exports need a connection.
+        </p>
+      ) : null}
       {error ? (
         <p className="dictionary-page-error" role="alert">
           {error}

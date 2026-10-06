@@ -1,5 +1,12 @@
 import type { DictionaryEntry, DictionaryRepository, DictionarySaveInput } from './types';
 import { normalizeDictionaryTerm } from './validation';
+import {
+  dictionaryCursor,
+  parseDictionaryCursor,
+  validateDictionaryIds,
+  validateDictionaryQuery,
+} from './query';
+import type { Tag } from '../tags/types';
 
 export interface DictionaryStatement {
   bind(...values: (string | number | null)[]): DictionaryStatement;
@@ -67,15 +74,91 @@ source_sentence_translation,lesson_id,segment_id,lesson_title,lesson_author,medi
 media_url,media_content_key,transcript_key,section_start,section_end,created_at,updated_at`;
 
 export function createD1DictionaryRepository(db: DictionaryDatabase): DictionaryRepository {
-  return {
-    async list(userId) {
+  async function hydrate(userId: string, entries: DictionaryEntry[]) {
+    for (let i = 0; i < entries.length; i += 50) {
+      const part = entries.slice(i, i + 50);
       const rows = await db
         .prepare(
-          `SELECT ${columns} FROM user_dictionary_entries WHERE user_id=? ORDER BY created_at DESC,id DESC LIMIT 500`,
+          `SELECT m.entry_id AS entryId,t.id,t.name,t.normalized_name AS normalizedName,t.created_at AS createdAt,t.updated_at AS updatedAt FROM user_dictionary_tags m JOIN user_tags t ON t.user_id=m.user_id AND t.id=m.tag_id WHERE m.user_id=? AND m.entry_id IN (${part.map(() => '?').join(',')}) ORDER BY t.normalized_name,t.id`,
         )
-        .bind(userId)
+        .bind(userId, ...part.map((e) => e.id))
+        .all<Tag & { entryId: string }>();
+      for (const e of part)
+        e.tags = rows.results
+          .filter((r) => r.entryId === e.id)
+          .map(({ id, name, normalizedName, createdAt, updatedAt }) => ({
+            id,
+            name,
+            normalizedName,
+            createdAt,
+            updatedAt,
+          }));
+    }
+    return entries;
+  }
+  const repository: DictionaryRepository = {
+    async page(userId, input) {
+      const query = validateDictionaryQuery(input);
+      const conditions = ['user_id=?'];
+      const values: (string | number)[] = [userId];
+      for (const [field, value] of [
+        ['normalized_term', query.term],
+        ['lesson_id', query.lessonId],
+        ['transcript_key', query.transcriptKey],
+      ] as const)
+        if (value) {
+          conditions.push(`${field}=?`);
+          values.push(value);
+        }
+      for (const [table, field, value] of [
+        ['user_deck_entries', 'deck_id', query.deckId],
+        ['user_dictionary_tags', 'tag_id', query.tagId],
+      ] as const)
+        if (value) {
+          conditions.push(`id IN (SELECT entry_id FROM ${table} WHERE user_id=? AND ${field}=?)`);
+          values.push(userId, value);
+        }
+      if (query.cursor) {
+        const cursor = parseDictionaryCursor(query.cursor);
+        conditions.push('(created_at,id)<(?,?)');
+        values.push(cursor.createdAt, cursor.id);
+      }
+      const rows = await db
+        .prepare(
+          `SELECT ${columns} FROM user_dictionary_entries WHERE ${conditions.join(' AND ')} ORDER BY created_at DESC,id DESC LIMIT ?`,
+        )
+        .bind(...values, query.limit + 1)
         .all<DictionaryRow>();
-      return rows.results.map(entry);
+      const entries = await hydrate(userId, rows.results.slice(0, query.limit).map(entry));
+      const last = entries.at(-1);
+      return {
+        entries,
+        nextCursor:
+          rows.results.length > query.limit && last
+            ? dictionaryCursor(last.createdAt, last.id)
+            : null,
+      };
+    },
+    async byIds(userId, input) {
+      const ids = validateDictionaryIds(input);
+      const rows = await db
+        .prepare(
+          `SELECT ${columns} FROM user_dictionary_entries WHERE user_id=? AND id IN (${ids.map(() => '?').join(',')}) ORDER BY created_at DESC,id DESC`,
+        )
+        .bind(userId, ...ids)
+        .all<DictionaryRow>();
+      return hydrate(userId, rows.results.map(entry));
+    },
+    async list(userId) {
+      // Compatibility facade for explicit full traversal. UI consumers use bounded queries.
+      const entries: DictionaryEntry[] = [];
+      let cursor: string | null = null;
+      do {
+        const page = await repository.page(userId, { cursor });
+        entries.push(...page.entries);
+        cursor = page.nextCursor;
+      } while (cursor);
+      return entries;
     },
     async save(userId: string, input: DictionarySaveInput) {
       const normalized = normalizeDictionaryTerm(input.term);
@@ -142,7 +225,7 @@ export function createD1DictionaryRepository(db: DictionaryDatabase): Dictionary
         )
         .bind(userId, row.id)
         .run();
-      return entry(row);
+      return (await hydrate(userId, [entry(row)]))[0];
     },
     async remove(userId, id) {
       await db
@@ -151,4 +234,5 @@ export function createD1DictionaryRepository(db: DictionaryDatabase): Dictionary
         .run();
     },
   };
+  return repository;
 }

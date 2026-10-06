@@ -244,6 +244,47 @@ try {
     'Content-Type': 'application/json',
   };
   const entryId = dictionaryPayload.entry.id;
+  const tagId = crypto.randomUUID();
+  const tagPost = (body) =>
+    mf.dispatchFetch('https://example.com/api/tags', {
+      method: 'POST',
+      headers: reviewHeaders,
+      body: JSON.stringify(body),
+    });
+  assert.equal((await tagPost({ action: 'create', id: tagId, name: '旅行' })).status, 200);
+  assert.equal(
+    (await tagPost({ action: 'membership', tagId, entryIds: [entryId], remove: false })).status,
+    200,
+  );
+  const exact = await mf.dispatchFetch('https://example.com/api/dictionary?ids=' + entryId, {
+    headers: { Cookie: cookie },
+  });
+  assert.equal(exact.status, 200);
+  assert.equal((await exact.json()).entries[0].tags[0].name, '旅行');
+  const filtered = await mf.dispatchFetch(
+    'https://example.com/api/dictionary?tagId=' + tagId + '&limit=1',
+    { headers: { Cookie: cookie } },
+  );
+  assert.equal(filtered.status, 200);
+  assert.equal((await filtered.json()).entries.length, 1);
+  assert.equal((await tagPost({ action: 'rename', id: tagId, name: '日本旅行' })).status, 200);
+  assert.equal((await mf.dispatchFetch('https://example.com/api/tags')).status, 401);
+  assert.equal(
+    (
+      await mf.dispatchFetch('https://example.com/api/tags', {
+        headers: { Cookie: cookie, 'X-Hibiki-Account': 'other' },
+      })
+    ).status,
+    409,
+  );
+  assert.equal(
+    (
+      await mf.dispatchFetch('https://example.com/api/dictionary?limit=101', {
+        headers: { Cookie: cookie },
+      })
+    ).status,
+    400,
+  );
   const enrolledAt = new Date().toISOString();
   const enrolled = await mf.dispatchFetch('https://example.com/api/review', {
     method: 'POST',
@@ -281,6 +322,12 @@ try {
   ).json();
   assert.equal(graded.cards[0].revision, 1);
   assert.equal(graded.cards[0].intervalDays, 1);
+  assert.equal((await tagPost({ action: 'delete', id: tagId })).status, 200);
+  const afterTagDelete = await (
+    await mf.dispatchFetch('https://example.com/api/review', { headers: { Cookie: cookie } })
+  ).json();
+  assert.equal(afterTagDelete.cards[0].revision, 1);
+  assert.deepEqual((await db.prepare('PRAGMA foreign_key_check').all()).results, []);
   assert.equal((await mf.dispatchFetch('https://example.com/api/review')).status, 401);
   assert.equal(
     (

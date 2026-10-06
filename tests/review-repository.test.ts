@@ -25,7 +25,7 @@ before(async () => {
   // Run historical migrations before 0007, including realistic existing users/words.
   for (const file of (await readdir('migrations'))
     .sort()
-    .filter((f) => f.endsWith('.sql') && !f.startsWith('0007')))
+    .filter((f) => f.endsWith('.sql') && Number(f.slice(0, 4)) < 7))
     await db.batch(
       (await readFile(`migrations/${file}`, 'utf8'))
         .split(';')
@@ -45,6 +45,13 @@ before(async () => {
     .run();
   await db.batch(
     (await readFile('migrations/0007_retention.sql', 'utf8'))
+      .split(';')
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map((s) => db.prepare(s)),
+  );
+  await db.batch(
+    (await readFile('migrations/0008_tags_dictionary_pagination.sql', 'utf8'))
       .split(';')
       .map((s) => s.trim())
       .filter(Boolean)

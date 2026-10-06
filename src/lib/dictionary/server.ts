@@ -1,6 +1,7 @@
 import { BodyLimitError, readBoundedText } from '../http-body';
 import type { DictionaryRepository } from './types';
 import { DictionaryValidationError, validateDictionarySaveInput } from './validation';
+import { readDictionaryQuery, validateDictionaryIds } from './query';
 
 export async function handleDictionaryRequest(
   request: Request,
@@ -11,7 +12,21 @@ export async function handleDictionaryRequest(
   const headers = { 'Cache-Control': 'no-store', Vary: 'Cookie' };
   const respond = (body: unknown, status = 200) => Response.json(body, { status, headers });
   try {
-    if (request.method === 'GET') return respond({ entries: await repository.list(userId) });
+    if (request.method === 'GET') {
+      const params = new URL(request.url).searchParams;
+      const query = readDictionaryQuery(params);
+      if (params.has('ids')) {
+        if ([...params.keys()].some((k) => k !== 'ids'))
+          throw new DictionaryValidationError('Invalid dictionary query');
+        const ids = validateDictionaryIds(params.get('ids')!.split(','));
+        const entries = await repository.byIds(userId, ids);
+        // Missing or foreign IDs return no material, without disclosing their owner/existence.
+        if (entries.length !== ids.length)
+          return respond({ error: 'Selected vocabulary is unavailable. Refresh review.' }, 404);
+        return respond({ entries });
+      }
+      return respond(await repository.page(userId, query));
+    }
     if (request.method !== 'POST') return respond({ error: 'Method not supported' }, 405);
     if (!emailVerified)
       return respond({ error: 'Verify your email before saving vocabulary.' }, 403);
