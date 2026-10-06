@@ -30,7 +30,7 @@ export function ComprehensionQuiz({
   onOpenChange,
 }: Props) {
   const { isPro } = useProAccess();
-  const quizAvailable = isPro || lesson.source === 'demo';
+  const quizAvailable = isPro;
   const [quiz, setQuiz] = useState<LessonQuiz | null>(null);
   const [attempt, setAttempt] = useState<QuizAttempt | null>(null);
   const [open, setOpen] = useState(false);
