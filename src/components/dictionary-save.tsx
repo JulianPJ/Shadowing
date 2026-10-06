@@ -26,7 +26,7 @@ export function DictionarySavePanel({
   const account = useAccount();
   const [translation, setTranslation] = useState('');
   const [sentenceMeaning, setSentenceMeaning] = useState(sourceTranslation ?? '');
-  const [loading, setLoading] = useState(Boolean(account.user?.emailVerified));
+  const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
@@ -64,7 +64,7 @@ export function DictionarySavePanel({
           setError(reason instanceof Error ? reason.message : 'Translation is unavailable right now.');
       })
       .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
+        if (!controller.signal.aborted) setLoaded(true);
       });
     return () => controller.abort();
   }, [account.user?.emailVerified, lesson, segment, sourceTranslation, term]);
@@ -113,7 +113,7 @@ export function DictionarySavePanel({
         <p role="status">Verify your account email before saving vocabulary.</p>
       ) : (
         <>
-          {loading ? (
+          {!loaded ? (
             <p className="dictionary-loading" role="status">
               <LoaderCircle className="spin" size={15} />
               Finding the meaning…
@@ -153,7 +153,7 @@ export function DictionarySavePanel({
           <div className="dictionary-save-actions">
             <button
               className="button primary"
-              disabled={loading || saving || !translation.trim() || !sentenceMeaning.trim()}
+              disabled={!loaded || saving || !translation.trim() || !sentenceMeaning.trim()}
               onClick={() => void save()}
             >
               <BookPlus size={15} />
