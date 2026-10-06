@@ -1,8 +1,9 @@
 import type { DatabaseSync, SQLInputValue } from 'node:sqlite';
 import type { ProgressDatabase, ProgressStatement } from './repository';
+import type { DictionaryDatabase, DictionaryStatement } from '../dictionary/repository';
 // Local development only; application SQL is identical to the D1 repository.
-export function localProgressDatabase(db: DatabaseSync): ProgressDatabase {
-  class Statement implements ProgressStatement {
+export function localProgressDatabase(db: DatabaseSync): ProgressDatabase & DictionaryDatabase {
+  class Statement implements ProgressStatement, DictionaryStatement {
     constructor(
       readonly sql: string,
       readonly values: SQLInputValue[] = [],
@@ -15,6 +16,9 @@ export function localProgressDatabase(db: DatabaseSync): ProgressDatabase {
     }
     async all<T>() {
       return { results: db.prepare(this.sql).all(...this.values) as T[] };
+    }
+    async run() {
+      return db.prepare(this.sql).run(...this.values);
     }
   }
   return {
