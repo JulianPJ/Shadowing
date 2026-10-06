@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import fs from 'node:fs';
 import demo from '../../src/data/demo.json' with { type: 'json' };
+import { mockProAccount } from '../helpers/pro-account';
 
 const id = 'IJ6R4u05ppw';
 const videoUrl = `https://www.youtube.com/watch?v=${id}`;
@@ -117,6 +118,7 @@ test('no-captions → own transcript retains link, identity, title and author wi
 test('captionless link generates subtitles from attached media while preserving link identity', async ({
   page,
 }) => {
+  await mockProAccount(page);
   await page.goto('/');
   await mockYouTube(page);
   await page.route('**/api/prepare', (route) =>

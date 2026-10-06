@@ -7,6 +7,7 @@ import { loadQuiz, loadQuizAttempt, saveQuiz, saveQuizAttempt } from '@/lib/stor
 import { timestamp } from '@/lib/youtube';
 import { JapaneseText } from './japanese-text';
 import { postContentRequest } from '@/lib/content-request';
+import { ProFeatureNotice, useProAccess } from './pro-feature';
 
 type Props = {
   furigana?: boolean;
@@ -28,6 +29,8 @@ export function ComprehensionQuiz({
   onReturn,
   onOpenChange,
 }: Props) {
+  const { isPro } = useProAccess();
+  const quizAvailable = isPro;
   const [quiz, setQuiz] = useState<LessonQuiz | null>(null);
   const [attempt, setAttempt] = useState<QuizAttempt | null>(null);
   const [open, setOpen] = useState(false);
@@ -134,6 +137,15 @@ export function ComprehensionQuiz({
       quiz,
     );
   }
+  if (!quizAvailable)
+    return (
+      <section id="lesson-quiz" className="quiz-card" aria-labelledby="quiz-title" tabIndex={-1}>
+        <span className="eyebrow">ONE MORE MOMENT WITH THIS LESSON</span>
+        <h2 id="quiz-title">Check your understanding</h2>
+        <ProFeatureNotice feature="Generated comprehension checks" />
+      </section>
+    );
+
   return (
     <section id="lesson-quiz" className="quiz-card" aria-labelledby="quiz-title" tabIndex={-1}>
       <span className="eyebrow">ONE MORE MOMENT WITH THIS LESSON</span>

@@ -1,4 +1,8 @@
-export async function POST() {
+import { localRequirePro } from '@/lib/auth/local-handler';
+
+export async function POST(request: Request) {
+  const denied = await localRequirePro(request);
+  if (denied) return denied;
   return Response.json(
     {
       error:

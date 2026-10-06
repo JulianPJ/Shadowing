@@ -1,5 +1,5 @@
 'use client';
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import {
   calculateSpeechSpeed,
   validateDifficultyAnalysis,
@@ -55,7 +55,7 @@ function DifficultyCard({
       abort.current?.abort();
     };
   }, []);
-  async function analyze() {
+  const analyze = useCallback(async () => {
     if (busy.current || checkingCache || analysis) return;
     busy.current = true;
     setLoading(true);
@@ -118,7 +118,11 @@ function DifficultyCard({
         onWaitingChange?.(false);
       }
     }
-  }
+  }, [analysis, checkingCache, lesson, onWaitingChange]);
+  useEffect(() => {
+    if (!checkingCache && !analysis && !insufficient) void analyze();
+  }, [analysis, analyze, checkingCache, insufficient]);
+
   const dimensions = analysis
     ? [
         { title: 'Vocabulary', value: analysis.vocabulary.label },
@@ -170,8 +174,8 @@ function DifficultyCard({
             <span className="small muted"> · Estimated from captions</span>
           </p>
           <p className="small muted">
-            Estimate the language demands when it’s useful. This is an approximate guide, not an
-            official JLPT classification.
+            Hibiki estimates the language demands automatically. This is an approximate guide,
+            not an official JLPT classification.
           </p>
           <button
             className="button difficulty-toggle"

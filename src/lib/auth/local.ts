@@ -5,12 +5,14 @@ import { createAuth, authEnvironment } from './server';
 import { createD1UserProgressRepository } from '../sync/repository';
 import { localProgressDatabase } from '../sync/local-database';
 import { createD1DictionaryRepository } from '../dictionary/repository';
+import { createD1AccessRepository } from '../access';
 
 let local:
   | Promise<{
       auth: ReturnType<typeof createAuth>;
       repository: ReturnType<typeof createD1UserProgressRepository>;
       dictionary: ReturnType<typeof createD1DictionaryRepository>;
+      access: ReturnType<typeof createD1AccessRepository>;
     } | null>
   | undefined;
 export function localAuth() {
@@ -37,6 +39,7 @@ export function localAuth() {
       auth: createAuth(db, authEnvironment()),
       repository: createD1UserProgressRepository(database),
       dictionary: createD1DictionaryRepository(database),
+      access: createD1AccessRepository(database),
     };
   })();
   return local;

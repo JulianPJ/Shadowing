@@ -14,6 +14,14 @@ const user: AccountUser = {
   email: 'learner@example.com',
   name: 'Learner',
   emailVerified: true,
+  plan: 'pro',
+};
+const freeUser: AccountUser = {
+  ...user,
+  id: 'account-free',
+  email: 'free@example.com',
+  name: 'Free learner',
+  plan: 'free',
 };
 class Remote {
   data = emptySync();
@@ -151,6 +159,20 @@ async function anonymousFixture() {
     'hibiki:v1:recording': 'PRIVATE_AUDIO',
   };
 }
+
+test('account plan controls paid UI without hiding the core account experience', async ({
+  page,
+  context,
+}) => {
+  const remote = new Remote();
+  await connect(context, remote, { user: freeUser });
+  await account(page);
+  await expect(page.getByText('Hibiki Free', { exact: true })).toBeVisible();
+  await page.goto('/dictionary');
+  await expect(page.getByText('My Words / Personal Dictionary is a Hibiki Pro feature.')).toBeVisible();
+  await expect(page.getByText('Opening your dictionary…')).toHaveCount(0);
+});
+
 test('explicit first-login import preserves local data and excludes private content, recordings and signed URLs', async ({
   page,
   context,

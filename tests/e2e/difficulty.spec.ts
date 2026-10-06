@@ -6,15 +6,13 @@ import questions from '../../src/data/demo-quiz.json' with { type: 'json' };
 import { createDifficultyAnalysis } from '../../src/lib/difficulty';
 import { createQuiz, transcriptRevision } from '../../src/lib/quiz';
 import type { Lesson } from '../../src/lib/types';
+import { mockProAccount, proStorageKey } from '../helpers/pro-account';
 
 async function openDemo(page: Page) {
   await page.goto('/practice/demo');
   await expect(page.getByRole('button', { name: 'Listen', exact: true })).toBeEnabled();
-  await expect(
-    page.getByRole('button', { name: 'Estimate difficulty', exact: true }),
-  ).toBeEnabled();
 }
-test('lazy analysis shows compact classifications for all five dimensions and reuses reload cache', async ({
+test('automatic analysis shows compact classifications for all five dimensions and reuses reload cache', async ({
   page,
 }) => {
   const errors: string[] = [];
@@ -27,11 +25,8 @@ test('lazy analysis shows compact classifications for all five dimensions and re
   });
   await openDemo(page);
   const card = page.getByTestId('lesson-difficulty');
-  await expect(card).toContainText('Estimated from captions');
-  expect(calls).toBe(0);
-  await expect(card).toContainText('not an official JLPT classification');
-  await page.getByRole('button', { name: 'Estimate difficulty', exact: true }).click();
   await expect(card.locator('dl')).toContainText('N5–N4');
+  expect(calls).toBe(1);
   for (const dimension of ['Approx. level', 'Vocabulary', 'Grammar', 'Speech', 'Conversation'])
     await expect(card.getByText(dimension, { exact: true })).toBeVisible();
   await expect(card).toContainText('Classification uses the full Japanese transcript');
@@ -43,12 +38,13 @@ test('lazy analysis shows compact classifications for all five dimensions and re
 test('API failure and malformed result can be retried while playback and the completed quiz still work', async ({
   page,
 }) => {
+  await mockProAccount(page);
   const analysis = await createDifficultyAnalysis(authored, demo as Lesson);
   let calls = 0;
   await page.addInitScript(
-    (revision) =>
-      localStorage.setItem('hibiki:v1:completion:demo', JSON.stringify({ transcript: revision })),
-    transcriptRevision(demo as Lesson),
+    ({ key, revision }) =>
+      localStorage.setItem(key, JSON.stringify({ transcript: revision })),
+    { key: proStorageKey('completion:demo'), revision: transcriptRevision(demo as Lesson) },
   );
   await page.route('**/api/difficulty', (route) => {
     calls++;
@@ -63,7 +59,6 @@ test('API failure and malformed result can be retried while playback and the com
   const quiz = await createQuiz(questions, demo as Lesson);
   await page.route('**/api/quiz', (route) => route.fulfill({ json: { quiz } }));
   await openDemo(page);
-  await page.getByRole('button', { name: 'Estimate difficulty', exact: true }).click();
   const card = page.getByTestId('lesson-difficulty');
   await expect(card.getByRole('alert')).toContainText('unavailable');
   await expect(card).not.toContainText('SECRET');
@@ -82,12 +77,6 @@ test('real authored demo route works without provider credentials and fits mobil
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await openDemo(page);
-  expect(
-    await page
-      .getByRole('button', { name: 'Estimate difficulty', exact: true })
-      .evaluate((e) => e.getBoundingClientRect().height),
-  ).toBeGreaterThanOrEqual(44);
-  await page.getByRole('button', { name: 'Estimate difficulty', exact: true }).click();
   const card = page.getByTestId('lesson-difficulty');
   await expect(card.locator('dl')).toContainText('N5–N4');
   await expect(card).toContainText('Classification uses the full Japanese transcript');
@@ -129,11 +118,6 @@ test('editing the same stored lesson invalidates cached analysis and generates f
     localStorage.setItem('hibiki:v1:lesson:difficulty-custom', JSON.stringify(value));
   });
   await page.reload();
-  await expect(
-    page.getByRole('button', { name: 'Estimate difficulty', exact: true }),
-  ).toBeEnabled();
-  await expect(page.getByTestId('lesson-difficulty').locator('dl')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Estimate difficulty', exact: true }).click();
   await expect(page.getByTestId('lesson-difficulty').locator('dl')).toContainText('N5–N4');
   expect(calls).toBe(1);
   const next = await page.evaluate(() =>
@@ -159,7 +143,6 @@ test('pending analysis leaves shadowing controls usable and storage failure reta
       throw new DOMException('Quota exceeded', 'QuotaExceededError');
     };
   });
-  await page.getByRole('button', { name: 'Estimate difficulty', exact: true }).click();
   await expect(page.getByTestId('lesson-difficulty').getByRole('status')).toContainText(
     'keep practicing',
   );
@@ -219,10 +202,9 @@ test('reattaching local media preserves a pending analysis for the unchanged tra
     await route.fulfill({ json: { analysis } });
   });
   await page.goto('/practice/difficulty-reattach');
-  await expect(
-    page.getByRole('button', { name: 'Estimate difficulty', exact: true }),
-  ).toBeEnabled();
-  await page.getByRole('button', { name: 'Estimate difficulty', exact: true }).click();
+  await expect(page.getByTestId('lesson-difficulty').getByRole('status')).toContainText(
+    'keep practicing',
+  );
   await page.getByLabel('Reattach media').setInputFiles(path.resolve('public/demo.mp4'));
   await expect(page.getByRole('button', { name: 'Listen', exact: true })).toBeEnabled();
   release();

@@ -6,6 +6,7 @@ import { createQuiz, transcriptKey } from '../../src/lib/quiz';
 import { createDifficultyAnalysis } from '../../src/lib/difficulty';
 import { createSession, lessonIdentity } from '../../src/lib/learner-progress';
 import type { Lesson } from '../../src/lib/types';
+import { mockProAccount } from '../helpers/pro-account';
 
 async function openDemo(page: Page) {
   await page.goto('/practice/demo');
@@ -122,6 +123,7 @@ test('recording attempts capture no audio and current progress is usable on mobi
 test('completion and quiz retakes feed existing comprehension history; evidence replay stays distinct', async ({
   page,
 }) => {
+  await mockProAccount(page);
   const quiz = await createQuiz(questions, demo as Lesson);
   await page.route('**/api/quiz', (route) => route.fulfill({ json: { quiz } }));
   await openDemo(page);
@@ -242,7 +244,6 @@ test('five practised unique analyzed lessons produce typical content and later a
     route.fulfill({ json: { analysis: analyses[4] } }),
   );
   await page.goto(`/practice/${lessons[4].id}`);
-  await page.getByRole('button', { name: 'Estimate difficulty', exact: true }).click();
   await expect(page.locator('.difficulty-summary')).toBeVisible();
   await progress(page);
   await expect(page.locator('.content-range')).toHaveText(
@@ -286,10 +287,11 @@ test('checkpointing is incremental, bounded and excludes a quiz/analysis wait', 
     await new Promise((resolve) => setTimeout(resolve, 5000));
     await route.fulfill({ status: 503, json: { error: 'Unavailable' } });
   });
-  await page.getByRole('button', { name: 'Estimate difficulty', exact: true }).click();
+  await page.evaluate(() => localStorage.removeItem('hibiki:v1:difficulty:demo'));
   const seconds = (await history(page)).sessions.find(
     (s: { origin: string }) => s.origin === 'practice',
   ).activeSeconds;
+  await page.reload();
   await expect(page.getByRole('button', { name: 'Retry difficulty analysis' })).toBeVisible();
   await progress(page);
   const final = (await history(page)).sessions.find(

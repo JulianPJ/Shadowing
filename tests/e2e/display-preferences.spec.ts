@@ -3,6 +3,7 @@ import demo from '../../src/data/demo.json' with { type: 'json' };
 import questions from '../../src/data/demo-quiz.json' with { type: 'json' };
 import { createQuiz, transcriptRevision } from '../../src/lib/quiz';
 import type { Lesson } from '../../src/lib/types';
+import { mockProAccount, proStorageKey } from '../helpers/pro-account';
 
 async function open(page: Page) {
   await page.goto('/practice/demo');
@@ -157,6 +158,7 @@ test('ruby on current/transcript, canonical search/copy bases/storage and prefer
 test('Studio and Furigana preserve quiz answers, difficulty, identity and bounded evidence replay', async ({
   page,
 }) => {
+  await mockProAccount(page);
   const quiz = await createQuiz(questions, demo as Lesson);
   let calls = 0;
   await page.route('**/api/quiz', (route) => {
@@ -164,12 +166,11 @@ test('Studio and Furigana preserve quiz answers, difficulty, identity and bounde
     return route.fulfill({ json: { quiz } });
   });
   await page.addInitScript(
-    ({ revision }) =>
-      localStorage.setItem('hibiki:v1:completion:demo', JSON.stringify({ transcript: revision })),
-    { revision: transcriptRevision(demo as Lesson) },
+    ({ key, revision }) =>
+      localStorage.setItem(key, JSON.stringify({ transcript: revision })),
+    { key: proStorageKey('completion:demo'), revision: transcriptRevision(demo as Lesson) },
   );
   await open(page);
-  await page.getByRole('button', { name: 'Estimate difficulty' }).click();
   await expect(page.locator('.difficulty-summary')).toBeVisible();
   await page.getByRole('button', { name: 'Take comprehension check' }).click();
   await page.getByRole('group', { name: 'Answer options' }).getByRole('button').nth(0).click();

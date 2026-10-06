@@ -36,6 +36,7 @@ import { ComprehensionQuiz } from '../comprehension-quiz';
 import { LessonDifficulty } from '../lesson-difficulty';
 import { ShadowingCompletion } from '../shadowing-completion';
 import { TopicVocabularyOverview } from '../topic-vocabulary-overview';
+import { useProAccess } from '../pro-feature';
 import { transcriptRevision } from '@/lib/transcript';
 import {
   aggregateShadowingScores,
@@ -58,6 +59,7 @@ import { usePlaybackBoundary } from './use-playback-boundary';
 import { TranscriptPanel } from './transcript-panel';
 export type Session = { lesson: Lesson; index: number; preferences: Preferences };
 export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () => void }) {
+  const { isPro } = useProAccess();
   const shadowingRevision = transcriptRevision(session.lesson);
   const [lesson, setLesson] = useState(session.lesson);
   const [index, setIndex] = useState(session.index);
@@ -206,7 +208,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
   );
 
   useEffect(() => {
-    if (!finished || !shadowingSignals) return;
+    if (!isPro || !finished || !shadowingSignals) return;
     if (shadowingScores.summary?.fingerprint === shadowingSignals.fingerprint) return;
     if (summaryAbort.current) return;
     const controller = new AbortController();
@@ -229,7 +231,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
         if (!controller.signal.aborted) setSummaryLoading(false);
       });
     return () => controller.abort();
-  }, [finished, shadowingSignals, shadowingScores.summary?.fingerprint]);
+  }, [finished, isPro, shadowingSignals, shadowingScores.summary?.fingerprint]);
 
   const navigate = useCallback(
     (nextIndex: number, play = true, evidenceReplay = false) => {
@@ -738,7 +740,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
               onNewRecording={() => setScoringError('')}
             />
           </div>
-          {finished && shadowingAggregate ? (
+          {isPro && finished && shadowingAggregate ? (
             <ShadowingCompletion
               aggregate={shadowingAggregate}
               summary={currentShadowingSummary}

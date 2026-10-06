@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Mic, Square, Trash2, LoaderCircle, Sparkles, RotateCcw } from 'lucide-react';
 import { shadowingScoreLabel, type ShadowingSectionResult } from '@/lib/shadowing-score';
+import { ProFeatureNotice, useProAccess } from './pro-feature';
 
 export function VoiceRecorder({
   enabled,
@@ -26,6 +27,7 @@ export function VoiceRecorder({
   onAnalyze?: (recording: Blob, durationSeconds: number) => Promise<boolean>;
   onNewRecording?: () => void;
 }) {
+  const { isPro } = useProAccess();
   const [recording, setRecording] = useState(false);
   const [requesting, setRequesting] = useState(false);
   const [recorded, setRecorded] = useState('');
@@ -149,7 +151,7 @@ export function VoiceRecorder({
   }
 
   async function analyze() {
-    if (!recordedBlob.current || !onAnalyze || analyzing || analyzedCurrent) return;
+    if (!isPro || !recordedBlob.current || !onAnalyze || analyzing || analyzedCurrent) return;
     const ok = await onAnalyze(recordedBlob.current, recordedDuration);
     if (mounted.current && ok) setAnalyzedCurrent(true);
   }
@@ -227,39 +229,43 @@ export function VoiceRecorder({
             </button>
           </div>
           {onAnalyze ? (
-            <div className="recording-analysis-actions">
-              <button
-                className="button shadowing-analyze-button"
-                disabled={analyzing || analyzedCurrent}
-                onClick={() => void analyze()}
-              >
-                {analyzing ? (
-                  <>
-                    <LoaderCircle className="spin" size={15} />
-                    Analysing…
-                  </>
-                ) : analyzedCurrent ? (
-                  <>
-                    <Sparkles size={15} />
-                    Attempt analysed
-                  </>
-                ) : (
-                  <>
-                    <Sparkles size={15} />
-                    Analyse attempt
-                  </>
-                )}
-              </button>
-              <span>
-                Analysing sends only this recording to Cloudflare AI for transcription. Hibiki does
-                not save the recording server-side.
-              </span>
-            </div>
+            isPro ? (
+              <div className="recording-analysis-actions">
+                <button
+                  className="button shadowing-analyze-button"
+                  disabled={analyzing || analyzedCurrent}
+                  onClick={() => void analyze()}
+                >
+                  {analyzing ? (
+                    <>
+                      <LoaderCircle className="spin" size={15} />
+                      Analysing…
+                    </>
+                  ) : analyzedCurrent ? (
+                    <>
+                      <Sparkles size={15} />
+                      Attempt analysed
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={15} />
+                      Analyse attempt
+                    </>
+                  )}
+                </button>
+                <span>
+                  Analysing sends only this recording to Cloudflare AI for transcription. Hibiki does
+                  not save the recording server-side.
+                </span>
+              </div>
+            ) : (
+              <ProFeatureNotice feature="Shadowing Match recording analysis" compact />
+            )
           ) : null}
         </>
       ) : null}
 
-      {analysis ? (
+      {analysis && isPro ? (
         <section className="shadowing-result" aria-labelledby="shadowing-match-title">
           <div className="shadowing-result-heading">
             <div>

@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import demo from '../../src/data/demo.json' with { type: 'json' };
 import path from 'node:path';
+import { mockProAccount } from '../helpers/pro-account';
 
 async function openDemo(page: Page) {
   await page.goto('/');
@@ -198,6 +199,7 @@ test('shadowing analysis is explicit, scores one recording, and shows aggregate 
   page,
   context,
 }) => {
+  await mockProAccount(page);
   await context.grantPermissions(['microphone']);
   let transcriptions = 0;
   let feedbackCalls = 0;

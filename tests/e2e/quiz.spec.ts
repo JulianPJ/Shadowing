@@ -3,6 +3,7 @@ import demo from '../../src/data/demo.json' with { type: 'json' };
 import questions from '../../src/data/demo-quiz.json' with { type: 'json' };
 import { createQuiz, transcriptRevision } from '../../src/lib/quiz';
 import type { Lesson } from '../../src/lib/types';
+import { mockProAccount, proStorageKey } from '../helpers/pro-account';
 
 async function finishLesson(page: Page, continuous = false) {
   await page.goto('/practice/demo');
@@ -30,6 +31,7 @@ async function mockQuiz(page: Page) {
 test('complete lesson, answer, explain, replay bounded evidence, return, finish, persist and reuse', async ({
   page,
 }) => {
+  await mockProAccount(page);
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   const mock = await mockQuiz(page);
@@ -104,8 +106,9 @@ test('complete lesson, answer, explain, replay bounded evidence, return, finish,
   await page.getByRole('button', { name: 'Finish comprehension check' }).click();
   await expect(page.locator('.quiz-summary')).toContainText('4 / 5 correct');
   await expect(page.locator('.quiz-summary')).toContainText('Result saved');
-  const history = await page.evaluate(() =>
-    JSON.parse(localStorage.getItem('hibiki:v1:quiz-attempts')!),
+  const history = await page.evaluate(
+    (key) => JSON.parse(localStorage.getItem(key)!),
+    proStorageKey('quiz-attempts'),
   );
   expect(history).toHaveLength(1);
   expect(history[0]).toMatchObject({
@@ -125,6 +128,7 @@ test('complete lesson, answer, explain, replay bounded evidence, return, finish,
 test('continuous completion opens optional quiz with first-class mobile layout', async ({
   page,
 }) => {
+  await mockProAccount(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await mockQuiz(page);
   await finishLesson(page, true);
@@ -149,6 +153,7 @@ test('continuous completion opens optional quiz with first-class mobile layout',
 test('provider failure and malformed output offer retry without blocking a completed lesson', async ({
   page,
 }) => {
+  await mockProAccount(page);
   let calls = 0;
   const quiz = await createQuiz(questions, demo as Lesson);
   await page.route('**/api/quiz', (route) => {
@@ -175,13 +180,15 @@ test('provider failure and malformed output offer retry without blocking a compl
   await page.getByRole('button', { name: 'Retry comprehension check' }).click();
   await expect(page.getByRole('heading', { name: questions.questions[0].question })).toBeVisible();
 });
-test('real demo API generates a quiz without provider configuration', async ({ page }) => {
+test('free completion exposes the comprehension check as a Pro feature', async ({ page }) => {
   await page.addInitScript(
     ({ revision }) =>
       localStorage.setItem('hibiki:v1:completion:demo', JSON.stringify({ transcript: revision })),
     { revision: transcriptRevision(demo as Lesson) },
   );
   await page.goto('/practice/demo');
-  await page.getByRole('button', { name: 'Take comprehension check' }).click();
-  await expect(page.getByRole('heading', { name: questions.questions[0].question })).toBeVisible();
+  const quiz = page.locator('#lesson-quiz');
+  await expect(quiz.getByRole('heading', { name: 'Check your understanding' })).toBeVisible();
+  await expect(quiz).toContainText('Generated comprehension checks is a Hibiki Pro feature.');
+  await expect(page.getByRole('button', { name: 'Take comprehension check' })).toHaveCount(0);
 });

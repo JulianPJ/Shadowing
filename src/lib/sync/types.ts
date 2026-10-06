@@ -87,4 +87,10 @@ export interface UserProgressRepository {
   bootstrap(userId: string, cursor?: string | null): Promise<SyncPage>;
   push(userId: string, data: SyncData): Promise<void>;
 }
-export type AccountUser = { id: string; email: string; name: string; emailVerified: boolean };
+export type AccountUser = {
+  id: string;
+  email: string;
+  name: string;
+  emailVerified: boolean;
+  plan: 'free' | 'pro';
+};
