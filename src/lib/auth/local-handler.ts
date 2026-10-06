@@ -10,5 +10,11 @@ export async function localAccountHandler(request: Request) {
           { headers: { 'Cache-Control': 'no-store' } },
         )
       : Response.json({ error: 'Sign in required' }, { status: 401 });
-  return accountHandler(services.auth, services.repository, authEnvironment())(request);
+  return accountHandler(
+    services.auth,
+    services.repository,
+    authEnvironment(),
+    undefined,
+    services.dictionary,
+  )(request);
 }

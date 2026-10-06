@@ -161,6 +161,69 @@ try {
     ).furigana,
     1,
   );
+  const dictionaryEntry = {
+    schemaVersion: 1,
+    term: '勉強',
+    reading: 'べんきょう',
+    translation: 'study',
+    sourceSentence: '日本語を勉強しています。',
+    sourceSentenceTranslation: 'I am studying Japanese.',
+    source: {
+      lessonId: 'youtube:IJ6R4u05ppw',
+      segmentId: 'segment-runtime',
+      lessonTitle: 'Runtime fixture',
+      lessonAuthor: 'Mock provider',
+      mediaType: 'youtube',
+      mediaId: 'IJ6R4u05ppw',
+      mediaUrl: 'https://www.youtube.com/watch?v=IJ6R4u05ppw',
+      mediaContentKey: 'youtube:IJ6R4u05ppw',
+      transcriptKey: 'a'.repeat(64),
+      start: 12.5,
+      end: 16.2,
+    },
+  };
+  const dictionarySaved = await mf.dispatchFetch('https://example.com/api/dictionary', {
+    method: 'POST',
+    headers: { Cookie: cookie, Origin: 'https://example.com', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'save', entry: dictionaryEntry }),
+  });
+  assert.equal(
+    dictionarySaved.status,
+    200,
+    `Dictionary save failed: ${await dictionarySaved.clone().text()}`,
+  );
+  const dictionaryPayload = await dictionarySaved.json();
+  assert.equal(dictionaryPayload.entry.term, '勉強');
+  assert.equal(dictionaryPayload.entry.source.start, 12.5);
+  assert.equal(
+    (
+      await db
+        .prepare('SELECT COUNT(*) AS n FROM user_dictionary_entries WHERE user_id=?')
+        .bind(identity.user.id)
+        .first()
+    ).n,
+    1,
+  );
+  const dictionaryList = await mf.dispatchFetch('https://example.com/api/dictionary', {
+    headers: { Cookie: cookie },
+  });
+  assert.equal(dictionaryList.status, 200);
+  assert.equal((await dictionaryList.json()).entries.length, 1);
+  const dictionaryDeleted = await mf.dispatchFetch('https://example.com/api/dictionary', {
+    method: 'POST',
+    headers: { Cookie: cookie, Origin: 'https://example.com', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'delete', id: dictionaryPayload.entry.id }),
+  });
+  assert.equal(dictionaryDeleted.status, 200);
+  assert.equal(
+    (
+      await db
+        .prepare('SELECT COUNT(*) AS n FROM user_dictionary_entries WHERE user_id=?')
+        .bind(identity.user.id)
+        .first()
+    ).n,
+    0,
+  );
   const signedOut = await mf.dispatchFetch('https://example.com/api/auth/sign-out', {
     method: 'POST',
     headers: { Cookie: cookie, Origin: 'https://example.com', 'Content-Type': 'application/json' },
@@ -175,8 +238,16 @@ try {
     ).status,
     401,
   );
+  assert.equal(
+    (
+      await mf.dispatchFetch('https://example.com/api/dictionary', {
+        headers: { Cookie: cookie },
+      })
+    ).status,
+    401,
+  );
   console.log(
-    'Built Worker + D1: framework password hashing, email verification, cookie session, learner sync and sign-out passed with mocked email delivery.',
+    'Built Worker + D1: framework password hashing, email verification, cookie session, learner sync, personal dictionary and sign-out passed with mocked email delivery.',
   );
   let lesson;
   for (let i = 0; i < 2; i++) {

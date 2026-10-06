@@ -3,6 +3,7 @@ import vinextHandler from 'vinext/server/fetch-handler';
 import { createAuth, handleAuthRequest } from './src/lib/auth/server';
 import { accountHandler } from './src/lib/sync/server';
 import { createD1UserProgressRepository } from './src/lib/sync/repository';
+import { createD1DictionaryRepository } from './src/lib/dictionary/repository';
 import { serveDemoAsset } from './src/lib/demo-asset';
 import { handleQuizRequest } from './src/lib/quiz-api';
 import { createWorkersAiQuizProvider } from './src/lib/providers/quiz';
@@ -66,7 +67,8 @@ const worker = {
     if (
       url.pathname.startsWith('/api/auth/') ||
       url.pathname.startsWith('/api/account/') ||
-      url.pathname.startsWith('/api/sync/')
+      url.pathname.startsWith('/api/sync/') ||
+      url.pathname === '/api/dictionary'
     ) {
       if (!env.HIBIKI_DB || !env.AUTH_SECRET || !env.AUTH_BASE_URL) {
         return url.pathname === '/api/account/me'
@@ -85,6 +87,7 @@ const worker = {
               createD1UserProgressRepository(env.HIBIKI_DB),
               env,
               env.HIBIKI_DB,
+              createD1DictionaryRepository(env.HIBIKI_DB),
             )(request);
       } catch {
         return Response.json(
