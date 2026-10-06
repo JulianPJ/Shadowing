@@ -17,6 +17,7 @@ import demo from '../src/data/demo.json';
 import demoQuiz from '../src/data/demo-quiz.json';
 import type { D1Database } from '../src/lib/d1';
 import type { Lesson } from '../src/lib/types';
+import { createD1AccessRepository, requirePro } from '../src/lib/access';
 const env = {
   AUTH_SECRET: 'deterministic-test-secret-at-least-32-characters',
   AUTH_BASE_URL: 'https://hibiki.example',
@@ -35,6 +36,7 @@ const mail: AuthMail[] = [];
 let db: D1Database,
   auth: ReturnType<typeof createAuth>,
   repo: ReturnType<typeof createD1UserProgressRepository>,
+  access: ReturnType<typeof createD1AccessRepository>,
   api: ReturnType<typeof accountHandler>;
 let cookieA = '',
   cookieB = '',
@@ -74,7 +76,8 @@ before(async () => {
     mail.push(message);
   });
   repo = createD1UserProgressRepository(db);
-  api = accountHandler(auth, repo, env, db);
+  access = createD1AccessRepository(db);
+  api = accountHandler(auth, repo, env, db, undefined, access);
   data = emptySync();
   const key = await transcriptKey(demo),
     identity = lessonIdentity(demo as Lesson, key),
@@ -188,6 +191,7 @@ test('framework email registration, verification, persistent session and sign in
     assert.match(signed.headers.get('set-cookie')!, /Secure/i);
     const me = await (await api(request('/api/account/me', undefined, cookie, ip))).json();
     assert.equal(me.user.email, email);
+    assert.equal(me.user.plan, 'free');
     if (email.startsWith('a')) {
       cookieA = cookie;
       userA = me.user.id;
@@ -198,6 +202,28 @@ test('framework email registration, verification, persistent session and sign in
   }
   assert.notEqual(userA, userB);
 });
+test('entitlements default Free, expose Pro from D1, and guard paid server routes', async () => {
+  assert.equal(await access.plan(userA), 'free');
+  assert.equal(await access.plan(userB), 'free');
+
+  await db
+    .prepare(
+      'INSERT INTO user_access (user_id,plan,source,updated_at) VALUES (?,?,?,?)',
+    )
+    .bind(userA, 'pro', 'test', new Date().toISOString())
+    .run();
+
+  assert.equal(await access.plan(userA), 'pro');
+  const proMe = await (await api(request('/api/account/me', undefined, cookieA))).json();
+  const freeMe = await (await api(request('/api/account/me', undefined, cookieB))).json();
+  assert.equal(proMe.user.plan, 'pro');
+  assert.equal(freeMe.user.plan, 'free');
+
+  assert.equal(await requirePro(request('/api/quiz'), auth, access).then((r) => r?.status), 401);
+  assert.equal(await requirePro(request('/api/quiz', undefined, cookieB), auth, access).then((r) => r?.status), 403);
+  assert.equal(await requirePro(request('/api/quiz', undefined, cookieA), auth, access), null);
+});
+
 test('sync session-derived ownership, cross-user isolation and forged body owner rejection', async () => {
   assert.equal((await api(request('/api/sync/bootstrap'))).status, 401);
   assert.equal((await api(request('/api/sync/push', data))).status, 401);
