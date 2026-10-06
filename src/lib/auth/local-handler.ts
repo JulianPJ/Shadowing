@@ -16,5 +16,6 @@ export async function localAccountHandler(request: Request) {
     authEnvironment(),
     undefined,
     services.dictionary,
+    services.access,
   )(request);
 }
