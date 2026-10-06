@@ -14,7 +14,7 @@ type PendingRequest = {
 };
 type WorkerResponse = {
   id: number;
-  kind: RequestKind;
+  kind?: RequestKind;
   tokens?: unknown;
   error?: boolean;
 };
@@ -45,7 +45,9 @@ function getWorker() {
       if (!request) return;
       pending.delete(data.id);
       clearTimeout(request.timer);
-      if (data.error || data.kind !== request.kind || !Array.isArray(data.tokens)) {
+      // Missing kind keeps compatibility with the original readings-only worker response.
+      const responseKind = data.kind ?? request.kind;
+      if (data.error || responseKind !== request.kind || !Array.isArray(data.tokens)) {
         request.reject(unavailable(request.kind));
         if (data.error) fail();
       } else request.resolve(data.tokens);
