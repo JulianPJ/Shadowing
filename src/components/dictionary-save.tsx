@@ -9,6 +9,7 @@ import {
 } from '@/lib/dictionary/client';
 import { dictionarySource } from '@/lib/dictionary/source';
 import { useAccount } from './account';
+import { ProFeatureNotice } from './pro-feature';
 
 export function DictionarySavePanel({
   term,
@@ -32,7 +33,7 @@ export function DictionarySavePanel({
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!account.user?.emailVerified || !term.trim()) return;
+    if (!account.user?.emailVerified || account.user.plan !== 'pro' || !term.trim()) return;
     const controller = new AbortController();
     const segmentIndex = lesson.segments.findIndex((value) => value.id === segment.id);
     void Promise.all([
@@ -67,10 +68,16 @@ export function DictionarySavePanel({
         if (!controller.signal.aborted) setLoaded(true);
       });
     return () => controller.abort();
-  }, [account.user?.emailVerified, lesson, segment, sourceTranslation, term]);
+  }, [account.user?.emailVerified, account.user?.plan, lesson, segment, sourceTranslation, term]);
 
   async function save() {
-    if (!account.user?.emailVerified || !translation.trim() || !sentenceMeaning.trim()) return;
+    if (
+      !account.user?.emailVerified ||
+      account.user.plan !== 'pro' ||
+      !translation.trim() ||
+      !sentenceMeaning.trim()
+    )
+      return;
     setSaving(true);
     setError('');
     try {
@@ -109,6 +116,8 @@ export function DictionarySavePanel({
             Sign in to save
           </Link>
         </div>
+      ) : account.user.plan !== 'pro' ? (
+        <ProFeatureNotice feature="My Words / Personal Dictionary" compact />
       ) : !account.user.emailVerified ? (
         <p role="status">Verify your account email before saving vocabulary.</p>
       ) : (
