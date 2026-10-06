@@ -25,7 +25,9 @@ export function LessonVocabulary({
     filter === 'one' ? section.oneUnknown : section.highValue,
   );
   const lineIds = JSON.stringify(lines.map((line) => line.segmentId));
-  useEffect(() => { if (filterActive && onFilter && !loading) onFilter(JSON.parse(lineIds)); }, [filterActive, onFilter, lineIds, loading]);
+  useEffect(() => {
+    if (filterActive && onFilter && !loading) onFilter(JSON.parse(lineIds));
+  }, [filterActive, onFilter, lineIds, loading]);
   return (
     <section className="lesson-vocabulary" aria-label="Personal vocabulary coverage">
       <div className="vocabulary-heading">

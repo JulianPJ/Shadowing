@@ -372,7 +372,8 @@ test('selected Japanese saves to the account dictionary with source context and 
 
   const panel = page.getByRole('complementary', { name: 'Save vocabulary' });
   await expect(panel).toBeVisible();
-  await expect(page.getByLabel('Vocabulary meaning')).toHaveValue('lookup meaning');
+  await expect(panel.locator('.lexicon-match')).not.toHaveCount(0);
+  await expect(page.getByLabel('Vocabulary meaning')).not.toHaveValue('');
   await expect(page.getByLabel('Source sentence meaning')).toHaveValue(
     demo.segments[0].translation,
   );

@@ -168,18 +168,25 @@ export const JapaneseText = memo(function JapaneseText({
                 ),
               )
             : token.surface_form;
-            return onLookup && /[\p{L}\p{N}]/u.test(token.surface_form) ? (
+          return onLookup && /[\p{L}\p{N}]/u.test(token.surface_form) ? (
             <LookupToken
               key={index}
               value={token.surface_form}
               lemma={lemma}
               state={state}
-                onLookup={onLookup}
+              onLookup={onLookup}
             >
               {children}
             </LookupToken>
           ) : (
-              <span key={index} className={state ? `word-state-${state}` : undefined} data-lemma={lemma} data-word-state={state}>{children}</span>
+            <span
+              key={index}
+              className={state ? `word-state-${state}` : undefined}
+              data-lemma={lemma}
+              data-word-state={state}
+            >
+              {children}
+            </span>
           );
         })}
       </span>
