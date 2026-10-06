@@ -3,7 +3,7 @@ import demo from '../../src/data/demo.json' with { type: 'json' };
 import questions from '../../src/data/demo-quiz.json' with { type: 'json' };
 import { createQuiz, transcriptRevision } from '../../src/lib/quiz';
 import type { Lesson } from '../../src/lib/types';
-import { mockProAccount } from '../helpers/pro-account';
+import { mockProAccount, proStorageKey } from '../helpers/pro-account';
 
 async function finishLesson(page: Page, continuous = false) {
   await page.goto('/practice/demo');
@@ -106,8 +106,9 @@ test('complete lesson, answer, explain, replay bounded evidence, return, finish,
   await page.getByRole('button', { name: 'Finish comprehension check' }).click();
   await expect(page.locator('.quiz-summary')).toContainText('4 / 5 correct');
   await expect(page.locator('.quiz-summary')).toContainText('Result saved');
-  const history = await page.evaluate(() =>
-    JSON.parse(localStorage.getItem('hibiki:v1:quiz-attempts')!),
+  const history = await page.evaluate(
+    (key) => JSON.parse(localStorage.getItem(key)!),
+    proStorageKey('quiz-attempts'),
   );
   expect(history).toHaveLength(1);
   expect(history[0]).toMatchObject({
