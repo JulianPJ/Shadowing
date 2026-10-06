@@ -1,4 +1,5 @@
 'use client';
+import { useState } from 'react';
 import {
   Mic,
   AudioLines,
@@ -12,13 +13,15 @@ import {
   Play,
   ArrowRight,
 } from 'lucide-react';
-import type { Mode, PlaybackState, Segment } from '@/lib/types';
+import type { Lesson, Mode, PlaybackState, Segment } from '@/lib/types';
 import { timestamp } from '@/lib/youtube';
 import { JapaneseText } from '../japanese-text';
+import { DictionarySavePanel } from '../dictionary-save';
 type CurrentSectionProps = {
   recording: boolean;
   status: PlaybackState;
   stateLabel: string;
+  lesson: Lesson;
   segment: Segment;
   furigana: boolean;
   revealed: boolean;
@@ -45,6 +48,7 @@ export function CurrentSection({
   recording,
   status,
   stateLabel,
+  lesson,
   segment,
   furigana,
   revealed,
@@ -67,6 +71,8 @@ export function CurrentSection({
   continuePractice,
   lastIndex,
 }: CurrentSectionProps) {
+  const [lookup, setLookup] = useState<{ segmentId: string; term: string } | null>(null);
+  const lookupTerm = lookup?.segmentId === segment.id ? lookup.term : '';
   return (
     <section
       className={`current-card state-${recording ? 'recording' : status}`}
@@ -95,8 +101,22 @@ export function CurrentSection({
         aria-label={segment.japanese}
         data-testid="current-japanese"
       >
-        <JapaneseText text={segment.japanese} furigana={furigana} />
+        <JapaneseText
+          text={segment.japanese}
+          furigana={furigana}
+          onLookup={(term) => setLookup({ segmentId: segment.id, term })}
+        />
       </h2>
+      <p className="dictionary-lookup-hint">Click a word or select a phrase to save it.</p>
+      {lookupTerm ? (
+        <DictionarySavePanel
+          term={lookupTerm}
+          lesson={lesson}
+          segment={segment}
+          sourceTranslation={translation}
+          onClose={() => setLookup(null)}
+        />
+      ) : null}
       <div className="translation-row">
         <button
           className="translation-button"
