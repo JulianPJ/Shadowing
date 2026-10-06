@@ -119,9 +119,14 @@ export function AccountPage() {
               Sign out
             </button>
           </div>
-          <Link className="button primary" href="/progress">
-            View progress
-          </Link>
+          <div className="account-actions">
+            <Link className="button primary" href="/progress">
+              View progress
+            </Link>
+            <Link className="button" href="/dictionary">
+              Personal dictionary
+            </Link>
+          </div>
         </>
       ) : (
         <>
@@ -134,7 +139,8 @@ export function AccountPage() {
       {message ? <p role="alert">{message}</p> : null}
       <p className="small muted">
         Anonymous practice stays available. Audio recordings and private transcripts stay on your
-        device.
+        device unless you explicitly save selected vocabulary and its sentence context to your
+        personal dictionary.
       </p>
     </main>
   );
