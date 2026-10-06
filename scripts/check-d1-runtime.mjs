@@ -130,6 +130,35 @@ try {
   });
   const identity = await me.json();
   assert.equal(identity.user.email, 'runtime@example.com');
+  assert.equal(identity.user.plan, 'free');
+
+  const freeDictionary = await mf.dispatchFetch('https://example.com/api/dictionary', {
+    headers: { Cookie: cookie },
+  });
+  assert.equal(freeDictionary.status, 403);
+  assert.equal((await freeDictionary.json()).code, 'pro-required');
+  const freeQuiz = await mf.dispatchFetch('https://example.com/api/quiz', {
+    method: 'POST',
+    headers: { Cookie: cookie },
+    body: '{}',
+  });
+  assert.equal(freeQuiz.status, 403);
+  const freeTranscription = await mf.dispatchFetch('https://example.com/api/transcribe', {
+    method: 'POST',
+    headers: { Cookie: cookie },
+    body: new Uint8Array(),
+  });
+  assert.equal(freeTranscription.status, 403);
+
+  await db
+    .prepare('INSERT INTO user_access (user_id,plan,source,updated_at) VALUES (?,?,?,?)')
+    .bind(identity.user.id, 'pro', 'test', new Date().toISOString())
+    .run();
+  const upgraded = await mf.dispatchFetch('https://example.com/api/account/me', {
+    headers: { Cookie: cookie },
+  });
+  assert.equal((await upgraded.json()).user.plan, 'pro');
+
   const sync = {
     preferences: {
       schemaVersion: 1,
@@ -224,6 +253,40 @@ try {
     ).n,
     0,
   );
+  let lesson;
+  for (let i = 0; i < 2; i++) {
+    const response = await mf.dispatchFetch('https://example.com/api/prepare', {
+      method: 'POST',
+      body: JSON.stringify({ url: 'https://youtu.be/IJ6R4u05ppw' }),
+    });
+    const last = JSON.parse((await response.text()).trim().split('\n').at(-1));
+    assert.equal(last.stage, 'done');
+    lesson = last.lesson;
+  }
+  assert.equal(captions, 1);
+  for (const endpoint of ['quiz', 'difficulty']) {
+    let first;
+    for (let i = 0; i < 2; i++) {
+      const response = await mf.dispatchFetch(`https://example.com/api/${endpoint}`, {
+        method: 'POST',
+        headers: { Cookie: cookie },
+        body: JSON.stringify({ lesson, content: { contentKey: lesson.mediaSource.contentKey } }),
+      });
+      assert.equal(response.status, 200, `${endpoint} failed: ${await response.clone().text()}`);
+      assert.equal(response.headers.get('X-Hibiki-Cache'), i ? 'hit' : 'miss');
+      const payload = await response.json();
+      if (i) assert.deepEqual(payload, first);
+      else first = payload;
+    }
+  }
+  const ai = await mf.getWorker('ai-mock');
+  assert.deepEqual(await (await ai.fetch('https://example.com/counts')).json(), {
+    quiz: 1,
+    difficulty: 1,
+  });
+  assert.equal((await db.prepare('SELECT COUNT(*) AS n FROM linked_transcripts').first()).n, 1);
+  assert.equal((await db.prepare('SELECT COUNT(*) AS n FROM generated_artifacts').first()).n, 2);
+
   const signedOut = await mf.dispatchFetch('https://example.com/api/auth/sign-out', {
     method: 'POST',
     headers: { Cookie: cookie, Origin: 'https://example.com', 'Content-Type': 'application/json' },
@@ -247,42 +310,7 @@ try {
     401,
   );
   console.log(
-    'Built Worker + D1: framework password hashing, email verification, cookie session, learner sync, personal dictionary and sign-out passed with mocked email delivery.',
-  );
-  let lesson;
-  for (let i = 0; i < 2; i++) {
-    const response = await mf.dispatchFetch('https://example.com/api/prepare', {
-      method: 'POST',
-      body: JSON.stringify({ url: 'https://youtu.be/IJ6R4u05ppw' }),
-    });
-    const last = JSON.parse((await response.text()).trim().split('\n').at(-1));
-    assert.equal(last.stage, 'done');
-    lesson = last.lesson;
-  }
-  assert.equal(captions, 1);
-  for (const endpoint of ['quiz', 'difficulty']) {
-    let first;
-    for (let i = 0; i < 2; i++) {
-      const response = await mf.dispatchFetch(`https://example.com/api/${endpoint}`, {
-        method: 'POST',
-        body: JSON.stringify({ lesson, content: { contentKey: lesson.mediaSource.contentKey } }),
-      });
-      assert.equal(response.status, 200, `${endpoint} failed: ${await response.clone().text()}`);
-      assert.equal(response.headers.get('X-Hibiki-Cache'), i ? 'hit' : 'miss');
-      const payload = await response.json();
-      if (i) assert.deepEqual(payload, first);
-      else first = payload;
-    }
-  }
-  const ai = await mf.getWorker('ai-mock');
-  assert.deepEqual(await (await ai.fetch('https://example.com/counts')).json(), {
-    quiz: 1,
-    difficulty: 1,
-  });
-  assert.equal((await db.prepare('SELECT COUNT(*) AS n FROM linked_transcripts').first()).n, 1);
-  assert.equal((await db.prepare('SELECT COUNT(*) AS n FROM generated_artifacts').first()).n, 2);
-  console.log(
-    'Built Worker + local D1: prepare, quiz, difficulty each miss/save/hit; caption/AI providers called exactly once.',
+    'Built Worker + D1: Free paid-feature denial, D1 Pro upgrade, sync, dictionary, quiz/difficulty cache and sign-out passed.',
   );
 } finally {
   await mf.dispose();
