@@ -255,15 +255,6 @@ Repeat count, pause behavior and reveal behavior must remain visible settings; d
 
 **Effort:** Large.
 
-### P3 — Discuss this video in Japanese
-
-**Borrowed from:** Language Reactor Aria, Todaii Tomo, Miraa.
-
-**UX:** After completion, offer 2–3 transcript-grounded prompts. The learner answers via text or voice and gets naturalness/correction feedback linked back to relevant source lines.
-
-**Why:** Good transfer from imitation to free production, but generic AI conversation is less differentiated than Hibiki’s shadowing + contextual review loop.
-
-**Effort:** Medium–Large.
 
 ### P3 — Reader / podcast / OCR capture
 
@@ -327,7 +318,6 @@ Build:
 - My Library / Continue Watching.
 - Weekly learning report.
 - Personal content recommendations.
-- Optional transcript-grounded conversation.
 
 These features become materially better after Hibiki has reliable learner-state data.
 
