@@ -41,10 +41,7 @@ test('dictionary records keep bounded contextual replay metadata', () => {
   assert.equal(entry.source.mediaId, 'IJ6R4u05ppw');
   assert.equal(entry.source.start, 12.5);
   assert.equal(entry.source.end, 16.2);
-  assert.equal(
-    normalizeDictionaryTerm('  ＡＢＣ　日本語  '),
-    'abc 日本語',
-  );
+  assert.equal(normalizeDictionaryTerm('  ＡＢＣ　日本語  '), 'abc 日本語');
 });
 
 test('dictionary validation refuses signed direct-media URLs and malformed timing', () => {
@@ -116,13 +113,13 @@ test('dictionary source captures provider replay identity but never local or sig
   assert.equal(directSource.mediaContentKey, `direct:${'c'.repeat(64)}`);
 });
 
-
 test('dictionary migration and repository save, upsert, list and delete against SQLite', async () => {
   const db = new DatabaseSync(':memory:');
   try {
     db.exec('PRAGMA foreign_keys = ON; CREATE TABLE "user" (id TEXT PRIMARY KEY);');
     db.prepare('INSERT INTO "user" (id) VALUES (?)').run('learner');
     db.exec(readFileSync('migrations/0004_personal_dictionary.sql', 'utf8'));
+    db.exec(readFileSync('migrations/0007_retention.sql', 'utf8'));
     const repository = createD1DictionaryRepository(localProgressDatabase(db));
     const input = validateDictionarySaveInput(baseEntry);
     const saved = await repository.save('learner', input);

@@ -288,6 +288,8 @@ The intended UX change is a continuous loop rather than separate feature pages:
 
 ## Recommended build order
 
+Implementation status: [Phase A retention foundation, verification and next slice](retention-implementation.md). Basic decks, explicit review enrollment, Daily Review, contextual replay, CSV export and a saved-word completion handoff are implemented there. Optional tags, Anki integration and richer recap diagnostics remain follow-up work.
+
 ### Phase A — close the retention loop
 
 Build:

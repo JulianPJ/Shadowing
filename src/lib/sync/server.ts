@@ -7,7 +7,9 @@ import { verifyAttempt } from './quiz-verification';
 import { restorePublicLesson } from './restore-lesson';
 import type { DictionaryRepository } from '../dictionary/types';
 import { handleDictionaryRequest } from '../dictionary/server';
-import { freeAccess, proRequiredResponse, type AccessRepository } from '../access';
+import { freeAccess, type AccessRepository } from '../access';
+import type { ReviewRepository } from '../review/types';
+import { handleReviewRequest } from '../review/server';
 
 export function accountHandler(
   auth: HibikiAuth,
@@ -16,6 +18,7 @@ export function accountHandler(
   db?: D1Database,
   dictionary?: DictionaryRepository,
   access: AccessRepository = freeAccess,
+  review?: ReviewRepository,
 ) {
   return async (request: Request): Promise<Response> => {
     const headers = { 'Cache-Control': 'no-store', Vary: 'Cookie' };
@@ -53,9 +56,12 @@ export function accountHandler(
       if (expectedAccount && expectedAccount !== userId)
         return respond({ error: 'Account changed. Refresh your session.' }, 409);
       if (url.pathname === '/api/dictionary') {
-        if ((await access.plan(userId)) !== 'pro') return proRequiredResponse();
         if (!dictionary) return respond({ error: 'Dictionary storage unavailable' }, 503);
         return handleDictionaryRequest(request, userId, session.user.emailVerified, dictionary);
+      }
+      if (url.pathname === '/api/review') {
+        if (!review) return respond({ error: 'Review storage unavailable' }, 503);
+        return handleReviewRequest(request, userId, session.user.emailVerified, review);
       }
       if (url.pathname === '/api/sync/lesson' && request.method === 'GET') {
         const id = url.searchParams.get('id');

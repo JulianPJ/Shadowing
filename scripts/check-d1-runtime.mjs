@@ -135,8 +135,8 @@ try {
   const freeDictionary = await mf.dispatchFetch('https://example.com/api/dictionary', {
     headers: { Cookie: cookie },
   });
-  assert.equal(freeDictionary.status, 403);
-  assert.equal((await freeDictionary.json()).code, 'pro-required');
+  assert.equal(freeDictionary.status, 200);
+  assert.deepEqual((await freeDictionary.json()).entries, []);
   const freeQuiz = await mf.dispatchFetch('https://example.com/api/quiz', {
     method: 'POST',
     headers: { Cookie: cookie },
@@ -238,12 +238,82 @@ try {
   });
   assert.equal(dictionaryList.status, 200);
   assert.equal((await dictionaryList.json()).entries.length, 1);
+  const reviewHeaders = {
+    Cookie: cookie,
+    Origin: 'https://example.com',
+    'Content-Type': 'application/json',
+  };
+  const entryId = dictionaryPayload.entry.id;
+  const enrolledAt = new Date().toISOString();
+  const enrolled = await mf.dispatchFetch('https://example.com/api/review', {
+    method: 'POST',
+    headers: reviewHeaders,
+    body: JSON.stringify({ action: 'enroll', entryIds: [entryId], deckId: 'inbox', enrolledAt }),
+  });
+  assert.equal(enrolled.status, 200);
+  const reviewSnapshot = await mf.dispatchFetch('https://example.com/api/review', {
+    headers: { Cookie: cookie },
+  });
+  const reviewData = await reviewSnapshot.json();
+  assert.equal(reviewData.cards.length, 1);
+  assert.equal(reviewData.cards[0].entryId, entryId);
+  const grade = {
+    action: 'grade',
+    entryId,
+    revision: 0,
+    grade: 'good',
+    reviewedAt: new Date().toISOString(),
+    operationId: crypto.randomUUID(),
+  };
+  for (let i = 0; i < 2; i++)
+    assert.equal(
+      (
+        await mf.dispatchFetch('https://example.com/api/review', {
+          method: 'POST',
+          headers: reviewHeaders,
+          body: JSON.stringify(grade),
+        })
+      ).status,
+      200,
+    );
+  const graded = await (
+    await mf.dispatchFetch('https://example.com/api/review', { headers: { Cookie: cookie } })
+  ).json();
+  assert.equal(graded.cards[0].revision, 1);
+  assert.equal(graded.cards[0].intervalDays, 1);
+  assert.equal((await mf.dispatchFetch('https://example.com/api/review')).status, 401);
+  assert.equal(
+    (
+      await mf.dispatchFetch('https://example.com/api/review', {
+        headers: { Cookie: cookie, 'X-Hibiki-Account': 'another-user' },
+      })
+    ).status,
+    409,
+  );
+  assert.equal(
+    (
+      await mf.dispatchFetch('https://example.com/api/review', {
+        method: 'POST',
+        headers: { ...reviewHeaders, Origin: 'https://evil.example' },
+        body: JSON.stringify(grade),
+      })
+    ).status,
+    403,
+  );
   const dictionaryDeleted = await mf.dispatchFetch('https://example.com/api/dictionary', {
     method: 'POST',
     headers: { Cookie: cookie, Origin: 'https://example.com', 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'delete', id: dictionaryPayload.entry.id }),
   });
   assert.equal(dictionaryDeleted.status, 200);
+  assert.equal(
+    (
+      await (
+        await mf.dispatchFetch('https://example.com/api/review', { headers: { Cookie: cookie } })
+      ).json()
+    ).cards.length,
+    0,
+  );
   assert.equal(
     (
       await db

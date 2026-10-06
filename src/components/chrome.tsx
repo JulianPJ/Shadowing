@@ -4,6 +4,7 @@ import { AudioLines, ArrowUpRight, X, Headphones, Mic, Repeat2, Keyboard } from 
 import { useEffect, useRef } from 'react';
 import { AccountEntry } from './account';
 import { ThemeToggle } from './theme-toggle';
+import { ReviewLink } from './review-link';
 
 export function Header({ onHelp, player = false }: { onHelp: () => void; player?: boolean }) {
   return (
@@ -22,6 +23,7 @@ export function Header({ onHelp, player = false }: { onHelp: () => void; player?
         </Link>
         <nav aria-label="Main navigation">
           <AccountEntry />
+          <ReviewLink />
           <Link className="nav-link" href="/progress">
             Progress
           </Link>

@@ -6,22 +6,19 @@ import { listDictionary, removeDictionary } from '@/lib/dictionary/client';
 import type { DictionaryEntry } from '@/lib/dictionary/types';
 import { timestamp } from '@/lib/youtube';
 import { useAccount } from './account';
-import { ProFeatureNotice } from './pro-feature';
-
-function externalReplay(entry: DictionaryEntry) {
-  const url = entry.source.mediaUrl;
-  if (!url) return null;
-  if (entry.source.mediaType === 'youtube')
-    return `${url}&t=${Math.max(0, Math.floor(entry.source.start))}s`;
-  if (entry.source.mediaType === 'vimeo')
-    return `${url}#t=${Math.max(0, Math.floor(entry.source.start))}s`;
-  if (entry.source.mediaType === 'direct')
-    return `${url}#t=${Math.max(0, entry.source.start)}`;
-  return url;
-}
+import { useReview } from './use-review';
+import { ReviewEntryActions } from './review-entry-actions';
+import { changeReview } from '@/lib/review/client';
+import { dueReviews } from '@/lib/review-scheduler';
+import { vocabularyCsv, vocabularyRows } from '@/lib/export/vocabulary';
+import { externalReplay } from '@/lib/dictionary/replay';
 
 export function PersonalDictionary() {
   const account = useAccount();
+  const review = useReview();
+  const [deck, setDeck] = useState('all');
+  const [deckName, setDeckName] = useState('');
+  const [selected, setSelected] = useState<string[]>([]);
   const [loaded, setLoaded] = useState<{
     userId: string;
     entries: DictionaryEntry[];
@@ -32,7 +29,7 @@ export function PersonalDictionary() {
 
   useEffect(() => {
     const userId = account.user?.id;
-    if (!userId || account.user?.plan !== 'pro') return;
+    if (!userId) return;
     let active = true;
     void listDictionary()
       .then((entries) => {
@@ -51,15 +48,37 @@ export function PersonalDictionary() {
     };
   }, [account.user?.id, account.user?.plan]);
 
-  const entries =
-    account.user?.plan === 'pro' && loaded?.userId === account.user.id ? loaded.entries : [];
-  const loading = Boolean(
-    account.user?.plan === 'pro' && loaded?.userId !== account.user.id,
-  );
+  const entries = account.user && loaded?.userId === account.user.id ? loaded.entries : [];
+  const loading = Boolean(account.user && loaded?.userId !== account.user.id);
   const error =
     actionError || (account.user && loaded?.userId === account.user.id ? loaded.error : '');
 
   const termCount = new Set(entries.map((entry) => entry.normalizedTerm)).size;
+  const visible = entries.filter(
+    (e) =>
+      deck === 'all' ||
+      review.data.memberships.some((m) => m.deckId === deck && m.entryId === e.id),
+  );
+  const chosen = selected.filter((id) => entries.some((e) => e.id === id));
+  function exportWords() {
+    const blob = new Blob(
+      [
+        vocabularyCsv(
+          vocabularyRows(
+            chosen.length ? entries.filter((e) => chosen.includes(e.id)) : visible,
+            review.data,
+          ),
+        ),
+      ],
+      { type: 'text/csv;charset=utf-8' },
+    );
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'hibiki-words.csv';
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
 
   async function remove(entry: DictionaryEntry) {
     setRemoving(entry.id);
@@ -89,32 +108,147 @@ export function PersonalDictionary() {
           <p>Words and phrases you chose to keep, attached to the Japanese you found them in.</p>
         </div>
         {account.user ? (
-          <span className="dictionary-count">{termCount} {termCount === 1 ? 'term' : 'terms'}</span>
+          <span className="dictionary-count">
+            {termCount} {termCount === 1 ? 'term' : 'terms'}
+          </span>
         ) : null}
       </div>
+      {account.user ? (
+        <section className="review-toolbar" aria-label="Dictionary collections">
+          <Link className="button primary" href="/review">
+            Daily Review · {dueReviews(review.data.cards, new Date().toISOString()).length} due
+          </Link>
+          <label>
+            Filter by deck{' '}
+            <select value={deck} onChange={(e) => setDeck(e.target.value)}>
+              <option value="all">All words</option>
+              {review.data.decks.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (deckName.trim()) {
+                changeReview({ action: 'deck', id: crypto.randomUUID(), name: deckName.trim() });
+                setDeckName('');
+              }
+            }}
+          >
+            <label>
+              New deck{' '}
+              <input
+                maxLength={80}
+                value={deckName}
+                onChange={(e) => setDeckName(e.target.value)}
+              />
+            </label>
+            <button className="button small-button" disabled={!deckName.trim()}>
+              Create deck
+            </button>
+          </form>
+          {deck !== 'all' && deck !== 'inbox' ? (
+            <button
+              className="text-button"
+              onClick={() => {
+                changeReview({ action: 'delete-deck', deckId: deck });
+                setDeck('all');
+              }}
+            >
+              Delete deck
+            </button>
+          ) : null}
+          <button
+            className="button small-button"
+            disabled={!chosen.length}
+            onClick={() =>
+              changeReview({
+                action: 'enroll',
+                entryIds: chosen,
+                deckId: deck === 'all' ? 'inbox' : deck,
+                enrolledAt: new Date().toISOString(),
+              })
+            }
+          >
+            Add selected to review
+          </button>
+          {deck !== 'all' ? (
+            <>
+              <button
+                className="text-button"
+                disabled={!chosen.length}
+                onClick={() =>
+                  changeReview({
+                    action: 'membership',
+                    entryIds: chosen,
+                    deckId: deck,
+                    remove: false,
+                  })
+                }
+              >
+                Add selected to deck
+              </button>
+              <button
+                className="text-button"
+                disabled={!chosen.length}
+                onClick={() =>
+                  changeReview({
+                    action: 'membership',
+                    entryIds: chosen,
+                    deckId: deck,
+                    remove: true,
+                  })
+                }
+              >
+                Remove selected from deck
+              </button>
+            </>
+          ) : null}
+          <button
+            className="text-button"
+            disabled={!visible.length && !chosen.length}
+            onClick={exportWords}
+          >
+            Export {chosen.length ? 'selected' : 'visible'} CSV
+          </button>
+        </section>
+      ) : null}
       {!account.user ? (
         <section className="dictionary-empty">
           <h2>Keep vocabulary with its context.</h2>
           <p>
-            Sign in, then click a word or select a phrase in a practice sentence to save its
-            meaning and source section here.
+            Sign in, then click a word or select a phrase in a practice sentence to save its meaning
+            and source section here.
           </p>
           <Link className="button primary" href="/sign-in">
             Sign in
           </Link>
         </section>
-      ) : account.user.plan !== 'pro' ? (
-        <section className="dictionary-empty">
-          <ProFeatureNotice feature="My Words / Personal Dictionary" />
-        </section>
       ) : loading ? (
         <p role="status">Opening your dictionary…</p>
       ) : entries.length ? (
         <div className="dictionary-list">
-          {entries.map((entry) => {
+          {visible.map((entry) => {
             const external = externalReplay(entry);
             return (
               <article className="dictionary-entry" key={entry.id}>
+                <label className="review-selection">
+                  <input
+                    type="checkbox"
+                    checked={chosen.includes(entry.id)}
+                    onChange={(e) =>
+                      setSelected(
+                        e.target.checked
+                          ? [...chosen, entry.id]
+                          : chosen.filter((id) => id !== entry.id),
+                      )
+                    }
+                  />
+                  Select {entry.term}
+                </label>
                 <div className="dictionary-entry-term">
                   <div>
                     <h2 lang="ja">{entry.term}</h2>
@@ -122,6 +256,7 @@ export function PersonalDictionary() {
                   </div>
                   <strong>{entry.translation}</strong>
                 </div>
+                <ReviewEntryActions entryId={entry.id} data={review.data} />
                 <div className="dictionary-entry-context">
                   <p lang="ja">{entry.sourceSentence}</p>
                   <p>{entry.sourceSentenceTranslation}</p>
@@ -167,11 +302,20 @@ export function PersonalDictionary() {
           </Link>
         </section>
       )}
-      {error ? <p className="dictionary-page-error" role="alert">{error}</p> : null}
-      <p className="dictionary-future small muted">
-        Today this is a simple account-backed list. The record IDs and source metadata are designed
-        so decks and spaced-repetition review state can be layered on later without rewriting saved
-        vocabulary.
+      {error ? (
+        <p className="dictionary-page-error" role="alert">
+          {error}
+        </p>
+      ) : null}
+      {review.pending ? (
+        <p role="status">Review changes saved on this device · waiting to sync</p>
+      ) : null}
+      {review.conflict || review.error ? (
+        <p role="alert">{review.conflict || review.error}</p>
+      ) : null}
+      <p className="small muted">
+        Saving keeps a word in Inbox. Add to review when you want to remember it. Basic decks,
+        review and export are included in Free.
       </p>
     </main>
   );

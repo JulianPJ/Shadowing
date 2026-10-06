@@ -2,10 +2,7 @@
 import { BookPlus, LoaderCircle, Play } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { Lesson } from '@/lib/types';
-import {
-  type TopicVocabularyAnalysis,
-  type TopicVocabularyItem,
-} from '@/lib/topic-vocabulary';
+import { type TopicVocabularyAnalysis, type TopicVocabularyItem } from '@/lib/topic-vocabulary';
 import { analyzeTopicVocabulary } from '@/lib/topic-vocabulary-client';
 import { DictionarySavePanel } from './dictionary-save';
 import { ProFeatureNotice, useProAccess } from './pro-feature';
@@ -132,6 +129,7 @@ export function TopicVocabularyOverview({
                     lesson={lesson}
                     segment={segment}
                     sourceTranslation={segment.translation}
+                    reading={item.reading ?? undefined}
                     onClose={() => setSelected(null)}
                   />
                 ) : null}

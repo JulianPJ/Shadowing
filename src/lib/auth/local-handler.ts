@@ -18,9 +18,9 @@ export async function localAccountHandler(request: Request) {
     undefined,
     services.dictionary,
     services.access,
+    services.review,
   )(request);
 }
-
 
 export async function localRequirePro(request: Request) {
   const services = await localAuth();
