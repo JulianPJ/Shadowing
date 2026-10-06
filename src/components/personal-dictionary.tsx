@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { ExternalLink, Play, Trash2 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { listDictionary, removeDictionary } from '@/lib/dictionary/client';
 import type { DictionaryEntry } from '@/lib/dictionary/types';
 import { timestamp } from '@/lib/youtube';
@@ -56,10 +56,7 @@ export function PersonalDictionary() {
   const error =
     actionError || (account.user && loaded?.userId === account.user.id ? loaded.error : '');
 
-  const termCount = useMemo(
-    () => new Set(entries.map((entry) => entry.normalizedTerm)).size,
-    [entries],
-  );
+  const termCount = new Set(entries.map((entry) => entry.normalizedTerm)).size;
 
   async function remove(entry: DictionaryEntry) {
     setRemoving(entry.id);
