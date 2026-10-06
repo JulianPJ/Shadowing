@@ -8,6 +8,7 @@ import {
 } from '@/lib/topic-vocabulary';
 import { analyzeTopicVocabulary } from '@/lib/topic-vocabulary-client';
 import { DictionarySavePanel } from './dictionary-save';
+import { ProFeatureNotice, useProAccess } from './pro-feature';
 
 function occurrenceLabel(item: TopicVocabularyItem) {
   const mentions = item.occurrences === 1 ? '1 mention' : `${item.occurrences} mentions`;
@@ -22,11 +23,13 @@ export function TopicVocabularyOverview({
   lesson: Lesson;
   onReview: (segmentIndex: number) => void;
 }) {
+  const { isPro } = useProAccess();
   const [analysis, setAnalysis] = useState<TopicVocabularyAnalysis | null>(null);
   const [error, setError] = useState('');
   const [selected, setSelected] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!isPro) return;
     const controller = new AbortController();
     void analyzeTopicVocabulary(lesson, controller.signal)
       .then((result) => {
@@ -37,7 +40,20 @@ export function TopicVocabularyOverview({
           setError('Topic vocabulary could not be analysed on this device.');
       });
     return () => controller.abort();
-  }, [lesson]);
+  }, [isPro, lesson]);
+
+  if (!isPro)
+    return (
+      <section className="topic-vocabulary-card" aria-labelledby="topic-vocabulary-heading">
+        <div className="topic-vocabulary-heading">
+          <div>
+            <span className="eyebrow">VIDEO OVERVIEW</span>
+            <h2 id="topic-vocabulary-heading">Topic vocabulary</h2>
+          </div>
+        </div>
+        <ProFeatureNotice feature="End-of-video topic vocabulary" />
+      </section>
+    );
 
   return (
     <section className="topic-vocabulary-card" aria-labelledby="topic-vocabulary-heading">
