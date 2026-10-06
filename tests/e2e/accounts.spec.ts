@@ -354,7 +354,7 @@ test('selected Japanese saves to the account dictionary with source context and 
     demo.segments[0].translation,
   );
   await page.getByRole('button', { name: 'Save to dictionary' }).click();
-  await expect(page.getByRole('button', { name: 'Saved' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
   await expect.poll(() => remote.dictionary.length).toBe(1);
   expect(remote.dictionary[0].term).toBe(term);
   expect(remote.dictionary[0].source.segmentId).toBe(demo.segments[0].id);
