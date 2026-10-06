@@ -8,6 +8,7 @@ import { mergeSync } from '../../src/lib/sync/merge';
 import { validateSync } from '../../src/lib/sync/validation';
 import { verifyAttempt } from '../../src/lib/sync/quiz-verification';
 import type { Lesson } from '../../src/lib/types';
+import type { DictionaryEntry } from '../../src/lib/dictionary/types';
 const user: AccountUser = {
   id: 'account-one',
   email: 'learner@example.com',
@@ -16,6 +17,7 @@ const user: AccountUser = {
 };
 class Remote {
   data = emptySync();
+  dictionary: DictionaryEntry[] = [];
   pushes: string[] = [];
   outage = false;
 }
@@ -51,6 +53,37 @@ async function connect(
     remote.pushes.push(route.request().postData()!);
     remote.data = mergeSync(remote.data, data);
     await route.fulfill({ json: { ok: true } });
+  });
+  await context.route('**/api/dictionary', async (route) => {
+    if (route.request().method() === 'GET') {
+      await route.fulfill({ json: { entries: remote.dictionary } });
+      return;
+    }
+    const body = route.request().postDataJSON() as
+      | { action: 'delete'; id: string }
+      | { action: 'save'; entry: Omit<DictionaryEntry, 'id' | 'normalizedTerm' | 'createdAt' | 'updatedAt'> };
+    if (body.action === 'delete') {
+      remote.dictionary = remote.dictionary.filter((entry) => entry.id !== body.id);
+      await route.fulfill({ json: { ok: true } });
+      return;
+    }
+    const now = new Date().toISOString();
+    const normalizedTerm = body.entry.term.normalize('NFKC').trim().toLocaleLowerCase();
+    const existing = remote.dictionary.find(
+      (entry) =>
+        entry.normalizedTerm === normalizedTerm &&
+        entry.source.lessonId === body.entry.source.lessonId &&
+        entry.source.segmentId === body.entry.source.segmentId,
+    );
+    const entry: DictionaryEntry = {
+      ...body.entry,
+      id: existing?.id ?? crypto.randomUUID(),
+      normalizedTerm,
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now,
+    };
+    remote.dictionary = [entry, ...remote.dictionary.filter((value) => value.id !== entry.id)];
+    await route.fulfill({ json: { entry } });
   });
 }
 async function account(page: Page) {
@@ -293,4 +326,57 @@ test('auth screens expose configured providers without offering unavailable emai
   await page.getByLabel('Email').fill('learner@example.com');
   await expect(page.getByRole('button', { name: 'Sign in' })).toBeEnabled();
   await expect(page.getByRole('button', { name: 'Resend verification email' })).toHaveCount(0);
+});
+
+
+test('selected Japanese saves to the account dictionary with source context and replay link', async ({
+  page,
+  context,
+}) => {
+  const remote = new Remote();
+  await connect(context, remote, { user });
+  await context.route('**/api/translate', (route) =>
+    route.fulfill({ json: { translation: 'lookup meaning', provider: 'Test translator' } }),
+  );
+  await account(page);
+  await page.goto('/practice/demo');
+  await expect(page.getByRole('button', { name: 'Listen', exact: true })).toBeEnabled();
+
+  const token = page.locator('#current-japanese .lookup-token').first();
+  const term = (await token.textContent())!.trim();
+  expect(term.length).toBeGreaterThan(0);
+  await token.click();
+
+  const panel = page.getByRole('complementary', { name: 'Save vocabulary' });
+  await expect(panel).toBeVisible();
+  await expect(panel.getByRole('strong')).toHaveCount(0).catch(() => {});
+  await expect(page.getByLabel('Vocabulary meaning')).toHaveValue('lookup meaning');
+  await expect(page.getByLabel('Source sentence meaning')).toHaveValue(
+    demo.segments[0].translation,
+  );
+  await page.getByRole('button', { name: 'Save to dictionary' }).click();
+  await expect(page.getByRole('button', { name: 'Saved' })).toBeVisible();
+  await expect.poll(() => remote.dictionary.length).toBe(1);
+  expect(remote.dictionary[0].term).toBe(term);
+  expect(remote.dictionary[0].source.segmentId).toBe(demo.segments[0].id);
+  expect(remote.dictionary[0].source.start).toBe(demo.segments[0].start);
+  expect(remote.dictionary[0].source.end).toBe(demo.segments[0].end);
+
+  await page.getByRole('link', { name: 'View dictionary' }).click();
+  await expect(page.getByRole('heading', { name: 'Personal dictionary' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: term })).toBeVisible();
+  await expect(page.getByText(demo.segments[0].japanese, { exact: true })).toBeVisible();
+  const open = page.getByRole('link', { name: 'Open section' });
+  await expect(open).toHaveAttribute(
+    'href',
+    `/practice/demo?section=${encodeURIComponent(demo.segments[0].id)}`,
+  );
+  await open.click();
+  await expect(page).toHaveURL(new RegExp(`section=${demo.segments[0].id}`));
+  await expect(page.getByTestId('current-japanese')).toHaveText(demo.segments[0].japanese);
+
+  await page.goto('/dictionary');
+  await page.getByRole('button', { name: 'Remove' }).click();
+  await expect(page.getByText('No saved vocabulary yet.')).toBeVisible();
+  expect(remote.dictionary).toHaveLength(0);
 });
