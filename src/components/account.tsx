@@ -83,6 +83,9 @@ export function AccountPage() {
       {account.user ? (
         <>
           <p>{account.user.email}</p>
+          <span className={`account-plan ${account.user.plan === 'pro' ? 'pro' : ''}`}>
+            {account.user.plan === 'pro' ? 'Hibiki Pro' : 'Hibiki Free'}
+          </span>
           <p className="muted">
             Connected sign-in methods:{' '}
             {methods
