@@ -6,6 +6,7 @@ import { listDictionary, removeDictionary } from '@/lib/dictionary/client';
 import type { DictionaryEntry } from '@/lib/dictionary/types';
 import { timestamp } from '@/lib/youtube';
 import { useAccount } from './account';
+import { ProFeatureNotice } from './pro-feature';
 
 function externalReplay(entry: DictionaryEntry) {
   const url = entry.source.mediaUrl;
@@ -31,7 +32,7 @@ export function PersonalDictionary() {
 
   useEffect(() => {
     const userId = account.user?.id;
-    if (!userId) return;
+    if (!userId || account.user?.plan !== 'pro') return;
     let active = true;
     void listDictionary()
       .then((entries) => {
@@ -48,11 +49,13 @@ export function PersonalDictionary() {
     return () => {
       active = false;
     };
-  }, [account.user?.id]);
+  }, [account.user?.id, account.user?.plan]);
 
   const entries =
-    account.user && loaded?.userId === account.user.id ? loaded.entries : [];
-  const loading = Boolean(account.user && loaded?.userId !== account.user.id);
+    account.user?.plan === 'pro' && loaded?.userId === account.user.id ? loaded.entries : [];
+  const loading = Boolean(
+    account.user?.plan === 'pro' && loaded?.userId !== account.user.id,
+  );
   const error =
     actionError || (account.user && loaded?.userId === account.user.id ? loaded.error : '');
 
@@ -99,6 +102,10 @@ export function PersonalDictionary() {
           <Link className="button primary" href="/sign-in">
             Sign in
           </Link>
+        </section>
+      ) : account.user.plan !== 'pro' ? (
+        <section className="dictionary-empty">
+          <ProFeatureNotice feature="My Words / Personal Dictionary" />
         </section>
       ) : loading ? (
         <p role="status">Opening your dictionary…</p>
