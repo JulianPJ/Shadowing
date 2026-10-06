@@ -1,5 +1,7 @@
 # Shared content storage
 
+Retention update: `0007_retention.sql` adds `user_decks`, `user_deck_entries` and `user_review_states`. Composite owner/entry and owner/deck foreign keys prevent cross-account references; vocabulary and account deletion cascade, while deck deletion preserves vocabulary and review state. Existing vocabulary backfills into Inbox with no automatic review enrollment. Browser `dictionary:entries` and `review:*` keys use the existing account namespace. Review state and its outbox contain entry references and scheduling/collection metadata, without transcript/media duplication. See [retention](retention-implementation.md).
+
 Cloudflare D1 is Hibiki's primary production application database, including the shared content cache and authenticated accounts/learner state. It uses native `env.HIBIKI_DB`, injected by `cloudflare-worker.js`; request handlers never use D1 REST or database tokens. `cloudflare.config.ts` uses the installed `cf/config` API: `bindings.d1({ name, id })`.
 
 Production database: `hibiki`, ID `cf88fe7d-16bb-4f58-8839-2b27718a7847`, account `faa2e940eaa3b7c4077ed18f34b4e653`, binding `HIBIKI_DB` on Worker `shadowing`.

@@ -130,6 +130,18 @@ export function createD1DictionaryRepository(db: DictionaryDatabase): Dictionary
         .bind(userId, normalized, s.lessonId, s.segmentId)
         .first<DictionaryRow>();
       if (!row) throw new Error('Dictionary write unavailable');
+      await db
+        .prepare(
+          `INSERT OR IGNORE INTO user_decks(user_id,id,name,created_at,updated_at) VALUES (?,'inbox','Inbox',?,?)`,
+        )
+        .bind(userId, now, now)
+        .run();
+      await db
+        .prepare(
+          `INSERT OR IGNORE INTO user_deck_entries(user_id,deck_id,entry_id) VALUES (?,'inbox',?)`,
+        )
+        .bind(userId, row.id)
+        .run();
       return entry(row);
     },
     async remove(userId, id) {

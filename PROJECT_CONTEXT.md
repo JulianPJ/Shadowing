@@ -1,5 +1,7 @@
 # Project Context — Hibiki / Shadowing
 
+> **Post-MVP update (6 October 2026):** The competitive roadmap in `docs/post-mvp-competitive-roadmap.md` now guides the retention work. Phase A's foundation adds account-owned Inbox/named decks, explicit Save to Review, deterministic Daily Review, transcript-checked source replay through the existing player, context-rich CSV export and a completion handoff for selected saved lesson words. Basic dictionary/decks/review/export are Free; existing AI and topic-vocabulary gates remain. See `docs/retention-implementation.md` for contracts, verification and the next slice. Older implementation snapshots below describe earlier milestones.
+
 > **Purpose:** persistent product and engineering context for future development.
 >
 > **Account update:** Better Auth accounts and eligible learner sync are implemented. Production D1 migrations and auth/Google secrets are configured; deployment awaits email sender secrets and real-provider smoke checks. Anonymous practice and shared-content trust remain unchanged. See `docs/accounts-and-sync-verification.md`.

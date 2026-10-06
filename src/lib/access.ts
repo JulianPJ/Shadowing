@@ -2,18 +2,12 @@ import type { HibikiAuth } from './auth/server';
 
 export type AccessPlan = 'free' | 'pro';
 export type ProFeature =
-  | 'ai-transcription'
-  | 'shadowing-analysis'
-  | 'quiz'
-  | 'dictionary'
-  | 'topic-vocabulary'
-  | 'grammar-analysis';
+  'ai-transcription' | 'shadowing-analysis' | 'quiz' | 'topic-vocabulary' | 'grammar-analysis';
 
 export const PRO_FEATURES: readonly ProFeature[] = [
   'ai-transcription',
   'shadowing-analysis',
   'quiz',
-  'dictionary',
   'topic-vocabulary',
   'grammar-analysis',
 ];

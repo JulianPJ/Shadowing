@@ -12,7 +12,10 @@ function safeDirectUrl(value: string) {
   }
 }
 
-export async function dictionarySource(lesson: Lesson, segment: Segment): Promise<DictionarySource> {
+export async function dictionarySource(
+  lesson: Lesson,
+  segment: Segment,
+): Promise<DictionarySource> {
   const media = lessonMedia(lesson);
   const mediaId = 'videoId' in media ? media.videoId : null;
   const mediaContentKey = 'contentKey' in media ? media.contentKey : null;

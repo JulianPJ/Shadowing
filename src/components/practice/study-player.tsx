@@ -36,6 +36,7 @@ import { ComprehensionQuiz } from '../comprehension-quiz';
 import { LessonDifficulty } from '../lesson-difficulty';
 import { ShadowingCompletion } from '../shadowing-completion';
 import { TopicVocabularyOverview } from '../topic-vocabulary-overview';
+import { LessonReviewRecap } from '../lesson-review-recap';
 import { useProAccess } from '../pro-feature';
 import { transcriptRevision } from '@/lib/transcript';
 import {
@@ -447,7 +448,9 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
       try {
         validateShadowingRecordingBeforeUpload(recordingDurationSeconds, referenceDurationSeconds);
       } catch (error) {
-        setScoringError(error instanceof Error ? error.message : 'Try recording the full section again.');
+        setScoringError(
+          error instanceof Error ? error.message : 'Try recording the full section again.',
+        );
         return false;
       }
 
@@ -483,12 +486,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
         summaryAbort.current = null;
         setSummaryLoading(false);
         setShadowingScores((current) => {
-          const next = upsertShadowingSection(
-            current,
-            lesson.id,
-            shadowingRevision,
-            result,
-          );
+          const next = upsertShadowingSection(current, lesson.id, shadowingRevision, result);
           saveShadowingSession(next);
           return next;
         });
@@ -748,8 +746,12 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
             />
           ) : null}
           {topicOverviewOpen ? (
-            <TopicVocabularyOverview lesson={lesson} onReview={(segmentIndex) => navigate(segmentIndex)} />
+            <TopicVocabularyOverview
+              lesson={lesson}
+              onReview={(segmentIndex) => navigate(segmentIndex)}
+            />
           ) : null}
+          {finished ? <LessonReviewRecap lesson={lesson} /> : null}
           {finished ? (
             <div className="completion-card" role="status">
               <span>

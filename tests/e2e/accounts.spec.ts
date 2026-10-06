@@ -69,7 +69,10 @@ async function connect(
     }
     const body = route.request().postDataJSON() as
       | { action: 'delete'; id: string }
-      | { action: 'save'; entry: Omit<DictionaryEntry, 'id' | 'normalizedTerm' | 'createdAt' | 'updatedAt'> };
+      | {
+          action: 'save';
+          entry: Omit<DictionaryEntry, 'id' | 'normalizedTerm' | 'createdAt' | 'updatedAt'>;
+        };
     if (body.action === 'delete') {
       remote.dictionary = remote.dictionary.filter((entry) => entry.id !== body.id);
       await route.fulfill({ json: { ok: true } });
@@ -169,7 +172,7 @@ test('account plan controls paid UI without hiding the core account experience',
   await account(page);
   await expect(page.getByText('Hibiki Free', { exact: true })).toBeVisible();
   await page.goto('/dictionary');
-  await expect(page.getByText('My Words / Personal Dictionary is a Hibiki Pro feature.')).toBeVisible();
+  await expect(page.getByText('No saved vocabulary yet.')).toBeVisible();
   await expect(page.getByText('Opening your dictionary…')).toHaveCount(0);
 });
 
@@ -318,7 +321,6 @@ test('two devices sync preferences, bookmarks, completion and retakes; offline e
   }
 });
 
-
 test('auth screens expose configured providers without offering unavailable email delivery', async ({
   page,
   context,
@@ -349,7 +351,6 @@ test('auth screens expose configured providers without offering unavailable emai
   await expect(page.getByRole('button', { name: 'Sign in' })).toBeEnabled();
   await expect(page.getByRole('button', { name: 'Resend verification email' })).toHaveCount(0);
 });
-
 
 test('selected Japanese saves to the account dictionary with source context and replay link', async ({
   page,

@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { authClient } from '@/lib/auth/client';
+import { startReviewSync } from '@/lib/review/client';
 import {
   chooseImport,
   refreshAccount,
@@ -25,6 +26,7 @@ export function useAccount() {
 export function AccountBridge() {
   const account = useAccount();
   useEffect(() => startSync(), []);
+  useEffect(() => startReviewSync(), []);
   return account.importPending ? (
     <aside className="account-import" aria-label="Import device progress">
       <strong>Add this device’s Hibiki progress to your account?</strong>

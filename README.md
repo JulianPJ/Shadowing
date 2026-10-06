@@ -1,5 +1,7 @@
 # Hibiki — Japanese shadowing practice
 
+Post-MVP retention: verified Free and Pro accounts can keep contextual vocabulary in Inbox/named decks, explicitly add words to Daily Review, reveal and grade Again/Hard/Good/Easy, replay the matching source section, and export spreadsheet-safe CSV. Completion offers selected saved words for review without blocking practice or starting new AI work. Review changes persist locally before D1 sync. See [implementation, limits and verification](docs/retention-implementation.md) and [the competitive roadmap](docs/post-mvp-competitive-roadmap.md).
+
 Hibiki is a personal Japanese listening and speaking practice app. It turns timestamped speech into short sections so you can **listen → pause → repeat aloud → replay → continue** at your own pace.
 
 The intention of this repository is to make regular shadowing easy: bring a supported video link or your own media, pair it with Japanese captions or a timed transcript, focus on the sound first, and reveal English only when you need it. It is a working practice prototype with replaceable media, transcription and translation providers. The core app needs no account, database, paid API key, or model download.

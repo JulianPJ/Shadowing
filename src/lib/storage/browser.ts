@@ -15,7 +15,7 @@ export function storageAccount() {
   return account;
 }
 const owned = (key: string) =>
-  /^(preferences$|history$|learner-history$|learner-migration|position:|favorites:|completion:|quiz-attempt|sync:)/.test(
+  /^(preferences$|history$|learner-history$|learner-migration|position:|favorites:|completion:|quiz-attempt|sync:|review:|dictionary:)/.test(
     key,
   );
 function physicalKey(key: string) {

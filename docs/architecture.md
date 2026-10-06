@@ -16,6 +16,10 @@ Hibiki runs on Cloudflare Workers via vinext. Standard Next.js is also supported
 | Browser persistence, lessons, preferences, learning records | `src/lib/storage/` |
 | Framework-owned authentication, cookie sessions and local Next adapter | `src/lib/auth/` |
 | Account sync contract, validation, merge, D1 repository and browser hydration | `src/lib/sync/` |
+| Dictionary identity/context and safe replay links | `src/lib/dictionary/` |
+| Collections and entry memberships | `src/lib/decks/`, `src/lib/review/repository.ts` |
+| Pure scheduling, local review outbox and authenticated D1 review | `src/lib/review-scheduler.ts`, `src/lib/review/` |
+| Exportable vocabulary rows and spreadsheet-safe CSV | `src/lib/export/vocabulary.ts` |
 | Optional account UI and first-login import prompt | `src/components/account.tsx`, `src/components/auth-form.tsx` |
 | Transcript validation and identity | `src/lib/transcript.ts`, `src/lib/transcript-validation.ts`, `src/lib/hash.ts` |
 | Quiz questions, documents and attempts | `src/lib/quiz/` |

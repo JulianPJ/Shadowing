@@ -10,6 +10,7 @@ import { lessonMedia, migrateLesson } from '@/lib/media';
 import { Header, Footer, HelpDialog } from './chrome';
 import { StudyPlayer, type Session } from './practice/study-player';
 import { restoreAccountLesson, subscribeSync, syncStatus } from '@/lib/sync/client';
+import { transcriptKey } from '@/lib/transcript';
 
 function openingIndex(lesson: Lesson, lessonId: string, sectionId?: string) {
   if (sectionId) {
@@ -20,25 +21,54 @@ function openingIndex(lesson: Lesson, lessonId: string, sectionId?: string) {
   return Number.isInteger(raw) ? Math.max(0, Math.min(raw, lesson.segments.length - 1)) : 0;
 }
 
-export function Practice({ lessonId, sectionId }: { lessonId: string; sectionId?: string }) {
+export function Practice({
+  lessonId,
+  sectionId,
+  expectedTranscript,
+}: {
+  lessonId: string;
+  sectionId?: string;
+  expectedTranscript?: string;
+}) {
   const [session, setSession] = useState<Session | null>(null);
   const [missing, setMissing] = useState(false);
+  const [revisionMissing, setRevisionMissing] = useState(false);
   const [help, setHelp] = useState(false);
   /* Browser-only lesson persistence requires a one-time sync after hydration. */
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     let disposed = false;
+    const open = async (lesson: Lesson) => {
+      if (
+        expectedTranscript &&
+        ((await transcriptKey(lesson)) !== expectedTranscript ||
+          !lesson.segments.some((s) => s.id === sectionId))
+      ) {
+        if (!disposed) {
+          setSession(null);
+          setRevisionMissing(true);
+          setMissing(true);
+        }
+        return;
+      }
+      if (!disposed) {
+        setSession({
+          lesson,
+          index: openingIndex(lesson, lessonId, sectionId),
+          preferences: loadPreferences(),
+        });
+        setMissing(false);
+        setRevisionMissing(false);
+      }
+    };
     const restore = () => {
       if (lessonId === 'demo' || loadLesson(lessonId)) return;
       if (syncStatus().state === 'saved')
         void restoreAccountLesson(lessonId).then((lesson) => {
           if (lesson && !disposed) {
-            setSession({
-              lesson,
-              index: openingIndex(lesson, lessonId, sectionId),
-              preferences: loadPreferences(),
+            void open(lesson).catch(() => {
+              if (!disposed) setMissing(true);
             });
-            setMissing(false);
           }
         });
     };
@@ -55,8 +85,9 @@ export function Practice({ lessonId, sectionId }: { lessonId: string; sectionId?
       }
       if (lessonMedia(lesson).type === 'local') lesson.mediaUrl = getLiveMedia(lesson.id);
       validateCues(lesson.segments);
-      const preferences = loadPreferences();
-      setSession({ lesson, index: openingIndex(lesson, lessonId, sectionId), preferences });
+      void open(lesson).catch(() => {
+        if (!disposed) setMissing(true);
+      });
     } catch {
       setMissing(true);
     }
@@ -64,7 +95,7 @@ export function Practice({ lessonId, sectionId }: { lessonId: string; sectionId?
       disposed = true;
       unsubscribe();
     };
-  }, [lessonId, sectionId]);
+  }, [lessonId, sectionId, expectedTranscript]);
   /* eslint-enable react-hooks/set-state-in-effect */
   return (
     <>
@@ -76,10 +107,15 @@ export function Practice({ lessonId, sectionId }: { lessonId: string; sectionId?
           {missing ? (
             <>
               <span className="eyebrow">A FRESH START</span>
-              <h1>This practice isn’t saved here yet.</h1>
+              <h1>
+                {revisionMissing
+                  ? 'This saved context has changed.'
+                  : 'This practice isn’t saved here yet.'}
+              </h1>
               <p>
-                Lessons are saved in the browser where you prepared them. Paste your video link
-                again or explore the sample.
+                {revisionMissing
+                  ? 'Reattach the original transcript to replay the exact saved section. Your review word and source sentence are still available.'
+                  : 'Lessons are saved in the browser where you prepared them. Paste your video link again or explore the sample.'}
               </p>
               <Link className="button primary" href="/">
                 Prepare a video <ArrowRight size={16} />
