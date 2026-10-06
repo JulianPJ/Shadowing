@@ -21,34 +21,40 @@ function externalReplay(entry: DictionaryEntry) {
 
 export function PersonalDictionary() {
   const account = useAccount();
-  const [entries, setEntries] = useState<DictionaryEntry[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [loaded, setLoaded] = useState<{
+    userId: string;
+    entries: DictionaryEntry[];
+    error: string;
+  } | null>(null);
+  const [actionError, setActionError] = useState('');
   const [removing, setRemoving] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!account.user) {
-      setEntries([]);
-      return;
-    }
+    const userId = account.user?.id;
+    if (!userId) return;
     let active = true;
-    setLoading(true);
-    setError('');
     void listDictionary()
-      .then((value) => {
-        if (active) setEntries(value);
+      .then((entries) => {
+        if (active) setLoaded({ userId, entries, error: '' });
       })
       .catch((reason) => {
         if (active)
-          setError(reason instanceof Error ? reason.message : 'Your dictionary is unavailable.');
-      })
-      .finally(() => {
-        if (active) setLoading(false);
+          setLoaded({
+            userId,
+            entries: [],
+            error: reason instanceof Error ? reason.message : 'Your dictionary is unavailable.',
+          });
       });
     return () => {
       active = false;
     };
-  }, [account.user]);
+  }, [account.user?.id]);
+
+  const entries =
+    account.user && loaded?.userId === account.user.id ? loaded.entries : [];
+  const loading = Boolean(account.user && loaded?.userId !== account.user.id);
+  const error =
+    actionError || (account.user && loaded?.userId === account.user.id ? loaded.error : '');
 
   const termCount = useMemo(
     () => new Set(entries.map((entry) => entry.normalizedTerm)).size,
@@ -57,12 +63,16 @@ export function PersonalDictionary() {
 
   async function remove(entry: DictionaryEntry) {
     setRemoving(entry.id);
-    setError('');
+    setActionError('');
     try {
       await removeDictionary(entry.id);
-      setEntries((current) => current.filter((value) => value.id !== entry.id));
+      setLoaded((current) =>
+        current && account.user && current.userId === account.user.id
+          ? { ...current, entries: current.entries.filter((value) => value.id !== entry.id) }
+          : current,
+      );
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Could not remove this entry.');
+      setActionError(reason instanceof Error ? reason.message : 'Could not remove this entry.');
     } finally {
       setRemoving(null);
     }
