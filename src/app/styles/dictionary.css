@@ -271,3 +271,7 @@
     flex-direction: column;
   }
 }
+
+.studio-mode .dictionary-lookup-hint {
+  display: none;
+}
