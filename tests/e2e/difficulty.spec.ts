@@ -6,7 +6,7 @@ import questions from '../../src/data/demo-quiz.json' with { type: 'json' };
 import { createDifficultyAnalysis } from '../../src/lib/difficulty';
 import { createQuiz, transcriptRevision } from '../../src/lib/quiz';
 import type { Lesson } from '../../src/lib/types';
-import { mockProAccount } from '../helpers/pro-account';
+import { mockProAccount, proStorageKey } from '../helpers/pro-account';
 
 async function openDemo(page: Page) {
   await page.goto('/practice/demo');
@@ -42,9 +42,9 @@ test('API failure and malformed result can be retried while playback and the com
   const analysis = await createDifficultyAnalysis(authored, demo as Lesson);
   let calls = 0;
   await page.addInitScript(
-    (revision) =>
-      localStorage.setItem('hibiki:v1:completion:demo', JSON.stringify({ transcript: revision })),
-    transcriptRevision(demo as Lesson),
+    ({ key, revision }) =>
+      localStorage.setItem(key, JSON.stringify({ transcript: revision })),
+    { key: proStorageKey('completion:demo'), revision: transcriptRevision(demo as Lesson) },
   );
   await page.route('**/api/difficulty', (route) => {
     calls++;
