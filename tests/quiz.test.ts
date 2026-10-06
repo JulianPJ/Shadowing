@@ -39,7 +39,7 @@ import {
   WORKERS_AI_MODEL,
   WORKERS_AI_QUIZ_SELECTOR_MODEL,
 } from '../src/lib/providers/quiz';
-import { POST } from '../src/app/api/quiz/route';
+import { handleQuizRequest } from '../src/lib/quiz-api';
 import type { QuizGenerationProvider } from '../src/lib/types';
 
 const lesson = validateQuizLesson(demo);
@@ -508,7 +508,7 @@ test('chat-completions adapter uses server credentials and rejects truncated or 
       await chatCompletionQuizProvider.generate(lesson, new AbortController().signal),
       demoQuiz,
     );
-    const generated = await POST(
+    const generated = await handleQuizRequest(
       new Request('http://localhost/api/quiz', {
         method: 'POST',
         body: JSON.stringify({ ...lesson, id: 'custom-video' }),
@@ -524,7 +524,7 @@ test('chat-completions adapter uses server credentials and rejects truncated or 
           { finish_reason: 'stop', message: { content: JSON.stringify({ questions: [] }) } },
         ],
       });
-    const empty = await POST(
+    const empty = await handleQuizRequest(
       new Request('http://localhost/api/quiz', {
         method: 'POST',
         body: JSON.stringify({ ...lesson, id: 'custom-video' }),
@@ -564,18 +564,18 @@ test('route accepts demo, rejects invalid/oversized input and cross-origin reque
       headers: { origin },
       body: JSON.stringify(body),
     });
-  const response = await POST(request(lesson));
+  const response = await handleQuizRequest(request(lesson));
   assert.equal(response.status, 200);
   assert.equal(response.headers.get('cache-control'), 'no-store');
   await validateQuiz((await response.json()).quiz, lesson);
-  assert.equal((await POST(request({ id: 'bad', segments: [] }))).status, 400);
-  assert.equal((await POST(request(lesson, 'https://external.example'))).status, 403);
-  assert.equal((await POST(request({ junk: 'x'.repeat(350001) }))).status, 400);
+  assert.equal((await handleQuizRequest(request({ id: 'bad', segments: [] }))).status, 400);
+  assert.equal((await handleQuizRequest(request(lesson, 'https://external.example'))).status, 403);
+  assert.equal((await handleQuizRequest(request({ junk: 'x'.repeat(350001) }))).status, 400);
   await assert.rejects(readBoundedJson(new Response('x'.repeat(101)), 100));
   const apiUrl = process.env.QUIZ_API_URL;
   delete process.env.QUIZ_API_URL;
   try {
-    const unavailable = await POST(request({ ...lesson, id: 'no-provider' }));
+    const unavailable = await handleQuizRequest(request({ ...lesson, id: 'no-provider' }));
     assert.equal(unavailable.status, 503);
     assert.equal((await unavailable.json()).code, 'unconfigured');
   } finally {
