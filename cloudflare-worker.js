@@ -4,6 +4,7 @@ import { createAuth, handleAuthRequest } from './src/lib/auth/server';
 import { accountHandler } from './src/lib/sync/server';
 import { createD1UserProgressRepository } from './src/lib/sync/repository';
 import { createD1DictionaryRepository } from './src/lib/dictionary/repository';
+import { createD1AccessRepository, requirePro } from './src/lib/access';
 import { serveDemoAsset } from './src/lib/demo-asset';
 import { handleQuizRequest } from './src/lib/quiz-api';
 import { createWorkersAiQuizProvider } from './src/lib/providers/quiz';
@@ -56,6 +57,21 @@ function shadowingRateLimitResponse() {
   );
 }
 
+/**
+ * @param {Request} request
+ * @param {WorkerEnv} env
+ * @param {Parameters<typeof vinextHandler.fetch>[2]} ctx
+ */
+async function requireProAccess(request, env, ctx) {
+  if (!env.HIBIKI_DB || !env.AUTH_SECRET || !env.AUTH_BASE_URL)
+    return Response.json(
+      { error: 'Accounts are awaiting configuration.' },
+      { status: 503, headers: { 'Cache-Control': 'no-store' } },
+    );
+  const auth = createAuth(env.HIBIKI_DB, env, (promise) => ctx.waitUntil(promise));
+  return requirePro(request, auth, createD1AccessRepository(env.HIBIKI_DB));
+}
+
 const worker = {
   /**
    * @param {Request} request
@@ -88,6 +104,7 @@ const worker = {
               env,
               env.HIBIKI_DB,
               createD1DictionaryRepository(env.HIBIKI_DB),
+              createD1AccessRepository(env.HIBIKI_DB),
             )(request);
       } catch {
         return Response.json(
@@ -115,10 +132,14 @@ const worker = {
     }
 
     if (url.pathname === '/api/transcribe' && request.method === 'POST') {
+      const denied = await requireProAccess(request, env, ctx);
+      if (denied) return denied;
       return handleTranscriptionRequest(request, createWorkersAiTranscriptionProvider(env.AI));
     }
 
     if (url.pathname.startsWith('/api/shadowing/') && request.method === 'POST') {
+      const denied = await requireProAccess(request, env, ctx);
+      if (denied) return denied;
       if (await shadowingRateLimited(request, env)) return shadowingRateLimitResponse();
       const provider = createWorkersAiShadowingProvider(env.AI);
       if (url.pathname === '/api/shadowing/transcribe')
@@ -134,6 +155,8 @@ const worker = {
     }
 
     if (url.pathname === '/api/quiz' && request.method === 'POST') {
+      const denied = await requireProAccess(request, env, ctx);
+      if (denied) return denied;
       return handleQuizRequest(request, createWorkersAiQuizProvider(env.AI), storage);
     }
 
