@@ -110,6 +110,7 @@ export function CurrentSection({
       <p className="dictionary-lookup-hint">Click a word or select a phrase to save it.</p>
       {lookupTerm ? (
         <DictionarySavePanel
+          key={`${segment.id}:${lookupTerm}`}
           term={lookupTerm}
           lesson={lesson}
           segment={segment}
