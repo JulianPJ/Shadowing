@@ -17,6 +17,7 @@ import { createImportedLesson } from '@/lib/import-lesson';
 import { localWhisper } from '@/lib/providers/local-whisper';
 import { transcribeMediaFile } from '@/lib/transcription-client';
 import type { Lesson, ResolvedMedia } from '@/lib/types';
+import { ProFeatureNotice, useProAccess } from './pro-feature';
 
 type SubtitleChoice = 'manual' | 'generate' | null;
 
@@ -35,6 +36,7 @@ export function ImportDialog({
   initialResolved?: ResolvedMedia;
   transcriptUnavailable?: boolean;
 }) {
+  const { isPro } = useProAccess();
   const dialog = useRef<HTMLDialogElement>(null);
   const abort = useRef<AbortController | null>(null);
   const [kind, setKind] = useState<'link' | 'upload'>('link');
@@ -83,6 +85,11 @@ export function ImportDialog({
   }
 
   function chooseSubtitleMethod(choice: Exclude<SubtitleChoice, null>) {
+    if (choice === 'generate' && !isPro) {
+      setSubtitleChoice(null);
+      setError('');
+      return;
+    }
     setSubtitleChoice(choice);
     setError('');
   }
@@ -98,6 +105,10 @@ export function ImportDialog({
     event.preventDefault();
     if (!subtitleChoice) {
       setError('Choose whether to upload your own subtitles or auto-generate subtitles.');
+      return;
+    }
+    if (subtitleChoice === 'generate' && !isPro) {
+      setError('Hibiki Pro is required to auto-generate subtitles.');
       return;
     }
 
@@ -271,11 +282,14 @@ export function ImportDialog({
             type="button"
             aria-pressed={subtitleChoice === 'generate'}
             className={subtitleChoice === 'generate' ? 'selected' : ''}
+            disabled={!isPro}
+            title={!isPro ? 'Hibiki Pro required' : undefined}
             onClick={() => chooseSubtitleMethod('generate')}
           >
             <Sparkles size={16} /> Auto-generate subtitles
           </button>
         </div>
+        {!isPro ? <ProFeatureNotice feature="Auto-generated subtitles" compact /> : null}
 
         {subtitleChoice === 'manual' ? (
           <>
