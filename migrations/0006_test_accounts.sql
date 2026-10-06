@@ -1,5 +1,5 @@
 -- Production QA accounts for exercising Free vs Pro entitlement behavior before billing is wired.
--- Passwords are not stored in plaintext; these are Better Auth-compatible scrypt hashes.
+-- Passwords are not stored in plaintext. These are Better Auth-compatible scrypt hashes.
 -- Remove/rotate these accounts when they are no longer required.
 
 INSERT OR IGNORE INTO "user" (id, name, email, emailVerified, image, createdAt, updatedAt)
