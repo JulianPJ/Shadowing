@@ -87,11 +87,32 @@ test('deck filtering, membership removal, bulk enrollment and context CSV export
   await page.getByLabel('New deck').fill('Travel');
   await page.getByRole('button', { name: 'Create deck' }).click();
   await expect.poll(() => remote.review.decks.length).toBe(2);
+  // Hold the local-first membership edit until the filtered server query has returned.
+  // The dictionary must refresh on acknowledgment without a manual reload.
+  let releaseMembership!: () => void;
+  const membershipPending = new Promise<void>((resolve) => {
+    releaseMembership = resolve;
+  });
+  await context.route('**/api/review', async (route) => {
+    if (
+      route.request().method() === 'POST' &&
+      route.request().postDataJSON().action === 'membership'
+    )
+      await membershipPending;
+    await route.fallback();
+  });
   const first = page
     .locator('.dictionary-entry')
     .filter({ has: page.getByRole('heading', { name: '朝', exact: true }) });
   await first.getByLabel('Travel', { exact: true }).check();
+  const initialFilter = page.waitForResponse(
+    (response) =>
+      response.url().includes('/api/dictionary?') &&
+      new URL(response.url()).searchParams.has('deckId'),
+  );
   await page.getByLabel('Filter by deck').selectOption({ label: 'Travel' });
+  expect((await (await initialFilter).json()).entries).toHaveLength(0);
+  releaseMembership();
   await expect(page.locator('.dictionary-entry')).toHaveCount(1);
   await page.getByLabel('Select 朝', { exact: true }).check();
   await page.getByRole('button', { name: 'Add selected to review', exact: true }).click();
@@ -108,6 +129,44 @@ test('deck filtering, membership removal, bulk enrollment and context CSV export
   await expect(page.locator('.dictionary-entry')).toHaveCount(0);
   expect(remote.entries).toHaveLength(2);
 });
+test('review edits queued during snapshot hydration sync without waiting for a timer', async ({
+  page,
+  context,
+}) => {
+  const remote = await connect(context);
+  await page.goto('/dictionary');
+  await expect(page.getByLabel('Filter by deck')).toBeVisible();
+  let holdSnapshot = false;
+  let releaseSnapshot!: () => void;
+  let snapshotStarted!: () => void;
+  const started = new Promise<void>((resolve) => {
+    snapshotStarted = resolve;
+  });
+  const release = new Promise<void>((resolve) => {
+    releaseSnapshot = resolve;
+  });
+  await context.route('**/api/review', async (route) => {
+    if (route.request().method() === 'POST' && route.request().postDataJSON().name === 'First')
+      holdSnapshot = true;
+    else if (route.request().method() === 'GET' && holdSnapshot) {
+      holdSnapshot = false;
+      snapshotStarted();
+      await release;
+    }
+    await route.fallback();
+  });
+  await page.getByLabel('New deck').fill('First');
+  await page.getByRole('button', { name: 'Create deck' }).click();
+  await started;
+  await page.getByLabel('New deck').fill('Second');
+  await page.getByRole('button', { name: 'Create deck' }).click();
+  releaseSnapshot();
+  await expect
+    .poll(() => remote.review.decks.map((d) => d.name))
+    .toEqual(['Inbox', 'First', 'Second']);
+  await expect(page.getByText(/changes saved on this device/)).toHaveCount(0);
+});
+
 test('offline grading survives reload and retries without duplicating reviews', async ({
   page,
   context,

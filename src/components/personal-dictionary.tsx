@@ -8,7 +8,7 @@ import { timestamp } from '@/lib/youtube';
 import { useAccount } from './account';
 import { useReview } from './use-review';
 import { ReviewEntryActions } from './review-entry-actions';
-import { changeReview } from '@/lib/review/client';
+import { cachedReview, changeReview, pendingReview } from '@/lib/review/client';
 import { dueReviews } from '@/lib/review-scheduler';
 import { vocabularyCsv, vocabularyTsv, vocabularyRows } from '@/lib/export/vocabulary';
 import { externalReplay } from '@/lib/dictionary/replay';
@@ -58,24 +58,47 @@ function DictionaryContent() {
     let active = true;
     const paginationGeneration = generation;
     paginationGeneration.current++;
-    const load = () =>
+    let requestGeneration = 0;
+    const load = () => {
+      const request = ++requestGeneration;
+      paginationGeneration.current++;
       void dictionaryPage(query)
         .then((page) => {
-          if (active) {
+          if (active && request === requestGeneration) {
             setLoaded({ userId, entries: page.entries, error: '' });
             setNextCursor(page.nextCursor);
             setOffline(!!page.offline);
           }
         })
         .catch((reason) => {
-          if (active)
+          if (active && request === requestGeneration)
             setLoaded({
               userId,
               entries: [],
               error: reason instanceof Error ? reason.message : 'Your dictionary is unavailable.',
             });
         });
+    };
     load();
+    const membershipKey = () =>
+      cachedReview()
+        .memberships.filter((m) => m.deckId === query.deckId)
+        .map((m) => m.entryId)
+        .sort()
+        .join(',');
+    let memberships = membershipKey();
+    let waitingForSync = pendingReview().length > 0;
+    const reviewChanged = () => {
+      if (!query.deckId) return;
+      if (pendingReview().length) {
+        waitingForSync = true;
+        return;
+      }
+      const current = membershipKey();
+      if (waitingForSync || current !== memberships) load();
+      memberships = current;
+      waitingForSync = false;
+    };
     const refresh = () => {
       load();
       void listTags()
@@ -96,10 +119,12 @@ function DictionaryContent() {
       })
       .catch(() => {});
     window.addEventListener('hibiki:dictionary-change', refresh);
+    window.addEventListener('hibiki:review-change', reviewChanged);
     return () => {
       active = false;
       paginationGeneration.current++;
       window.removeEventListener('hibiki:dictionary-change', refresh);
+      window.removeEventListener('hibiki:review-change', reviewChanged);
     };
   }, [account.user?.id, query]);
 

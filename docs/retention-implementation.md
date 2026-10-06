@@ -20,6 +20,8 @@ The cache retains at most 700 records and a 3 MB UTF-8 record budget. Exact-ID r
 
 Review/deck writes retain PR #31's durable local-first outbox, revisions and operation IDs. New dictionary creation and tag edits require a connection. Tags do not enter the review operation protocol or alter SRS.
 
+Server-filtered deck pages refresh after pending review/deck edits are acknowledged, and superseded page requests cannot replace that refresh. Edits queued during the final review snapshot are drained under the existing account lock immediately, without waiting for a timer.
+
 ### Tags and migration 0008
 
 `0008_tags_dictionary_pagination.sql` is additive to the existing retention data. It creates `user_tags` and `user_dictionary_tags`, with composite owner/tag and owner/entry foreign keys. Tag deletion removes memberships; dictionary/review records survive. Entry/account deletion cascades. Migration 0007 and existing schedule data are unchanged.
@@ -46,7 +48,7 @@ Begin with richer dictionary data, then persistent word knowledge states, Word B
 
 ### Phase A.2 verification
 
-Local Node 24.21.0 verification passed 216 unit/integration tests, typecheck, lint, both production builds, real local D1 migrations and the built Worker/D1 check. The full 68-test browser suite passed on Next production and isolated vinext/Worker production. The final account-switch UI guard passed the focused 14-test account/retention suite on both runtimes; the PR records the expanded 69-test exact-head CI counts before merge. Real D1 fixtures upgrade a populated 0007 database, traverse 650 entries, reach an older word through ID/lesson/export paths, enforce atomic tag limits and bulk 50, and reject forged ownership directly through composite foreign keys. The migrated local ledger includes 0008 and `foreign_key_check` is empty.
+Local Node 24.21.0 verification passed 216 unit/integration tests, typecheck, lint, both production builds, real local D1 migrations and the built Worker/D1 check. The full 68-test browser suite passed on Next production and isolated vinext/Worker production. The final account-switch UI guard passed the focused 14-test account/retention suite on both runtimes. Deterministic browser regressions additionally cover filtering before deck membership acknowledgment and edits queued during review snapshot hydration; the PR records the expanded 70-test exact-head CI counts before merge. Real D1 fixtures upgrade a populated 0007 database, traverse 650 entries, reach an older word through ID/lesson/export paths, enforce atomic tag limits and bulk 50, and reject forged ownership directly through composite foreign keys. The migrated local ledger includes 0008 and `foreign_key_check` is empty.
 
 Changed code passes formatting; the repository-wide check reports 21 unchanged baseline files outside this diff. The PR records canonical production commit/version, migration/FK audit and a small Free/Pro smoke after merge. Neither local nor live completion verification needs AI generation.
 
