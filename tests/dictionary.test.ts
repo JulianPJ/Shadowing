@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { DatabaseSync } from 'node:sqlite';
 import { test } from 'node:test';
 import demo from '../src/data/demo.json' with { type: 'json' };
 import { dictionarySource } from '../src/lib/dictionary/source';
@@ -8,6 +10,8 @@ import {
   validateDictionarySaveInput,
 } from '../src/lib/dictionary/validation';
 import type { Lesson } from '../src/lib/types';
+import { createD1DictionaryRepository } from '../src/lib/dictionary/repository';
+import { localProgressDatabase } from '../src/lib/sync/local-database';
 
 const baseEntry = {
   schemaVersion: 1 as const,
@@ -110,4 +114,31 @@ test('dictionary source captures provider replay identity but never local or sig
   const directSource = await dictionarySource(direct, direct.segments[0]);
   assert.equal(directSource.mediaUrl, null);
   assert.equal(directSource.mediaContentKey, `direct:${'c'.repeat(64)}`);
+});
+
+
+test('dictionary migration and repository save, upsert, list and delete against SQLite', async () => {
+  const db = new DatabaseSync(':memory:');
+  try {
+    db.exec('PRAGMA foreign_keys = ON; CREATE TABLE "user" (id TEXT PRIMARY KEY);');
+    db.prepare('INSERT INTO "user" (id) VALUES (?)').run('learner');
+    db.exec(readFileSync('migrations/0004_personal_dictionary.sql', 'utf8'));
+    const repository = createD1DictionaryRepository(localProgressDatabase(db));
+    const input = validateDictionarySaveInput(baseEntry);
+    const saved = await repository.save('learner', input);
+    assert.equal(saved.term, '勉強');
+    assert.equal(saved.translation, 'study');
+    assert.equal((await repository.list('learner')).length, 1);
+
+    const updated = await repository.save('learner', { ...input, translation: 'studying' });
+    assert.equal(updated.id, saved.id);
+    assert.equal(updated.createdAt, saved.createdAt);
+    assert.equal(updated.translation, 'studying');
+    assert.equal((await repository.list('learner')).length, 1);
+
+    await repository.remove('learner', saved.id);
+    assert.deepEqual(await repository.list('learner'), []);
+  } finally {
+    db.close();
+  }
 });
