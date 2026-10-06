@@ -693,6 +693,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
           </div>
           <div className="practice-current-stack">
             <CurrentSection
+              lesson={lesson}
               recording={recording}
               status={status}
               stateLabel={stateLabel}
