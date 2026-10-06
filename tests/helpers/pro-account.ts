@@ -9,7 +9,19 @@ export const proTestUser: AccountUser = {
   plan: 'pro',
 };
 
+export const proStorageKey = (key: string) =>
+  `hibiki:v1:account:${proTestUser.id}:${key}`;
+
 export async function mockProAccount(page: Page) {
+  await page.addInitScript(
+    ({ userId }) => {
+      localStorage.setItem(
+        `hibiki:v1:account:${userId}:sync:import-decision`,
+        JSON.stringify('declined'),
+      );
+    },
+    { userId: proTestUser.id },
+  );
   await page.route('**/api/account/me', (route) =>
     route.fulfill({
       json: {
