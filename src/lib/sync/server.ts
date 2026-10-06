@@ -7,6 +7,7 @@ import { verifyAttempt } from './quiz-verification';
 import { restorePublicLesson } from './restore-lesson';
 import type { DictionaryRepository } from '../dictionary/types';
 import { handleDictionaryRequest } from '../dictionary/server';
+import { freeAccess, proRequiredResponse, type AccessRepository } from '../access';
 
 export function accountHandler(
   auth: HibikiAuth,
@@ -14,6 +15,7 @@ export function accountHandler(
   env: AuthEnvironment,
   db?: D1Database,
   dictionary?: DictionaryRepository,
+  access: AccessRepository = freeAccess,
 ) {
   return async (request: Request): Promise<Response> => {
     const headers = { 'Cache-Control': 'no-store', Vary: 'Cookie' };
@@ -37,6 +39,7 @@ export function accountHandler(
                 email: session.user.email,
                 name: session.user.name,
                 emailVerified: session.user.emailVerified,
+                plan: await access.plan(session.user.id),
               }
             : null,
           googleEnabled: !!env.GOOGLE_CLIENT_ID && !!env.GOOGLE_CLIENT_SECRET,
@@ -50,6 +53,7 @@ export function accountHandler(
       if (expectedAccount && expectedAccount !== userId)
         return respond({ error: 'Account changed. Refresh your session.' }, 409);
       if (url.pathname === '/api/dictionary') {
+        if ((await access.plan(userId)) !== 'pro') return proRequiredResponse();
         if (!dictionary) return respond({ error: 'Dictionary storage unavailable' }, 503);
         return handleDictionaryRequest(request, userId, session.user.emailVerified, dictionary);
       }
