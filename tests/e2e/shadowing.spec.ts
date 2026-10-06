@@ -280,6 +280,11 @@ test('shadowing analysis is explicit, scores one recording, and shows aggregate 
   await expect(page.getByTestId('playback-state')).toContainText('YOUR TURN');
   await page.getByRole('button', { name: 'Finish practice', exact: true }).click();
 
+  const topicOverview = page.locator('.topic-vocabulary-card');
+  await expect(topicOverview.getByRole('heading', { name: 'Topic vocabulary' })).toBeVisible();
+  await expect(topicOverview.getByText('Local · no AI', { exact: true })).toBeVisible();
+  await expect(topicOverview.getByText('コーヒー', { exact: true })).toBeVisible({ timeout: 15000 });
+  await expect(topicOverview.getByText('公園', { exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: '100 / 100' })).toBeVisible();
   await expect(page.getByText(`Scored 1 of ${demo.segments.length} shadowing sections`)).toBeVisible();
   await expect(page.getByText('You made a little progress today.')).toBeVisible();
