@@ -5,12 +5,15 @@ import type { UserProgressRepository } from './types';
 import { validateSync } from './validation';
 import { verifyAttempt } from './quiz-verification';
 import { restorePublicLesson } from './restore-lesson';
+import type { DictionaryRepository } from '../dictionary/types';
+import { handleDictionaryRequest } from '../dictionary/server';
 
 export function accountHandler(
   auth: HibikiAuth,
   repository: UserProgressRepository,
   env: AuthEnvironment,
   db?: D1Database,
+  dictionary?: DictionaryRepository,
 ) {
   return async (request: Request): Promise<Response> => {
     const headers = { 'Cache-Control': 'no-store', Vary: 'Cookie' };
@@ -46,6 +49,10 @@ export function accountHandler(
       const expectedAccount = request.headers.get('X-Hibiki-Account');
       if (expectedAccount && expectedAccount !== userId)
         return respond({ error: 'Account changed. Refresh your session.' }, 409);
+      if (url.pathname === '/api/dictionary') {
+        if (!dictionary) return respond({ error: 'Dictionary storage unavailable' }, 503);
+        return handleDictionaryRequest(request, userId, session.user.emailVerified, dictionary);
+      }
       if (url.pathname === '/api/sync/lesson' && request.method === 'GET') {
         const id = url.searchParams.get('id');
         if (!id || id.length > 1000) return respond({ error: 'Invalid lesson identity' }, 400);
