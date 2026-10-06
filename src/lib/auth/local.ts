@@ -7,6 +7,7 @@ import { localProgressDatabase } from '../sync/local-database';
 import { createD1DictionaryRepository } from '../dictionary/repository';
 import { createD1AccessRepository } from '../access';
 import { createD1ReviewRepository } from '../review/repository';
+import { createD1TagRepository } from '../tags/repository';
 
 let local:
   | Promise<{
@@ -15,6 +16,7 @@ let local:
       dictionary: ReturnType<typeof createD1DictionaryRepository>;
       access: ReturnType<typeof createD1AccessRepository>;
       review: ReturnType<typeof createD1ReviewRepository>;
+      tags: ReturnType<typeof createD1TagRepository>;
     } | null>
   | undefined;
 export function localAuth() {
@@ -43,6 +45,7 @@ export function localAuth() {
       dictionary: createD1DictionaryRepository(database),
       access: createD1AccessRepository(database),
       review: createD1ReviewRepository(database),
+      tags: createD1TagRepository(database),
     };
   })();
   return local;

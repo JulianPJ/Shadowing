@@ -5,6 +5,7 @@ import { accountHandler } from './src/lib/sync/server';
 import { createD1UserProgressRepository } from './src/lib/sync/repository';
 import { createD1DictionaryRepository } from './src/lib/dictionary/repository';
 import { createD1ReviewRepository } from './src/lib/review/repository';
+import { createD1TagRepository } from './src/lib/tags/repository';
 import { createD1AccessRepository, requirePro } from './src/lib/access';
 import { serveDemoAsset } from './src/lib/demo-asset';
 import { handleQuizRequest } from './src/lib/quiz-api';
@@ -86,7 +87,8 @@ const worker = {
       url.pathname.startsWith('/api/account/') ||
       url.pathname.startsWith('/api/sync/') ||
       url.pathname === '/api/dictionary' ||
-      url.pathname === '/api/review'
+      url.pathname === '/api/review' ||
+      url.pathname === '/api/tags'
     ) {
       if (!env.HIBIKI_DB || !env.AUTH_SECRET || !env.AUTH_BASE_URL) {
         return url.pathname === '/api/account/me'
@@ -108,6 +110,7 @@ const worker = {
               createD1DictionaryRepository(env.HIBIKI_DB),
               createD1AccessRepository(env.HIBIKI_DB),
               createD1ReviewRepository(env.HIBIKI_DB),
+              createD1TagRepository(env.HIBIKI_DB),
             )(request);
       } catch {
         return Response.json(

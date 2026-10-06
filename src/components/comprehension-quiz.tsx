@@ -18,6 +18,7 @@ type Props = {
   onReplay: (evidence: QuizEvidence) => void;
   onReturn: () => void;
   onOpenChange: (open: boolean) => void;
+  onAttemptChange?: (attempt: QuizAttempt) => void;
 };
 export function ComprehensionQuiz({
   furigana = false,
@@ -28,6 +29,7 @@ export function ComprehensionQuiz({
   onReplay,
   onReturn,
   onOpenChange,
+  onAttemptChange,
 }: Props) {
   const { isPro } = useProAccess();
   const quizAvailable = isPro;
@@ -47,6 +49,7 @@ export function ComprehensionQuiz({
 
   function persist(next: QuizAttempt, currentQuiz: LessonQuiz) {
     setAttempt(next);
+    onAttemptChange?.(next);
     const saved = saveQuizAttempt(next, currentQuiz, lesson);
     setStorageWarning((current) => current || !saved);
   }

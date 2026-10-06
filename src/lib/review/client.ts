@@ -53,39 +53,43 @@ export async function refreshReview(): Promise<void> {
   if (!owner || owner !== storageAccount()) return;
   const current = () => owner === storageAccount() && syncStatus().user?.id === owner;
   const synchronize = async () => {
-    while (current() && pendingReview().length) {
-      const op = pendingReview()[0];
-      try {
-        await request(owner, op);
-      } catch (error) {
-        if (current() && (error as { conflict?: boolean }).conflict) {
-          // Stop dependent grades; remote state wins. Keep conflict visible until acknowledged.
-          writeStorage(
-            'review:pending',
-            pendingReview()
-              .slice(1)
-              .filter((p) => !('entryId' in p && 'entryId' in op && p.entryId === op.entryId)),
-          );
-          writeStorage(
-            'review:conflict',
-            'A review changed on another device. Its latest schedule was restored.',
-          );
-          const remote = (await request(owner)) as ReviewSnapshot;
-          if (current())
-            writeStorage('review:data', pendingReview().reduce(applyLocalReview, remote));
-          notify();
+    do {
+      while (current() && pendingReview().length) {
+        const op = pendingReview()[0];
+        try {
+          await request(owner, op);
+        } catch (error) {
+          if (current() && (error as { conflict?: boolean }).conflict) {
+            // Stop dependent grades; remote state wins. Keep conflict visible until acknowledged.
+            writeStorage(
+              'review:pending',
+              pendingReview()
+                .slice(1)
+                .filter((p) => !('entryId' in p && 'entryId' in op && p.entryId === op.entryId)),
+            );
+            writeStorage(
+              'review:conflict',
+              'A review changed on another device. Its latest schedule was restored.',
+            );
+            const remote = (await request(owner)) as ReviewSnapshot;
+            if (current())
+              writeStorage('review:data', pendingReview().reduce(applyLocalReview, remote));
+            notify();
+          }
+          throw error;
         }
-        throw error;
+        if (!current()) return;
+        const pending = pendingReview();
+        if (JSON.stringify(pending[0]) === JSON.stringify(op))
+          writeStorage('review:pending', pending.slice(1));
       }
+      const remote = (await request(owner)) as ReviewSnapshot;
       if (!current()) return;
-      const pending = pendingReview();
-      if (JSON.stringify(pending[0]) === JSON.stringify(op))
-        writeStorage('review:pending', pending.slice(1));
-    }
-    const remote = (await request(owner)) as ReviewSnapshot;
-    if (!current()) return;
-    writeStorage('review:data', pendingReview().reduce(applyLocalReview, remote));
-    notify();
+      writeStorage('review:data', pendingReview().reduce(applyLocalReview, remote));
+      notify();
+      // An edit can arrive while the final snapshot is in flight. Drain it under
+      // the same lock instead of leaving it queued until the next focus/timer.
+    } while (current() && pendingReview().length);
   };
   // Tabs share the account outbox. Serialize network drains to avoid dropping an unsent operation.
   const drain = async () => {

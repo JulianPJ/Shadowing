@@ -82,21 +82,15 @@ test('playback offset shifts authored pause and navigation timing', async ({ pag
   await page.getByRole('button', { name: 'Listen', exact: true }).click();
   await expect(page.getByTestId('playback-state')).toContainText('LISTEN CLOSELY');
 
-  await page.locator('video').evaluate(
-    (video: HTMLVideoElement, end: number) => {
-      video.currentTime = end + 0.1;
-    },
-    demo.segments[0].end,
-  );
+  await page.locator('video').evaluate((video: HTMLVideoElement, end: number) => {
+    video.currentTime = end + 0.1;
+  }, demo.segments[0].end);
   await page.waitForTimeout(120);
   await expect(page.getByTestId('playback-state')).toContainText('LISTEN CLOSELY');
 
-  await page.locator('video').evaluate(
-    (video: HTMLVideoElement, end: number) => {
-      video.currentTime = end + 0.45;
-    },
-    demo.segments[0].end,
-  );
+  await page.locator('video').evaluate((video: HTMLVideoElement, end: number) => {
+    video.currentTime = end + 0.45;
+  }, demo.segments[0].end);
   await expect(page.getByTestId('playback-state')).toContainText('YOUR TURN');
   const stoppedAt = await page
     .locator('video')
@@ -208,7 +202,9 @@ test('shadowing analysis is explicit, scores one recording, and shows aggregate 
   await page.route('**/api/shadowing/transcribe', async (route) => {
     transcriptions++;
     expect(route.request().headers()['content-type']).toContain('audio/');
-    expect(Number(route.request().headers()['x-hibiki-recording-duration-ms'])).toBeGreaterThan(1900);
+    expect(Number(route.request().headers()['x-hibiki-recording-duration-ms'])).toBeGreaterThan(
+      1900,
+    );
     return route.fulfill({
       contentType: 'application/json',
       body: JSON.stringify({
@@ -260,7 +256,9 @@ test('shadowing analysis is explicit, scores one recording, and shows aggregate 
 
   expect(transcriptions).toBe(0);
   expect(feedbackCalls).toBe(0);
-  await expect(page.getByText('Analysing sends only this recording to Cloudflare AI')).toBeVisible();
+  await expect(
+    page.getByText('Analysing sends only this recording to Cloudflare AI'),
+  ).toBeVisible();
 
   await page.getByRole('button', { name: 'Analyse attempt', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Shadowing Match' })).toBeVisible();
@@ -285,11 +283,19 @@ test('shadowing analysis is explicit, scores one recording, and shows aggregate 
   const topicOverview = page.locator('.topic-vocabulary-card');
   await expect(topicOverview.getByRole('heading', { name: 'Topic vocabulary' })).toBeVisible();
   await expect(topicOverview.getByText('Local · no AI', { exact: true })).toBeVisible();
-  await expect(topicOverview.getByText('コーヒー', { exact: true })).toBeVisible({ timeout: 15000 });
+  await expect(topicOverview.getByText('コーヒー', { exact: true })).toBeVisible({
+    timeout: 15000,
+  });
   await expect(topicOverview.getByText('公園', { exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: '100 / 100' })).toBeVisible();
-  await expect(page.getByText(`Scored 1 of ${demo.segments.length} shadowing sections`)).toBeVisible();
-  await expect(page.getByText('You made a little progress today.')).toBeVisible();
-  await expect(page.getByText('Your speech was recognised accurately and your pacing matched the reference.')).toBeVisible();
+  await expect(
+    page.getByText(`Scored 1 of ${demo.segments.length} shadowing sections`),
+  ).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Lesson complete', exact: true })).toBeVisible();
+  expect(summaryCalls).toBe(0);
+  await page.getByRole('button', { name: 'Summarise Shadowing Match' }).click();
+  await expect(
+    page.getByText('Your speech was recognised accurately and your pacing matched the reference.'),
+  ).toBeVisible();
   expect(summaryCalls).toBe(1);
 });

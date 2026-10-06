@@ -41,9 +41,7 @@ test('display defaults, lazy assets, Studio playback continuity, navigation and 
   const offset = page.getByRole('button', { name: 'Reset playback timing offset' });
   await expect(offset).toHaveText('0 ms');
   for (let i = 0; i < 7; i++)
-    await page
-      .getByRole('button', { name: 'Shift playback timing 50 milliseconds later' })
-      .click();
+    await page.getByRole('button', { name: 'Shift playback timing 50 milliseconds later' }).click();
   await expect(offset).toHaveText('+350 ms');
   await expect(page.getByRole('button', { name: 'Continuous', exact: true })).toHaveAttribute(
     'aria-pressed',
@@ -166,8 +164,7 @@ test('Studio and Furigana preserve quiz answers, difficulty, identity and bounde
     return route.fulfill({ json: { quiz } });
   });
   await page.addInitScript(
-    ({ key, revision }) =>
-      localStorage.setItem(key, JSON.stringify({ transcript: revision })),
+    ({ key, revision }) => localStorage.setItem(key, JSON.stringify({ transcript: revision })),
     { key: proStorageKey('completion:demo'), revision: transcriptRevision(demo as Lesson) },
   );
   await open(page);
@@ -176,9 +173,10 @@ test('Studio and Furigana preserve quiz answers, difficulty, identity and bounde
   await page.getByRole('group', { name: 'Answer options' }).getByRole('button').nth(0).click();
   const artifacts = await page.evaluate(() =>
     Object.fromEntries(
-      Object.entries(localStorage).filter(([key]) =>
-        /quiz|difficulty|completion|lesson:demo/.test(key),
-      ),
+      Object.entries(localStorage)
+        .filter(([key]) => /quiz|difficulty|completion|lesson:demo/.test(key))
+        // Account hydration validates/reserializes records; key order is not data.
+        .map(([key, value]) => [key, JSON.parse(value)]),
     ),
   );
   await studio(page).click();
@@ -197,9 +195,9 @@ test('Studio and Furigana preserve quiz answers, difficulty, identity and bounde
   expect(
     await page.evaluate(() =>
       Object.fromEntries(
-        Object.entries(localStorage).filter(([key]) =>
-          /quiz|difficulty|completion|lesson:demo/.test(key),
-        ),
+        Object.entries(localStorage)
+          .filter(([key]) => /quiz|difficulty|completion|lesson:demo/.test(key))
+          .map(([key, value]) => [key, JSON.parse(value)]),
       ),
     ),
   ).toEqual(artifacts);

@@ -29,10 +29,24 @@ export type DictionaryEntry = DictionarySaveInput & {
   normalizedTerm: string;
   createdAt: string;
   updatedAt: string;
+  tags?: import('../tags/types').Tag[];
 };
+
+export type DictionaryQuery = {
+  limit?: number;
+  cursor?: string | null;
+  term?: string;
+  deckId?: string;
+  tagId?: string;
+  lessonId?: string;
+  transcriptKey?: string;
+};
+export type DictionaryPage = { entries: DictionaryEntry[]; nextCursor: string | null };
 
 export interface DictionaryRepository {
   list(userId: string): Promise<DictionaryEntry[]>;
+  page(userId: string, query: DictionaryQuery): Promise<DictionaryPage>;
+  byIds(userId: string, ids: string[]): Promise<DictionaryEntry[]>;
   save(userId: string, input: DictionarySaveInput): Promise<DictionaryEntry>;
   remove(userId: string, id: string): Promise<void>;
 }

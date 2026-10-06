@@ -6,10 +6,8 @@ import Link from 'next/link';
 import {
   ArrowLeft,
   ArrowRight,
-  RotateCcw,
   Headphones,
   Mic,
-  Check,
   Languages,
   Keyboard,
   Upload,
@@ -32,11 +30,7 @@ import { lessonMedia, sourceLabel, MEDIA_ACCEPT, validateMediaFile } from '@/lib
 import { timestamp } from '@/lib/youtube';
 import { MediaPlayer, type MediaHandle } from '../media-player';
 import { VoiceRecorder } from '../voice-recorder';
-import { ComprehensionQuiz } from '../comprehension-quiz';
-import { LessonDifficulty } from '../lesson-difficulty';
-import { ShadowingCompletion } from '../shadowing-completion';
-import { TopicVocabularyOverview } from '../topic-vocabulary-overview';
-import { LessonReviewRecap } from '../lesson-review-recap';
+import { LessonCompletionSummary } from '../lesson-completion-summary';
 import { useProAccess } from '../pro-feature';
 import { transcriptRevision } from '@/lib/transcript';
 import {
@@ -86,7 +80,6 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
   const [favorites, setFavorites] = useState<string[]>(() => loadFavorites(lesson));
 
   const [finished, setFinished] = useState(false);
-  const [topicOverviewOpen, setTopicOverviewOpen] = useState(false);
   const [completed, setCompleted] = useState(() => lessonCompleted(session.lesson));
   const [quizOpen, setQuizOpen] = useState(false);
   const [difficultyWaiting, setDifficultyWaiting] = useState(false);
@@ -208,7 +201,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
     [],
   );
 
-  useEffect(() => {
+  function summarizeShadowing() {
     if (!isPro || !finished || !shadowingSignals) return;
     if (shadowingScores.summary?.fingerprint === shadowingSignals.fingerprint) return;
     if (summaryAbort.current) return;
@@ -231,8 +224,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
         if (summaryAbort.current === controller) summaryAbort.current = null;
         if (!controller.signal.aborted) setSummaryLoading(false);
       });
-    return () => controller.abort();
-  }, [finished, isPro, shadowingSignals, shadowingScores.summary?.fingerprint]);
+  }
 
   const navigate = useCallback(
     (nextIndex: number, play = true, evidenceReplay = false) => {
@@ -257,7 +249,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
       setIndex(next);
       setElapsed(target.start);
       setStatus(play ? 'listening' : 'ready');
-      setFinished(false);
+      if (!evidenceReplay) setFinished(false);
       setPlaybackError('');
       if (next !== index) resetTranslation();
       if (play)
@@ -304,7 +296,6 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
       media.current?.pause();
       setStatus('complete');
       setFinished(true);
-      setTopicOverviewOpen(true);
       setCompleted(true);
       completeLesson(lesson);
       recordCompletion();
@@ -420,7 +411,6 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
     setElapsed(duration);
     if (mode === 'continuous') {
       setFinished(true);
-      setTopicOverviewOpen(true);
       setCompleted(true);
       completeLesson(lesson);
       recordCompletion();
@@ -738,66 +728,41 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
               onNewRecording={() => setScoringError('')}
             />
           </div>
-          {isPro && finished && shadowingAggregate ? (
-            <ShadowingCompletion
-              aggregate={shadowingAggregate}
-              summary={currentShadowingSummary}
-              loading={summaryLoading}
-            />
-          ) : null}
-          {topicOverviewOpen ? (
-            <TopicVocabularyOverview
-              lesson={lesson}
-              onReview={(segmentIndex) => navigate(segmentIndex)}
-            />
-          ) : null}
-          {finished ? <LessonReviewRecap lesson={lesson} /> : null}
-          {finished ? (
-            <div className="completion-card" role="status">
-              <span>
-                <Check size={20} />
-              </span>
-              <div>
-                <strong>You made a little progress today.</strong>
-                <p>Every repetition helps the rhythm feel more familiar.</p>
-              </div>
-              <button
-                className="text-button"
-                onClick={() => {
-                  setTopicOverviewOpen(false);
-                  navigate(0, false);
-                }}
-              >
-                Practice again
-                <RotateCcw size={14} />
-              </button>
-            </div>
-          ) : null}
-          {completed ? (
-            <ComprehensionQuiz
-              furigana={furigana}
-              lesson={lesson}
-              ready={ready}
-              recording={recording}
-              replaying={!!replayRange}
-              onReplay={replayEvidence}
-              onReturn={returnToQuiz}
-              onOpenChange={(open) => {
+          <LessonCompletionSummary
+            lesson={lesson}
+            finished={finished}
+            scores={shadowingScores}
+            aggregate={shadowingAggregate}
+            summary={currentShadowingSummary}
+            summaryLoading={summaryLoading}
+            onSummarize={isPro ? summarizeShadowing : undefined}
+            onPracticeAgain={() => navigate(0, false)}
+            onReview={(segmentIndex) => navigate(segmentIndex)}
+            favorites={favorites}
+            onDifficultyWaiting={setDifficultyWaiting}
+            quiz={{
+              furigana,
+              ready,
+              recording,
+              replaying: !!replayRange,
+              onReplay: replayEvidence,
+              onReturn: returnToQuiz,
+              onOpenChange: (open) => {
                 setQuizOpen(open);
                 if (!open && replayRange) returnToQuiz();
                 else if (open) {
                   media.current?.pause();
                   setStatus('paused');
                 }
-              }}
-            />
-          ) : null}
+              },
+              available: completed,
+            }}
+          />
           {playbackError ? (
             <p role="alert" className="error-message">
               {playbackError}
             </p>
           ) : null}
-          <LessonDifficulty lesson={lesson} onWaitingChange={setDifficultyWaiting} />
           <div className="player-footnote">
             <span>
               {lesson.source === 'demo'

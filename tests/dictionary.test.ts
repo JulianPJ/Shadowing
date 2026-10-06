@@ -120,6 +120,7 @@ test('dictionary migration and repository save, upsert, list and delete against 
     db.prepare('INSERT INTO "user" (id) VALUES (?)').run('learner');
     db.exec(readFileSync('migrations/0004_personal_dictionary.sql', 'utf8'));
     db.exec(readFileSync('migrations/0007_retention.sql', 'utf8'));
+    db.exec(readFileSync('migrations/0008_tags_dictionary_pagination.sql', 'utf8'));
     const repository = createD1DictionaryRepository(localProgressDatabase(db));
     const input = validateDictionarySaveInput(baseEntry);
     const saved = await repository.save('learner', input);

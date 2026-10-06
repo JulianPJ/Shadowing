@@ -275,3 +275,84 @@
 .studio-mode .dictionary-lookup-hint {
   display: none;
 }
+.lesson-completion-summary {
+  padding: clamp(18px, 3vw, 30px);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--paper);
+  display: grid;
+  gap: 24px;
+  margin-top: 20px;
+}
+.lesson-completion-summary h2 {
+  margin: 6px 0;
+}
+.completion-results {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 18px;
+}
+.completion-results .shadowing-completion {
+  margin: 0;
+}
+.completion-comprehension strong {
+  font-size: 2rem;
+}
+.completion-vocabulary {
+  min-width: 0;
+}
+.completion-vocabulary .review-selection {
+  overflow-wrap: anywhere;
+}
+.completion-revisit li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.completion-next {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.completion-next > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.lesson-completion-summary .topic-vocabulary-card,
+.lesson-completion-summary .quiz-card {
+  margin: 0;
+}
+.entry-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0;
+}
+.tag-chip {
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 5px 10px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.tag-controls {
+  max-width: 100%;
+}
+.tag-controls[open] {
+  flex-basis: 100%;
+}
+.tag-controls label {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px;
+}
+.tag-controls input {
+  max-width: 100%;
+}

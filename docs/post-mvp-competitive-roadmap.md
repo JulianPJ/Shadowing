@@ -288,7 +288,7 @@ The intended UX change is a continuous loop rather than separate feature pages:
 
 ## Recommended build order
 
-Implementation status: [Phase A retention foundation, verification and next slice](retention-implementation.md). Basic decks, explicit review enrollment, Daily Review, contextual replay, CSV export and a saved-word completion handoff are implemented there. Optional tags, Anki integration and richer recap diagnostics remain follow-up work.
+Implementation status: **Phase A complete** in the A.2 slice: [contracts, verification and next stage](retention-implementation.md). PR #31's decks, explicit enrollment, Daily Review and contextual replay are extended with lightweight tags, cursor/targeted dictionary retrieval, a bounded review-aware cache, complete CSV/TSV export and one lesson completion summary of already-computed evidence. AnkiConnect/APKG, inline playback and offline new-word capture remain optional follow-up work. The next product stage is Phase B below.
 
 ### Phase A — close the retention loop
 

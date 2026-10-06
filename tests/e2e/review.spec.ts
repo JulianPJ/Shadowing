@@ -1,113 +1,8 @@
-import { test, expect, type BrowserContext } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import demo from '../../src/data/demo.json' with { type: 'json' };
-import { emptySync, type AccountUser } from '../../src/lib/sync/types';
-import type { DictionaryEntry } from '../../src/lib/dictionary/types';
-import type { ReviewSnapshot, ReviewOperation } from '../../src/lib/review/types';
-import { emptyReview, applyLocalReview } from '../../src/lib/review/local';
-import { dictionarySource } from '../../src/lib/dictionary/source';
-import type { Lesson } from '../../src/lib/types';
-type Remote = {
-  entries: DictionaryEntry[];
-  review: ReviewSnapshot;
-  offline: boolean;
-  writes: ReviewOperation[];
-};
-async function connect(context: BrowserContext, plan: AccountUser['plan'] = 'free') {
-  const user: AccountUser = {
-    id: 'retention-' + plan,
-    email: plan + '@example.com',
-    name: 'Learner',
-    emailVerified: true,
-    plan,
-  };
-  await context.addInitScript(
-    (id) =>
-      localStorage.setItem(
-        `hibiki:v1:account:${id}:sync:import-decision`,
-        JSON.stringify('declined'),
-      ),
-    user.id,
-  );
-  const remote: Remote = {
-    entries: [],
-    review: {
-      ...emptyReview(),
-      decks: [{ id: 'inbox', name: 'Inbox', createdAt: '', updatedAt: '' }],
-    },
-    offline: false,
-    writes: [],
-  };
-  await context.route('**/api/account/me', (route) =>
-    route.fulfill({ json: { user, googleEnabled: false, emailEnabled: false } }),
-  );
-  await context.route('**/api/sync/bootstrap*', (route) =>
-    route.fulfill({ json: { data: emptySync(), nextCursor: null } }),
-  );
-  await context.route('**/api/sync/push', (route) => route.fulfill({ json: { ok: true } }));
-  await context.route('**/api/translate', (route) =>
-    route.fulfill({ json: { translation: 'morning' } }),
-  );
-  await context.route('**/api/review', (route) => {
-    if (remote.offline) return route.fulfill({ status: 503, json: { error: 'offline' } });
-    if (route.request().method() === 'POST') {
-      const op = route.request().postDataJSON() as ReviewOperation;
-      remote.writes.push(op);
-      remote.review = applyLocalReview(remote.review, op);
-      return route.fulfill({ json: { ok: true } });
-    }
-    return route.fulfill({ json: remote.review });
-  });
-  await context.route('**/api/dictionary', (route) => {
-    if (remote.offline) return route.fulfill({ status: 503, json: { error: 'offline' } });
-    if (route.request().method() === 'GET')
-      return route.fulfill({ json: { entries: remote.entries } });
-    const body = route.request().postDataJSON();
-    if (body.action === 'delete') {
-      remote.entries = remote.entries.filter((e) => e.id !== body.id);
-      remote.review.cards = remote.review.cards.filter((c) => c.entryId !== body.id);
-      return route.fulfill({ json: { ok: true } });
-    }
-    const now = new Date().toISOString();
-    const entry: DictionaryEntry = {
-      ...body.entry,
-      id: crypto.randomUUID(),
-      normalizedTerm: body.entry.term,
-      createdAt: now,
-      updatedAt: now,
-    };
-    remote.entries.unshift(entry);
-    remote.review.memberships.push({ deckId: 'inbox', entryId: entry.id });
-    return route.fulfill({ json: { entry } });
-  });
-  return remote;
-}
-async function seed(remote: Remote, count: number) {
-  for (let i = 0; i < count; i++) {
-    const now = new Date(Date.now() - 60000).toISOString(),
-      segment = demo.segments[i + 1];
-    const entry: DictionaryEntry = {
-      schemaVersion: 1,
-      id: 'word-' + i,
-      term: ['朝', '空', '静か', '散歩'][i],
-      reading: null,
-      normalizedTerm: 'term-' + i,
-      translation: 'Meaning ' + i,
-      sourceSentence: segment.japanese,
-      sourceSentenceTranslation: segment.translation,
-      source: await dictionarySource(demo as Lesson, segment),
-      createdAt: now,
-      updatedAt: now,
-    };
-    remote.entries.push(entry);
-    remote.review = applyLocalReview(remote.review, {
-      action: 'enroll',
-      entryIds: [entry.id],
-      deckId: 'inbox',
-      enrolledAt: now,
-    });
-  }
-}
+import { applyLocalReview } from '../../src/lib/review/local';
+import { connect, seed } from '../helpers/retention-account';
 for (const plan of ['free', 'pro'] as const)
   test(`${plan}: save during practice, explicit enrollment, reveal, context replay and grade`, async ({
     page,
@@ -169,7 +64,7 @@ test('all four grades advance the session and persist deterministic state across
     const second = await browser.newContext();
     await connect(second); // Replace mock routes with the first device's authoritative state.
     await second.route('**/api/review', (route) => route.fulfill({ json: remote.review }));
-    await second.route('**/api/dictionary', (route) =>
+    await second.route('**/api/dictionary*', (route) =>
       route.fulfill({ json: { entries: remote.entries } }),
     );
     const other = await second.newPage();
@@ -192,11 +87,32 @@ test('deck filtering, membership removal, bulk enrollment and context CSV export
   await page.getByLabel('New deck').fill('Travel');
   await page.getByRole('button', { name: 'Create deck' }).click();
   await expect.poll(() => remote.review.decks.length).toBe(2);
+  // Hold the local-first membership edit until the filtered server query has returned.
+  // The dictionary must refresh on acknowledgment without a manual reload.
+  let releaseMembership!: () => void;
+  const membershipPending = new Promise<void>((resolve) => {
+    releaseMembership = resolve;
+  });
+  await context.route('**/api/review', async (route) => {
+    if (
+      route.request().method() === 'POST' &&
+      route.request().postDataJSON().action === 'membership'
+    )
+      await membershipPending;
+    await route.fallback();
+  });
   const first = page
     .locator('.dictionary-entry')
     .filter({ has: page.getByRole('heading', { name: '朝', exact: true }) });
   await first.getByLabel('Travel', { exact: true }).check();
+  const initialFilter = page.waitForResponse(
+    (response) =>
+      response.url().includes('/api/dictionary?') &&
+      new URL(response.url()).searchParams.has('deckId'),
+  );
   await page.getByLabel('Filter by deck').selectOption({ label: 'Travel' });
+  expect((await (await initialFilter).json()).entries).toHaveLength(0);
+  releaseMembership();
   await expect(page.locator('.dictionary-entry')).toHaveCount(1);
   await page.getByLabel('Select 朝', { exact: true }).check();
   await page.getByRole('button', { name: 'Add selected to review', exact: true }).click();
@@ -213,6 +129,44 @@ test('deck filtering, membership removal, bulk enrollment and context CSV export
   await expect(page.locator('.dictionary-entry')).toHaveCount(0);
   expect(remote.entries).toHaveLength(2);
 });
+test('review edits queued during snapshot hydration sync without waiting for a timer', async ({
+  page,
+  context,
+}) => {
+  const remote = await connect(context);
+  await page.goto('/dictionary');
+  await expect(page.getByLabel('Filter by deck')).toBeVisible();
+  let holdSnapshot = false;
+  let releaseSnapshot!: () => void;
+  let snapshotStarted!: () => void;
+  const started = new Promise<void>((resolve) => {
+    snapshotStarted = resolve;
+  });
+  const release = new Promise<void>((resolve) => {
+    releaseSnapshot = resolve;
+  });
+  await context.route('**/api/review', async (route) => {
+    if (route.request().method() === 'POST' && route.request().postDataJSON().name === 'First')
+      holdSnapshot = true;
+    else if (route.request().method() === 'GET' && holdSnapshot) {
+      holdSnapshot = false;
+      snapshotStarted();
+      await release;
+    }
+    await route.fallback();
+  });
+  await page.getByLabel('New deck').fill('First');
+  await page.getByRole('button', { name: 'Create deck' }).click();
+  await started;
+  await page.getByLabel('New deck').fill('Second');
+  await page.getByRole('button', { name: 'Create deck' }).click();
+  releaseSnapshot();
+  await expect
+    .poll(() => remote.review.decks.map((d) => d.name))
+    .toEqual(['Inbox', 'First', 'Second']);
+  await expect(page.getByText(/changes saved on this device/)).toHaveCount(0);
+});
+
 test('offline grading survives reload and retries without duplicating reviews', async ({
   page,
   context,
@@ -248,7 +202,10 @@ test('completion recap explicitly hands selected saved lesson words to review', 
   await page.getByTestId('transcript-13').click();
   await page.getByRole('button', { name: /Finish practice/ }).click();
   const recap = page.getByRole('region', { name: 'Lesson recap' });
-  await expect(recap).toContainText('14 sections completed · 1 saved words');
+  await expect(page.getByRole('region', { name: 'Lesson completion summary' })).toContainText(
+    '14 sections completed',
+  );
+  await expect(recap).toContainText('1 saved words');
   expect(remote.review.cards).toHaveLength(0);
   await recap.getByRole('checkbox').check();
   await recap.getByRole('button', { name: 'Add selected words to review' }).click();

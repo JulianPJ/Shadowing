@@ -1,71 +1,128 @@
 'use client';
-import type { DictionaryEntry, DictionarySaveInput } from './types';
-import { readStorage, writeStorage, storageAccount } from '../storage/browser';
+import type {
+  DictionaryEntry,
+  DictionarySaveInput,
+  DictionaryQuery,
+  DictionaryPage,
+} from './types';
+import { writeStorage, storageAccount } from '../storage/browser';
 import { syncStatus } from '../sync/client';
+import {
+  cacheDictionary,
+  cachedDictionary,
+  cachedDictionaryQuery,
+  deleteDictionaryCache,
+} from './cache';
+import { dictionaryQueryParams, validateDictionaryIds } from './query';
 
-async function request(path: string, init?: RequestInit) {
+export async function dictionaryRequest(path: string, init?: RequestInit) {
+  const owner = storageAccount();
+  if (!owner || syncStatus().user?.id !== owner)
+    throw new Error('Sign in to open your dictionary.');
   const response = await fetch(path, {
     credentials: 'same-origin',
     cache: 'no-store',
     signal: AbortSignal.timeout(15000),
     ...init,
-    headers: {
-      ...init?.headers,
-      ...(syncStatus().user ? { 'X-Hibiki-Account': syncStatus().user!.id } : {}),
-    },
+    headers: { ...init?.headers, 'X-Hibiki-Account': owner },
   });
+  if (owner !== storageAccount() || syncStatus().user?.id !== owner)
+    throw new Error('Account changed');
   const data = (await response.json()) as { error?: string };
-  if (!response.ok) throw new Error(data.error || 'Your dictionary is unavailable right now.');
+  if (!response.ok)
+    throw Object.assign(new Error(data.error || 'Your dictionary is unavailable right now.'), {
+      status: response.status,
+    });
   return data;
 }
-
-export async function listDictionary() {
-  const owner = storageAccount();
+const canUseCache = (error: unknown) => {
+  const e = error as { status?: number; message?: string };
+  return (
+    e.message !== 'Account changed' &&
+    e.message !== 'Sign in to open your dictionary.' &&
+    (!e.status || e.status >= 500)
+  );
+};
+export async function dictionaryPage(
+  query: DictionaryQuery = {},
+  remoteOnly = false,
+): Promise<DictionaryPage & { offline?: boolean }> {
+  const owner = storageAccount(),
+    startedAt = Date.now();
   try {
-    const data = (await request('/api/dictionary')) as { entries: DictionaryEntry[] };
+    const page = (await dictionaryRequest(
+      '/api/dictionary?' + dictionaryQueryParams(query),
+    )) as DictionaryPage;
     if (owner !== storageAccount()) throw new Error('Account changed');
-    writeStorage('dictionary:entries', data.entries);
-    return data.entries;
+    cacheDictionary(page.entries, startedAt);
+    const cache = cachedDictionary();
+    return {
+      ...page,
+      nextCursor: page.nextCursor ?? null,
+      entries: page.entries
+        .filter((e) => !cache.deleted[e.id])
+        .map((e) => cache.records[e.id]?.entry ?? e),
+    };
   } catch (error) {
-    const cached =
-      owner === storageAccount()
-        ? readStorage<DictionaryEntry[] | null>('dictionary:entries', null)
-        : null;
-    if (cached) return cached;
-    throw error;
+    if (remoteOnly || owner !== storageAccount() || !canUseCache(error)) throw error;
+    return { entries: cachedDictionaryQuery(query), nextCursor: null, offline: true };
   }
 }
-
+export async function dictionaryByIds(ids: string[], pin = true) {
+  const valid = validateDictionaryIds(ids),
+    owner = storageAccount(),
+    startedAt = Date.now();
+  try {
+    const data = (await dictionaryRequest(
+      '/api/dictionary?' + new URLSearchParams({ ids: valid.join(',') }),
+    )) as { entries: DictionaryEntry[] };
+    if (owner !== storageAccount()) throw new Error('Account changed');
+    cacheDictionary(data.entries, startedAt, pin);
+    const cache = cachedDictionary();
+    return data.entries
+      .filter((e) => !cache.deleted[e.id])
+      .map((e) => cache.records[e.id]?.entry ?? e);
+  } catch (error) {
+    if (owner !== storageAccount() || !canUseCache(error)) throw error;
+    const cache = cachedDictionary();
+    return valid.flatMap((id) => (cache.records[id] ? [cache.records[id].entry] : []));
+  }
+}
+/** Explicit full traversal for export/compatibility. Failure never yields a partial export. */
+export async function listDictionary(query: DictionaryQuery = {}) {
+  const owner = storageAccount(),
+    entries = new Map<string, DictionaryEntry>();
+  let cursor: string | null = null;
+  do {
+    if (owner !== storageAccount()) throw new Error('Account changed');
+    const page = await dictionaryPage({ ...query, cursor }, true);
+    for (const entry of page.entries) entries.set(entry.id, entry);
+    cursor = page.nextCursor;
+  } while (cursor);
+  return [...entries.values()];
+}
 export async function saveDictionary(input: DictionarySaveInput) {
-  const owner = storageAccount();
-  const data = (await request('/api/dictionary', {
+  const owner = storageAccount(),
+    startedAt = Date.now();
+  const data = (await dictionaryRequest('/api/dictionary', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'save', entry: input }),
   })) as { entry: DictionaryEntry };
   if (owner !== storageAccount()) throw new Error('Account changed');
-  writeStorage('dictionary:entries', [
-    data.entry,
-    ...readStorage<DictionaryEntry[]>('dictionary:entries', []).filter(
-      (e) => e.id !== data.entry.id,
-    ),
-  ]);
+  cacheDictionary([data.entry], startedAt);
   window.dispatchEvent(new Event('hibiki:dictionary-change'));
   return data.entry;
 }
-
 export async function removeDictionary(id: string) {
   const owner = storageAccount();
-  await request('/api/dictionary', {
+  await dictionaryRequest('/api/dictionary', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'delete', id }),
   });
   if (owner !== storageAccount()) return;
-  writeStorage(
-    'dictionary:entries',
-    readStorage<DictionaryEntry[]>('dictionary:entries', []).filter((e) => e.id !== id),
-  );
+  writeStorage('dictionary:entries', deleteDictionaryCache(cachedDictionary(), id, Date.now()));
   window.dispatchEvent(new Event('hibiki:dictionary-change'));
 }
 

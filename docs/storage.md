@@ -1,5 +1,9 @@
 # Shared content storage
 
+Phase A.2: additive `0008_tags_dictionary_pagination.sql` creates account-owned descriptive tags/memberships and indexes for actual cursor and lesson/revision queries. Both ownership foreign keys cascade memberships while preserving dictionary/review state when a tag is deleted. Migration 0007 is unchanged. The recent dictionary index now includes `id DESC` to support stable duplicate-timestamp ordering; the lesson index includes owner, lesson, transcript revision and cursor tuple. Existing normalized-term and deck membership indexes are reused.
+
+Dictionary retrieval is bounded at 100 entries/page or 50 exact IDs/request. Tags accompany only those entries; `/api/tags` lists at most the enforced 100 account tags. The existing `dictionary:entries` account key migrates in place to a version-2 ID map, merging newest records, fencing local deletion races and prioritizing explicitly hydrated offline review material. Bounds are 700 records/3 MB of UTF-8 record data, with up to 200 recent review records prioritized within that budget. Partial cached pages never represent a complete remote dictionary; offline UI identifies cached material and full export requires successful server traversal. `dictionary:tags` is account-scoped management metadata. See [complete query/cache/export contracts](retention-implementation.md).
+
 Retention update: `0007_retention.sql` adds `user_decks`, `user_deck_entries` and `user_review_states`. Composite owner/entry and owner/deck foreign keys prevent cross-account references; vocabulary and account deletion cascade, while deck deletion preserves vocabulary and review state. Existing vocabulary backfills into Inbox with no automatic review enrollment. Browser `dictionary:entries` and `review:*` keys use the existing account namespace. Review state and its outbox contain entry references and scheduling/collection metadata, without transcript/media duplication. See [retention](retention-implementation.md).
 
 Cloudflare D1 is Hibiki's primary production application database, including the shared content cache and authenticated accounts/learner state. It uses native `env.HIBIKI_DB`, injected by `cloudflare-worker.js`; request handlers never use D1 REST or database tokens. `cloudflare.config.ts` uses the installed `cf/config` API: `bindings.d1({ name, id })`.
@@ -57,6 +61,8 @@ npx cf deploy --prebuilt
 ```
 
 `db:migrations:*` lists **pending** migrations; an empty list means current. Applying normally twice is safe. Local migration commands use `.cloudflare/state`, never production. `npm run deploy:vinext` gates deployment on a successful production migration.
+
+CI runs `npm run test:d1:migrations` against real persisted local workerd/D1 at `.cloudflare/migration-verification`. It atomically applies each committed migration with its ledger row, verifies the full ledger, composite tag ownership FKs and an empty `foreign_key_check`, and explicitly disposes Miniflare. This avoids the installed beta `cf` CLI's Linux process-lifetime hang after successful local migration output. The manual local CLI commands and production migration/deployment gate remain unchanged; the populated 0007 → 0008 upgrade is additionally covered by the real D1 integration fixture.
 
 The connected Cloudflare build trigger uses `npm run deploy:vinext`, which expands to `npm run db:migrate:production && cf deploy --prebuilt` (build remains `npm run build:vinext`). The build token needs D1 migration permissions; a failure stops deployment. Do not assume deployment alone applies SQL. For manual API-based operations, apply the same committed statements and ledger atomically, then verify the ledger before deployment.
 

@@ -5,7 +5,7 @@ import { useAccount } from './account';
 import { useReview } from './use-review';
 import { changeReview } from '@/lib/review/client';
 import { dueReviews } from '@/lib/review-scheduler';
-import { listDictionary } from '@/lib/dictionary/client';
+import { dictionaryByIds } from '@/lib/dictionary/client';
 import { reviewContextHref, externalReplay } from '@/lib/dictionary/replay';
 import type { DictionaryEntry } from '@/lib/dictionary/types';
 import type { ReviewGrade } from '@/lib/review/types';
@@ -20,13 +20,38 @@ export function DailyReview() {
   const [revealed, setRevealed] = useState(false);
   const [error, setError] = useState('');
   const [deck, setDeck] = useState('all');
+  const dueCards = dueReviews(review.data.cards, new Date().toISOString()).filter(
+    (c) =>
+      deck === 'all' ||
+      review.data.memberships.some((m) => m.entryId === c.entryId && m.deckId === deck),
+  );
+  const hydrationIds = [
+    ...new Set([
+      ...(session && session.owner === account.user?.id ? session.ids : []),
+      ...dueCards.slice(0, 20).map((c) => c.entryId),
+    ]),
+  ];
+  const hydrationKey = JSON.stringify(hydrationIds);
   useEffect(() => {
     const owner = account.user?.id;
     if (!owner) return;
     let active = true;
-    void listDictionary()
+    const ids = JSON.parse(hydrationKey) as string[];
+    if (!ids.length) return;
+    void dictionaryByIds(ids)
       .then((entries) => {
-        if (active) setLoaded({ owner, entries });
+        if (active)
+          setLoaded((current) => ({
+            owner,
+            entries: [
+              ...new Map(
+                [...(current?.owner === owner ? current.entries : []), ...entries].map((e) => [
+                  e.id,
+                  e,
+                ]),
+              ).values(),
+            ],
+          }));
       })
       .catch((e) => {
         if (active) setError((e as Error).message);
@@ -34,14 +59,9 @@ export function DailyReview() {
     return () => {
       active = false;
     };
-  }, [account.user?.id]);
+  }, [account.user?.id, hydrationKey]);
   const entries = loaded && loaded.owner === account.user?.id ? loaded.entries : [];
-  const due = dueReviews(review.data.cards, new Date().toISOString()).filter(
-    (c) =>
-      entries.some((e) => e.id === c.entryId) &&
-      (deck === 'all' ||
-        review.data.memberships.some((m) => m.entryId === c.entryId && m.deckId === deck)),
-  );
+  const due = dueCards.filter((c) => entries.some((e) => e.id === c.entryId));
   const activeSession = session?.owner === account.user?.id ? session : null;
   const id = activeSession?.ids[activeSession.index];
   const entry = entries.find((e) => e.id === id);
@@ -93,9 +113,15 @@ export function DailyReview() {
                 </select>
               </label>
               <h2>
-                {due.length} due · ~{Math.max(1, Math.ceil(Math.min(due.length, 20) * 0.25))} min
+                {dueCards.length} due · ~
+                {Math.max(1, Math.ceil(Math.min(dueCards.length, 20) * 0.25))} min
               </h2>
               <p>Up to 20 words per session. You choose what enters review.</p>
+              {dueCards.length && due.length < Math.min(20, dueCards.length) ? (
+                <p role="status">
+                  Loading review material. Offline sessions use words already cached on this device.
+                </p>
+              ) : null}
               <button
                 className="button primary"
                 disabled={!due.length}

@@ -10,6 +10,8 @@ import { handleDictionaryRequest } from '../dictionary/server';
 import { freeAccess, type AccessRepository } from '../access';
 import type { ReviewRepository } from '../review/types';
 import { handleReviewRequest } from '../review/server';
+import type { TagRepository } from '../tags/types';
+import { handleTagRequest } from '../tags/server';
 
 export function accountHandler(
   auth: HibikiAuth,
@@ -19,6 +21,7 @@ export function accountHandler(
   dictionary?: DictionaryRepository,
   access: AccessRepository = freeAccess,
   review?: ReviewRepository,
+  tags?: TagRepository,
 ) {
   return async (request: Request): Promise<Response> => {
     const headers = { 'Cache-Control': 'no-store', Vary: 'Cookie' };
@@ -62,6 +65,10 @@ export function accountHandler(
       if (url.pathname === '/api/review') {
         if (!review) return respond({ error: 'Review storage unavailable' }, 503);
         return handleReviewRequest(request, userId, session.user.emailVerified, review);
+      }
+      if (url.pathname === '/api/tags') {
+        if (!tags) return respond({ error: 'Tag storage unavailable' }, 503);
+        return handleTagRequest(request, userId, session.user.emailVerified, tags);
       }
       if (url.pathname === '/api/sync/lesson' && request.method === 'GET') {
         const id = url.searchParams.get('id');
