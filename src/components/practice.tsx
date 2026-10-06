@@ -10,7 +10,17 @@ import { lessonMedia, migrateLesson } from '@/lib/media';
 import { Header, Footer, HelpDialog } from './chrome';
 import { StudyPlayer, type Session } from './practice/study-player';
 import { restoreAccountLesson, subscribeSync, syncStatus } from '@/lib/sync/client';
-export function Practice({ lessonId }: { lessonId: string }) {
+
+function openingIndex(lesson: Lesson, lessonId: string, sectionId?: string) {
+  if (sectionId) {
+    const linked = lesson.segments.findIndex((segment) => segment.id === sectionId);
+    if (linked >= 0) return linked;
+  }
+  const raw = readStorage<number>(`position:${lessonId}`, 0);
+  return Number.isInteger(raw) ? Math.max(0, Math.min(raw, lesson.segments.length - 1)) : 0;
+}
+
+export function Practice({ lessonId, sectionId }: { lessonId: string; sectionId?: string }) {
   const [session, setSession] = useState<Session | null>(null);
   const [missing, setMissing] = useState(false);
   const [help, setHelp] = useState(false);
@@ -25,7 +35,7 @@ export function Practice({ lessonId }: { lessonId: string }) {
           if (lesson && !disposed) {
             setSession({
               lesson,
-              index: readStorage(`position:${lessonId}`, 0),
+              index: openingIndex(lesson, lessonId, sectionId),
               preferences: loadPreferences(),
             });
             setMissing(false);
@@ -45,12 +55,8 @@ export function Practice({ lessonId }: { lessonId: string }) {
       }
       if (lessonMedia(lesson).type === 'local') lesson.mediaUrl = getLiveMedia(lesson.id);
       validateCues(lesson.segments);
-      const rawIndex = readStorage<number>(`position:${lessonId}`, 0);
-      const index = Number.isInteger(rawIndex)
-        ? Math.max(0, Math.min(rawIndex, lesson.segments.length - 1))
-        : 0;
       const preferences = loadPreferences();
-      setSession({ lesson, index, preferences });
+      setSession({ lesson, index: openingIndex(lesson, lessonId, sectionId), preferences });
     } catch {
       setMissing(true);
     }
@@ -58,7 +64,7 @@ export function Practice({ lessonId }: { lessonId: string }) {
       disposed = true;
       unsubscribe();
     };
-  }, [lessonId]);
+  }, [lessonId, sectionId]);
   /* eslint-enable react-hooks/set-state-in-effect */
   return (
     <>
