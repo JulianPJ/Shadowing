@@ -1,6 +1,7 @@
 import { localAuth } from './local';
 import { authEnvironment } from './server';
 import { accountHandler } from '../sync/server';
+import { requirePro } from '../access';
 export async function localAccountHandler(request: Request) {
   const services = await localAuth();
   if (!services)
@@ -18,4 +19,15 @@ export async function localAccountHandler(request: Request) {
     services.dictionary,
     services.access,
   )(request);
+}
+
+
+export async function localRequirePro(request: Request) {
+  const services = await localAuth();
+  if (!services)
+    return Response.json(
+      { code: 'sign-in-required', error: 'Sign in to use Hibiki Pro features.' },
+      { status: 401, headers: { 'Cache-Control': 'no-store', Vary: 'Cookie' } },
+    );
+  return requirePro(request, services.auth, services.access);
 }
