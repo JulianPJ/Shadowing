@@ -3,6 +3,7 @@ import { readStorage, writeStorage, storageAccount } from '../storage/browser';
 import { syncStatus } from '../sync/client';
 import { applyLocalReview, emptyReview } from './local';
 import type { ReviewOperation, ReviewSnapshot } from './types';
+import { rememberReview } from './history';
 let running: Promise<void> | null = null;
 const notify = () => window.dispatchEvent(new Event('hibiki:review-change'));
 export const cachedReview = () => readStorage<ReviewSnapshot>('review:data', emptyReview());
@@ -40,10 +41,24 @@ export function changeReview(op: ReviewOperation) {
   }
   if (!syncStatus().user || syncStatus().user?.id !== storageAccount())
     throw new Error('Sign in to review.');
-  const data = applyLocalReview(cachedReview(), op);
+  const before = cachedReview();
+  const data = applyLocalReview(before, op);
   // Persist operations before optimistic state so interrupted writes remain replayable.
   writeStorage('review:pending', [...pendingReview(), op]);
   writeStorage('review:data', data);
+  if (
+    op.action === 'grade' &&
+    before.cards.some(
+      (card) =>
+        card.entryId === op.entryId && card.revision === op.revision && card.status !== 'suspended',
+    )
+  )
+    rememberReview({
+      operationId: op.operationId,
+      entryId: op.entryId,
+      grade: op.grade,
+      reviewedAt: op.reviewedAt,
+    });
   notify();
   void refreshReview().catch(() => {});
 }

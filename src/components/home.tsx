@@ -19,18 +19,14 @@ import {
 } from 'lucide-react';
 import { Header, Footer, HelpDialog } from './chrome';
 import { ImportDialog } from './import-dialog';
-import { sourceLabel } from '@/lib/media';
 import { resolveMediaLink } from '@/lib/media-discovery';
 import { needsUserTranscript } from '@/lib/linked-transcripts';
-import { recentLessons, saveLesson, type StudyRecord } from '@/lib/storage';
+import { saveLesson } from '@/lib/storage';
 import type { Lesson, ResolvedMedia } from '@/lib/types';
-import { accountLessons } from '@/lib/sync/client';
-import type { SyncedLesson } from '@/lib/sync/types';
-import { useAccount } from './account';
+import { LibraryPreview } from './library-preview';
+import { addQueueLink } from '@/lib/library/client';
 
 export function Home() {
-  const account = useAccount();
-  const [remoteRecent, setRemoteRecent] = useState<SyncedLesson[]>([]);
   const router = useRouter();
   const [url, setUrl] = useState('');
   const [help, setHelp] = useState(false);
@@ -41,27 +37,15 @@ export function Home() {
   const [busy, setBusy] = useState(false);
   const [stage, setStage] = useState('identify');
   const [message, setMessage] = useState('Finding your video…');
-  const [recent, setRecent] = useState<StudyRecord[]>([]);
+  const [queueNotice, setQueueNotice] = useState('');
   const abort = useRef<AbortController | null>(null);
   useEffect(() => {
-    const history = recentLessons();
-    // Browser-only persistence is read once after hydration.
-    if (Array.isArray(history))
+    const queuedUrl = new URL(window.location.href).searchParams.get('video');
+    // Browser-only navigation state is read after hydration.
+    if (queuedUrl && queuedUrl.length <= 2000)
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setRecent(history.filter((item) => item?.lesson?.segments?.length).slice(0, 3));
+      setUrl(queuedUrl);
     return () => abort.current?.abort();
-  }, []);
-  useEffect(() => {
-    const refresh = () => {
-      setRecent(recentLessons().slice(0, 3));
-      setRemoteRecent(
-        accountLessons()
-          .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-          .slice(0, 3),
-      );
-    };
-    window.addEventListener('hibiki:sync-hydrated', refresh);
-    return () => window.removeEventListener('hibiki:sync-hydrated', refresh);
   }, []);
   function openLesson(lesson: Lesson) {
     saveLesson(lesson, 0);
@@ -237,6 +221,33 @@ export function Home() {
                 </div>
               </div>
             ) : null}
+            {!busy && url.trim() ? (
+              <button
+                className="text-button queue-current-link"
+                type="button"
+                onClick={() => {
+                  try {
+                    const saved = addQueueLink(url, 'Queued video');
+                    setQueueNotice(
+                      saved
+                        ? 'Saved to your queue.'
+                        : 'Queued for this visit. Browser storage is unavailable.',
+                    );
+                  } catch (error) {
+                    setQueueNotice(
+                      error instanceof Error ? error.message : 'This link could not be queued.',
+                    );
+                  }
+                }}
+              >
+                Queue for later <ArrowRight size={14} />
+              </button>
+            ) : null}
+            {queueNotice ? (
+              <p className="small muted" role="status">
+                {queueNotice}
+              </p>
+            ) : null}
             {needsTranscript ? (
               <div role="status" className="error-message">
                 <p>{message}</p>
@@ -260,6 +271,7 @@ export function Home() {
             ) : null}
           </div>
         </section>
+        <LibraryPreview />
         <section className="demo-section" aria-labelledby="demo-title">
           <div className="demo-art">
             <Image
@@ -303,58 +315,6 @@ export function Home() {
             <span className="demo-note">Built-in sample · Japanese synthetic voice · no setup</span>
           </div>
         </section>
-        {recent.length || remoteRecent.length ? (
-          <section className="recent-section">
-            <div className="section-heading">
-              <h2>Pick up where you left off</h2>
-              <span className="small muted">
-                {account.user ? 'Your account and this device' : 'Saved on this device'}
-              </span>
-            </div>
-            <div className="recent-grid">
-              {recent.map((item) => (
-                <Link
-                  href={`/practice/${item.lesson.id}`}
-                  className="recent-card"
-                  key={item.lesson.id}
-                >
-                  <span className="recent-icon">
-                    <Headphones size={20} />
-                  </span>
-                  <div>
-                    <strong>{item.lesson.title}</strong>
-                    <span>
-                      Section {item.index + 1} of {item.lesson.segments.length} ·{' '}
-                      {sourceLabel(item.lesson)}
-                    </span>
-                  </div>
-                  <ArrowUpRight size={17} />
-                </Link>
-              ))}
-              {remoteRecent
-                .filter((r) => !recent.some((l) => l.lesson.id === r.lesson.lessonId))
-                .map((r) => (
-                  <Link
-                    href={`/practice/${encodeURIComponent(r.lesson.lessonId)}`}
-                    className="recent-card"
-                    key={r.id}
-                  >
-                    <span className="recent-icon">
-                      <Headphones size={20} />
-                    </span>
-                    <div>
-                      <strong>{r.lesson.title}</strong>
-                      <span>
-                        Section {r.position + 1} of {r.lesson.segmentCount}
-                        {!r.mediaAvailable ? ' · Reattach media or transcript' : ''}
-                      </span>
-                    </div>
-                    <ArrowUpRight size={17} />
-                  </Link>
-                ))}
-            </div>
-          </section>
-        ) : null}
         <section className="rhythm-section">
           <div className="section-heading">
             <span className="eyebrow">LESS RUSH. MORE RHYTHM.</span>

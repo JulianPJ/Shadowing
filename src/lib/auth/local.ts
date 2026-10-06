@@ -8,6 +8,7 @@ import { createD1DictionaryRepository } from '../dictionary/repository';
 import { createD1AccessRepository } from '../access';
 import { createD1ReviewRepository } from '../review/repository';
 import { createD1TagRepository } from '../tags/repository';
+import { D1KnowledgeRepository } from '../knowledge/repository';
 
 let local:
   | Promise<{
@@ -17,6 +18,7 @@ let local:
       access: ReturnType<typeof createD1AccessRepository>;
       review: ReturnType<typeof createD1ReviewRepository>;
       tags: ReturnType<typeof createD1TagRepository>;
+      knowledge: D1KnowledgeRepository;
     } | null>
   | undefined;
 export function localAuth() {
@@ -46,6 +48,7 @@ export function localAuth() {
       access: createD1AccessRepository(database),
       review: createD1ReviewRepository(database),
       tags: createD1TagRepository(database),
+      knowledge: new D1KnowledgeRepository(database),
     };
   })();
   return local;

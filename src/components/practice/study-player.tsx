@@ -29,10 +29,13 @@ import {
 import { lessonMedia, sourceLabel, MEDIA_ACCEPT, validateMediaFile } from '@/lib/media';
 import { timestamp } from '@/lib/youtube';
 import { MediaPlayer, type MediaHandle } from '../media-player';
-import { VoiceRecorder } from '../voice-recorder';
+import { VoiceRecorder, type VoiceRecorderHandle } from '../voice-recorder';
+import { loadDrillSettings, practicePreset, type PracticePreset } from '@/lib/drill-presets';
 import { LessonCompletionSummary } from '../lesson-completion-summary';
+import { LessonVocabulary } from '../lesson-vocabulary';
 import { useProAccess } from '../pro-feature';
 import { transcriptRevision } from '@/lib/transcript';
+import { storageAccount } from '@/lib/storage/browser';
 import {
   aggregateShadowingScores,
   loadShadowingSession,
@@ -59,6 +62,24 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
   const [lesson, setLesson] = useState(session.lesson);
   const [index, setIndex] = useState(session.index);
   const [mode, setMode] = useState<Mode>(session.preferences.mode);
+  const [drill, setDrill] = useState(() => loadDrillSettings(session.preferences.mode));
+  const [drillRunning, setDrillRunning] = useState(false);
+  const [drillPreparing, setDrillPreparing] = useState(false);
+  const recorder = useRef<VoiceRecorderHandle>(null);
+  const repeatNumber = useRef(1);
+  const boundaryGeneration = useRef(0);
+  const handledBoundary = useRef(-1);
+  const automationId = useRef(0);
+  const responseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stopAutomation = useCallback(() => {
+    automationId.current++;
+    if (responseTimer.current) clearTimeout(responseTimer.current);
+    responseTimer.current = null;
+    recorder.current?.cancel();
+    setDrillRunning(false);
+    setDrillPreparing(false);
+    repeatNumber.current = 1;
+  }, []);
   const [speed, setSpeed] = useState(session.preferences.speed);
   const [playbackOffsetMs, setPlaybackOffsetMs] = useState(session.preferences.playbackOffsetMs);
   const [studioMode, setStudioMode] = useState(session.preferences.studioMode);
@@ -78,6 +99,14 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
   const summaryAbort = useRef<AbortController | null>(null);
 
   const [favorites, setFavorites] = useState<string[]>(() => loadFavorites(lesson));
+  const [recommendedSegmentIds, setRecommendedSegmentIds] = useState<Set<string> | null>(null);
+  const filterRecommendations = useCallback((ids: string[] | null) => {
+    setRecommendedSegmentIds((current) => {
+      if (ids === null) return null;
+      if (current?.size === ids.length && ids.every((id) => current.has(id))) return current;
+      return new Set(ids);
+    });
+  }, []);
 
   const [finished, setFinished] = useState(false);
   const [completed, setCompleted] = useState(() => lessonCompleted(session.lesson));
@@ -159,6 +188,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
     const hydrate = () => {
       const prefs = loadPreferences();
       setMode(prefs.mode);
+      setDrill(loadDrillSettings(prefs.mode));
       setSpeed(prefs.speed);
       setPlaybackOffsetMs(prefs.playbackOffsetMs);
       setStudioMode(prefs.studioMode);
@@ -166,9 +196,26 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
       setFavorites(loadFavorites(lesson));
       setCompleted(lessonCompleted(lesson));
     };
+    const changeAccount = () => {
+      stopAutomation();
+      scoreAbort.current?.abort();
+      scoreAbort.current = null;
+      summaryAbort.current?.abort();
+      summaryAbort.current = null;
+      setScoringSection(null);
+      setScoringError('');
+      setSummaryLoading(false);
+      setShadowingScores(loadShadowingSession(lesson.id, shadowingRevision));
+      setRecommendedSegmentIds(null);
+      hydrate();
+    };
     window.addEventListener('hibiki:sync-hydrated', hydrate);
-    return () => window.removeEventListener('hibiki:sync-hydrated', hydrate);
-  }, [lesson]);
+    window.addEventListener('hibiki:account-change', changeAccount);
+    return () => {
+      window.removeEventListener('hibiki:sync-hydrated', hydrate);
+      window.removeEventListener('hibiki:account-change', changeAccount);
+    };
+  }, [lesson, shadowingRevision, stopAutomation]);
   useEffect(() => {
     saveLesson(lesson, index);
   }, [lesson, index]);
@@ -182,6 +229,23 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
       furigana,
     });
   }, [mode, speed, playbackOffsetMs, studioMode, furigana]);
+  useEffect(() => {
+    writeStorage('drill:settings', drill);
+  }, [drill]);
+  useEffect(() => {
+    const generation = automationId;
+    const interrupt = () => {
+      if (document.hidden) stopAutomation();
+    };
+    window.addEventListener('hibiki:account-changing', stopAutomation);
+    document.addEventListener('visibilitychange', interrupt);
+    return () => {
+      generation.current++;
+      if (responseTimer.current) clearTimeout(responseTimer.current);
+      window.removeEventListener('hibiki:account-changing', stopAutomation);
+      document.removeEventListener('visibilitychange', interrupt);
+    };
+  }, [stopAutomation]);
   useEffect(() => {
     document.body.classList.toggle('studio-active', studioMode);
     return () => document.body.classList.remove('studio-active');
@@ -206,12 +270,14 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
     if (shadowingScores.summary?.fingerprint === shadowingSignals.fingerprint) return;
     if (summaryAbort.current) return;
     const controller = new AbortController();
+    const owner = storageAccount();
     summaryAbort.current = controller;
     setSummaryLoading(true);
     void shadowingSessionSummary(shadowingSignals, controller.signal)
       .then((summary) => {
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted || storageAccount() !== owner) return;
         setShadowingScores((current) => {
+          if (controller.signal.aborted || storageAccount() !== owner) return current;
           const next = {
             ...current,
             summary: { ...summary, fingerprint: shadowingSignals.fingerprint },
@@ -227,7 +293,9 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
   }
 
   const navigate = useCallback(
-    (nextIndex: number, play = true, evidenceReplay = false) => {
+    (nextIndex: number, play = true, evidenceReplay = false, preserveAutomation = false) => {
+      if (!preserveAutomation) stopAutomation();
+      boundaryGeneration.current++;
       scoreAbort.current?.abort();
       scoreAbort.current = null;
       setScoringSection(null);
@@ -258,7 +326,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
           setPlaybackError('Playback didn’t start. Press play inside the video, then try again.');
         });
     },
-    [lesson.segments, index, resetTranslation, recordSignal, mediaTimeFor],
+    [lesson.segments, index, resetTranslation, recordSignal, mediaTimeFor, stopAutomation],
   );
   const replaySection = useCallback(() => {
     recordSignal(segment, 'replay');
@@ -266,6 +334,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
   }, [recordSignal, segment, navigate, index]);
   const togglePlayback = useCallback(() => {
     if (isPlaying) {
+      stopAutomation();
       media.current?.pause();
       setStatus('paused');
       return;
@@ -290,8 +359,18 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
       setStatus('paused');
       setPlaybackError('Playback didn’t start. Try the play button inside the video.');
     });
-  }, [isPlaying, mode, status, segment.end, navigate, index, playbackOffsetSeconds]);
+  }, [
+    isPlaying,
+    mode,
+    status,
+    segment.end,
+    navigate,
+    index,
+    playbackOffsetSeconds,
+    stopAutomation,
+  ]);
   const continuePractice = useCallback(() => {
+    stopAutomation();
     if (index === lesson.segments.length - 1) {
       media.current?.pause();
       setStatus('complete');
@@ -304,7 +383,75 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
     }
     setPracticeCount((n) => n + 1);
     navigate(index + 1);
-  }, [index, lesson, navigate, recordCompletion]);
+  }, [index, lesson, navigate, recordCompletion, stopAutomation]);
+
+  const automaticContinue = useCallback(() => {
+    repeatNumber.current = 1;
+    if (index === lesson.segments.length - 1) {
+      stopAutomation();
+      media.current?.pause();
+      setStatus('complete');
+      setFinished(true);
+      setCompleted(true);
+      completeLesson(lesson);
+      recordCompletion();
+    } else navigate(index + 1, true, false, true);
+  }, [index, lesson, navigate, recordCompletion, stopAutomation]);
+
+  const onSectionEnd = useCallback(() => {
+    if (handledBoundary.current === boundaryGeneration.current) return;
+    handledBoundary.current = boundaryGeneration.current;
+    if (repeatNumber.current < drill.repeats) {
+      repeatNumber.current++;
+      recordSignal(segment, 'replay');
+      navigate(index, true, false, true);
+      return;
+    }
+    repeatNumber.current = 1;
+    if (drill.reveal === 'after-pause' && !revealed) void revealTranslation();
+    const generation = automationId.current;
+    if (drillRunning && drill.preset === 'drill') {
+      void recorder.current?.recordFor(drill.responseSeconds).then((ok) => {
+        if (generation !== automationId.current) return;
+        if (ok) automaticContinue();
+        else stopAutomation();
+      });
+    } else if (drill.pause === 'timed') {
+      responseTimer.current = setTimeout(() => {
+        if (generation === automationId.current) automaticContinue();
+      }, drill.responseSeconds * 1000);
+    }
+  }, [
+    drill,
+    drillRunning,
+    index,
+    segment,
+    recordSignal,
+    navigate,
+    revealed,
+    revealTranslation,
+    automaticContinue,
+    stopAutomation,
+  ]);
+
+  function selectPreset(preset: PracticePreset) {
+    stopAutomation();
+    setDrill(practicePreset(preset));
+    setMode(preset === 'continuous' ? 'continuous' : 'shadowing');
+    resetTranslation();
+  }
+
+  async function startHandsFree() {
+    stopAutomation();
+    const generation = automationId.current;
+    setDrillPreparing(true);
+    const allowed = await recorder.current?.prepare();
+    if (generation !== automationId.current) return;
+    setDrillPreparing(false);
+    if (!allowed) return;
+    setDrillRunning(true);
+    navigate(index, true, false, true);
+  }
 
   usePlaybackBoundary({
     ready,
@@ -323,8 +470,10 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
     setStatus,
     setPracticeCount,
     setIndex,
+    onSectionEnd,
   });
   function replayEvidence(evidence: QuizEvidence) {
+    stopAutomation();
     const evidenceSection = lesson.segments.find((s) => s.id === evidence.segmentIds[0]);
     if (evidenceSection) recordSignal(evidenceSection, 'evidence-replay');
     if (replayResumeIndex.current === null) replayResumeIndex.current = index;
@@ -357,7 +506,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
         element.closest(
           'input, textarea, select, audio, video, [contenteditable="true"], dialog',
         ) ||
-        ([' ', 'Enter'].includes(event.key) && element.closest('button,a')) ||
+        ([' ', 'Enter'].includes(event.key) && element.closest('button,a,[role="button"]')) ||
         document.querySelector('dialog[open]') ||
         !ready ||
         recording ||
@@ -407,20 +556,41 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
       setStatus('paused');
       return;
     }
+    if (mode === 'shadowing' && readPlaybackTime() < segment.end - 0.08) return;
     setStatus(mode === 'shadowing' ? 'your-turn' : 'complete');
     setElapsed(duration);
+    if (mode === 'shadowing') onSectionEnd();
     if (mode === 'continuous') {
       setFinished(true);
       setCompleted(true);
       completeLesson(lesson);
       recordCompletion();
     }
-  }, [mode, duration, lesson, replayRange, recordCompletion]);
-  const onMediaError = useCallback((message: string) => {
-    setPlaybackError(message);
-    setStatus('paused');
-  }, []);
-  const pauseForRecording = useCallback(() => {
+  }, [
+    mode,
+    duration,
+    lesson,
+    replayRange,
+    recordCompletion,
+    onSectionEnd,
+    readPlaybackTime,
+    segment.end,
+  ]);
+  const onMediaError = useCallback(
+    (message: string) => {
+      stopAutomation();
+      setPlaybackError(message);
+      setStatus('paused');
+    },
+    [stopAutomation],
+  );
+  const pauseForRecording = useCallback((automatic = false) => {
+    if (!automatic) {
+      automationId.current++;
+      if (responseTimer.current) clearTimeout(responseTimer.current);
+      responseTimer.current = null;
+      setDrillRunning(false);
+    }
     media.current?.pause();
     setStatus('your-turn');
   }, []);
@@ -434,6 +604,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
     async (recordingBlob: Blob, recordingDurationSeconds: number) => {
       if (scoreAbort.current) return false;
       const target = segment;
+      const owner = storageAccount();
       const referenceDurationSeconds = (target.end - target.start) / speed;
       try {
         validateShadowingRecordingBeforeUpload(recordingDurationSeconds, referenceDurationSeconds);
@@ -465,7 +636,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
           recordingDurationSeconds: recognizedSpeechDurationSeconds,
         });
         const suggestions = await shadowingAttemptFeedback(analysis, controller.signal);
-        if (controller.signal.aborted) return false;
+        if (controller.signal.aborted || storageAccount() !== owner) return false;
         const result = {
           ...analysis,
           sectionId: target.id,
@@ -476,6 +647,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
         summaryAbort.current = null;
         setSummaryLoading(false);
         setShadowingScores((current) => {
+          if (controller.signal.aborted || storageAccount() !== owner) return current;
           const next = upsertShadowingSection(current, lesson.id, shadowingRevision, result);
           saveShadowingSession(next);
           return next;
@@ -614,7 +786,8 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
               <button
                 className={mode === 'shadowing' ? 'selected' : ''}
                 aria-pressed={mode === 'shadowing'}
-                onClick={() => setMode('shadowing')}
+                disabled={recording || drillPreparing}
+                onClick={() => selectPreset('focus')}
               >
                 <Mic size={14} />
                 Shadowing
@@ -622,7 +795,8 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
               <button
                 className={mode === 'continuous' ? 'selected' : ''}
                 aria-pressed={mode === 'continuous'}
-                onClick={() => setMode('continuous')}
+                disabled={recording || drillPreparing}
+                onClick={() => selectPreset('continuous')}
               >
                 <Headphones size={14} />
                 Continuous
@@ -634,7 +808,11 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
                 <select
                   aria-label="Playback speed"
                   value={speed}
-                  onChange={(event) => setSpeed(Number(event.target.value))}
+                  disabled={recording}
+                  onChange={(event) => {
+                    stopAutomation();
+                    setSpeed(Number(event.target.value));
+                  }}
                 >
                   <option value="0.5">0.5×</option>
                   <option value="0.75">0.75×</option>
@@ -653,11 +831,12 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
                   type="button"
                   aria-label="Shift playback timing 50 milliseconds earlier"
                   disabled={playbackOffsetMs <= PLAYBACK_OFFSET_MIN_MS}
-                  onClick={() =>
+                  onClick={() => {
+                    stopAutomation();
                     setPlaybackOffsetMs((value) =>
                       Math.max(PLAYBACK_OFFSET_MIN_MS, value - PLAYBACK_OFFSET_STEP_MS),
-                    )
-                  }
+                    );
+                  }}
                 >
                   −
                 </button>
@@ -665,7 +844,10 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
                   type="button"
                   className="offset-value"
                   aria-label="Reset playback timing offset"
-                  onClick={() => setPlaybackOffsetMs(0)}
+                  onClick={() => {
+                    stopAutomation();
+                    setPlaybackOffsetMs(0);
+                  }}
                 >
                   {playbackOffsetMs > 0 ? '+' : ''}
                   {playbackOffsetMs} ms
@@ -674,16 +856,147 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
                   type="button"
                   aria-label="Shift playback timing 50 milliseconds later"
                   disabled={playbackOffsetMs >= PLAYBACK_OFFSET_MAX_MS}
-                  onClick={() =>
+                  onClick={() => {
+                    stopAutomation();
                     setPlaybackOffsetMs((value) =>
                       Math.min(PLAYBACK_OFFSET_MAX_MS, value + PLAYBACK_OFFSET_STEP_MS),
-                    )
-                  }
+                    );
+                  }}
                 >
                   +
                 </button>
               </div>
             </div>
+          </div>
+          <div className="drill-settings" role="group" aria-label="Practice presets">
+            <label>
+              Preset
+              <select
+                aria-label="Practice preset"
+                value={drill.preset}
+                disabled={recording || drillPreparing}
+                onChange={(event) => selectPreset(event.target.value as PracticePreset)}
+              >
+                <option value="focus">Focus — listen, pause, repeat</option>
+                <option value="support">Support — meaning after a pause</option>
+                <option value="drill">Drill — listen twice, record</option>
+                <option value="continuous">Continuous — listen through</option>
+              </select>
+            </label>
+            <label>
+              Source repeats
+              <select
+                aria-label="Source repeat count"
+                value={drill.repeats}
+                disabled={mode === 'continuous' || recording || drillRunning}
+                onChange={(event) => {
+                  stopAutomation();
+                  setDrill((current) => ({ ...current, repeats: Number(event.target.value) }));
+                }}
+              >
+                {[1, 2, 3].map((count) => (
+                  <option key={count} value={count}>
+                    {count}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Pause
+              <select
+                aria-label="Section pause behavior"
+                value={drill.pause}
+                disabled={mode === 'continuous' || recording || drillRunning}
+                onChange={(event) => {
+                  stopAutomation();
+                  setDrill((current) => ({
+                    ...current,
+                    pause: event.target.value as 'manual' | 'timed',
+                  }));
+                }}
+              >
+                <option value="manual">Until I continue</option>
+                <option value="timed">Timed speaking window</option>
+              </select>
+            </label>
+            <label>
+              Translation
+              <select
+                aria-label="Translation reveal behavior"
+                value={drill.reveal}
+                disabled={mode === 'continuous' || recording || drillRunning}
+                onChange={(event) => {
+                  stopAutomation();
+                  setDrill((current) => ({
+                    ...current,
+                    reveal: event.target.value as 'manual' | 'after-pause',
+                  }));
+                }}
+              >
+                <option value="manual">Reveal on request</option>
+                <option value="after-pause">Reveal after source repeats</option>
+              </select>
+            </label>
+            {drill.pause === 'timed' || drill.preset === 'drill' ? (
+              <label>
+                Speaking window (seconds)
+                <input
+                  aria-label="Speaking window seconds"
+                  type="number"
+                  min={2}
+                  max={30}
+                  value={drill.responseSeconds}
+                  disabled={recording || drillRunning}
+                  onChange={(event) => {
+                    const seconds = Number(event.target.value);
+                    if (Number.isInteger(seconds) && seconds >= 2 && seconds <= 30) {
+                      stopAutomation();
+                      setDrill((current) => ({ ...current, responseSeconds: seconds }));
+                    }
+                  }}
+                />
+              </label>
+            ) : null}
+            {drill.preset === 'drill' ? (
+              <button
+                className="button"
+                disabled={!ready || (!drillRunning && recording)}
+                onClick={() => {
+                  if (drillRunning || drillPreparing) {
+                    stopAutomation();
+                    media.current?.pause();
+                    setStatus('paused');
+                  } else void startHandsFree();
+                }}
+              >
+                {drillPreparing
+                  ? 'Cancel microphone request'
+                  : drillRunning
+                    ? 'Stop hands-free drill'
+                    : 'Start hands-free drill'}
+              </button>
+            ) : null}
+            {mode === 'shadowing' && drill.pause === 'timed' && !drillRunning ? (
+              <button
+                className="button"
+                onClick={() => {
+                  stopAutomation();
+                  setDrill((current) => ({ ...current, pause: 'manual' }));
+                  media.current?.pause();
+                  setStatus('paused');
+                }}
+              >
+                Stop timed practice
+              </button>
+            ) : null}
+            <p className="small muted">
+              {mode === 'continuous'
+                ? 'Continuous follows the media without repeats or automatic section pauses.'
+                : `${drill.repeats} source ${drill.repeats === 1 ? 'play' : 'plays'} → ${drillRunning ? `${drill.responseSeconds} s local recording → next section` : drill.pause === 'timed' ? `${drill.responseSeconds} s to speak → next section` : 'pause until Continue'}.`}
+              {drill.preset === 'drill'
+                ? ' Hands-free needs your microphone permission; recordings are local and analysis stays explicit.'
+                : ''}
+            </p>
           </div>
           <div className="practice-current-stack">
             <CurrentSection
@@ -715,6 +1028,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
             />
 
             <VoiceRecorder
+              ref={recorder}
               key={segment.id}
               enabled={ready && !isPlaying}
               nativePlaying={isPlaying}
@@ -726,8 +1040,19 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
               analysisError={scoringError}
               onAnalyze={analyzeShadowing}
               onNewRecording={() => setScoringError('')}
+              recentAttempts={shadowingScores.recentAttempts?.[segment.id]}
+              onManualStop={stopAutomation}
             />
           </div>
+          <LessonVocabulary
+            lesson={lesson}
+            onPractice={(sectionId) => {
+              const targetIndex = lesson.segments.findIndex((s) => s.id === sectionId);
+              if (targetIndex >= 0) navigate(targetIndex, ready);
+            }}
+            onFilter={filterRecommendations}
+            filterActive={recommendedSegmentIds !== null}
+          />
           <LessonCompletionSummary
             lesson={lesson}
             finished={finished}
@@ -748,6 +1073,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
               onReplay: replayEvidence,
               onReturn: returnToQuiz,
               onOpenChange: (open) => {
+                stopAutomation();
                 setQuizOpen(open);
                 if (!open && replayRange) returnToQuiz();
                 else if (open) {
@@ -792,6 +1118,8 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
           mode={mode}
           practiceCount={practiceCount}
           navigate={navigate}
+          recommendedSegmentIds={recommendedSegmentIds}
+          onClearRecommendations={() => setRecommendedSegmentIds(null)}
         />
       </div>
       <div className="practice-signoff">

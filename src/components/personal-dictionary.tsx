@@ -236,6 +236,7 @@ function DictionaryContent() {
           </span>
         ) : null}
       </div>
+      <p><Link className="button small-button" href="/words">Word Browser · bulk knowledge states</Link></p>
       {account.user ? (
         <section className="review-toolbar" aria-label="Dictionary collections">
           <Link className="button primary" href="/review">

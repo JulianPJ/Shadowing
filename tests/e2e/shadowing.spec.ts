@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import demo from '../../src/data/demo.json' with { type: 'json' };
 import path from 'node:path';
-import { mockProAccount } from '../helpers/pro-account';
+import { mockProAccount, proTestUser } from '../helpers/pro-account';
 
 async function openDemo(page: Page) {
   await page.goto('/');
@@ -269,8 +269,10 @@ test('shadowing analysis is explicit, scores one recording, and shows aggregate 
   expect(transcriptions).toBe(1);
   expect(feedbackCalls).toBe(1);
 
-  const stored = await page.evaluate(() =>
-    JSON.parse(sessionStorage.getItem('hibiki:shadowing:v1:demo') || 'null'),
+  const stored = await page.evaluate(
+    (userId) =>
+      JSON.parse(sessionStorage.getItem(`hibiki:shadowing:v1:account:${userId}:demo`) || 'null'),
+    proTestUser.id,
   );
   expect(stored.sections['segment-1'].score).toBe(100);
   expect(Object.keys(stored.sections)).toEqual(['segment-1']);

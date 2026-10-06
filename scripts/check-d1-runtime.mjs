@@ -137,6 +137,56 @@ try {
   });
   assert.equal(freeDictionary.status, 200);
   assert.deepEqual((await freeDictionary.json()).entries, []);
+  assert.equal((await mf.dispatchFetch('https://example.com/api/knowledge')).status, 401);
+  const knowledgeHeaders = {
+    Cookie: cookie,
+    Origin: 'https://example.com',
+    'Content-Type': 'application/json',
+    'X-Hibiki-Account': identity.user.id,
+  };
+  const wordState = {
+    lemma: '勉強',
+    reading: 'べんきょう',
+    state: 'known',
+    updatedAt: new Date().toISOString(),
+  };
+  const savedWord = await mf.dispatchFetch('https://example.com/api/knowledge', {
+    method: 'POST',
+    headers: knowledgeHeaders,
+    body: JSON.stringify({ records: [wordState] }),
+  });
+  assert.equal(savedWord.status, 200);
+  const wordPage = await mf.dispatchFetch('https://example.com/api/knowledge', {
+    headers: { Cookie: cookie, 'X-Hibiki-Account': identity.user.id },
+  });
+  assert.deepEqual((await wordPage.json()).records, [wordState]);
+  assert.equal(
+    (
+      await mf.dispatchFetch('https://example.com/api/knowledge', {
+        headers: { Cookie: cookie, 'X-Hibiki-Account': 'someone-else' },
+      })
+    ).status,
+    409,
+  );
+  assert.equal(
+    (
+      await mf.dispatchFetch('https://example.com/api/knowledge', {
+        method: 'POST',
+        headers: { ...knowledgeHeaders, Origin: 'https://evil.example' },
+        body: JSON.stringify({ records: [wordState] }),
+      })
+    ).status,
+    403,
+  );
+  assert.equal(
+    (
+      await db
+        .prepare('SELECT COUNT(*) AS n FROM user_word_knowledge WHERE user_id=?')
+        .bind(identity.user.id)
+        .first()
+    ).n,
+    1,
+  );
   const freeQuiz = await mf.dispatchFetch('https://example.com/api/quiz', {
     method: 'POST',
     headers: { Cookie: cookie },
@@ -404,6 +454,25 @@ try {
   assert.equal((await db.prepare('SELECT COUNT(*) AS n FROM linked_transcripts').first()).n, 1);
   assert.equal((await db.prepare('SELECT COUNT(*) AS n FROM generated_artifacts').first()).n, 2);
 
+  const discovered = await mf.dispatchFetch('https://example.com/api/discovery');
+  assert.equal(discovered.status, 200);
+  const discovery = await discovered.json();
+  assert.equal(discovery.lessons.length, 1);
+  assert.equal(discovery.lessons[0].title, 'Runtime fixture');
+  assert.equal(discovery.lessons[0].videoId, lesson.videoId);
+  assert.deepEqual(discovery.lessons[0].segments, lesson.segments);
+  assert.equal(discovery.difficulties.length, 1);
+  assert.match(discovery.difficulties[0].transcriptKey, /^[a-f0-9]{64}$/);
+  await db
+    .prepare("UPDATE linked_transcripts SET visibility='private', owner_user_id=?")
+    .bind(identity.user.id)
+    .run();
+  assert.deepEqual(
+    (await (await mf.dispatchFetch('https://example.com/api/discovery')).json()).lessons,
+    [],
+  );
+  await db.prepare("UPDATE linked_transcripts SET visibility='system', owner_user_id=NULL").run();
+
   const signedOut = await mf.dispatchFetch('https://example.com/api/auth/sign-out', {
     method: 'POST',
     headers: { Cookie: cookie, Origin: 'https://example.com', 'Content-Type': 'application/json' },
@@ -427,7 +496,7 @@ try {
     401,
   );
   console.log(
-    'Built Worker + D1: Free paid-feature denial, D1 Pro upgrade, sync, dictionary, quiz/difficulty cache and sign-out passed.',
+    'Built Worker + D1: Free word states and paid-feature denial, D1 Pro upgrade, sync, dictionary, public discovery, quiz/difficulty cache and sign-out passed.',
   );
 } finally {
   await mf.dispose();

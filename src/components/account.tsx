@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { authClient } from '@/lib/auth/client';
 import { startReviewSync } from '@/lib/review/client';
+import { startKnowledgeSync } from '@/lib/knowledge/client';
 import {
   chooseImport,
   refreshAccount,
@@ -27,12 +28,13 @@ export function AccountBridge() {
   const account = useAccount();
   useEffect(() => startSync(), []);
   useEffect(() => startReviewSync(), []);
+  useEffect(() => startKnowledgeSync(), []);
   return account.importPending ? (
     <aside className="account-import" aria-label="Import device progress">
       <strong>Add this device’s Hibiki progress to your account?</strong>
       <p>
-        Include preferences, practice history, quiz answers and bookmarks. Media, recordings,
-        transcript text and playback links stay on this device.
+        Include preferences, practice history, quiz answers, bookmarks and word knowledge states.
+        Media, recordings, transcript text and playback links stay on this device.
       </p>
       <div>
         <button className="button primary" onClick={() => void chooseImport(true)}>

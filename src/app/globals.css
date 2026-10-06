@@ -13,4 +13,7 @@
 @import './styles/dictionary.css';
 @import './styles/review.css';
 @import './styles/topic-vocabulary.css';
+@import './styles/drill.css';
+@import './styles/library.css';
+@import './styles/adaptive.css';
 @import './styles/theme.css';

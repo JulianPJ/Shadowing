@@ -44,6 +44,19 @@ export type ShadowingSectionResult = ShadowingAttemptAnalysis & {
   suggestions: string[];
 };
 
+/** Consecutive recognizer alignment units, grouped only for readable diagnostics. */
+export function shadowingAlignmentChunks(alignment: ShadowingAlignmentOperation[]) {
+  const chunks: ShadowingAlignmentOperation[] = [];
+  for (const operation of alignment) {
+    const previous = chunks.at(-1);
+    if (previous?.type === operation.type) {
+      if (operation.expected) previous.expected = (previous.expected ?? '') + operation.expected;
+      if (operation.heard) previous.heard = (previous.heard ?? '') + operation.heard;
+    } else chunks.push({ ...operation });
+  }
+  return chunks;
+}
+
 export class ShadowingScoreError extends Error {
   constructor(
     public code: 'invalid-target' | 'no-speech' | 'recording-too-short' | 'analysis-too-large',
@@ -151,7 +164,10 @@ export function shadowingPaceBand(relativeSpeakingSpeed: number): ShadowingPaceB
   return 'close';
 }
 
-export function timingSimilarity(recordingDurationSeconds: number, referenceDurationSeconds: number) {
+export function timingSimilarity(
+  recordingDurationSeconds: number,
+  referenceDurationSeconds: number,
+) {
   const ratio = recordingDurationSeconds / referenceDurationSeconds;
   const deviation = Math.abs(Math.log(ratio));
   const tolerance = Math.log(SHADOWING_SCORE_CONSTANTS.timingToleranceRatio);
@@ -258,17 +274,27 @@ export function fallbackShadowingSuggestions(analysis: ShadowingAttemptAnalysis)
   if (analysis.contentScore >= 94)
     suggestions.push('Your speech was recognised very close to the target wording.');
   else if (analysis.missing.length)
-    suggestions.push('Some expected sounds were not recognised clearly. Try keeping the sentence ending audible.');
+    suggestions.push(
+      'Some expected sounds were not recognised clearly. Try keeping the sentence ending audible.',
+    );
   else if (analysis.substitutions.length)
-    suggestions.push('A few sounds were recognised differently from the target. Try the sentence once more in smaller chunks.');
+    suggestions.push(
+      'A few sounds were recognised differently from the target. Try the sentence once more in smaller chunks.',
+    );
   else if (analysis.additions.length)
-    suggestions.push('A few extra sounds were recognised. Aim for the same compact phrasing as the reference.');
+    suggestions.push(
+      'A few extra sounds were recognised. Aim for the same compact phrasing as the reference.',
+    );
 
   const pace = shadowingPaceBand(analysis.relativeSpeakingSpeed);
   if (pace === 'faster')
-    suggestions.push('Your attempt was faster than the reference. Give each phrase a little more space.');
+    suggestions.push(
+      'Your attempt was faster than the reference. Give each phrase a little more space.',
+    );
   else if (pace === 'slower')
-    suggestions.push('Your attempt was slower than the reference. Try carrying the rhythm through the whole section.');
+    suggestions.push(
+      'Your attempt was slower than the reference. Try carrying the rhythm through the whole section.',
+    );
   else if (analysis.timingScore >= 90)
     suggestions.push('Your overall pacing was close to the reference timing.');
 

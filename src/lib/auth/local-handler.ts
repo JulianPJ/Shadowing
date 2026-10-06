@@ -20,6 +20,7 @@ export async function localAccountHandler(request: Request) {
     services.access,
     services.review,
     services.tags,
+    services.knowledge,
   )(request);
 }
 

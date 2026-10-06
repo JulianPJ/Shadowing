@@ -23,6 +23,7 @@ type BoundaryOptions = {
   setStatus: Dispatch<SetStateAction<PlaybackState>>;
   setPracticeCount: Dispatch<SetStateAction<number>>;
   setIndex: Dispatch<SetStateAction<number>>;
+  onSectionEnd?: () => void;
 };
 
 export function usePlaybackBoundary({
@@ -42,6 +43,7 @@ export function usePlaybackBoundary({
   setStatus,
   setPracticeCount,
   setIndex,
+  onSectionEnd,
 }: BoundaryOptions) {
   const sectionAt = useMemo(
     () => createSectionLookup(lesson.segments, duration),
@@ -85,6 +87,7 @@ export function usePlaybackBoundary({
           setElapsed(segment.end);
           setStatus('your-turn');
           setPracticeCount((n) => n + 1);
+          onSectionEnd?.();
           return;
         }
         if (match >= 0 && match !== index) {
@@ -128,5 +131,6 @@ export function usePlaybackBoundary({
     setStatus,
     setPracticeCount,
     setIndex,
+    onSectionEnd,
   ]);
 }

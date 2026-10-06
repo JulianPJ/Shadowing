@@ -7,6 +7,7 @@ import { Header, Footer, HelpDialog } from './chrome';
 import { identityKey } from '@/lib/learner-progress';
 import { timestamp } from '@/lib/youtube';
 import { useAccount } from './account';
+import { WeeklyReport } from './weekly-report';
 
 function practiceTime(seconds: number) {
   if (seconds < 60) return seconds > 0 ? 'Less than a minute' : 'No time recorded yet';
@@ -37,6 +38,7 @@ export function LearnerProgress() {
             ? 'Your account progress, saved locally as you practise and synced across devices.'
             : 'Saved on this device, in this browser. A history of your practice and the moments you returned to.'}
         </p>
+        <WeeklyReport />
         {warning ? (
           <p className="error-message" role="status">
             Progress for this visit may not be saved.
@@ -261,7 +263,10 @@ export function LearnerProgress() {
               Active practice counts visible listening, recording, short spoken-response windows and
               deliberate interactions. Idle and hidden tabs, comprehension checks and
               difficulty-analysis waits are excluded. Earlier activity has no invented practice
-              time. Your history stays local; clearing this browser’s data removes it.
+              time.{' '}
+              {account.user
+                ? 'Eligible practice history syncs to your account. Local media, recordings, queue and daily goal remain on this device.'
+                : 'Your history stays local; clearing this browser’s data removes it.'}
             </p>
           </>
         )}

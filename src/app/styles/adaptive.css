@@ -1,0 +1,246 @@
+.word-state-unknown {
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, #c89445 65%, transparent);
+  text-underline-offset: 4px;
+}
+.word-state-learning {
+  background: color-mix(in srgb, #7aa9aa 15%, transparent);
+}
+.word-state-known {
+  text-decoration-color: transparent;
+}
+.word-state-ignored {
+  opacity: 0.65;
+}
+.word-state-controls {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0;
+}
+.word-state-controls > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.word-state-controls small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.word-state-choice {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 11px;
+  background-color: var(--paper);
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+}
+.word-state-choice[aria-pressed='true'] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.lexicon-definitions {
+  margin: 14px 0;
+  max-height: 420px;
+  overflow-y: auto;
+}
+.lexicon-match {
+  border-bottom: 1px solid var(--line);
+  padding: 12px 0;
+}
+.lexicon-term {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.lexicon-term strong {
+  font-size: 20px;
+}
+.lexicon-term > span {
+  font-size: 12px;
+}
+.lexicon-common {
+  color: var(--accent);
+}
+.lexicon-match ol {
+  padding-left: 23px;
+  margin: 8px 0;
+}
+.lexicon-match li {
+  margin: 10px 0;
+}
+.lexicon-match li p {
+  margin: 4px 0;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.lexicon-pos {
+  font-size: 11px;
+  color: var(--muted);
+}
+.lexicon-match li small {
+  display: block;
+  margin: 4px 0;
+}
+.lexicon-attribution {
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.lexicon-attribution a {
+  text-decoration: underline;
+}
+.lesson-vocabulary {
+  margin: 20px 0;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+}
+.vocabulary-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+.vocabulary-heading h2 {
+  margin: 5px 0 12px;
+  font-size: 18px;
+}
+.vocabulary-counts,
+.vocabulary-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 12px 0;
+}
+.vocabulary-counts {
+  font-size: 11px;
+  color: var(--muted);
+}
+.vocabulary-filters button[aria-pressed='true'] {
+  border-color: var(--accent);
+}
+.good-lines {
+  list-style: none;
+  margin: 14px 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.good-line {
+  width: 100%;
+  display: grid;
+  text-align: left;
+  gap: 5px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.good-line:hover {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+.good-line small {
+  color: var(--muted);
+}
+.word-browser-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 15px;
+  margin: 22px 0;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+}
+.word-browser-toolbar form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 8px;
+}
+.word-browser-toolbar label {
+  display: grid;
+  gap: 7px;
+  font-size: 12px;
+}
+.word-browser-toolbar input,
+.word-browser-toolbar select,
+.word-browser-table select {
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+}
+.word-browser-toolbar > p {
+  flex-basis: 100%;
+  margin: 0;
+}
+.word-browser-bulk,
+.word-browser-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 18px 0;
+  font-size: 12px;
+}
+.word-browser-bulk > span {
+  margin-right: 10px;
+}
+.word-browser-select {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+  margin: 12px 0;
+}
+.word-browser-table {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.word-browser-table table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 570px;
+  text-align: left;
+  font-size: 12px;
+}
+.word-browser-table td,
+.word-browser-table th {
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.word-browser-table td small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+}
+.word-browser-lookup {
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+@media (max-width: 600px) {
+  .lesson-vocabulary {
+    padding: 15px;
+  }
+  .vocabulary-heading {
+    align-items: flex-start;
+  }
+  .word-browser-toolbar form {
+    width: 100%;
+  }
+  .word-browser-toolbar input {
+    max-width: 100%;
+  }
+}

@@ -279,7 +279,7 @@ The intended UX change is a continuous loop rather than separate feature pages:
 
 ## Recommended build order
 
-Implementation status: **Phase A complete** in the A.2 slice: [contracts, verification and next stage](retention-implementation.md). PR #31's decks, explicit enrollment, Daily Review and contextual replay are extended with lightweight tags, cursor/targeted dictionary retrieval, a bounded review-aware cache, complete CSV/TSV export and one lesson completion summary of already-computed evidence. AnkiConnect/APKG, inline playback and offline new-word capture remain optional follow-up work. The next product stage is Phase B below.
+Implementation status: **Phases A–D implemented**. Phase A's A.2 contracts remain documented in [retention](retention-implementation.md). The integrated B–D implementation adds licensed lexical lookup and cumulative word knowledge, explicit speaking drills/diagnostics, and personal library/report/discovery surfaces: [implementation and verification](post-mvp-phases-b-d.md). Fit thresholds and recognizer quality remain calibration work; optional Grammar Coach/conversation, AnkiConnect/APKG, inline review playback and broader content capture remain separate follow-up work.
 
 ### Phase A — close the retention loop
 

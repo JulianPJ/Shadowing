@@ -20,6 +20,11 @@ Hibiki runs on Cloudflare Workers via vinext. Standard Next.js is also supported
 | Dictionary cursor/filter and exact-ID queries, account-scoped record cache | `src/lib/dictionary/query.ts`, `repository.ts`, `cache.ts`, `client.ts` |
 | Descriptive tags, ownership, limits and connected edits | `src/lib/tags/`, `src/components/tag-controls.tsx` |
 | Composed completion recap and explainable revisit evidence | `src/components/lesson-completion-summary.tsx`, `src/lib/lesson-completion.ts` |
+| Licensed lexical assets, lookup and contextual lemma resolution | `scripts/prepare-lexicon.mjs`, `src/lib/lexicon/`, `src/components/lexicon-definitions.tsx` |
+| Local-first word knowledge, D1 ownership, vocabulary coverage and Word Browser | `src/lib/knowledge/`, `src/components/use-word-knowledge.ts`, `src/components/lesson-vocabulary.tsx`, `src/components/word-browser.tsx` |
+| Explicit presets, local recording automation and bounded Match trends | `src/lib/drill-presets.ts`, `src/lib/shadowing-session.ts`, `src/components/voice-recorder.tsx` |
+| My Library/queue, trusted public discovery and personal next lessons | `src/lib/library/`, `src/lib/discovery-api.ts`, `src/components/my-library.tsx` |
+| Weekly evidence, self-rated review history and local daily goal | `src/lib/reports/weekly.ts`, `src/lib/review/history.ts`, `src/components/weekly-report.tsx` |
 | Collections and entry memberships | `src/lib/decks/`, `src/lib/review/repository.ts` |
 | Pure scheduling, local review outbox and authenticated D1 review | `src/lib/review-scheduler.ts`, `src/lib/review/` |
 | Exportable vocabulary rows and spreadsheet-safe CSV | `src/lib/export/vocabulary.ts` |

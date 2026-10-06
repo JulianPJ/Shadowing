@@ -24,11 +24,17 @@ export function Header({ onHelp, player = false }: { onHelp: () => void; player?
         <nav aria-label="Main navigation">
           <AccountEntry />
           <ReviewLink />
+          <Link className="nav-link" href="/library">
+            Library
+          </Link>
           <Link className="nav-link" href="/progress">
             Progress
           </Link>
           <Link className="nav-link" href="/dictionary">
             Dictionary
+          </Link>
+          <Link className="nav-link" href="/words">
+            Words
           </Link>
           <button className="nav-link" onClick={onHelp}>
             {player ? (

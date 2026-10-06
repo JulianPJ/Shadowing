@@ -6,8 +6,10 @@ import { createD1UserProgressRepository } from './src/lib/sync/repository';
 import { createD1DictionaryRepository } from './src/lib/dictionary/repository';
 import { createD1ReviewRepository } from './src/lib/review/repository';
 import { createD1TagRepository } from './src/lib/tags/repository';
+import { D1KnowledgeRepository } from './src/lib/knowledge/repository';
 import { createD1AccessRepository, requirePro } from './src/lib/access';
 import { serveDemoAsset } from './src/lib/demo-asset';
+import { handleDiscoveryRequest } from './src/lib/discovery-api';
 import { handleQuizRequest } from './src/lib/quiz-api';
 import { createWorkersAiQuizProvider } from './src/lib/providers/quiz';
 import { handleDifficultyRequest } from './src/lib/difficulty-api';
@@ -82,13 +84,17 @@ const worker = {
    */
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    if (url.pathname === '/api/discovery') {
+      return handleDiscoveryRequest(request, env.HIBIKI_DB);
+    }
     if (
       url.pathname.startsWith('/api/auth/') ||
       url.pathname.startsWith('/api/account/') ||
       url.pathname.startsWith('/api/sync/') ||
       url.pathname === '/api/dictionary' ||
       url.pathname === '/api/review' ||
-      url.pathname === '/api/tags'
+      url.pathname === '/api/tags' ||
+      url.pathname === '/api/knowledge'
     ) {
       if (!env.HIBIKI_DB || !env.AUTH_SECRET || !env.AUTH_BASE_URL) {
         return url.pathname === '/api/account/me'
@@ -111,6 +117,7 @@ const worker = {
               createD1AccessRepository(env.HIBIKI_DB),
               createD1ReviewRepository(env.HIBIKI_DB),
               createD1TagRepository(env.HIBIKI_DB),
+              new D1KnowledgeRepository(env.HIBIKI_DB),
             )(request);
       } catch {
         return Response.json(

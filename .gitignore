@@ -16,3 +16,5 @@ __pycache__/
 .wrangler/
 
 /public/furigana/
+/public/lexicon/
+/.lexicon-cache/

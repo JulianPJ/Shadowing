@@ -20,6 +20,8 @@ import { hydrateSync } from './hydrate';
 import { loadLesson } from '../storage/lessons';
 import type { Lesson } from '../types';
 import { sanitizeDeviceData } from './sanitize';
+import { loadKnowledge, importKnowledgeRecords } from '../knowledge/client';
+import type { WordKnowledgeRecord } from '../knowledge/types';
 
 export type SyncStatus = {
   user: AccountUser | null;
@@ -101,9 +103,11 @@ export async function refreshAccount() {
     if (info.user?.id !== storageAccount()) {
       // Freeze anonymous eligibility before switching. Declined data remains in its own namespace.
       let anonymous: SyncData | null = null;
+      let anonymousKnowledge: WordKnowledgeRecord[] = [];
       if (!storageAccount() && info.user) {
         await migrateLearnerHistory();
         anonymous = await deviceSnapshot();
+        anonymousKnowledge = Object.values(loadKnowledge());
       }
       if (ticket !== generation) return;
       applying = true;
@@ -112,9 +116,11 @@ export async function refreshAccount() {
         info.user &&
         anonymous &&
         !readStorage('sync:import-decision', null) &&
-        hasData(anonymous)
-      )
+        (hasData(anonymous) || anonymousKnowledge.length)
+      ) {
         writeStorage('sync:import-candidate', anonymous);
+        writeStorage('sync:knowledge-import-candidate', anonymousKnowledge);
+      }
       applying = false;
     }
     const saved = readStorage<string | null>('sync:last', null);
@@ -137,10 +143,17 @@ export async function refreshAccount() {
 }
 
 export async function chooseImport(accept: boolean) {
-  if (!status.user) return;
+  const owner = status.user?.id,
+    ticket = generation;
+  const current = () =>
+    storageAccount() === owner && status.user?.id === owner && ticket === generation;
+  if (!owner || !current()) return;
   if (accept) {
     const candidate = readStorage<SyncData | null>('sync:import-candidate', null);
     if (candidate) saveCache(mergeSync(cache(), candidate));
+    importKnowledgeRecords(
+      readStorage<WordKnowledgeRecord[]>('sync:knowledge-import-candidate', []),
+    );
     writeStorage('sync:import-decision', 'accepted');
     applying = true;
     try {
@@ -149,6 +162,8 @@ export async function chooseImport(accept: boolean) {
       applying = false;
     }
   } else writeStorage('sync:import-decision', 'declined');
+  if (!current()) return;
+  writeStorage('sync:knowledge-import-candidate', []);
   publish({ importPending: false });
   if (accept) await synchronize();
 }
@@ -198,6 +213,7 @@ export async function synchronize() {
     if (storageAccount() !== owner || ticket !== generation) return;
     // Include edits made while the request was in flight before applying any remote state.
     data = mergeSync(data, await deviceSnapshot());
+    if (storageAccount() !== owner || ticket !== generation) return;
     // Read server-normalized scores and conflict results after pushing.
     cursor = null;
     do {
@@ -211,6 +227,7 @@ export async function synchronize() {
       cursor = page.nextCursor;
     } while (cursor);
     const latest = await deviceSnapshot();
+    if (storageAccount() !== owner || ticket !== generation) return;
     // In-flight local edits with a newer date survive; equal-date server quiz scoring is authoritative.
     for (const kind of syncCollections) {
       const current = new Map(data[kind].map((x) => [x.id, x]));
@@ -233,6 +250,7 @@ export async function synchronize() {
     } finally {
       applying = false;
     }
+    if (storageAccount() !== owner || ticket !== generation) return;
     const lastSync = new Date().toISOString();
     writeStorage('sync:last', lastSync);
     if (readStorage('sync:import-decision', null) === 'accepted')

@@ -14,6 +14,8 @@ type TranscriptProps = {
   mode: Mode;
   practiceCount: number;
   navigate: (index: number, play?: boolean) => void;
+  recommendedSegmentIds?: Set<string> | null;
+  onClearRecommendations?: () => void;
 };
 export const TranscriptPanel = memo(function TranscriptPanel({
   lesson,
@@ -25,6 +27,8 @@ export const TranscriptPanel = memo(function TranscriptPanel({
   mode,
   practiceCount,
   navigate,
+  recommendedSegmentIds,
+  onClearRecommendations,
 }: TranscriptProps) {
   const [search, setSearch] = useState('');
   const [onlyFavorites, setOnlyFavorites] = useState(false);
@@ -38,9 +42,10 @@ export const TranscriptPanel = memo(function TranscriptPanel({
       .filter(
         (item) =>
           (!onlyFavorites || savedIds.has(item.segment.id)) &&
+          (!recommendedSegmentIds || recommendedSegmentIds.has(item.segment.id)) &&
           (!search || item.segment.japanese.includes(phrase)),
       );
-  }, [lesson.segments, onlyFavorites, savedIds, search]);
+  }, [lesson.segments, onlyFavorites, savedIds, search, recommendedSegmentIds]);
   useEffect(() => {
     const row = activeRow.current;
     const container = transcript.current;
@@ -89,6 +94,14 @@ export const TranscriptPanel = memo(function TranscriptPanel({
           <Bookmark size={16} fill={onlyFavorites ? 'currentColor' : 'none'} />
         </button>
       </div>
+      {recommendedSegmentIds ? (
+        <div className="transcript-recommendations small">
+          <span>Good lines to learn · {recommendedSegmentIds.size} suitable sections</span>
+          <button className="text-button" onClick={onClearRecommendations}>
+            Show full transcript
+          </button>
+        </div>
+      ) : null}
       <div
         className="transcript-scroll"
         ref={transcript}
@@ -123,7 +136,7 @@ export const TranscriptPanel = memo(function TranscriptPanel({
                   ) : null}
                 </span>
                 <span lang="ja">
-                  <JapaneseText text={item.segment.japanese} furigana={furigana} />
+                  <JapaneseText text={item.segment.japanese} furigana={furigana} highlightWords />
                 </span>
               </span>
               {item.index === index ? <span className="active-dot" /> : null}
@@ -132,9 +145,11 @@ export const TranscriptPanel = memo(function TranscriptPanel({
         </div>
         {!filtered.length ? (
           <p className="transcript-empty">
-            {onlyFavorites
-              ? 'Save a section with the bookmark beside its translation button.'
-              : 'No phrases found. Try a shorter Japanese phrase.'}
+            {recommendedSegmentIds
+              ? 'No recommended lines match these filters. Clear search or show the full transcript.'
+              : onlyFavorites
+                ? 'Save a section with the bookmark beside its translation button.'
+                : 'No phrases found. Try a shorter Japanese phrase.'}
           </p>
         ) : null}
       </div>
