@@ -25,6 +25,9 @@ export function Header({ onHelp, player = false }: { onHelp: () => void; player?
           <Link className="nav-link" href="/progress">
             Progress
           </Link>
+          <Link className="nav-link" href="/dictionary">
+            Dictionary
+          </Link>
           <button className="nav-link" onClick={onHelp}>
             {player ? (
               <>
