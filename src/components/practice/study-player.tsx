@@ -35,6 +35,7 @@ import { VoiceRecorder } from '../voice-recorder';
 import { ComprehensionQuiz } from '../comprehension-quiz';
 import { LessonDifficulty } from '../lesson-difficulty';
 import { ShadowingCompletion } from '../shadowing-completion';
+import { TopicVocabularyOverview } from '../topic-vocabulary-overview';
 import { transcriptRevision } from '@/lib/transcript';
 import {
   aggregateShadowingScores,
@@ -82,6 +83,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
   const [favorites, setFavorites] = useState<string[]>(() => loadFavorites(lesson));
 
   const [finished, setFinished] = useState(false);
+  const [topicOverviewOpen, setTopicOverviewOpen] = useState(false);
   const [completed, setCompleted] = useState(() => lessonCompleted(session.lesson));
   const [quizOpen, setQuizOpen] = useState(false);
   const [difficultyWaiting, setDifficultyWaiting] = useState(false);
@@ -299,6 +301,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
       media.current?.pause();
       setStatus('complete');
       setFinished(true);
+      setTopicOverviewOpen(true);
       setCompleted(true);
       completeLesson(lesson);
       recordCompletion();
@@ -414,6 +417,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
     setElapsed(duration);
     if (mode === 'continuous') {
       setFinished(true);
+      setTopicOverviewOpen(true);
       setCompleted(true);
       completeLesson(lesson);
       recordCompletion();
@@ -741,6 +745,9 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
               loading={summaryLoading}
             />
           ) : null}
+          {topicOverviewOpen ? (
+            <TopicVocabularyOverview lesson={lesson} onReview={(segmentIndex) => navigate(segmentIndex)} />
+          ) : null}
           {finished ? (
             <div className="completion-card" role="status">
               <span>
@@ -750,7 +757,13 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
                 <strong>You made a little progress today.</strong>
                 <p>Every repetition helps the rhythm feel more familiar.</p>
               </div>
-              <button className="text-button" onClick={() => navigate(0, false)}>
+              <button
+                className="text-button"
+                onClick={() => {
+                  setTopicOverviewOpen(false);
+                  navigate(0, false);
+                }}
+              >
                 Practice again
                 <RotateCcw size={14} />
               </button>

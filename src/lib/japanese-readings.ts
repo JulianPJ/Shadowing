@@ -1,6 +1,18 @@
 // Derived display data only. Never attach readings to a Lesson or Segment.
 export type JapaneseReadingToken = Readonly<{ text: string; reading?: string }>;
-export type MorphologicalToken = { surface_form: string; reading?: string; word_type?: string };
+export type MorphologicalToken = {
+  surface_form: string;
+  reading?: string;
+  word_type?: string;
+  basic_form?: string;
+  pos?: string;
+  pos_detail_1?: string;
+  pos_detail_2?: string;
+  pos_detail_3?: string;
+  conjugated_type?: string;
+  conjugated_form?: string;
+  pronunciation?: string;
+};
 export const FURIGANA_GENERATOR_VERSION = 'kuromoji-0.1.2-ipadic-v1';
 export const hasKanji = (text: string) => /[\p{Script=Han}々〆]/u.test(text);
 export function hiragana(text: string): string {
