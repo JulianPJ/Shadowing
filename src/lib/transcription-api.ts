@@ -51,11 +51,7 @@ export async function handleTranscriptionRequest(
   if (!bytes.byteLength) return noStoreJson({ error: 'Choose an audio or video file first.' }, 400);
 
   const controller = new AbortController();
-  const signal = AbortSignal.any([
-    request.signal,
-    controller.signal,
-    AbortSignal.timeout(120000),
-  ]);
+  const signal = AbortSignal.any([request.signal, controller.signal, AbortSignal.timeout(120000)]);
   try {
     const result = await provider.transcribe(bytes, signal);
     return noStoreJson({

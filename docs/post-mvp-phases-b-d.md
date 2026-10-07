@@ -40,3 +40,18 @@ Detailed contracts live in [adaptive immersion](adaptive-immersion.md), [speakin
 Focused browser checks cover dictionary senses/deinflection and saving, state changes and bulk actions, cross-video persistence and highlighting, coverage and recommended-line filters, explicit account import/decline/isolation, repeat/reveal/timed/hands-free drill behaviour, microphone denial and interruption, score diagnostics and persistent trends, library queue/completion, trusted recommendation inputs, report/goal persistence and mobile width.
 
 Run the full unit suite, typecheck, lint and formatting checks; build both Next and vinext; run Playwright against both production builds. The local native D1 migration check and built Worker/D1 integration test verify the new ownership and runtime paths without calling live AI or caption providers. Browser fixtures use real local JMdict/Kuromoji assets and deterministic provider responses. Semantic recognizer quality, real-provider availability and fit thresholds remain subjects for product iteration.
+
+### Verified 7 October 2026
+
+The final implementation was checked with Node 24.21.0 and desktop Chrome, including mobile and tablet viewports.
+
+| Check | Result |
+| --- | --- |
+| `npm test` | 238 passed, zero skipped |
+| `npm run typecheck`, `npm run lint`, `npm run format:check` | Passed |
+| Next production build and full browser suite | Build passed; 92/92 browser tests passed |
+| vinext production build and full browser suite in isolated local workerd | Build passed; 92/92 browser tests passed |
+| Native D1 migration ledger and ownership | All nine migrations applied; foreign-key check empty |
+| Built Worker/D1 integration | Free knowledge persistence, ownership/origin guards, public/private discovery, existing sync and shared caches passed |
+
+Speaking checks exercise real browser MediaRecorder with microphone fixtures. Account-switch tests delay response JSON and transcript hashing to verify outbox and consent isolation. Exact dictionary meanings flow through saving and Daily Review. Source links reject replacement transcripts. The replay test driver waits for controller-produced progress before advancing media time, preserving the player's existing seek acknowledgement and timing contract; the repeat/Support check also passed five consecutive runs on each runtime. Practice, library and report mobile screenshots were inspected. CI repeats both production browser suites and now enforces formatting.

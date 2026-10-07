@@ -7,6 +7,23 @@ async function openDemo(page: Page) {
   await expect(page.getByRole('button', { name: 'Listen', exact: true })).toBeEnabled();
 }
 async function reachBoundary(page: Page, index = 0) {
+  await expect(page.getByTestId('current-japanese')).toHaveText(demo.segments[index].japanese);
+  // A source replay first seeks to its authored start. Wait for a positive progress update from
+  // the boundary poll before the test jumps time: otherwise that jump can overtake the seek
+  // acknowledgement and deliberately remain behind the player's four-second seek guard.
+  await expect
+    .poll(
+      () =>
+        page.locator('video').evaluate((video: HTMLVideoElement) => {
+          const progress = document.querySelector<HTMLElement>('.section-track > span');
+          const percent = Number.parseFloat(progress?.style.width ?? '0');
+          return !video.paused && !video.seeking && percent > 0 && percent < 25;
+        }),
+      {
+        message: 'Source playback and authored-section boundary polling have settled after seeking',
+      },
+    )
+    .toBe(true);
   await page.locator('video').evaluate((video: HTMLVideoElement, end: number) => {
     video.currentTime = end - 0.03;
   }, demo.segments[index].end);
@@ -34,6 +51,69 @@ test('keyboard word lookup opens help without advancing or starting source playb
     page.getByRole('complementary', { name: 'Save vocabulary', exact: true }),
   ).toBeVisible();
   await expect(page.getByTestId('playback-state')).toContainText('READY WHEN YOU ARE');
+});
+
+test('cancelling the recorder permission prompt releases the pending hands-free start and ignores a late permission result', async ({
+  page,
+  context,
+}) => {
+  await context.grantPermissions(['microphone']);
+  await page.addInitScript(() => {
+    const original = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+    let release = () => {};
+    let stopped = 0;
+    navigator.mediaDevices.getUserMedia = () =>
+      new Promise<MediaStream>((resolve) => {
+        release = () =>
+          resolve({ getTracks: () => [{ stop: () => stopped++ }] } as unknown as MediaStream);
+      });
+    const state = globalThis as typeof globalThis & {
+      pendingMicrophone: { release: () => void; stopped: () => number; restore: () => void };
+    };
+    state.pendingMicrophone = {
+      release: () => release(),
+      stopped: () => stopped,
+      restore: () => {
+        navigator.mediaDevices.getUserMedia = original;
+      },
+    };
+  });
+  await openDemo(page);
+  await page.getByLabel('Practice preset', { exact: true }).selectOption('drill');
+  await page.getByRole('button', { name: 'Start hands-free drill' }).click();
+  await expect(
+    page.getByRole('button', { name: 'Cancel microphone request', exact: true }),
+  ).toHaveCount(2);
+  await page
+    .locator('.recording-panel')
+    .getByRole('button', { name: 'Cancel microphone request', exact: true })
+    .click();
+  await expect(page.getByRole('button', { name: 'Start hands-free drill' })).toBeEnabled();
+  await expect(page.getByLabel('Practice preset', { exact: true })).toBeEnabled();
+  await page.evaluate(() =>
+    (
+      globalThis as typeof globalThis & { pendingMicrophone: { release: () => void } }
+    ).pendingMicrophone.release(),
+  );
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        (
+          globalThis as typeof globalThis & { pendingMicrophone: { stopped: () => number } }
+        ).pendingMicrophone.stopped(),
+      ),
+    )
+    .toBe(1);
+  await expect(page.getByTestId('playback-state')).toContainText('READY WHEN YOU ARE');
+  expect(await page.locator('video').evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
+  await page.evaluate(() =>
+    (
+      globalThis as typeof globalThis & { pendingMicrophone: { restore: () => void } }
+    ).pendingMicrophone.restore(),
+  );
+  await page.getByRole('button', { name: 'Start hands-free drill' }).click();
+  await expect(page.getByTestId('playback-state')).toContainText('LISTEN CLOSELY');
+  await page.getByRole('button', { name: 'Stop hands-free drill' }).click();
 });
 
 test('Drill plays the selected section twice then pauses; Support reveals help only after a pause', async ({

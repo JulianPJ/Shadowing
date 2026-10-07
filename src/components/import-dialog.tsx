@@ -267,7 +267,9 @@ export function ImportDialog({
 
         <div className="field-label">
           Subtitles
-          <span className="small muted">Choose one option. Hibiki will never auto-generate without your selection.</span>
+          <span className="small muted">
+            Choose one option. Hibiki will never auto-generate without your selection.
+          </span>
         </div>
         <div className="segmented-control import-tabs subtitle-methods">
           <button

@@ -174,8 +174,8 @@ function DifficultyCard({
             <span className="small muted"> · Estimated from captions</span>
           </p>
           <p className="small muted">
-            Hibiki estimates the language demands automatically. This is an approximate guide,
-            not an official JLPT classification.
+            Hibiki estimates the language demands automatically. This is an approximate guide, not
+            an official JLPT classification.
           </p>
           <button
             className="button difficulty-toggle"

@@ -5,10 +5,7 @@ import {
   SHADOWING_SCORE_CONSTANTS,
   type ShadowingAttemptAnalysis,
 } from './shadowing-score';
-import {
-  fallbackShadowingSummary,
-  type ShadowingSummarySignals,
-} from './shadowing-session';
+import { fallbackShadowingSummary, type ShadowingSummarySignals } from './shadowing-session';
 
 export type ShadowingTranscriptionResponse = {
   recognizedText: string;
@@ -37,7 +34,9 @@ export function validateShadowingRecordingBeforeUpload(
     recordingDurationSeconds / referenceDurationSeconds <
       SHADOWING_SCORE_CONSTANTS.minimumDurationRatio
   )
-    throw new Error('That recording is too short for a reliable match. Try the full section again.');
+    throw new Error(
+      'That recording is too short for a reliable match. Try the full section again.',
+    );
 }
 
 export async function transcribeShadowingRecording(
@@ -106,7 +105,8 @@ export async function shadowingAttemptFeedback(
       signal: AbortSignal.any([signal, AbortSignal.timeout(30_000)]),
     });
     const result = await jsonResponse<{ suggestions: string[] }>(response);
-    if (!Array.isArray(result.suggestions) || !result.suggestions.length) throw new Error('No feedback');
+    if (!Array.isArray(result.suggestions) || !result.suggestions.length)
+      throw new Error('No feedback');
     return result.suggestions.slice(0, 3);
   } catch {
     if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
@@ -114,7 +114,10 @@ export async function shadowingAttemptFeedback(
   }
 }
 
-export async function shadowingSessionSummary(signals: ShadowingSummarySignals, signal: AbortSignal) {
+export async function shadowingSessionSummary(
+  signals: ShadowingSummarySignals,
+  signal: AbortSignal,
+) {
   try {
     const summarySignals: Omit<ShadowingSummarySignals, 'fingerprint'> = {
       score: signals.score,

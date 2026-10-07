@@ -29,10 +29,7 @@ test('Whisper scoring transcription is Japanese/VAD and never receives the targe
       throw new Error('unexpected model');
     },
   });
-  const result = await provider.transcribe(
-    new Uint8Array([1, 2, 3]),
-    new AbortController().signal,
-  );
+  const result = await provider.transcribe(new Uint8Array([1, 2, 3]), new AbortController().signal);
   assert.equal(result.recognizedText, '今日は天気がいいです');
   const whisperInput = seen[0];
   assert.ok(whisperInput);
@@ -75,18 +72,20 @@ test('header-only Whisper VTT is classified as no speech rather than malformed',
   });
   await assert.rejects(
     () => provider.transcribe(new Uint8Array([1, 2, 3]), new AbortController().signal),
-    (error: unknown) =>
-      error instanceof ShadowingProviderError && error.code === 'no-speech',
+    (error: unknown) => error instanceof ShadowingProviderError && error.code === 'no-speech',
   );
 });
 
 test('transcription endpoint validates origin, audio type, duration and size before inference', async () => {
   let calls = 0;
   const provider = mockProvider();
-  const wrapped = { ...provider, transcribe: async (...args: Parameters<typeof provider.transcribe>) => {
-    calls++;
-    return provider.transcribe(...args);
-  }};
+  const wrapped = {
+    ...provider,
+    transcribe: async (...args: Parameters<typeof provider.transcribe>) => {
+      calls++;
+      return provider.transcribe(...args);
+    },
+  };
   const wrongOrigin = await handleShadowingTranscriptionRequest(
     new Request('https://hibiki.example/api/shadowing/transcribe', {
       method: 'POST',

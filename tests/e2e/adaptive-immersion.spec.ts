@@ -63,7 +63,7 @@ async function seed(page: Page) {
       localStorage.setItem(
         'hibiki:v1:knowledge:records',
         JSON.stringify(
-          ['魚', '食べる', '家', '寝る'].map((lemma) => ({
+          ['魚', '食べる', '家', '寝る', 'が'].map((lemma) => ({
             lemma,
             reading: null,
             state: 'known',
@@ -100,6 +100,7 @@ test('full Japanese lexicon loads real readings, senses and deinflection without
   await expect(lookup).toContainText('Ichidan verb');
   await expect(lookup).toContainText('CC BY-SA 4.0');
   await lookup.getByRole('button', { name: 'Known', exact: true }).click();
+  await page.getByLabel('Find Japanese words').fill('');
   await expect(page.getByLabel('State of 食べる')).toHaveValue('known');
   await page.reload();
   await expect(page.getByLabel('State of 食べる')).toHaveValue('known');
@@ -123,6 +124,18 @@ test('word states highlight across lessons and update coverage, bulk status and 
     'data-word-state',
     'known',
   );
+  await expect(page.locator('#current-japanese [data-lemma="が"]')).toHaveAttribute(
+    'data-word-state',
+    'known',
+  );
+  await expect(
+    page.locator('.transcript-row').first().locator('[data-lemma="が"]'),
+  ).toHaveAttribute('data-word-state', 'known');
+  await expect(page.locator('#current-japanese [data-lemma="を"]')).not.toHaveAttribute(
+    'data-word-state',
+    /.+/,
+  );
+  await expect(coverage).toContainText('6 of 9 content-word occurrences');
   await expect(
     page.locator('.transcript-row').first().locator('[data-lemma="食べる"]'),
   ).toHaveAttribute('data-word-state', 'known');
@@ -131,8 +144,6 @@ test('word states highlight across lessons and update coverage, bulk status and 
   await coverage.getByRole('button', { name: 'High-value lines' }).click();
   await expect(coverage).toContainText('Recurring Unknown word: 猫');
   await expect(page.locator('.transcript-row')).toHaveCount(2);
-  await page.getByRole('button', { name: 'Show full transcript' }).click();
-  await expect(page.locator('.transcript-row')).toHaveCount(3);
   await page.locator('#current-japanese [data-lemma="猫"]').click();
   const panel = page.getByRole('complementary', { name: 'Save vocabulary' });
   await expect(panel).toContainText('cat');
@@ -141,6 +152,9 @@ test('word states highlight across lessons and update coverage, bulk status and 
     'data-word-state',
     'learning',
   );
+  await expect(page.locator('.transcript-row')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Show full transcript' }).click();
+  await expect(page.locator('.transcript-row')).toHaveCount(3);
   await page.goto('/practice/adaptive-two');
   await expect(page.locator('#current-japanese [data-lemma="猫"]')).toHaveAttribute(
     'data-word-state',
@@ -161,15 +175,36 @@ test('word states highlight across lessons and update coverage, bulk status and 
   );
 });
 
+test('Word Browser source links reject a replacement transcript revision', async ({ page }) => {
+  await seed(page);
+  await page.goto('/words');
+  await page.getByRole('button', { name: 'Browse words from recent lessons' }).click();
+  const row = page
+    .getByRole('row')
+    .filter({ has: page.getByRole('checkbox', { name: 'Select 猫', exact: true }) });
+  const href = await row.getByRole('link', { name: 'Open section' }).getAttribute('href');
+  expect(href).toMatch(/^\/practice\/adaptive-one\?section=cat-eats&transcript=[a-f0-9]{64}$/);
+  await page.evaluate(() => {
+    const replacement = JSON.parse(localStorage.getItem('hibiki:v1:lesson:adaptive-one')!);
+    replacement.segments[0].japanese = '猫は犬と走る。';
+    localStorage.setItem('hibiki:v1:lesson:adaptive-one', JSON.stringify(replacement));
+  });
+  await page.goto(href!);
+  await expect(
+    page.getByRole('heading', { name: 'This saved context has changed.' }),
+  ).toBeVisible();
+  await expect(page.locator('video')).toHaveCount(0);
+});
+
 test('Free account knowledge survives offline edits and replays its durable outbox', async ({
   page,
   context,
 }) => {
-  const { user } = await connect(context, 'free');
+  await connect(context, 'free');
   let offline = true;
   const remote = new Map<string, WordKnowledgeRecord>();
   await context.route('**/api/knowledge*', (route) => {
-    expect(route.request().headers()['x-hibiki-account']).toBe(user.id);
+    expect(route.request().headers()['x-hibiki-account']).toBe('retention-free');
     if (offline) return route.fulfill({ status: 503, json: { error: 'offline' } });
     if (route.request().method() === 'POST') {
       for (const record of route.request().postDataJSON().records) remote.set(record.lemma, record);

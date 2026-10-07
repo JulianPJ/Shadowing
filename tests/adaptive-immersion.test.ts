@@ -171,6 +171,33 @@ test('coverage counts explicit lexical knowledge, excludes function words and wi
   assert.equal(ignored.knownPercent, 100);
   assert.equal(ignored.ignoredTokens, 2);
   assert.equal(ignored.sections[0].oneUnknown, false);
+  const overlapping = analyzeVocabulary(
+    [segments[0], { ...segments[1], start: 3, end: 7 }],
+    tokens,
+    mergeKnowledge([record('食べる', 'known'), record('寝る', 'known')]),
+  );
+  assert.equal(overlapping.knownPercent, 50);
+  assert.equal(overlapping.totalTokens, 4);
+  assert.ok(overlapping.sections.every((section) => !section.oneUnknown && !section.highValue));
+  const adjacent = analyzeVocabulary(
+    [segments[0], { ...segments[1], start: 4, end: 8 }],
+    tokens,
+    mergeKnowledge([record('食べる', 'known'), record('寝る', 'known')]),
+  );
+  assert.equal(adjacent.knownPercent, 50);
+  assert.ok(adjacent.sections.every((section) => section.oneUnknown));
+  const invalidNeighbour = analyzeVocabulary(
+    [segments[0], { ...segments[1], start: Number.NaN }],
+    tokens,
+    mergeKnowledge([record('食べる', 'known'), record('寝る', 'known')]),
+  );
+  assert.equal(invalidNeighbour.sections[0].oneUnknown, true);
+  const zeroNeighbour = analyzeVocabulary(
+    [segments[0], { ...segments[1], start: 2, end: 2 }],
+    tokens,
+    mergeKnowledge([record('食べる', 'known'), record('寝る', 'known')]),
+  );
+  assert.equal(zeroNeighbour.sections[0].oneUnknown, true);
   const bad = analyzeVocabulary(segments, { ...tokens, b: [token('猫')] }, {});
   assert.equal(bad.complete, false);
   assert.equal(bad.analyzedSegments, 1);

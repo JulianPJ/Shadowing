@@ -22,6 +22,7 @@ export type VocabularySection = {
   oneUnknown: boolean;
   highValue: boolean;
   reason: string;
+  highValueReason: string;
 };
 export type VocabularyAnalysis = {
   knownTokens: number;
@@ -44,6 +45,26 @@ export function analyzeVocabulary(
 ): VocabularyAnalysis {
   const occurrences = new Map<string, number>();
   const tracked = new Set<string>();
+  // Coverage can use overlapping captions, but a recommended standalone replay line cannot.
+  const timed = [...segments]
+    .filter(
+      (segment) =>
+        Number.isFinite(segment.start) &&
+        Number.isFinite(segment.end) &&
+        segment.start >= 0 &&
+        segment.end > segment.start,
+    )
+    .sort((a, b) => a.start - b.start || a.end - b.end);
+  const reliableWindows = new Set<string>();
+  let precedingEnd = -Infinity;
+  timed.forEach((segment, index) => {
+    if (
+      segment.start >= precedingEnd &&
+      (!timed[index + 1] || segment.end <= timed[index + 1].start)
+    )
+      reliableWindows.add(segment.id);
+    precedingEnd = Math.max(precedingEnd, segment.end);
+  });
   const analyzed = segments.filter(
     (segment) =>
       tokensBySegment[segment.id]?.map((token) => token.surface_form).join('') === segment.japanese,
@@ -73,6 +94,7 @@ export function analyzeVocabulary(
     }
     const total = known + learning + unknown;
     const clean =
+      reliableWindows.has(segment.id) &&
       !segment.estimated &&
       Number.isFinite(segment.start) &&
       Number.isFinite(segment.end) &&
@@ -103,6 +125,9 @@ export function analyzeVocabulary(
         : highValue
           ? `Recurring Unknown word${recurrent.length > 1 ? 's' : ''}: ${recurrent.join('、')}`
           : '',
+      highValueReason: highValue
+        ? `Recurring Unknown word${recurrent.length > 1 ? 's' : ''}: ${recurrent.join('、')}`
+        : '',
     };
   });
   const sum = (key: 'known' | 'learning' | 'unknown' | 'ignored' | 'total') =>

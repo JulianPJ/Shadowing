@@ -48,9 +48,7 @@ scope.onmessage = async ({ data: { id, text, kind = 'readings' } }) => {
       id,
       kind,
       tokens:
-        kind === 'morphology'
-          ? analyzed.map(safeMorphology)
-          : annotateJapanese(text, analyzed),
+        kind === 'morphology' ? analyzed.map(safeMorphology) : annotateJapanese(text, analyzed),
     });
   } catch {
     scope.postMessage({ id, kind, error: true });

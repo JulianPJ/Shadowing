@@ -45,7 +45,9 @@ The recent-score sequence is available even after the latest full analysis has l
 
 - `tests/shadowing-score.test.ts` retains score/calibration, aggregation and failure behavior checks.
 - `tests/speaking-drills.test.ts` covers preset defaults and malformed settings, exact chunk grouping without alignment mutation, eight-point retention, tab loss, revision/account isolation, same-speed comparisons, malformed persisted evidence and revision/byte bounds.
-- `tests/e2e/speaking-drills.spec.ts` exercises real media boundaries and real MediaRecorder with browser microphone fixtures: repeat twice, Support reveal timing, timed continuation and stop/navigation cancellation, opt-in hands-free recording and interruption, recognized omissions/pacing with persistent history, microphone denial and final boundary deduplication.
+- `tests/e2e/speaking-drills.spec.ts` exercises real media boundaries and real MediaRecorder with browser microphone fixtures: repeat twice, Support reveal timing, timed continuation and stop/navigation cancellation, opt-in hands-free recording and interruption, cancelled pending permission with late track release, recognized omissions/pacing with persistent history, microphone denial, keyboard lookup shortcut isolation and final boundary deduplication.
 - Existing `tests/e2e/shadowing.spec.ts` continues to exercise the original player, recording, explicit scoring, completion and local media path.
 
 Browser transcription and feedback use deterministic fixtures; these tests verify the complete browser flow and request boundary without claiming live speech-recognizer quality. Provider calibration remains separate validation work.
+
+Boundary tests wait for an early controller-produced section-progress update after replay seeking before advancing the media clock. This confirms that the boundary poll has acknowledged the authored start; a forced clock jump made before that acknowledgement would correctly remain behind the player's existing seek guard and would test a different playback operation.

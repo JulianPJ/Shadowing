@@ -207,9 +207,7 @@ test('entitlements default Free, expose Pro from D1, and guard paid server route
   assert.equal(await access.plan(userB), 'free');
 
   await db
-    .prepare(
-      'INSERT INTO user_access (user_id,plan,source,updated_at) VALUES (?,?,?,?)',
-    )
+    .prepare('INSERT INTO user_access (user_id,plan,source,updated_at) VALUES (?,?,?,?)')
     .bind(userA, 'pro', 'test', new Date().toISOString())
     .run();
 
@@ -220,7 +218,10 @@ test('entitlements default Free, expose Pro from D1, and guard paid server route
   assert.equal(freeMe.user.plan, 'free');
 
   assert.equal(await requirePro(request('/api/quiz'), auth, access).then((r) => r?.status), 401);
-  assert.equal(await requirePro(request('/api/quiz', undefined, cookieB), auth, access).then((r) => r?.status), 403);
+  assert.equal(
+    await requirePro(request('/api/quiz', undefined, cookieB), auth, access).then((r) => r?.status),
+    403,
+  );
   assert.equal(await requirePro(request('/api/quiz', undefined, cookieA), auth, access), null);
 });
 
