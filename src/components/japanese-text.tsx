@@ -78,11 +78,13 @@ export const JapaneseText = memo(function JapaneseText({
   furigana = false,
   onLookup,
   highlightWords = false,
+  analysisPriority = 'interactive',
 }: {
   text: string;
   furigana?: boolean;
   onLookup?: (text: string) => void;
   highlightWords?: boolean;
+  analysisPriority?: 'interactive' | 'background';
 }) {
   const [annotation, setAnnotation] = useState<{
     text: string;
@@ -105,8 +107,11 @@ export const JapaneseText = memo(function JapaneseText({
   useEffect(() => {
     if (!furigana || !hasKanji(text)) return;
     let active = true;
+    const controller = new AbortController();
     void import('@/lib/furigana-client')
-      .then((client) => client.japaneseReadings(text))
+      .then((client) =>
+        client.japaneseReadings(text, { priority: analysisPriority, signal: controller.signal }),
+      )
       .then((tokens) => {
         if (active) {
           setAnnotation({ text, tokens });
@@ -118,14 +123,18 @@ export const JapaneseText = memo(function JapaneseText({
       });
     return () => {
       active = false;
+      controller.abort();
     };
-  }, [text, furigana]);
+  }, [text, furigana, analysisPriority]);
 
   useEffect(() => {
     if (!highlighting) return;
     let active = true;
+    const controller = new AbortController();
     void import('@/lib/furigana-client')
-      .then((client) => client.japaneseMorphology(text))
+      .then((client) =>
+        client.japaneseMorphology(text, { priority: analysisPriority, signal: controller.signal }),
+      )
       .then((tokens) => {
         if (active && tokens.map((token) => token.surface_form).join('') === text)
           setMorphology({ text, tokens });
@@ -135,8 +144,9 @@ export const JapaneseText = memo(function JapaneseText({
       });
     return () => {
       active = false;
+      controller.abort();
     };
-  }, [text, highlighting]);
+  }, [text, highlighting, analysisPriority]);
 
   if (!furigana && !onLookup && (!highlighting || morphology?.text !== text)) return text;
 

@@ -22,6 +22,9 @@ const options = convertV4MiniflareOptions({
       compatibilityDate: '2026-10-03',
       compatibilityFlags: ['nodejs_compat', 'global_fetch_strictly_public'],
       d1Databases: { HIBIKI_DB: 'runtime-test' },
+      ratelimits: {
+        SHADOWING_AI_RATE_LIMIT: { namespace_id: '19001', simple: { limit: 6, period: 60 } },
+      },
       serviceBindings: { AI: 'ai-mock' },
       bindings: {
         AUTH_BASE_URL: 'https://example.com',
@@ -57,10 +60,14 @@ const options = convertV4MiniflareOptions({
       modules: true,
       compatibilityDate: '2026-10-03',
       script: `import { WorkerEntrypoint } from 'cloudflare:workers';
-      let calls = {quiz:0,difficulty:0};
+      let calls = {quiz:0,difficulty:0,transcription:0};
       export default class extends WorkerEntrypoint {
         async fetch() { return Response.json(calls); }
         async run(model,input) {
+          if (model.includes('whisper')) {
+            calls.transcription++;
+            return {text:'日本語です。',vtt:'WEBVTT\\n\\n00:00:00.000 --> 00:00:01.000\\n日本語です。'};
+          }
           if (model.includes('qwen')) {
             if (++calls.quiz > 1) throw new Error('Quiz inference must be bypassed');
             const content=input.messages.find(m=>m.role==='user').content;
@@ -208,6 +215,42 @@ try {
     headers: { Cookie: cookie },
   });
   assert.equal((await upgraded.json()).user.plan, 'pro');
+
+  // Bounded browser-prepared audio follows the same Pro gate and existing rate binding.
+  const audio = new Uint8Array(44 + 32000);
+  const audioView = new DataView(audio.buffer);
+  for (const [offset, value] of [
+    [0, 'RIFF'],
+    [8, 'WAVE'],
+    [12, 'fmt '],
+    [36, 'data'],
+  ])
+    [...value].forEach((character, index) => (audio[offset + index] = character.charCodeAt(0)));
+  audioView.setUint32(4, audio.length - 8, true);
+  audioView.setUint32(16, 16, true);
+  audioView.setUint16(20, 1, true);
+  audioView.setUint16(22, 1, true);
+  audioView.setUint32(24, 16000, true);
+  audioView.setUint32(28, 32000, true);
+  audioView.setUint16(32, 2, true);
+  audioView.setUint16(34, 16, true);
+  audioView.setUint32(40, 32000, true);
+  for (let attempt = 0; attempt < 7; attempt++) {
+    const response = await mf.dispatchFetch('https://example.com/api/transcribe', {
+      method: 'POST',
+      headers: {
+        Cookie: cookie,
+        Origin: 'https://example.com',
+        'Content-Type': 'audio/wav',
+        'X-Hibiki-Audio-Chunk': '1',
+        'cf-connecting-ip': '192.0.2.20',
+      },
+      body: audio,
+    });
+    assert.equal(response.status, attempt < 6 ? 200 : 429);
+    if (attempt < 6) assert.equal((await response.json()).cues[0].text, '日本語です。');
+    else assert.equal(response.headers.get('Retry-After'), '60');
+  }
 
   const sync = {
     preferences: {
@@ -450,6 +493,7 @@ try {
   assert.deepEqual(await (await ai.fetch('https://example.com/counts')).json(), {
     quiz: 1,
     difficulty: 1,
+    transcription: 6,
   });
   assert.equal((await db.prepare('SELECT COUNT(*) AS n FROM linked_transcripts').first()).n, 1);
   assert.equal((await db.prepare('SELECT COUNT(*) AS n FROM generated_artifacts').first()).n, 2);

@@ -5,7 +5,7 @@ import type { Lesson, LinkedMediaSource, MediaSource, ResolvedMedia } from './ty
 export const MEDIA_EXTENSIONS = /\.(mp4|m4v|webm|mov|mp3|m4a|aac|wav|ogg|oga|ogv|flac)$/i;
 export const MEDIA_ACCEPT =
   'video/*,audio/*,.mp4,.m4v,.webm,.mov,.mp3,.m4a,.aac,.wav,.ogg,.oga,.ogv,.flac';
-export const MEDIA_LIMIT = 250 * 1024 * 1024;
+export const MEDIA_LIMIT = 1024 * 1024 * 1024;
 export const UNSUPPORTED_MEDIA =
   'This page does not expose a supported player or an accessible direct media link. Paste a YouTube, Vimeo, or direct audio/video link, or import your own media.';
 export class UnsupportedMediaError extends Error {}
@@ -94,7 +94,7 @@ export async function resolveMediaUrl(input: string): Promise<ResolvedMedia> {
   throw new UnsupportedMediaError(UNSUPPORTED_MEDIA);
 }
 export function validateMediaFile(file: Pick<File, 'size' | 'name' | 'type'>) {
-  if (file.size > MEDIA_LIMIT) throw new Error('Please use media smaller than 250 MB.');
+  if (file.size > MEDIA_LIMIT) throw new Error('Please use media smaller than 1 GB.');
   if (
     file.type &&
     file.type !== 'application/octet-stream' &&

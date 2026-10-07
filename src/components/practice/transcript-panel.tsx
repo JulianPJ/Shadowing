@@ -136,7 +136,12 @@ export const TranscriptPanel = memo(function TranscriptPanel({
                   ) : null}
                 </span>
                 <span lang="ja">
-                  <JapaneseText text={item.segment.japanese} furigana={furigana} highlightWords />
+                  <JapaneseText
+                    text={item.segment.japanese}
+                    furigana={furigana}
+                    highlightWords
+                    analysisPriority="background"
+                  />
                 </span>
               </span>
               {item.index === index ? <span className="active-dot" /> : null}

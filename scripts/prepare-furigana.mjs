@@ -20,6 +20,26 @@ await build({
   platform: 'browser',
   target: 'es2022',
 });
+// Lazy browser-only media processing shares the existing asset preparation hook.
+// No codec runtime is imported by the application server or deployed Worker.
+await build({
+  entryPoints: {
+    'media-audio-worker': 'src/lib/media-audio/worker.ts',
+    'audio-diagnostics-worker': 'src/lib/audio-diagnostics-worker.ts',
+  },
+  outdir: target,
+  entryNames: '[name]',
+  bundle: true,
+  minify: true,
+  platform: 'browser',
+  target: 'es2022',
+});
+const mediaSource = path.resolve(path.dirname(require.resolve('mediabunny')), '../..');
+await copyFile(path.join(mediaSource, 'LICENSE'), path.join(target, 'MEDIABUNNY-LICENSE.txt'));
+const mediaWorker = await readFile(path.join(target, 'media-audio-worker.js'));
+console.log(
+  `Optional audio worker: ${mediaWorker.length} bytes / ${gzipSync(mediaWorker).length} gzip; loaded on request.`,
+);
 const dictionaryBytes = (
   await Promise.all(
     (await readdir(path.join(target, 'dict'))).map(

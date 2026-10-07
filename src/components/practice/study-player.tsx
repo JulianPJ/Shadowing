@@ -27,6 +27,7 @@ import {
   type Preferences,
 } from '@/lib/storage';
 import { lessonMedia, sourceLabel, MEDIA_ACCEPT, validateMediaFile } from '@/lib/media';
+import { localMediaFile, localMediaUrl } from '@/lib/local-media-file';
 import { timestamp } from '@/lib/youtube';
 import { MediaPlayer, type MediaHandle } from '../media-player';
 import { VoiceRecorder, type VoiceRecorderHandle } from '../voice-recorder';
@@ -669,6 +670,29 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
     [lesson.id, segment, shadowingRevision, speed],
   );
 
+  const referenceSource = lessonMedia(lesson);
+  const accessibleReference =
+    referenceSource.type === 'demo' ||
+    (referenceSource.type === 'local' && !!localMediaFile(lesson.mediaUrl));
+  const referenceAudio = useCallback(
+    async (signal: AbortSignal) => {
+      const { extractMediaAudioRange } = await import('@/lib/transcription-client');
+      let file = localMediaFile(lesson.mediaUrl);
+      if (lessonMedia(lesson).type === 'demo') {
+        const response = await fetch('/demo.mp4', { signal });
+        if (!response.ok) throw new Error('Reference audio is unavailable.');
+        const blob = await response.blob();
+        file = new File([blob], 'demo.mp4', { type: 'video/mp4' });
+      }
+      if (!file) throw new Error('Reattach the local media to compare its audio.');
+      const start = Math.max(0, segment.start + playbackOffsetMs / 1000);
+      const end = segment.end + playbackOffsetMs / 1000;
+      const recording = await extractMediaAudioRange(file, start, end, signal);
+      return { recording, durationSeconds: end - start, playbackSpeed: speed };
+    },
+    [lesson, segment.start, segment.end, playbackOffsetMs, speed],
+  );
+
   function reattach(file: File | undefined) {
     if (!file) return;
     try {
@@ -677,7 +701,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
       setPlaybackError((error as Error).message);
       return;
     }
-    const mediaUrl = URL.createObjectURL(file);
+    const mediaUrl = localMediaUrl(file);
     setLesson((current) => ({ ...current, mediaUrl }));
     setReady(false);
   }
@@ -1042,6 +1066,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
               onNewRecording={() => setScoringError('')}
               recentAttempts={shadowingScores.recentAttempts?.[segment.id]}
               onManualStop={stopAutomation}
+              referenceAudio={accessibleReference ? referenceAudio : undefined}
             />
           </div>
           <LessonVocabulary

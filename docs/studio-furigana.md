@@ -27,7 +27,7 @@ Pinned development dependency **`kuromoji@0.1.2`** provides its published browse
 
 `npm run furigana:prepare` reproducibly copies assets/licenses and compiles the worker into ignored `public/furigana/v1/`. It runs automatically before the standard Next.js and vinext dev/build scripts. Use the npm scripts when starting/building; invoking `next`/`vite` directly on a clean checkout needs asset preparation first. Next and vinext package the same static files; no files are manually maintained in the generated directory.
 
-Measured asset costs:
+Original Furigana release asset costs (client/worker sizes predate the shared-analysis scheduler):
 
 | Asset | Bytes |
 | --- | ---: |
@@ -39,7 +39,11 @@ Measured asset costs:
 
 The dictionary is deliberately **optional and lazy**. Its size is justified by broad morphological coverage on arbitrary imported transcripts instead of a demo-only word list. It is excluded from the initial JavaScript and server Worker bundle. The reading-client chunk is measured separately in build output. Enabling Furigana has a substantial one-time dictionary download and memory cost, especially on low-memory phones; playback stays on the main thread while initialization and tokenization run in the worker.
 
-Promises are cached by exact canonical Japanese string, sharing requests across current section, rows and quiz evidence. The cache is bounded to 2,000 entries. Disabled rendering starts no worker or asset fetch. Component cleanup ignores stale results, failures fall back to plain Japanese, and requests have a bounded timeout. Readings remain in memory and are never stored in D1 or browser lesson records.
+`analyzeJapanese()` supplies one exact-source morphology result to both public facades, `japaneseReadings()` and `japaneseMorphology()`. Furigana derives its display tokens from that result; topic vocabulary, word coverage, dictionary lookup and Shadowing normalization reuse the same canonical tokenization. Cache identity includes the existing engine/dictionary version. Completed results use LRU eviction with limits of 2,000 entries and 250,000 source UTF-16 units; requests in flight are deduplicated separately and failures are evicted.
+
+`analyzeJapaneseBatch()` retains section IDs and tokenizes each section independently. It sends at most eight sections and 4,096 source UTF-16 units per worker message, yielding between windows; a single longer sentence stays intact in its own message. Only one batch runs at a time, and interactive work takes priority over queued background batches. Abort signals remove unneeded queued work and stop later windows without cancelling another consumer of a shared request. An already-running synchronous tokenization finishes, but its cancelled consumer receives no stale result. The topic overview and active lesson-coverage hook cancel their own work when the lesson is replaced.
+
+A disabled Furigana view does not request readings; other enabled local analysis features can initialize the shared worker. Component cleanup ignores stale results, failures fall back to plain Japanese, and each active worker message has a 60-second timeout. Readings and morphology remain in memory and are never stored in D1 or browser lesson records. Kuromoji/IPADIC remains the shipped engine: the investigated Lindera replacement has not met output-parity and browser-performance gates, so no new WASM engine or deployment toolchain is introduced.
 
 IPADIC is an older dictionary. Proper names, new terms, ambiguous homographs and unusual orthography can be unknown or receive a dictionary reading inappropriate to the context. These are dictionary/parser limitations, not AI-generated guesses. Readings are an aid rather than authoritative pronunciation feedback.
 

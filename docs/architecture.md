@@ -21,6 +21,7 @@ Hibiki runs on Cloudflare Workers via vinext. Standard Next.js is also supported
 | Descriptive tags, ownership, limits and connected edits | `src/lib/tags/`, `src/components/tag-controls.tsx` |
 | Composed completion recap and explainable revisit evidence | `src/components/lesson-completion-summary.tsx`, `src/lib/lesson-completion.ts` |
 | Licensed lexical assets, lookup and contextual lemma resolution | `scripts/prepare-lexicon.mjs`, `src/lib/lexicon/`, `src/components/lexicon-definitions.tsx` |
+| Shared Japanese morphology, Furigana views and prioritized bounded worker batches | `src/lib/japanese-analysis.ts`, `japanese-analysis-protocol.ts`, `japanese-analysis-worker.ts`, `furigana-client.ts`, `furigana-worker.ts` |
 | Local-first word knowledge, D1 ownership, vocabulary coverage and Word Browser | `src/lib/knowledge/`, `src/components/use-word-knowledge.ts`, `src/components/lesson-vocabulary.tsx`, `src/components/word-browser.tsx` |
 | Explicit presets, local recording automation and bounded Match trends | `src/lib/drill-presets.ts`, `src/lib/shadowing-session.ts`, `src/components/voice-recorder.tsx` |
 | My Library/queue, trusted public discovery and personal next lessons | `src/lib/library/`, `src/lib/discovery-api.ts`, `src/components/my-library.tsx` |

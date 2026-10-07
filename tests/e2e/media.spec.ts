@@ -135,7 +135,7 @@ test('captionless link generates subtitles from attached media while preserving 
   let transcriptions = 0;
   await page.route('**/api/transcribe', async (route) => {
     transcriptions++;
-    expect(route.request().headers()['content-type']).toContain('video/mp4');
+    expect(route.request().headers()['content-type']).toContain('audio/mp4');
     expect(route.request().postDataBuffer()?.byteLength).toBeGreaterThan(1000);
     return route.fulfill({
       contentType: 'application/json',
