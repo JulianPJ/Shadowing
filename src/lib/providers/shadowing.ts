@@ -3,11 +3,7 @@ import { parseSubtitles } from '../subtitles';
 import { shadowingPaceBand, type ShadowingAttemptAnalysis } from '../shadowing-score';
 import type { ShadowingSummarySignals } from '../shadowing-session';
 import { parseChatCompletion } from './quiz/chat';
-import {
-  runWorkersAi,
-  WORKERS_AI_GENERATIVE_MODEL,
-  type WorkersAiBindingLike,
-} from './workers-ai';
+import { runWorkersAi, WORKERS_AI_GENERATIVE_MODEL, type WorkersAiBindingLike } from './workers-ai';
 
 export const SHADOWING_WHISPER_MODEL = '@cf/openai/whisper-large-v3-turbo';
 export const SHADOWING_WHISPER_PROVIDER = 'Cloudflare Whisper large-v3-turbo';
@@ -94,7 +90,8 @@ const SUMMARY_SYSTEM = `You write a compact end-of-video Japanese shadowing summ
 Write one concise English sentence for what went well and one concise English sentence for what to keep working on. Quote Japanese fragments when useful. Be epistemically careful: recognition mismatches are not proof of a precise pronunciation defect. Use only the aggregate signals supplied. Do not mention model names, internal implementation, or unattempted sections. Return only the requested structured fields.`;
 
 function stringArray(value: unknown, max: number) {
-  if (!Array.isArray(value) || !value.length || value.length > max) throw new Error('Invalid array');
+  if (!Array.isArray(value) || !value.length || value.length > max)
+    throw new Error('Invalid array');
   const result = value.map((item) => {
     if (typeof item !== 'string' || !item.trim()) throw new Error('Invalid string');
     return item.trim().slice(0, 220);
@@ -243,7 +240,10 @@ export function createWorkersAiShadowingProvider(
           keepWorking: parsed.keepWorking.trim().slice(0, 320),
         };
       } catch {
-        throw new ShadowingProviderError('malformed', 'Summary feedback could not be read reliably.');
+        throw new ShadowingProviderError(
+          'malformed',
+          'Summary feedback could not be read reliably.',
+        );
       }
     },
   };

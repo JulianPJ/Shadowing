@@ -161,7 +161,9 @@ function dispersion(candidate: Candidate, segments: readonly Segment[]) {
   const points = candidate.occurrences.map(({ segmentIndex }) =>
     clamp((segmentMidpoint(segments[segmentIndex]) - segments[0].start) / duration),
   );
-  const buckets = new Set(points.map((point) => Math.min(bucketCount - 1, Math.floor(point * bucketCount))));
+  const buckets = new Set(
+    points.map((point) => Math.min(bucketCount - 1, Math.floor(point * bucketCount))),
+  );
   const bucketSpread = (buckets.size - 1) / Math.max(1, bucketCount - 1);
   const timelineSpan = Math.max(...points) - Math.min(...points);
   return clamp(bucketSpread * 0.6 + timelineSpan * 0.4);
@@ -198,7 +200,8 @@ export function rankTopicVocabulary(
   analyzed: readonly (readonly MorphologicalToken[])[],
   options: { threshold?: number; maxItems?: number } = {},
 ): TopicVocabularyAnalysis {
-  if (segments.length !== analyzed.length) throw new Error('Topic vocabulary tokenization mismatch.');
+  if (segments.length !== analyzed.length)
+    throw new Error('Topic vocabulary tokenization mismatch.');
   const candidates = new Map<string, Candidate>();
 
   analyzed.forEach((tokens, segmentIndex) => {
@@ -286,7 +289,11 @@ export function rankTopicVocabulary(
   const uniqueTerms = new Map<string, TopicVocabularyItem>();
   for (const item of withoutRedundantWords) {
     const existing = uniqueTerms.get(item.term);
-    if (!existing || item.score > existing.score || (item.kind === 'compound' && existing.kind === 'word'))
+    if (
+      !existing ||
+      item.score > existing.score ||
+      (item.kind === 'compound' && existing.kind === 'word')
+    )
       uniqueTerms.set(item.term, item);
   }
 

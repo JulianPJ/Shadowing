@@ -42,8 +42,7 @@ test('API failure and malformed result can be retried while playback and the com
   const analysis = await createDifficultyAnalysis(authored, demo as Lesson);
   let calls = 0;
   await page.addInitScript(
-    ({ key, revision }) =>
-      localStorage.setItem(key, JSON.stringify({ transcript: revision })),
+    ({ key, revision }) => localStorage.setItem(key, JSON.stringify({ transcript: revision })),
     { key: proStorageKey('completion:demo'), revision: transcriptRevision(demo as Lesson) },
   );
   await page.route('**/api/difficulty', (route) => {

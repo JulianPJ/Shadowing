@@ -150,8 +150,12 @@ test('captionless link generates subtitles from attached media while preserving 
   });
   await startLink(page, videoUrl);
   await expect(page.getByRole('dialog')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Upload own subtitles', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Auto-generate subtitles', exact: true })).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Upload own subtitles', exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Auto-generate subtitles', exact: true }),
+  ).toBeVisible();
   expect(transcriptions).toBe(0);
   await page.getByRole('button', { name: 'Auto-generate subtitles', exact: true }).click();
   expect(transcriptions).toBe(0);

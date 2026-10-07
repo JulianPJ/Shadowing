@@ -24,10 +24,15 @@ function sameOrigin(request: Request) {
 }
 
 function looksLikeAudio(bytes: Uint8Array<ArrayBuffer>, type: string) {
-  const ascii = (start: number, end: number) =>
-    String.fromCharCode(...bytes.slice(start, end));
+  const ascii = (start: number, end: number) => String.fromCharCode(...bytes.slice(start, end));
   if (type === 'audio/webm')
-    return bytes.length >= 4 && bytes[0] === 0x1a && bytes[1] === 0x45 && bytes[2] === 0xdf && bytes[3] === 0xa3;
+    return (
+      bytes.length >= 4 &&
+      bytes[0] === 0x1a &&
+      bytes[1] === 0x45 &&
+      bytes[2] === 0xdf &&
+      bytes[3] === 0xa3
+    );
   if (type === 'audio/ogg') return bytes.length >= 4 && ascii(0, 4) === 'OggS';
   if (type === 'audio/wav')
     return bytes.length >= 12 && ascii(0, 4) === 'RIFF' && ascii(8, 12) === 'WAVE';
@@ -40,7 +45,8 @@ function finite(value: unknown, min: number, max: number) {
 }
 
 function shortString(value: unknown, max = 5000) {
-  if (typeof value !== 'string' || !value.trim() || value.length > max) throw new Error('Invalid text');
+  if (typeof value !== 'string' || !value.trim() || value.length > max)
+    throw new Error('Invalid text');
   return value;
 }
 
@@ -102,9 +108,7 @@ function validateFeedbackInput(value: unknown): ShadowingFeedbackInput {
   };
 }
 
-function validateSummarySignals(
-  value: unknown,
-): Omit<ShadowingSummarySignals, 'fingerprint'> {
+function validateSummarySignals(value: unknown): Omit<ShadowingSummarySignals, 'fingerprint'> {
   if (!value || typeof value !== 'object') throw new Error('Invalid summary');
   const raw = value as Record<string, unknown>;
   for (const field of ['score', 'averageContentScore', 'averageTimingScore'] as const)
@@ -197,10 +201,14 @@ export async function handleShadowingTranscriptionRequest(
   request: Request,
   provider: ShadowingFeedbackProvider,
 ) {
-  if (!sameOrigin(request)) return json({ error: 'Open shadowing analysis from your lesson.' }, 403);
+  if (!sameOrigin(request))
+    return json({ error: 'Open shadowing analysis from your lesson.' }, 403);
   const type = request.headers.get('content-type')?.split(';', 1)[0].trim().toLowerCase() || '';
   if (!['audio/webm', 'audio/mp4', 'audio/ogg', 'audio/wav'].includes(type))
-    return json({ code: 'unsupported-audio', error: 'This recording format cannot be analysed.' }, 415);
+    return json(
+      { code: 'unsupported-audio', error: 'This recording format cannot be analysed.' },
+      415,
+    );
   const durationMs = Number(request.headers.get('x-hibiki-recording-duration-ms'));
   if (!Number.isFinite(durationMs) || durationMs < SHADOWING_RECORDING_MIN_MS)
     return json(
@@ -218,10 +226,14 @@ export async function handleShadowingTranscriptionRequest(
     bytes = await readBoundedBytes(request, SHADOWING_AUDIO_LIMIT);
   } catch (error) {
     if (error instanceof BodyLimitError)
-      return json({ code: 'audio-too-large', error: 'That recording is too large to analyse.' }, 413);
+      return json(
+        { code: 'audio-too-large', error: 'That recording is too large to analyse.' },
+        413,
+      );
     throw error;
   }
-  if (!bytes.byteLength) return json({ code: 'empty-audio', error: 'Record the section first.' }, 400);
+  if (!bytes.byteLength)
+    return json({ code: 'empty-audio', error: 'Record the section first.' }, 400);
   if (!looksLikeAudio(bytes, type))
     return json(
       { code: 'invalid-audio', error: 'This recording could not be read as supported audio.' },
@@ -262,12 +274,16 @@ export async function handleShadowingFeedbackRequest(
   request: Request,
   provider: ShadowingFeedbackProvider,
 ) {
-  if (!sameOrigin(request)) return json({ error: 'Open shadowing feedback from your lesson.' }, 403);
+  if (!sameOrigin(request))
+    return json({ error: 'Open shadowing feedback from your lesson.' }, 403);
   let input: ShadowingFeedbackInput;
   try {
     input = validateFeedbackInput(await readBoundedJson(request, 50_000));
   } catch {
-    return json({ code: 'invalid-analysis', error: 'The scoring result could not be validated.' }, 400);
+    return json(
+      { code: 'invalid-analysis', error: 'The scoring result could not be validated.' },
+      400,
+    );
   }
   try {
     const suggestions = await provider.feedback(
@@ -284,12 +300,16 @@ export async function handleShadowingSummaryRequest(
   request: Request,
   provider: ShadowingFeedbackProvider,
 ) {
-  if (!sameOrigin(request)) return json({ error: 'Open shadowing feedback from your lesson.' }, 403);
+  if (!sameOrigin(request))
+    return json({ error: 'Open shadowing feedback from your lesson.' }, 403);
   let input: Omit<ShadowingSummarySignals, 'fingerprint'>;
   try {
     input = validateSummarySignals(await readBoundedJson(request, 40_000));
   } catch {
-    return json({ code: 'invalid-summary', error: 'The session summary could not be validated.' }, 400);
+    return json(
+      { code: 'invalid-summary', error: 'The session summary could not be validated.' },
+      400,
+    );
   }
   try {
     return json({

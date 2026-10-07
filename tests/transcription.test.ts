@@ -25,15 +25,13 @@ test('Workers AI transcription requests Japanese Whisper and normalizes returned
       };
     },
   });
-  const result = await provider.transcribe(
-    new Uint8Array([1, 2, 3]),
-    new AbortController().signal,
-  );
+  const result = await provider.transcribe(new Uint8Array([1, 2, 3]), new AbortController().signal);
   assert.equal(called, 1);
   assert.equal(result.provider, WORKERS_AI_TRANSCRIPTION_PROVIDER);
-  assert.deepEqual(result.cues.map(({ start, end, text }) => ({ start, end, text })), [
-    { start: 0.28, end: 2.5, text: 'おはようございます。' },
-  ]);
+  assert.deepEqual(
+    result.cues.map(({ start, end, text }) => ({ start, end, text })),
+    [{ start: 0.28, end: 2.5, text: 'おはようございます。' }],
+  );
 });
 
 test('transcription API accepts bounded audio/video bytes and returns Hibiki cues', async () => {

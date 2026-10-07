@@ -9,8 +9,7 @@ export const proTestUser: AccountUser = {
   plan: 'pro',
 };
 
-export const proStorageKey = (key: string) =>
-  `hibiki:v1:account:${proTestUser.id}:${key}`;
+export const proStorageKey = (key: string) => `hibiki:v1:account:${proTestUser.id}:${key}`;
 
 export async function mockProAccount(page: Page) {
   await page.addInitScript(

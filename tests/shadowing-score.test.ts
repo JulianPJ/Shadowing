@@ -26,9 +26,7 @@ const score = (
     recognizedText,
     recordingDurationSeconds,
     referenceDurationSeconds,
-    ...(readings
-      ? { targetReading: readings.target, recognizedReading: readings.heard }
-      : {}),
+    ...(readings ? { targetReading: readings.target, recognizedReading: readings.heard } : {}),
   });
 
 test('exact transcript match with matched timing scores 100', () => {

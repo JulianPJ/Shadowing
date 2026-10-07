@@ -1,8 +1,4 @@
-import {
-  hasKanji,
-  type JapaneseReadingToken,
-  type MorphologicalToken,
-} from './japanese-readings';
+import { hasKanji, type JapaneseReadingToken, type MorphologicalToken } from './japanese-readings';
 
 const LIMIT = 2000;
 type RequestKind = 'readings' | 'morphology';
