@@ -16,6 +16,8 @@ import { lookupJapanese } from '@/lib/lexicon/client';
 import type { LexiconResult } from '@/lib/lexicon/types';
 import { LexiconDefinitions } from './lexicon-definitions';
 import { WordStateControls } from './word-state-controls';
+import { transcriptKey } from '@/lib/transcript';
+import { storageAccount } from '@/lib/storage/browser';
 
 type Word = {
   lemma: string;
@@ -24,6 +26,7 @@ type Word = {
   lessonId?: string;
   segmentId?: string;
   sentence?: string;
+  transcriptKey?: string;
 };
 export function WordBrowser() {
   const account = useAccount();
@@ -62,6 +65,7 @@ function WordBrowserContent() {
             lessonId: entry.source.lessonId,
             segmentId: entry.source.segmentId,
             sentence: entry.sourceSentence,
+            transcriptKey: entry.source.transcriptKey,
           })),
         );
     };
@@ -95,12 +99,16 @@ function WordBrowserContent() {
   const visible = words.slice(offset, offset + 100);
   const chosen = selected.filter((lemma) => words.some((word) => word.lemma === lemma));
   async function analyzeRecent() {
+    const owner = storageAccount();
+    const current = () => mounted.current && storageAccount() === owner;
     setLoading(true);
     setError('');
     try {
       const rows = new Map<string, Word>();
       for (const record of recentLessons()) {
         const tokens = await lessonTokens(record.lesson);
+        const revision = await transcriptKey(record.lesson);
+        if (!current()) return;
         for (const segment of record.lesson.segments) {
           if (tokens[segment.id]?.map((token) => token.surface_form).join('') !== segment.japanese)
             continue;
@@ -114,29 +122,32 @@ function WordBrowserContent() {
               lessonId: previous?.lessonId ?? record.lesson.id,
               segmentId: previous?.segmentId ?? segment.id,
               sentence: previous?.sentence ?? segment.japanese,
+              transcriptKey: previous?.transcriptKey ?? revision,
             });
           }
         }
       }
-      if (mounted.current) setCorpus([...rows.values()]);
+      if (current()) setCorpus([...rows.values()]);
     } catch {
-      if (mounted.current)
+      if (current())
         setError('Recent lesson analysis is unavailable. Tracked word states are still available.');
     } finally {
-      if (mounted.current) setLoading(false);
+      if (current()) setLoading(false);
     }
   }
   async function find(term: string) {
+    const owner = storageAccount();
+    const current = () => mounted.current && storageAccount() === owner;
     setLookupLoading(true);
     setError('');
     try {
       const result = await lookupJapanese(term);
-      if (mounted.current) setLookup(result);
+      if (current()) setLookup(result);
     } catch (reason) {
-      if (mounted.current)
+      if (current())
         setError(reason instanceof Error ? reason.message : 'Dictionary lookup unavailable.');
     } finally {
-      if (mounted.current) setLookupLoading(false);
+      if (current()) setLookupLoading(false);
     }
   }
   return (
@@ -318,7 +329,7 @@ function WordBrowserContent() {
                       {word.lessonId && word.segmentId ? (
                         <Link
                           className="text-button"
-                          href={`/practice/${encodeURIComponent(word.lessonId)}?section=${encodeURIComponent(word.segmentId)}`}
+                          href={`/practice/${encodeURIComponent(word.lessonId)}?section=${encodeURIComponent(word.segmentId)}${word.transcriptKey ? `&transcript=${encodeURIComponent(word.transcriptKey)}` : ''}`}
                           title={word.sentence}
                         >
                           Open section

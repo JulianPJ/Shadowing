@@ -3,6 +3,8 @@
 > **Post-MVP update (6 October 2026):** Phase A's retention loop is extended by **phases B–D**: licensed full English JMdict lookup, persistent Free word states, Word Browser/bulk status, personal vocabulary coverage and recommended lines; calibrated speaking diagnostics, explicit drills and bounded section trends; My Library/Continue Watching/queue, weekly evidence and a calm daily goal, plus explainable public/prepared-caption recommendations. The memory loop remains Free; existing AI/topic-vocabulary gates remain. See `docs/post-mvp-phases-b-d.md` for integration, runtime and verification contracts. Next work is product iteration and calibration, with optional Grammar Coach/conversation and content-source expansion kept separate. Older snapshots below describe earlier milestones.
 
 > **Purpose:** persistent product and engineering context for future development.
+
+> **B–D verification (7 October 2026):** 238 unit tests and 92 browser tests on each production runtime pass, together with typecheck, lint, formatting, both builds, all nine native D1 migrations and the built Worker/D1 boundary. Browser checks use actual local lexical assets, media and MediaRecorder with deterministic provider fixtures. Production deployment remains a separate release action; apply `0009_word_knowledge.sql` before releasing these features. See the verification record in `docs/post-mvp-phases-b-d.md`.
 >
 > **Account update:** Better Auth accounts and eligible learner sync are implemented. Production D1 migrations and auth/Google secrets are configured; deployment awaits email sender secrets and real-provider smoke checks. Anonymous practice and shared-content trust remain unchanged. See `docs/accounts-and-sync-verification.md`.
 >

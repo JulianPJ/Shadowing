@@ -155,7 +155,7 @@ export const JapaneseText = memo(function JapaneseText({
       >
         {morphology.tokens.map((token, index) => {
           const lemma = canonicalLemma(token);
-          const state = contentWord(token) ? (states[lemma]?.state ?? 'unknown') : undefined;
+          const state = states[lemma]?.state ?? (contentWord(token) ? 'unknown' : undefined);
           const children = furigana
             ? annotateJapanese(token.surface_form, [token]).map((part, partIndex) =>
                 part.reading ? (

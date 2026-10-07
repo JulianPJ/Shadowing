@@ -65,7 +65,7 @@ export const TranscriptPanel = memo(function TranscriptPanel({
             : 'smooth',
         });
     }
-  }, [index, search, onlyFavorites]);
+  }, [index, search, onlyFavorites, recommendedSegmentIds]);
   return (
     <aside className="transcript-card" aria-labelledby="transcript-title">
       <div className="transcript-heading">

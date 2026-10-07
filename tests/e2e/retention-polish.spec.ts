@@ -106,7 +106,7 @@ test('completion combines cached match, completed quiz and explainable revisit l
         JSON.stringify(attempt),
       );
       sessionStorage.setItem(
-        'hibiki:shadowing:v1:demo',
+        'hibiki:shadowing:v1:account:retention-pro:demo',
         JSON.stringify({
           schemaVersion: 1,
           lessonId: 'demo',

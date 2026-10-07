@@ -119,7 +119,8 @@ export function LessonVocabulary({
                         <JapaneseText text={segment.japanese} />
                       </span>
                       <small>
-                        {line.reason} · {Math.round(segment.end - segment.start)}s
+                        {filter === 'value' ? line.highValueReason : line.reason} ·{' '}
+                        {Math.round(segment.end - segment.start)}s
                       </small>
                     </button>
                   </li>

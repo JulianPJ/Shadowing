@@ -293,8 +293,8 @@ export function VoiceRecorder({
         <button
           className="text-button small"
           onClick={() => {
-            requestId.current++;
-            setRequesting(false);
+            onManualStop?.();
+            cancel();
           }}
         >
           Cancel microphone request

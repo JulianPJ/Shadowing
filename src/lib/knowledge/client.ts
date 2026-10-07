@@ -101,6 +101,7 @@ export async function syncWordKnowledge() {
         'knowledge:outbox',
         outbox().filter((record) => sent.get(record.lemma) !== record.updatedAt),
       );
+      publish();
     }
     let cursor: string | null = null;
     const records: WordKnowledgeRecord[] = [];
