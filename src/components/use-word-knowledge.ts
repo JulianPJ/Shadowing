@@ -62,7 +62,8 @@ export function useLessonVocabulary(lesson: Lesson, enabled = true) {
   useEffect(() => {
     if (!enabled) return;
     let active = true;
-    void lessonTokens(lesson)
+    const controller = new AbortController();
+    void lessonTokens(lesson, controller.signal)
       .then((tokens) => {
         if (active) setResult({ lesson, tokens, error: '' });
       })
@@ -77,6 +78,7 @@ export function useLessonVocabulary(lesson: Lesson, enabled = true) {
       });
     return () => {
       active = false;
+      controller.abort();
     };
   }, [lesson, enabled]);
   const tokensBySegment = result?.lesson === lesson ? result.tokens : emptyTokens;

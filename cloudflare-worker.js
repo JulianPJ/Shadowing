@@ -54,9 +54,11 @@ async function shadowingRateLimited(request, env) {
   }
 }
 
-function shadowingRateLimitResponse() {
+function shadowingRateLimitResponse(
+  error = 'Too many shadowing analyses. Wait a moment and try again.',
+) {
   return Response.json(
-    { code: 'rate-limited', error: 'Too many shadowing analyses. Wait a moment and try again.' },
+    { code: 'rate-limited', error },
     { status: 429, headers: { 'Cache-Control': 'no-store', 'Retry-After': '60' } },
   );
 }
@@ -147,6 +149,10 @@ const worker = {
     if (url.pathname === '/api/transcribe' && request.method === 'POST') {
       const denied = await requireProAccess(request, env, ctx);
       if (denied) return denied;
+      if (await shadowingRateLimited(request, env))
+        return shadowingRateLimitResponse(
+          'Too many subtitle requests. Wait a moment and try again.',
+        );
       return handleTranscriptionRequest(request, createWorkersAiTranscriptionProvider(env.AI));
     }
 

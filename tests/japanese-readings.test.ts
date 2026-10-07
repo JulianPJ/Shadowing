@@ -10,6 +10,7 @@ import {
   annotateJapanese,
   type MorphologicalToken,
 } from '../src/lib/japanese-readings';
+import { runJapaneseWorkerRequest } from '../src/lib/japanese-analysis-worker';
 import { JapaneseText } from '../src/components/japanese-text';
 import { createQuiz, transcriptKey, transcriptRevision, validateQuiz } from '../src/lib/quiz';
 import { transcriptHash } from '../src/lib/linked-transcripts';
@@ -118,4 +119,87 @@ test('annotation leaves Lesson/Segment, shared transcript hash, transcriptKey an
   assert.equal(await transcriptHash(cues()), hash);
   assert.deepEqual(await validateQuiz(quiz, lesson), quiz);
   assert.ok(lesson.segments.every((s) => !('reading' in s) && !('furigana' in s)));
+});
+
+test('shared batch analysis preserves Kuromoji morphology, readings and exact independent sentence context', async () => {
+  const fields: (keyof MorphologicalToken)[] = [
+    'surface_form',
+    'reading',
+    'word_type',
+    'basic_form',
+    'pos',
+    'pos_detail_1',
+    'pos_detail_2',
+    'pos_detail_3',
+    'conjugated_type',
+    'conjugated_form',
+    'pronunciation',
+  ];
+  const corpus = [
+    '日本語を勉強しています。',
+    '今日は天気がいいですね。',
+    '政策金利を下げました。',
+    'こんにちは。カタカナ！',
+    ' 今日は、いい天気。 ',
+    '日本語 Hello 2026。\r\n食べました！',
+    '𠮷野XYZ、🙂',
+    '私\tは静かに話す。',
+  ];
+  const response = await runJapaneseWorkerRequest(
+    {
+      id: 1,
+      kind: 'morphology-batch',
+      items: corpus.map((text, index) => ({ id: index, text })),
+    },
+    async () => tokenizer,
+  );
+  assert.ok('results' in response);
+  if (!('results' in response) || !response.results) throw new Error('Expected batch results');
+  for (let index = 0; index < corpus.length; index++) {
+    const text = corpus[index];
+    const expected = tokenizer
+      .tokenize(text)
+      .map((token) =>
+        Object.fromEntries(
+          fields.filter((field) => token[field]).map((field) => [field, token[field]]),
+        ),
+      );
+    assert.equal(response.results[index].id, index);
+    assert.deepEqual(response.results[index].tokens, expected);
+    assert.deepEqual(annotateJapanese(text, response.results[index].tokens), readings(text));
+  }
+  const legacy = await runJapaneseWorkerRequest({ id: 2, text: corpus[0] }, async () => tokenizer);
+  assert.ok('tokens' in legacy);
+  if ('tokens' in legacy) assert.deepEqual(legacy.tokens, readings(corpus[0]));
+});
+
+test('worker rejects over-budget/duplicate batches before tokenizer work and reports engine failures', async () => {
+  let loaded = 0;
+  const loader = async () => {
+    loaded++;
+    return tokenizer;
+  };
+  for (const items of [
+    Array.from({ length: 9 }, (_, id) => ({ id, text: '日本語' })),
+    [
+      { id: 1, text: '甲'.repeat(3000) },
+      { id: 2, text: '乙'.repeat(3000) },
+    ],
+    [
+      { id: 1, text: '日本語' },
+      { id: 1, text: '天気' },
+    ],
+  ]) {
+    assert.deepEqual(
+      await runJapaneseWorkerRequest({ id: 1, kind: 'morphology-batch', items }, loader),
+      { id: 1, kind: 'morphology-batch', error: true },
+    );
+  }
+  assert.equal(loaded, 0);
+  assert.deepEqual(
+    await runJapaneseWorkerRequest({ id: 2, kind: 'morphology', text: '日本語' }, async () => {
+      throw new Error('dictionary missing');
+    }),
+    { id: 2, kind: 'morphology', error: true },
+  );
 });

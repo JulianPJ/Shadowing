@@ -8,12 +8,20 @@ import {
   type ShadowingSectionResult,
 } from '@/lib/shadowing-score';
 import { shadowingSectionTrend, type ShadowingRecentAttempt } from '@/lib/shadowing-session';
+import { recordingAudioDiagnostics } from '@/lib/audio-diagnostics-client';
+import type { AudioDiagnostics } from '@/lib/audio-diagnostics';
+import { AudioDiagnosticsPanel } from './audio-diagnostics-panel';
 import { ProFeatureNotice, useProAccess } from './pro-feature';
 
 export type VoiceRecorderHandle = {
   prepare: () => Promise<boolean>;
   recordFor: (seconds: number) => Promise<boolean>;
   cancel: () => void;
+};
+export type VoiceRecorderReference = {
+  recording: Blob;
+  durationSeconds: number;
+  playbackSpeed: number;
 };
 
 export function VoiceRecorder({
@@ -30,6 +38,7 @@ export function VoiceRecorder({
   onNewRecording,
   recentAttempts = [],
   onManualStop,
+  referenceAudio,
 }: {
   ref?: Ref<VoiceRecorderHandle>;
   enabled: boolean;
@@ -44,6 +53,7 @@ export function VoiceRecorder({
   onNewRecording?: () => void;
   recentAttempts?: ShadowingRecentAttempt[];
   onManualStop?: () => void;
+  referenceAudio?: (signal: AbortSignal) => Promise<VoiceRecorderReference>;
 }) {
   const { isPro } = useProAccess();
   const [recording, setRecording] = useState(false);
@@ -53,8 +63,16 @@ export function VoiceRecorder({
   const [analyzedCurrent, setAnalyzedCurrent] = useState(false);
   const [error, setError] = useState('');
   const [seconds, setSeconds] = useState(0);
+  const [localDiagnostics, setLocalDiagnostics] = useState<AudioDiagnostics>();
+  const [localAnalyzing, setLocalAnalyzing] = useState(false);
+  const [localError, setLocalError] = useState('');
+  const [referenceDiagnostics, setReferenceDiagnostics] = useState<{
+    result: AudioDiagnostics;
+    speed: number;
+  }>();
   const audio = useRef<HTMLAudioElement>(null);
   const recorder = useRef<MediaRecorder | null>(null);
+  const manuallyStopped = useRef<{ recorder: MediaRecorder; request: number } | null>(null);
   const recordedBlob = useRef<Blob | null>(null);
   const recordingStartedAt = useRef(0);
   const stream = useRef<MediaStream | null>(null);
@@ -64,15 +82,31 @@ export function VoiceRecorder({
   const callback = useRef(onRecording);
   const automaticDone = useRef<((ok: boolean) => void) | null>(null);
   const automaticTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const localController = useRef<AbortController | null>(null);
+
+  function cancelLocalCheck(reset = true) {
+    localController.current?.abort();
+    localController.current = null;
+    setLocalAnalyzing(false);
+    if (reset) {
+      setLocalDiagnostics(undefined);
+      setReferenceDiagnostics(undefined);
+    }
+    setLocalError('');
+  }
 
   function cancel() {
+    manuallyStopped.current = null;
     requestId.current++;
+    cancelLocalCheck(false);
     if (automaticTimer.current) clearTimeout(automaticTimer.current);
     automaticTimer.current = null;
     automaticDone.current?.(false);
     automaticDone.current = null;
     if (recorder.current?.state === 'recording') recorder.current.stop();
     stream.current?.getTracks().forEach((track) => track.stop());
+    setRecording(false);
+    callback.current(false);
     setRequesting(false);
   }
 
@@ -125,6 +159,7 @@ export function VoiceRecorder({
     return () => {
       mounted.current = false;
       request.current++;
+      localController.current?.abort();
       if (automaticTimer.current) clearTimeout(automaticTimer.current);
       automaticDone.current?.(false);
       automaticDone.current = null;
@@ -147,6 +182,8 @@ export function VoiceRecorder({
 
   async function start(automatic = false) {
     setError('');
+    manuallyStopped.current = null;
+    cancelLocalCheck();
     onNewRecording?.();
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
       setError(
@@ -182,7 +219,15 @@ export function VoiceRecorder({
       };
       instance.onstop = () => {
         media.getTracks().forEach((track) => track.stop());
-        if (!mounted.current) return;
+        const manualStop = manuallyStopped.current;
+        if (
+          !mounted.current ||
+          (id !== requestId.current &&
+            !(manualStop?.recorder === instance && manualStop.request === requestId.current))
+        )
+          return;
+        manuallyStopped.current = null;
+        cancelLocalCheck();
         if (objectUrl.current) URL.revokeObjectURL(objectUrl.current);
         const blob = new Blob(chunks, { type: instance.mimeType || mimeType || 'audio/webm' });
         const url = URL.createObjectURL(blob);
@@ -199,8 +244,11 @@ export function VoiceRecorder({
         automaticDone.current = null;
       };
       instance.onerror = () => {
-        setError('Recording was interrupted. Please try again.');
         media.getTracks().forEach((track) => track.stop());
+        if (!mounted.current || id !== requestId.current) return;
+        requestId.current++;
+        manuallyStopped.current = null;
+        setError('Recording was interrupted. Please try again.');
         setRecording(false);
         callback.current(false);
         if (automaticTimer.current) clearTimeout(automaticTimer.current);
@@ -233,12 +281,71 @@ export function VoiceRecorder({
   }
 
   async function analyze() {
-    if (!isPro || !recordedBlob.current || !onAnalyze || analyzing || analyzedCurrent) return;
-    const ok = await onAnalyze(recordedBlob.current, recordedDuration);
-    if (mounted.current && ok) setAnalyzedCurrent(true);
+    if (
+      !isPro ||
+      !recordedBlob.current ||
+      !onAnalyze ||
+      analyzing ||
+      analyzedCurrent ||
+      recording ||
+      requesting
+    )
+      return;
+    const blob = recordedBlob.current;
+    if (!localDiagnostics && !localController.current) void checkRecordingLocally();
+    const ok = await onAnalyze(blob, recordedDuration);
+    if (mounted.current && recordedBlob.current === blob && ok) setAnalyzedCurrent(true);
+  }
+
+  async function checkRecordingLocally() {
+    const blob = recordedBlob.current;
+    if (!blob || localController.current || recording || requesting) return;
+    const controller = new AbortController();
+    localController.current = controller;
+    setLocalAnalyzing(true);
+    setLocalError('');
+    try {
+      const result = await recordingAudioDiagnostics(blob, recordedDuration, controller.signal);
+      if (!mounted.current || controller.signal.aborted || recordedBlob.current !== blob) return;
+      setLocalDiagnostics(result);
+      if (referenceAudio && result.activity === 'detected') {
+        try {
+          const reference = await referenceAudio(controller.signal);
+          const sourceResult = await recordingAudioDiagnostics(
+            reference.recording,
+            reference.durationSeconds,
+            controller.signal,
+            reference.playbackSpeed,
+          );
+          if (mounted.current && !controller.signal.aborted && recordedBlob.current === blob) {
+            if (sourceResult.activity === 'detected')
+              setReferenceDiagnostics({ result: sourceResult, speed: reference.playbackSpeed });
+            else setLocalError('Source activity was unclear, so only your recording is shown.');
+          }
+        } catch {
+          if (mounted.current && !controller.signal.aborted && recordedBlob.current === blob)
+            setLocalError(
+              'Source audio could not be checked locally. Your recording check is still available.',
+            );
+        }
+      }
+    } catch (error) {
+      if (mounted.current && !controller.signal.aborted && recordedBlob.current === blob)
+        setLocalError(
+          error instanceof Error ? error.message : 'Local recording check unavailable.',
+        );
+    } finally {
+      if (localController.current === controller) {
+        localController.current = null;
+        if (mounted.current) setLocalAnalyzing(false);
+      }
+    }
   }
 
   function clearRecording() {
+    manuallyStopped.current = null;
+    cancelLocalCheck();
+    onNewRecording?.();
     if (recorded) URL.revokeObjectURL(recorded);
     objectUrl.current = '';
     recordedBlob.current = null;
@@ -265,8 +372,11 @@ export function VoiceRecorder({
           disabled={(!enabled && !recording) || requesting || analyzing}
           onClick={() => {
             if (recording) {
+              const instance = recorder.current;
+              if (instance?.state === 'recording') instance.stop();
               onManualStop?.();
-              recorder.current?.stop();
+              if (instance)
+                manuallyStopped.current = { recorder: instance, request: requestId.current };
             } else void start();
           }}
         >
@@ -319,12 +429,29 @@ export function VoiceRecorder({
               <Trash2 size={16} />
             </button>
           </div>
+          <div className="recording-analysis-actions">
+            <button
+              className="text-button small"
+              disabled={(Boolean(localDiagnostics) && !localAnalyzing) || recording || requesting}
+              onClick={() => {
+                if (localAnalyzing) cancelLocalCheck();
+                else void checkRecordingLocally();
+              }}
+            >
+              {localAnalyzing
+                ? 'Cancel local check'
+                : localDiagnostics
+                  ? 'Recording checked locally'
+                  : 'Check recording locally'}
+            </button>
+            <span>Check sound activity, pauses and recording level on this device.</span>
+          </div>
           {onAnalyze ? (
             isPro ? (
               <div className="recording-analysis-actions">
                 <button
                   className="button shadowing-analyze-button"
-                  disabled={analyzing || analyzedCurrent}
+                  disabled={analyzing || analyzedCurrent || recording || requesting}
                   onClick={() => void analyze()}
                 >
                   {analyzing ? (
@@ -354,6 +481,19 @@ export function VoiceRecorder({
             )
           ) : null}
         </>
+      ) : null}
+
+      {localDiagnostics ? (
+        <AudioDiagnosticsPanel
+          result={localDiagnostics}
+          reference={referenceDiagnostics?.result}
+          referenceSpeed={referenceDiagnostics?.speed}
+        />
+      ) : null}
+      {localError ? (
+        <p className="small recording-error" role="status">
+          {localError}
+        </p>
       ) : null}
 
       {analysis && isPro ? (

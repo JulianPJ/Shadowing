@@ -305,7 +305,7 @@ test('empty caption-provider metadata preserves the available official title and
   assert.equal(result.title, 'A video');
   assert.equal(result.author, 'Author');
 });
-test('expanded browser media types retain the 250 MB bound', () => {
+test('browser media types support larger local files with a 1 GB bound', () => {
   for (const name of [
     'clip.mp4',
     'clip.m4v',
@@ -325,7 +325,7 @@ test('expanded browser media types retain the 250 MB bound', () => {
   validateMediaFile({ name: 'file.unknown', size: 10, type: '' });
   assert.throws(
     () => validateMediaFile({ name: 'a.mp4', size: MEDIA_LIMIT + 1, type: 'video/mp4' }),
-    /250 MB/,
+    /1 GB/,
   );
   assert.throws(() => validateMediaFile({ name: 'doc.pdf', size: 10, type: 'application/pdf' }));
 });

@@ -172,7 +172,7 @@ Basic learner recording is already implemented with browser `MediaRecorder`:
 - recordings remain local/in-memory and are not uploaded;
 - microphone denial degrades gracefully.
 
-This means future pronunciation work should build on the existing recording flow rather than replacing it.
+Recordings also offer a Free local sound-activity, pause and level check. Accessible demo/local source excerpts can provide descriptive comparisons at the selected playback speed. These measurements add no inference, persistence or score input; existing Pro analysis and A/B replay remain available. See [local recording checks](docs/local-recording-diagnostics.md). Future pronunciation work should build on this recording flow and requires separate calibration.
 
 ### Media playback
 
@@ -197,7 +197,7 @@ Current transcript sources are:
 - pasted timestamped transcript text;
 - optional local Whisper/faster-whisper for the learner's own media.
 
-All imported formats share cue validation. Genuine missing Japanese captions retain the resolved video and open **Video link + transcript** automatically; caption infrastructure failures stay errors. Vimeo/direct links enter the transcript continuation immediately. Local file selection is capability-based, retains the 250 MB bound, and reports browser decode failures.
+All imported formats share cue validation. Genuine missing Japanese captions retain the resolved video and open **Video link + transcript** automatically; caption infrastructure failures stay errors. Vimeo/direct links enter the transcript continuation immediately. Local file selection is capability-based, permits up to 1 GiB for native playback, and reports browser decode failures. Pro automatic subtitles extract only the audio in a lazy browser worker: compatible AAC is copied into audio-only MP4, other supported codecs become bounded mono WAV, and adjacent parts use the existing Cloudflare Whisper route. Four-hour imports have cancellable progress and account-scoped completed-part checkpoints; the optional Python route retains its separate 250 MB bound. See [browser analysis and media imports](docs/browser-media-analysis.md).
 
 ### Segmentation
 

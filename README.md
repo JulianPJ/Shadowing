@@ -96,7 +96,11 @@ Segmentation cleans markup, removes repeated rolling-caption text, trims display
 
 ### Own audio/video
 
-Choose **Import media or subtitles → Own media**, then select media and Japanese subtitles. Formats depend on the browser's codecs; common candidates include MP4/M4V, WebM, MOV, MP3/M4A/AAC, WAV, OGG/OGA/OGV and FLAC. Selection uses media MIME categories and the browser determines decoding support; unsupported files produce a playback error. Media is limited to **250 MB**.
+Choose **Import media or subtitles → Own media**, then select media and Japanese subtitles. Formats depend on the browser's codecs; common candidates include MP4/M4V, WebM, MOV, MP3/M4A/AAC, WAV, OGG/OGA/OGV and FLAC. Selection uses media MIME categories and the browser determines decoding support; unsupported files produce a playback error. Local media is limited to **1 GB**; it stays on this device for native playback.
+
+Pro automatic subtitles prepare audio locally instead of uploading the video. A lazy browser worker reads the selected media incrementally and sends bounded mono audio parts through the existing Cloudflare Whisper endpoint, up to four hours of audio. Progress and cancellation are available, and completed parts can resume in the same tab after reattaching the matching file. Codec support varies by browser; manual subtitles remain available when extraction is unsupported. [Browser analysis and media imports](docs/browser-media-analysis.md) describes limits, timeline handling, privacy and verification. The optional local Python service retains its separate 250 MB upload limit.
+
+Recordings also offer **Check recording locally**: descriptive sound-activity, pause and level checks without another AI request. These measurements do not change Shadowing Match scores and are not pronunciation assessment.
 
 With subtitle import, media stays in the browser. After a full refresh, the transcript and last section remain saved, but you must reattach the original media file. Browser object URLs survive only the current session.
 

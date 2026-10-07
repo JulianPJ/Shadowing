@@ -31,8 +31,20 @@ export function createWorkersAiTranscriptionProvider(
         },
         signal,
       );
-      if (!result || typeof result.vtt !== 'string' || !result.vtt.trim())
+      if (!result || typeof result.vtt !== 'string')
         throw new Error('The transcription service did not return timed subtitles.');
+      const vtt = result.vtt.trim();
+      const text = typeof result.text === 'string' ? result.text.trim() : '';
+      // A legitimate empty recognition is distinct from missing or malformed timed output.
+      // Long imports can contain wholly silent parts before later Japanese speech.
+      if (
+        typeof result.text === 'string' &&
+        !text &&
+        (!Array.isArray(result.segments) || result.segments.length === 0) &&
+        (!vtt || /^WEBVTT[^\r\n]*\s*$/.test(vtt))
+      )
+        throw new Error('No Japanese speech was detected in this media.');
+      if (!vtt) throw new Error('The transcription service did not return timed subtitles.');
       let cues: Cue[];
       try {
         cues = parseSubtitles(result.vtt);

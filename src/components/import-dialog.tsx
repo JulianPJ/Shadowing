@@ -14,8 +14,9 @@ import { parseSubtitles } from '@/lib/subtitles';
 import { resolveMediaLink } from '@/lib/media-discovery';
 import { MEDIA_ACCEPT, validateMediaFile } from '@/lib/media';
 import { createImportedLesson } from '@/lib/import-lesson';
+import { localMediaUrl } from '@/lib/local-media-file';
 import { localWhisper } from '@/lib/providers/local-whisper';
-import { transcribeMediaFile } from '@/lib/transcription-client';
+import { transcribeMediaFile, type TranscriptionProgress } from '@/lib/transcription-client';
 import type { Lesson, ResolvedMedia } from '@/lib/types';
 import { ProFeatureNotice, useProAccess } from './pro-feature';
 
@@ -36,7 +37,7 @@ export function ImportDialog({
   initialResolved?: ResolvedMedia;
   transcriptUnavailable?: boolean;
 }) {
-  const { isPro } = useProAccess();
+  const { isPro, account } = useProAccess();
   const dialog = useRef<HTMLDialogElement>(null);
   const abort = useRef<AbortController | null>(null);
   const [kind, setKind] = useState<'link' | 'upload'>('link');
@@ -49,6 +50,7 @@ export function ImportDialog({
   const [subtitleName, setSubtitleName] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<TranscriptionProgress | null>(null);
 
   useEffect(() => {
     if (open) dialog.current?.showModal();
@@ -58,6 +60,12 @@ export function ImportDialog({
     }
     return () => abort.current?.abort();
   }, [open]);
+
+  useEffect(() => {
+    const cancelForAccountChange = () => abort.current?.abort();
+    window.addEventListener('hibiki:account-changing', cancelForAccountChange);
+    return () => window.removeEventListener('hibiki:account-changing', cancelForAccountChange);
+  }, []);
 
   async function readFile(file: File | undefined) {
     if (!file) return;
@@ -76,12 +84,19 @@ export function ImportDialog({
   }
 
   async function generateSubtitles(file: File, signal: AbortSignal) {
-    const timedSignal = AbortSignal.any([signal, AbortSignal.timeout(300000)]);
     if (process.env.NEXT_PUBLIC_WHISPER_URL) {
+      const timedSignal = AbortSignal.any([signal, AbortSignal.timeout(300000)]);
       const result = await localWhisper.transcribe(file, timedSignal);
       return { ...result, provider: 'Local Whisper' };
     }
-    return transcribeMediaFile(file, timedSignal);
+    return transcribeMediaFile(
+      file,
+      signal,
+      (value) => {
+        if (!signal.aborted) setProgress(value);
+      },
+      { checkpointScope: account.user?.id },
+    );
   }
 
   function chooseSubtitleMethod(choice: Exclude<SubtitleChoice, null>) {
@@ -114,6 +129,7 @@ export function ImportDialog({
 
     setError('');
     setBusy(true);
+    setProgress(null);
     const controller = new AbortController();
     abort.current = controller;
     try {
@@ -158,7 +174,7 @@ export function ImportDialog({
         provenance: source,
       });
       if (kind === 'upload' && file && !controller.signal.aborted)
-        lesson.mediaUrl = URL.createObjectURL(file);
+        lesson.mediaUrl = localMediaUrl(file);
       if (!controller.signal.aborted) {
         onLesson(lesson);
         onClose();
@@ -167,7 +183,11 @@ export function ImportDialog({
       if (!controller.signal.aborted)
         setError(error instanceof Error ? error.message : 'Import failed. Try another transcript.');
     } finally {
-      setBusy(false);
+      if (abort.current === controller) {
+        abort.current = null;
+        setBusy(false);
+        setProgress(null);
+      }
     }
   }
 
@@ -200,6 +220,7 @@ export function ImportDialog({
           type="button"
           aria-pressed={kind === 'link'}
           className={kind === 'link' ? 'selected' : ''}
+          disabled={busy}
           onClick={() => chooseKind('link')}
         >
           <SquarePlay size={16} /> Video link
@@ -208,6 +229,7 @@ export function ImportDialog({
           type="button"
           aria-pressed={kind === 'upload'}
           className={kind === 'upload' ? 'selected' : ''}
+          disabled={busy}
           onClick={() => chooseKind('upload')}
         >
           <Upload size={16} /> Own media
@@ -229,17 +251,19 @@ export function ImportDialog({
               placeholder="https://…"
               maxLength={2000}
               required
+              disabled={busy}
             />
           </label>
         ) : (
           <label className="upload-field">
             <Upload size={22} />
             <strong>{file ? file.name : 'Choose audio or video'}</strong>
-            <span>Common browser-supported audio/video formats · up to 250 MB</span>
+            <span>Common browser-supported audio/video formats · up to 1 GB</span>
             <input
               aria-label="Audio or video file"
               type="file"
               accept={MEDIA_ACCEPT}
+              disabled={busy}
               onChange={(event) => setFile(event.target.files?.[0] ?? null)}
             />
           </label>
@@ -276,6 +300,7 @@ export function ImportDialog({
             type="button"
             aria-pressed={subtitleChoice === 'manual'}
             className={subtitleChoice === 'manual' ? 'selected' : ''}
+            disabled={busy}
             onClick={() => chooseSubtitleMethod('manual')}
           >
             <FileText size={16} /> Upload own subtitles
@@ -284,7 +309,7 @@ export function ImportDialog({
             type="button"
             aria-pressed={subtitleChoice === 'generate'}
             className={subtitleChoice === 'generate' ? 'selected' : ''}
-            disabled={!isPro}
+            disabled={busy || !isPro}
             title={!isPro ? 'Hibiki Pro required' : undefined}
             onClick={() => chooseSubtitleMethod('generate')}
           >
@@ -306,6 +331,7 @@ export function ImportDialog({
                 aria-label="Japanese subtitle file"
                 type="file"
                 accept=".srt,.vtt,.ass,.ssa,.json,.txt"
+                disabled={busy}
                 onChange={(event) => void readFile(event.target.files?.[0])}
               />
             </label>
@@ -322,6 +348,7 @@ export function ImportDialog({
               }
               rows={5}
               maxLength={2000000}
+              disabled={busy}
             />
           </>
         ) : null}
@@ -332,7 +359,8 @@ export function ImportDialog({
               Audio/video to transcribe
               <span className="small muted">
                 Attach the matching media file. Hibiki does not download the linked video for
-                transcription. AI generation currently accepts files up to 32 MB.
+                transcription. Only its audio is sent for AI subtitles, in small parts. Up to four
+                hours of audio is supported.
               </span>
               <span className="subtitle-upload">
                 <Upload size={17} />
@@ -341,6 +369,7 @@ export function ImportDialog({
                   aria-label="Audio or video for subtitle generation"
                   type="file"
                   accept={MEDIA_ACCEPT}
+                  disabled={busy}
                   onChange={(event) => setGenerationFile(event.target.files?.[0] ?? null)}
                 />
               </span>
@@ -351,7 +380,10 @@ export function ImportDialog({
               {process.env.NEXT_PUBLIC_WHISPER_URL
                 ? 'your local Whisper service'
                 : 'Cloudflare Whisper'}
-              . AI generation currently accepts files up to 32 MB.
+              .{' '}
+              {process.env.NEXT_PUBLIC_WHISPER_URL
+                ? 'The local service accepts media up to 250 MB.'
+                : 'Your video stays on this device; only audio is sent in small parts, up to four hours.'}
             </p>
           )
         ) : null}
@@ -360,6 +392,23 @@ export function ImportDialog({
           <div role="alert" className="error-message">
             {error}
           </div>
+        ) : null}
+
+        {busy && progress ? (
+          <p className="small muted" role="status" aria-live="polite">
+            {progress.message}
+            {progress.total > 1 ? ` (${progress.completed} of ${progress.total})` : ''}
+          </p>
+        ) : null}
+
+        {busy ? (
+          <button
+            type="button"
+            className="button secondary full-width"
+            onClick={() => abort.current?.abort()}
+          >
+            Cancel preparation
+          </button>
         ) : null}
 
         <button
