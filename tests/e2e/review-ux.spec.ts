@@ -4,6 +4,52 @@ import demo from '../../src/data/demo.json' with { type: 'json' };
 import { dictionarySource } from '../../src/lib/dictionary/source';
 import type { Lesson } from '../../src/lib/types';
 
+test('exhausted and overlapping deck limits leave eligible words in the combined study queue', async ({
+  page,
+  context,
+}) => {
+  const remote = await connect(context);
+  await seed(remote, 4);
+  remote.review.decks.push(
+    ...['travel', 'blocked'].map((id) => ({ id, name: id, createdAt: '', updatedAt: '' })),
+  );
+  remote.review.memberships.push(
+    { entryId: 'word-0', deckId: 'blocked' },
+    { entryId: 'word-0', deckId: 'travel' },
+    { entryId: 'word-1', deckId: 'travel' },
+    { entryId: 'word-2', deckId: 'travel' },
+  );
+  await context.addInitScript(() =>
+    localStorage.setItem(
+      'hibiki:v1:account:retention-free:preferences',
+      JSON.stringify({
+        mode: 'shadowing',
+        speed: 1,
+        reviewLimits: {
+          defaults: { new: 3, review: null },
+          decks: { travel: { new: 2, review: null }, blocked: { new: 0, review: null } },
+        },
+      }),
+    ),
+  );
+  await page.goto('/review');
+  await page.getByRole('button', { name: 'Start review', exact: true }).click();
+  for (const entry of remote.entries.slice(1)) {
+    await expect(page.locator('.review-card h2')).toHaveText(entry.term);
+    await page.getByRole('button', { name: /Reveal answer/ }).click();
+    await page.getByRole('button', { name: /^Easy/ }).click();
+  }
+  await expect(page.getByRole('heading', { name: 'Caught up for now' })).toBeVisible();
+  await expect
+    .poll(() =>
+      remote.writes
+        .filter((op) => op.action === 'grade')
+        .map((op) => ('entryId' in op ? op.entryId : '')),
+    )
+    .toEqual(['word-1', 'word-2', 'word-3']);
+  expect(remote.review.cards.find((card) => card.entryId === 'word-0')?.revision).toBe(0);
+});
+
 test('all 25 due cards can be finished; optional limits keep the remaining backlog visible', async ({
   page,
   context,

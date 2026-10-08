@@ -98,27 +98,34 @@ export function limitDeckStudyQueue(
     deck === 'all',
   );
   if (deck !== 'all') return base;
-  const admittedByDeck = Object.keys(settings.decks).map((deckId) => {
+  const remaining = (limits: StudyLimits, reviewed: { new: number; review: number }) => ({
+    new: limits.new === null ? Infinity : Math.max(0, limits.new - reviewed.new),
+    review: limits.review === null ? Infinity : Math.max(0, limits.review - reviewed.review),
+  });
+  const globalRemaining = remaining(studyLimits(settings, deck, studyDay(at)), base.reviewed);
+  const allowances = Object.keys(settings.decks).map((deckId) => {
     const membership = new Set(
       memberships.filter((item) => item.deckId === deckId).map((item) => item.entryId),
     );
     const scoped = cards.filter((card) => membership.has(card.entryId));
-    const allowed = limitStudyQueue(
-      scoped,
-      history,
-      at,
-      studyLimits(settings, deckId, studyDay(at)),
-    );
-    return { membership, ids: new Set(allowed.cards.map((card) => card.entryId)) };
+    const limits = studyLimits(settings, deckId, studyDay(at));
+    const { reviewed } = limitStudyQueue(scoped, history, at, limits);
+    return { membership, remaining: remaining(limits, reviewed) };
   });
   return {
     ...base,
-    cards: base.cards.filter(
-      (card) =>
-        card.status === 'learning' ||
-        admittedByDeck.every(
-          ({ membership, ids }) => !membership.has(card.entryId) || ids.has(card.entryId),
-        ),
-    ),
+    cards: dueReviews(cards, at).filter((card) => {
+      if (card.status === 'learning') return true;
+      if (card.status !== 'new' && card.status !== 'review') return false;
+      const kind = card.status;
+      const decks = allowances.filter(({ membership }) => membership.has(card.entryId));
+      if (globalRemaining[kind] <= 0 || decks.some((scope) => scope.remaining[kind] <= 0))
+        return false;
+      // A skipped deck must not consume capacity in another deck or the global
+      // queue. Admit once, then charge every applicable allowance together.
+      globalRemaining[kind]--;
+      for (const scope of decks) scope.remaining[kind]--;
+      return true;
+    }),
   };
 }

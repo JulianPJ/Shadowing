@@ -118,3 +118,51 @@ test('deleting a previously rated word does not reset the global daily allowance
   assert.equal(limited.cards.length, 0);
   assert.deepEqual(limited.reviewed, { new: 1, review: 0 });
 });
+
+test('an exhausted deck never consumes the global allowance before other due decks can enter', async () => {
+  const { limitDeckStudyQueue } = await import('../src/lib/review/study-settings');
+  const cards = Array.from({ length: 4 }, (_, i) => newReview(`word-${i}`, at));
+  const memberships = [
+    { entryId: 'word-0', deckId: 'blocked' },
+    { entryId: 'word-1', deckId: 'blocked' },
+  ];
+  const result = limitDeckStudyQueue(
+    cards,
+    memberships,
+    [],
+    at,
+    {
+      defaults: { new: 2, review: null },
+      decks: { blocked: { new: 0, review: null } },
+      extensions: {},
+    },
+    'all',
+  );
+  assert.deepEqual(
+    result.cards.map((card) => card.entryId),
+    ['word-2', 'word-3'],
+  );
+});
+
+test('overlapping deck quotas charge admitted cards once and keep unused capacity available', async () => {
+  const { limitDeckStudyQueue } = await import('../src/lib/review/study-settings');
+  const cards = Array.from({ length: 4 }, (_, i) => newReview(`word-${i}`, at));
+  const memberships = [
+    { entryId: 'word-0', deckId: 'travel' },
+    { entryId: 'word-0', deckId: 'blocked' },
+    { entryId: 'word-1', deckId: 'travel' },
+    { entryId: 'word-2', deckId: 'travel' },
+  ];
+  const options = {
+    defaults: { new: 3, review: null },
+    decks: { travel: { new: 2, review: null }, blocked: { new: 0, review: null } },
+    extensions: {},
+  };
+  const original = structuredClone({ cards, memberships, options });
+  const result = limitDeckStudyQueue(cards, memberships, [], at, options, 'all');
+  assert.deepEqual(
+    result.cards.map((card) => card.entryId),
+    ['word-1', 'word-2', 'word-3'],
+  );
+  assert.deepEqual({ cards, memberships, options }, original);
+});
