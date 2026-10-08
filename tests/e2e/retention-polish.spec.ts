@@ -240,7 +240,7 @@ test('cursor UI and complete export reach old vocabulary; targeted review remain
   await expect(page.getByRole('button', { name: 'Start review' })).toBeEnabled();
   await page.getByRole('button', { name: 'Start review' }).click();
   await expect(page.getByRole('heading', { name: '古い語', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Reveal answer' }).click();
+  await page.getByRole('button', { name: 'Show answer' }).click();
   await page.getByRole('button', { name: /^Good/ }).click();
   await expect(page.getByRole('heading', { name: 'Caught up for now' })).toBeVisible();
 });

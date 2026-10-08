@@ -469,26 +469,38 @@ export function DailyReview() {
                       <p>
                         Today: {limited.reviewed.new} new · {limited.reviewed.review} review cards.
                       </p>
+                      <p className="small muted">
+                        Leave a field empty for no limit. Set it to 0 to pause that card type.
+                      </p>
                       {(['new', 'review'] as const).map((kind) => (
-                        <label key={kind}>
-                          Daily {kind} card limit{' '}
-                          <select
-                            value={configuredLimits[kind] ?? ''}
-                            onChange={(e) =>
-                              updateLimits({
-                                ...configuredLimits,
-                                [kind]: e.target.value === '' ? null : Number(e.target.value),
-                              })
-                            }
+                        <div className="review-limit-control" key={kind}>
+                          <label>
+                            Daily {kind} card limit
+                            <input
+                              type="number"
+                              min={0}
+                              max={10000}
+                              step={1}
+                              placeholder="No limit"
+                              value={configuredLimits[kind] ?? ''}
+                              onChange={(e) => {
+                                if (e.target.value !== '' && !e.target.validity.valid) return;
+                                updateLimits({
+                                  ...configuredLimits,
+                                  [kind]: e.target.value === '' ? null : Number(e.target.value),
+                                });
+                              }}
+                            />
+                          </label>
+                          <button
+                            className="text-button"
+                            aria-label={`No limit for ${kind} cards`}
+                            disabled={configuredLimits[kind] === null}
+                            onClick={() => updateLimits({ ...configuredLimits, [kind]: null })}
                           >
-                            <option value="">No limit</option>
-                            {[0, 1, 5, 10, 20, 50, 100, 200].map((value) => (
-                              <option key={value} value={value}>
-                                {value}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
+                            No limit
+                          </button>
+                        </div>
                       ))}
                       {selectedDeck !== 'all' && settings.decks[selectedDeck] ? (
                         <button
@@ -518,9 +530,11 @@ export function DailyReview() {
                     {activeSession.answered} ratings · {dueCards.length} due now · {delayed.length}{' '}
                     learning later today
                   </p>
-                  <button className="text-button" onClick={pause}>
-                    Pause study
-                  </button>
+                  {revealed ? (
+                    <button className="text-button" onClick={pause}>
+                      Pause study
+                    </button>
+                  ) : null}
                 </div>
                 <h2 lang="ja" tabIndex={-1} ref={heading}>
                   {entry.term}
@@ -532,7 +546,7 @@ export function DailyReview() {
                       aria-expanded={reading}
                       onClick={() => setReading(!reading)}
                     >
-                      {reading ? 'Hide reading' : 'Show reading'}
+                      {reading ? 'Hide furigana' : 'Show furigana'}
                     </button>
                     {reading ? (
                       <p lang="ja" className="review-reading">
@@ -541,55 +555,55 @@ export function DailyReview() {
                     ) : null}
                   </>
                 ) : null}
-                <div className="review-actions">
-                  <button
-                    className="button"
-                    aria-expanded={contextOpen}
-                    onClick={() => setContextOpen(!contextOpen)}
-                  >
-                    {contextOpen ? 'Hide context player' : 'Play this section'}
-                  </button>
-                  <Link
-                    className="text-button"
-                    href={reviewContextHref(entry)}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Open full lesson ↗
-                  </Link>
-                  {externalReplay(entry) ? (
-                    <a
-                      className="text-button"
-                      href={externalReplay(entry)!}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Open{' '}
-                      {entry.source.mediaType === 'youtube'
-                        ? 'on YouTube'
-                        : entry.source.mediaType === 'vimeo'
-                          ? 'on Vimeo'
-                          : 'source website'}{' '}
-                      ↗
-                    </a>
-                  ) : null}
-                </div>
-                {contextOpen ? (
-                  <ContextPlayer
-                    key={entry.id}
-                    entry={entry}
-                    onClose={() => setContextOpen(false)}
-                  />
-                ) : null}
                 {!revealed ? (
                   <>
                     <p>Recall the meaning before revealing.</p>
                     <button className="button primary" onClick={() => setRevealed(true)}>
-                      Reveal answer <kbd>Space</kbd>
+                      Show answer <kbd>Space</kbd>
                     </button>
                   </>
                 ) : (
                   <div className="review-answer">
+                    <div className="review-actions">
+                      <button
+                        className="button"
+                        aria-expanded={contextOpen}
+                        onClick={() => setContextOpen(!contextOpen)}
+                      >
+                        {contextOpen ? 'Hide context player' : 'Play this section'}
+                      </button>
+                      <Link
+                        className="text-button"
+                        href={reviewContextHref(entry)}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Open full lesson ↗
+                      </Link>
+                      {externalReplay(entry) ? (
+                        <a
+                          className="text-button"
+                          href={externalReplay(entry)!}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          Open{' '}
+                          {entry.source.mediaType === 'youtube'
+                            ? 'on YouTube'
+                            : entry.source.mediaType === 'vimeo'
+                              ? 'on Vimeo'
+                              : 'source website'}{' '}
+                          ↗
+                        </a>
+                      ) : null}
+                    </div>
+                    {contextOpen ? (
+                      <ContextPlayer
+                        key={entry.id}
+                        entry={entry}
+                        onClose={() => setContextOpen(false)}
+                      />
+                    ) : null}
                     <strong>{entry.translation}</strong>
                     <p lang="ja">
                       <JapaneseText text={entry.sourceSentence} furigana={sentenceReading} />
@@ -751,7 +765,7 @@ export function DailyReview() {
                 </p>
               </section>
             )}
-            {activeSession?.lastRating ? (
+            {activeSession?.lastRating && (!entry || !card || revealed) ? (
               <button className="button review-undo" disabled={!!review.conflict} onClick={undo}>
                 Undo last rating
               </button>
