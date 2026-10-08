@@ -54,7 +54,7 @@ New account APIs reuse Better Auth, same-origin JSON checks, verified-email muta
 | `DELETE /api/watch-later/<id>` | Timestamped removal without fetching content |
 | `POST /api/discover/events` | Up to 24 validated events; cannot write catalogue state |
 
-Existing current-account local queues migrate once. Anonymous saves require Library's explicit **Add this device's anonymous saves to my account** action. Sign-in never infers consent. Namespaces remain isolated across account changes/logout. Vimeo/direct links retain local behavior; cross-device Watch Later covers canonical YouTube links.
+Existing current-account local queues migrate once. Anonymous saves require Library's explicit **Add this device's anonymous saves to my account** action. Sign-in never infers consent. Namespaces remain isolated across account changes/logout. Vimeo/direct links retain local behavior; cross-device Watch Later covers canonical YouTube links. Device-only media reserve places in the 40-link local view; any additional account saves remain in records/D1, with a visible overflow count, and appear when a local place is freed.
 
 Records keep original added time, edit time, position and deletion tombstones. Newer edits win; deletion wins an exact-time tie, followed by deterministic title/position ties consistent between SQL/browser. Order is position, added time and ID. Future edits beyond five minutes are rejected. D1 enforces 40 active links across a batch; excess concurrent additions show an actionable conflict. Removals replay before replacements. Large offline outboxes use 120-record batches and clear only exact accepted versions, retaining in-flight edits.
 
@@ -80,3 +80,18 @@ Local workerd/D1 checks need no live key. Standard Next uses durable `.cloudflar
 Fixtures use fictional IDs and mocked provider boundaries without spending YouTube/AI quota. `tests/discover.test.ts` covers bands, abstention, filter/freshness/region bounds, ranking/diversity, cursor integrity, provider envelopes, merge ties and preparation transport. `tests/discover-d1.test.ts` applies all twelve migrations to real local D1 and verifies metadata-only reads, public artifact trust, quota/purge, ownership, capacity/replacement and privacy cohorts. `tests/e2e/discover.spec.ts` covers desktop/mobile, blocked storage, filters/back/reload, pagination, save/undo/Library, preference/feedback, card-to-practice, missing captions, account offline/reconnect and explicit anonymous import. The built Worker check verifies new routes and unchanged caption/AI counts beside existing caches.
 
 Run typecheck, lint, formatting, unit tests, both builds, `test:d1:migrations`, `test:d1:runtime` and Playwright on both production runtimes. See [architecture](architecture.md) for commands.
+
+### Local verification record — 8 October 2026
+
+| Check | Result |
+| --- | --- |
+| Unit/integration | 334 passing, including real D1 and account-switch migration isolation |
+| Typecheck, ESLint, Prettier | Passing |
+| Next production / canonical Cloudflare builds | Passing |
+| Persisted native D1 migrations | All twelve applied; ledger/ownership and empty foreign-key check verified |
+| Built Worker + native D1 | Accounts, feed, canonical/idempotent queue, preferences, ownership, rollback preserving legacy discovery/queue, unchanged caption/AI counts and sign-out pass |
+| Browser coverage | 142 distinct scenarios per runtime across full regressions and final focused rechecks; the final 40-case set covers Discover, Library, accounts, knowledge, navigation and progress |
+| Discover browser scenarios | Ten: filters/search, save/undo, auto-preparation and Back/scroll, missing captions, preferences/feedback, pagination, mobile/error/blocked storage, offline account merge/import, 141-record replay and full account queue retaining device-only media |
+| Visual inspection | Desktop, mobile advanced-filter sheet and dark theme using explicit demonstration metadata/thumbnails |
+
+Provider/player boundaries are mocked or use authored local demo media. These results do not claim live YouTube acquisition, remote inference, a production migration or a deployment. GitHub CI independently runs the complete suites on the PR head.

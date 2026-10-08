@@ -94,14 +94,6 @@ for (const file of await readdir(root, { recursive: true, withFileTypes: true })
   };
 }
 options.workers[0].config.manifest = { mainModule: 'index.js', modulesRoot: root, modules };
-options.workers.push({
-  ...options.workers[0],
-  config: {
-    ...options.workers[0].config,
-    name: 'shadowing-disabled',
-    env: { ...options.workers[0].config.env, DISCOVER_ENABLED: { type: 'text', value: 'false' } },
-  },
-});
 const mf = new Miniflare(options);
 try {
   const db = await mf.getD1Database('HIBIKI_DB', 'shadowing');
@@ -635,13 +627,31 @@ try {
     transcription: 6,
   });
 
-  const disabled = await mf.getWorker('shadowing-disabled');
-  assert.equal((await disabled.fetch('https://example.com/api/discover')).status, 404);
-  assert.equal((await disabled.fetch('https://example.com/discover')).status, 404);
-  assert.equal((await disabled.fetch('https://example.com/api/discovery')).status, 200);
+  // Exercise rollback through the public request adapter, retaining the configured HTTPS origin.
+  await mf.setOptions({
+    ...options,
+    workers: options.workers.map((worker, index) =>
+      index !== 0
+        ? worker
+        : {
+            ...worker,
+            config: {
+              ...worker.config,
+              env: { ...worker.config.env, DISCOVER_ENABLED: { type: 'text', value: 'false' } },
+            },
+          },
+    ),
+  });
+  assert.equal((await mf.dispatchFetch('https://example.com/api/discover')).status, 404);
+  assert.equal((await mf.dispatchFetch('https://example.com/discover')).status, 404);
+  assert.equal((await mf.dispatchFetch('https://example.com/api/discovery')).status, 200);
+  const disabledWatch = await mf.dispatchFetch('https://example.com/api/watch-later', {
+    headers: watchHeaders,
+  });
   assert.equal(
-    (await disabled.fetch('https://example.com/api/watch-later', { headers: watchHeaders })).status,
+    disabledWatch.status,
     200,
+    disabledWatch.status !== 200 ? await disabledWatch.text() : undefined,
   );
 
   const signedOut = await mf.dispatchFetch('https://example.com/api/auth/sign-out', {

@@ -9,6 +9,7 @@ import {
   DEFAULT_PREFERENCES,
   EMPTY_CONTEXT,
   bandFromRange,
+  canonicalUrl,
   type Preferences,
   type Context,
 } from './types';
@@ -95,7 +96,10 @@ export function queueEdited(previous: QueueItem[], next: QueueItem[]) {
         removed: true,
       });
     }
-  if (!updates.length) return;
+  if (!updates.length) {
+    if (previous.length !== next.length) void syncDiscover();
+    return;
+  }
   writeStorage('library:watch-records', mergeWatchRecords(records, updates));
   writeStorage('library:watch-outbox', mergeWatchRecords(outbox(), updates));
   publish();
@@ -274,7 +278,8 @@ export async function syncDiscover() {
           return true;
         }
       });
-    saveLibrary({ ...library, queue: [...queueFromRecords(merged), ...other].slice(0, 40) }, false);
+    // Device-only media must survive a full remote queue. Extra account links remain in records/D1.
+    saveLibrary({ ...library, queue: [...other, ...queueFromRecords(merged)].slice(0, 40) }, false);
     if (readStorage('discover:preferences-pending', false)) {
       const sent = discoveryPreferences();
       await request('/api/discover/preferences', 'PATCH', sent);
@@ -377,4 +382,8 @@ export function startDiscoverSync() {
 }
 export function savedVideo(url: string) {
   return loadLibrary().queue.some((q) => q.url === normalizeQueueUrl(url));
+}
+export function hiddenAccountSaveCount() {
+  const visible = new Set(loadLibrary().queue.map((q) => q.url));
+  return watchRecords().filter((r) => !r.removed && !visible.has(canonicalUrl(r.videoId))).length;
 }

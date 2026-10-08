@@ -17,6 +17,7 @@ const videos = Array.from({ length: 36 }, (_, i) =>
   }),
 );
 async function catalog(page: Page) {
+  const rankingTime = Date.now();
   await page.route('**/api/discover', async (route) => {
     const body = route.request().postDataJSON();
     const feed = await buildFeed(
@@ -25,6 +26,7 @@ async function catalog(page: Page) {
       validateContext(body.context),
       body.cursor,
       'JP',
+      rankingTime,
     );
     await route.fulfill({ json: feed });
   });
@@ -270,7 +272,9 @@ test('error recovery, empty filters, mobile and blocked storage stay usable', as
     route.fulfill({ status: 503, json: { error: 'Temporary catalogue outage' } }),
   );
   await page.getByRole('button', { name: 'Reset filters', exact: true }).click();
-  await expect(page.getByRole('alert')).toContainText('Temporary catalogue outage');
+  await expect(page.getByRole('main').getByRole('alert')).toContainText(
+    'Temporary catalogue outage',
+  );
   await page.unroute('**/api/discover');
   await catalog(page);
   await page.getByRole('button', { name: 'Try again', exact: true }).click();
@@ -401,4 +405,56 @@ test('a long offline queue outbox reconnects in bounded batches without losing r
       ),
     )
     .toBe(0);
+});
+
+test('a full account queue preserves device-only media and reveals retained account saves when a place is freed', async ({
+  page,
+}) => {
+  await mockProAccount(page);
+  await page.route('**/api/knowledge*', (route) =>
+    route.fulfill({ json: { records: [], nextCursor: null } }),
+  );
+  const time = new Date().toISOString();
+  const remote: WatchRecord[] = Array.from({ length: 40 }, (_, i) => ({
+    videoId: `video${String(i).padStart(6, '0')}`,
+    title: `Account save ${i}`,
+    position: i,
+    addedAt: time,
+    updatedAt: time,
+    removed: false,
+  }));
+  await page.addInitScript(
+    ({ key, time }) =>
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          version: 1,
+          pinned: [],
+          queue: [
+            {
+              id: 'vimeo-local',
+              url: 'https://vimeo.com/123456789',
+              title: 'Device-only Vimeo',
+              addedAt: time,
+            },
+          ],
+        }),
+      ),
+    { key: proStorageKey('library:data'), time },
+  );
+  await page.route('**/api/watch-later', (route) => route.fulfill({ json: { records: remote } }));
+  await page.goto('/library');
+  await expect(page.locator('.library-queue li')).toHaveCount(40);
+  await expect(page.locator('.library-queue')).toContainText('Device-only Vimeo');
+  await expect(
+    page.getByRole('status').filter({ hasText: 'beyond this device’s 40-link view' }),
+  ).toContainText('1 account save');
+  await page
+    .getByRole('button', { name: 'Remove Device-only Vimeo from queue', exact: true })
+    .click();
+  await expect(page.locator('.library-queue li')).toHaveCount(40);
+  await expect(page.locator('.library-queue')).toContainText('Account save 39');
+  await expect(
+    page.getByRole('status').filter({ hasText: 'beyond this device’s 40-link view' }),
+  ).toHaveCount(0);
 });
