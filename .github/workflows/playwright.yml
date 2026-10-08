@@ -19,7 +19,8 @@ jobs:
   e2e:
     name: Playwright E2E
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    # Both production runtimes run the full media/browser and native D1 checks.
+    timeout-minutes: 35
     env:
       CI: true
       PLAYWRIGHT_BASE_URL: http://localhost:3000
