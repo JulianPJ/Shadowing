@@ -143,6 +143,10 @@
 .dictionary-save-panel .dictionary-context > span {
   font-size: 13px;
 }
+.dictionary-save-panel .dictionary-privacy,
+.dictionary-save-panel .dictionary-context > span {
+  color: var(--muted);
+}
 .dictionary-save-panel .dictionary-fields input,
 .dictionary-save-panel .dictionary-fields textarea {
   font-size: 14px;
@@ -154,4 +158,12 @@
 .practice-main .offset-control button,
 .practice-main .practice-view-controls .button {
   font-size: 13px;
+}
+.practice-main .practice-controls {
+  flex-wrap: wrap;
+}
+.dictionary-save-panel .dictionary-fields :is(input, select, textarea),
+.practice-main .speed-control select,
+.practice-main .drill-settings :is(input, select) {
+  border-color: color-mix(in srgb, var(--muted) 75%, var(--paper));
 }
