@@ -9,7 +9,8 @@ import { validateSync } from '../../src/lib/sync/validation';
 import { verifyAttempt } from '../../src/lib/sync/quiz-verification';
 import type { Lesson } from '../../src/lib/types';
 import type { DictionaryEntry } from '../../src/lib/dictionary/types';
-import { emptyReview } from '../../src/lib/review/local';
+import { applyLocalReview, emptyReview } from '../../src/lib/review/local';
+import type { ReviewOperation } from '../../src/lib/review/types';
 const user: AccountUser = {
   id: 'account-one',
   email: 'learner@example.com',
@@ -26,6 +27,7 @@ const freeUser: AccountUser = {
 };
 class Remote {
   data = emptySync();
+  reviews = new Map<string, ReturnType<typeof emptyReview>>();
   dictionary: DictionaryEntry[] = [];
   pushes: string[] = [];
   outage = false;
@@ -63,7 +65,19 @@ async function connect(
     remote.data = mergeSync(remote.data, data);
     await route.fulfill({ json: { ok: true } });
   });
-  await context.route('**/api/review', (route) => route.fulfill({ json: emptyReview() }));
+  await context.route('**/api/review', (route) => {
+    const owner = state.user?.id;
+    if (!owner) return route.fulfill({ status: 401, json: { error: 'Sign in required' } });
+    const snapshot = remote.reviews.get(owner) ?? emptyReview();
+    if (route.request().method() === 'POST') {
+      remote.reviews.set(
+        owner,
+        applyLocalReview(snapshot, route.request().postDataJSON() as ReviewOperation),
+      );
+      return route.fulfill({ json: { ok: true } });
+    }
+    return route.fulfill({ json: snapshot });
+  });
   await context.route('**/api/knowledge*', (route) =>
     route.fulfill({ json: { records: [], nextCursor: null } }),
   );
