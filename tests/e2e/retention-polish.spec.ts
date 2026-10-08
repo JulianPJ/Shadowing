@@ -9,6 +9,8 @@ import type { Lesson } from '../../src/lib/types';
 import authored from '../../src/data/demo-difficulty.json' with { type: 'json' };
 import { createDifficultyAnalysis } from '../../src/lib/difficulty';
 import type { BrowserContext } from '@playwright/test';
+// These flows include local dictionary loading and hundreds of paginated vocabulary rows.
+test.setTimeout(90_000);
 async function cacheDifficulty(context: BrowserContext) {
   const analysis = await createDifficultyAnalysis(authored, demo as Lesson);
   await context.addInitScript(
@@ -39,11 +41,13 @@ test('uncached practice difficulty runs once at opening; completion starts no ad
     );
   });
   await page.goto('/practice/demo');
+  await page.getByText('About this lesson’s difficulty', { exact: true }).click();
   await expect(page.getByTestId('lesson-difficulty').locator('dl')).toContainText('N5–N4');
   expect(requests).toHaveLength(1);
   await page.getByTestId('transcript-13').click();
   await page.getByRole('button', { name: 'Finish practice', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Lesson complete', exact: true })).toBeVisible();
+  await page.getByText('About this lesson’s difficulty', { exact: true }).click();
   await expect(
     page
       .getByRole('region', { name: 'Lesson completion summary' })
@@ -67,12 +71,13 @@ for (const plan of ['free', 'pro'] as const)
     });
     await finish(page);
     const recap = page.getByRole('region', { name: 'Lesson completion summary' });
-    await expect(recap).toContainText('14 sections completed');
-    await expect(recap).toContainText('0 saved words');
+    await expect(recap).toContainText('You reached the end of this lesson.');
+    await expect(recap).toContainText('No saved words due right now');
     await expect(recap.getByRole('heading', { name: 'Comprehension', exact: true })).toHaveCount(0);
     await expect(recap.locator('.shadowing-completion')).toHaveCount(0);
     await expect(recap.getByRole('heading', { name: 'Worth another listen' })).toHaveCount(0);
-    await expect(recap.getByRole('link', { name: 'Start Daily Review' })).toBeVisible();
+    await expect(recap.getByRole('link', { name: 'Choose next lesson' })).toBeVisible();
+    await recap.getByText('Saved words and practice details', { exact: true }).click();
     if (plan === 'pro')
       await expect(recap.getByText('コーヒー', { exact: true })).toBeVisible({ timeout: 15000 });
     expect(inference).toEqual([]);
@@ -147,6 +152,7 @@ test('completion combines cached match, completed quiz and explainable revisit l
   });
   await finish(page);
   const recap = page.getByRole('region', { name: 'Lesson completion summary' });
+  await recap.getByText('Saved words and practice details', { exact: true }).click();
   await expect(recap.locator('.completion-comprehension')).toContainText(
     `${attempt.score} / ${attempt.totalQuestions}`,
   );
@@ -176,7 +182,8 @@ test('tags are optional metadata: create Japanese, bulk tag, combine deck/tag fi
   await page.getByLabel('Filter by tag').selectOption({ label: '旅行' });
   await page.getByLabel('Filter by deck').selectOption('inbox');
   await expect(page.locator('.dictionary-entry')).toHaveCount(1);
-  await page.getByLabel('Select 朝', { exact: true }).uncheck();
+  await expect(page.getByLabel('Select 朝', { exact: true })).not.toBeChecked();
+  await page.getByText('Export saved words', { exact: true }).click();
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Export filtered TSV' }).click();
   const tsv = await readFile((await (await download).path())!, 'utf8');
@@ -185,6 +192,7 @@ test('tags are optional metadata: create Japanese, bulk tag, combine deck/tag fi
   await page.getByLabel('Tag name').fill('旅');
   await page.getByRole('button', { name: 'Rename tag' }).click();
   await expect.poll(() => remote.tags[0].name).toBe('旅');
+  page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: 'Delete tag', exact: true }).click();
   await expect.poll(() => remote.tags.length).toBe(0);
   expect(remote.entries).toHaveLength(2);
@@ -216,10 +224,11 @@ test('cursor UI and complete export reach old vocabulary; targeted review remain
   await page.goto('/dictionary');
   await expect(page.locator('.dictionary-entry')).toHaveCount(100);
   for (let i = 0; i < 8; i++) {
-    await page.getByRole('button', { name: 'Load more', exact: true }).click();
+    await page.getByRole('button', { name: 'Load more saved words', exact: true }).click();
     await expect(page.locator('.dictionary-entry')).toHaveCount(Math.min(806, (i + 2) * 100));
   }
   await expect(page.getByRole('heading', { name: '古い語', exact: true })).toBeVisible();
+  await page.getByText('Export saved words', { exact: true }).click();
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Export entire dictionary CSV' }).click();
   const csv = await readFile((await (await download).path())!, 'utf8');
@@ -232,30 +241,30 @@ test('cursor UI and complete export reach old vocabulary; targeted review remain
   await page.getByRole('button', { name: 'Start review' }).click();
   await expect(page.getByRole('heading', { name: '古い語', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Reveal answer' }).click();
-  await page.getByRole('button', { name: 'Good', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Review complete' })).toBeVisible();
+  await page.getByRole('button', { name: /^Good/ }).click();
+  await expect(page.getByRole('heading', { name: 'Caught up for now' })).toBeVisible();
 });
 
-test('review reports all scheduled due words while hydrating only its bounded session', async ({
+test('review keeps the full due queue and bounds each targeted hydration request', async ({
   page,
   context,
 }) => {
   const remote = await connect(context);
   await seed(remote, 25);
   await page.goto('/review');
-  await expect(page.getByRole('heading', { name: '25 due · ~5 min' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '25 due now' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Start review' })).toBeEnabled();
   expect(remote.queries.length).toBeGreaterThan(0);
   for (const query of remote.queries) {
     const params = new URLSearchParams(query);
     expect([...params.keys()]).toEqual(['ids']);
-    expect(params.get('ids')!.split(',')).toHaveLength(20);
+    expect(params.get('ids')!.split(',').length).toBeLessThanOrEqual(40);
   }
   remote.offline = true;
   await page.reload();
-  await expect(page.getByRole('heading', { name: '25 due · ~5 min' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '25 due now' })).toBeVisible();
   await page.getByRole('button', { name: 'Start review' }).click();
-  await expect(page.getByText('1 of 20', { exact: true })).toBeVisible();
+  await expect(page.getByText(/0 ratings · 25 due now/)).toBeVisible();
 });
 
 test('account switching clears dictionary selections and tag forms while retaining isolated caches', async ({

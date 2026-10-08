@@ -59,7 +59,27 @@ export async function connect(context: BrowserContext, plan: AccountUser['plan']
     if (route.request().method() === 'POST') {
       const op = route.request().postDataJSON() as ReviewOperation;
       remote.writes.push(op);
+      const before = remote.review.cards.find(
+        (card) => 'entryId' in op && card.entryId === op.entryId,
+      );
       remote.review = applyLocalReview(remote.review, op);
+      if (op.action === 'grade' && before?.revision === op.revision) {
+        remote.review.history = [
+          ...(remote.review.history ?? []),
+          {
+            operationId: op.operationId,
+            entryId: op.entryId,
+            grade: op.grade,
+            reviewedAt: op.reviewedAt,
+            status: before.status as 'new' | 'learning' | 'review',
+          },
+        ];
+        remote.review.historySince = new Date(Date.now() - 7 * 86400000).toISOString();
+      } else if (op.action === 'undo' && remote.review.history) {
+        remote.review.history = remote.review.history.filter(
+          (event) => event.operationId !== op.targetOperationId,
+        );
+      }
       return route.fulfill({ json: { ok: true } });
     }
     return route.fulfill({ json: remote.review });
@@ -76,6 +96,10 @@ export async function connect(context: BrowserContext, plan: AccountUser['plan']
           (!params.has('transcriptKey') ||
             e.source.transcriptKey === params.get('transcriptKey')) &&
           (!params.has('term') || e.normalizedTerm === params.get('term')) &&
+          (!params.has('search') ||
+            [e.term, e.reading ?? '', e.translation].some((value) =>
+              value.toLocaleLowerCase().includes(params.get('search')!.toLocaleLowerCase()),
+            )) &&
           (!params.has('deckId') ||
             remote.review.memberships.some(
               (m) => m.entryId === e.id && m.deckId === params.get('deckId'),

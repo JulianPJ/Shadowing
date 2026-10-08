@@ -2,6 +2,8 @@
 import Link from 'next/link';
 import { LockKeyhole } from 'lucide-react';
 import { useAccount } from './account';
+import { authPath } from '@/lib/auth/return-path';
+import { useTaskReturn } from './task-return';
 
 export function useProAccess() {
   const account = useAccount();
@@ -19,6 +21,14 @@ export function ProFeatureNotice({
   compact?: boolean;
 }) {
   const { account } = useProAccess();
+  const { destination } = useTaskReturn();
+  if (!account.loaded)
+    return (
+      <p className="pro-feature-notice" role="status">
+        Checking feature access…
+      </p>
+    );
+  if (account.user?.plan === 'pro') return null;
   return (
     <div className={`pro-feature-notice${compact ? ' compact' : ''}`} role="status">
       <LockKeyhole size={compact ? 14 : 17} />
@@ -31,10 +41,14 @@ export function ProFeatureNotice({
         </p>
       </div>
       {!account.user ? (
-        <Link className="text-button" href="/sign-in">
+        <Link className="text-button" href={authPath('/sign-in', destination)}>
           Sign in
         </Link>
-      ) : null}
+      ) : (
+        <Link className="text-button" href="/account#plans">
+          Compare Free and Pro
+        </Link>
+      )}
     </div>
   );
 }

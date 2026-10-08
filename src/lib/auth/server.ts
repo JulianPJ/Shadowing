@@ -1,5 +1,6 @@
 import { betterAuth } from 'better-auth';
 import type { BetterAuthOptions } from 'better-auth';
+import { safeReturnPath } from './return-path';
 
 export type AuthEnvironment = {
   AUTH_SECRET?: string;
@@ -140,15 +141,16 @@ export type HibikiAuth = ReturnType<typeof createAuth>;
 
 // The application only allows these return paths, including email action redirects.
 export function allowedAuthRedirect(value: unknown, origin: string) {
-  if (typeof value !== 'string') return false;
+  if (typeof value !== 'string' || /[\\\u0000-\u0020]/.test(value)) return false;
   try {
     const url = new URL(value, origin);
+    const path = `${url.pathname}${url.search}${url.hash}`;
     return (
       url.origin === origin &&
-      ['/account', '/sign-in', '/reset-password', '/'].includes(url.pathname) &&
+      (safeReturnPath(path, '') === path ||
+        ['/sign-in', '/reset-password'].includes(url.pathname)) &&
       !url.username &&
-      !url.password &&
-      !url.hash
+      !url.password
     );
   } catch {
     return false;

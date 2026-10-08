@@ -1,0 +1,157 @@
+/* Final readability and focus rules cover surfaces after theme/mobile overrides. */
+:where(button, a, input, select, textarea):focus-visible {
+  outline: 3px solid var(--accent, #64765b);
+  outline-offset: 3px;
+}
+.source-guidance {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--muted);
+  margin: 12px 0;
+}
+.returning-home .hero-intro {
+  display: none;
+}
+.returning-home .hero {
+  display: block;
+  margin-top: 28px;
+}
+.returning-home .start-card {
+  max-width: none;
+}
+.returning-home .demo-section,
+.returning-home .rhythm-section,
+.returning-home .home-signoff {
+  display: none;
+}
+.progress-next-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+  margin: 20px 0;
+}
+.progress-panel > summary {
+  cursor: pointer;
+  font-size: 15px;
+  padding: 8px 0;
+}
+.library-notice {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 18px;
+  background: var(--paper);
+  line-height: 1.6;
+}
+.library-notice.notice-success {
+  border-color: var(--accent);
+}
+.library-notice.notice-error {
+  color: var(--danger, #a84636);
+}
+.library-lesson-list li > div {
+  min-width: 0;
+}
+.library-lesson-title {
+  overflow-wrap: anywhere;
+}
+.weekly-metrics dt,
+.weekly-metrics span,
+.weekly-evidence p,
+.daily-goal p {
+  font-size: 13px;
+}
+@media (pointer: coarse) {
+  :where(.icon-button, .text-button, .button) {
+    min-height: 44px;
+  }
+}
+@media (max-width: 700px) {
+  .source-guidance {
+    font-size: 13px;
+  }
+  .library-queue li,
+  .library-remote {
+    flex-wrap: wrap;
+  }
+}
+:root:not([data-theme='dark']) {
+  --muted: #626b60;
+}
+.lookup-token:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+.lookup-token.lookup-selected {
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+}
+.lookup-phrase-action {
+  display: block;
+  min-height: 44px;
+  margin-top: 10px;
+  color: var(--accent);
+  font: 13px var(--font);
+}
+.lexicon-definitions button[aria-pressed='true'] {
+  background: var(--pale);
+  border-color: var(--accent);
+  color: var(--ink);
+}
+.dictionary-fields select {
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: var(--paper);
+  color: var(--ink);
+  max-width: 100%;
+}
+.dictionary-lookup-error {
+  margin: 12px 0;
+  font-size: 13px;
+  color: var(--ink);
+}
+.dictionary-save-panel .eyebrow,
+.dictionary-save-panel .dictionary-reading,
+.dictionary-lookup-hint,
+.dictionary-loading,
+.dictionary-signin p,
+.dictionary-fields label,
+.dictionary-save-panel .small,
+.dictionary-save-panel .text-button,
+.dictionary-save-panel .error-message {
+  font-size: 13px;
+  color: var(--muted);
+}
+.dictionary-save-panel .button {
+  min-height: 44px;
+  font-size: 14px;
+}
+.dictionary-save-heading .icon-button {
+  width: 44px;
+  height: 44px;
+}
+.dictionary-save-actions {
+  flex-wrap: wrap;
+}
+.dictionary-save-panel .lexicon-definitions button {
+  min-height: 44px;
+  font-size: 13px;
+}
+.dictionary-save-panel .dictionary-privacy,
+.dictionary-save-panel .dictionary-error,
+.dictionary-save-panel .dictionary-context > span {
+  font-size: 13px;
+}
+.dictionary-save-panel .dictionary-fields input,
+.dictionary-save-panel .dictionary-fields textarea {
+  font-size: 14px;
+}
+.practice-main .drill-settings label,
+.practice-main .drill-settings select,
+.practice-main .drill-settings input,
+.practice-main .offset-control > span,
+.practice-main .offset-control button,
+.practice-main .practice-view-controls .button {
+  font-size: 13px;
+}

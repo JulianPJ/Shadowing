@@ -1,5 +1,7 @@
 # Project Context — Hibiki / Shadowing
 
+> **UX implementation (7 October 2026, awaiting release):** The core-loop changes from audit PR #35 simplify practice/Studio, contextual lookup → save → study, deck management, review and return-to-practice journeys. Daily review limits sync through account preferences; recent accepted rating events support cross-device counts and guarded undo. Release requires additive migrations `0010_review_limits.sql` and `0011_review_events.sql`. See `docs/ux-core-loops.md` for coverage, compatibility and verification. This is an implementation checkpoint, not a production deployment claim.
+
 > **Post-MVP update (6 October 2026):** Phase A's retention loop is extended by **phases B–D**: licensed full English JMdict lookup, persistent Free word states, Word Browser/bulk status, personal vocabulary coverage and recommended lines; calibrated speaking diagnostics, explicit drills and bounded section trends; My Library/Continue Watching/queue, weekly evidence and a calm daily goal, plus explainable public/prepared-caption recommendations. The memory loop remains Free; existing AI/topic-vocabulary gates remain. See `docs/post-mvp-phases-b-d.md` for integration, runtime and verification contracts. Next work is product iteration and calibration, with optional Grammar Coach/conversation and content-source expansion kept separate. Older snapshots below describe earlier milestones.
 
 > **Purpose:** persistent product and engineering context for future development.

@@ -110,6 +110,13 @@ export function createD1DictionaryRepository(db: DictionaryDatabase): Dictionary
           conditions.push(`${field}=?`);
           values.push(value);
         }
+      if (query.search) {
+        const pattern = `%${query.search.replace(/[\\%_]/g, '\\$&')}%`;
+        conditions.push(
+          "(normalized_term LIKE ? ESCAPE '\\' OR lower(reading) LIKE ? ESCAPE '\\' OR lower(translation) LIKE ? ESCAPE '\\')",
+        );
+        values.push(pattern, pattern, pattern);
+      }
       for (const [table, field, value] of [
         ['user_deck_entries', 'deck_id', query.deckId],
         ['user_dictionary_tags', 'tag_id', query.tagId],

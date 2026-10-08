@@ -356,3 +356,270 @@
 .tag-controls input {
   max-width: 100%;
 }
+
+/* Saved vocabulary and collection management keep primary actions visible at narrow widths. */
+.dictionary-screen {
+  overflow-wrap: anywhere;
+}
+.dictionary-screen .small,
+.dictionary-screen .dictionary-count,
+.dictionary-screen .dictionary-entry-term > div > span,
+.dictionary-screen .dictionary-entry-context p + p,
+.dictionary-screen .dictionary-entry-source,
+.dictionary-screen .dictionary-entry-source .text-button {
+  font-size: 13px;
+  line-height: 1.65;
+}
+.dictionary-screen .button,
+.dictionary-screen .text-button,
+.dictionary-screen summary,
+.dictionary-screen .tag-chip {
+  min-height: 44px;
+}
+.dictionary-screen summary {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 550;
+}
+.dictionary-screen summary::before {
+  content: '▸';
+}
+.dictionary-screen details[open] > summary::before {
+  content: '▾';
+}
+.dictionary-screen label:not(.review-selection):not(.entry-deck-membership) {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  font-size: 14px;
+}
+.dictionary-screen input:not([type='checkbox']),
+.dictionary-screen select {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+}
+.dictionary-screen input[type='checkbox'] {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  accent-color: var(--accent);
+}
+.saved-words-filters,
+.saved-words-bulk,
+.deck-collection,
+.knowledge-definitions {
+  margin: 22px 0;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+}
+.saved-words-filters,
+.saved-words-filters form,
+.collection-bulk-actions,
+.collection-selection,
+.collection-tag-form,
+.collection-create,
+.deck-collection-actions,
+.deck-settings form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+}
+.saved-words-filters > label,
+.saved-words-filters form,
+.collection-create label,
+.collection-tag-form label {
+  flex: 1 1 180px;
+}
+.saved-words-filters form label {
+  flex: 1 1 180px;
+}
+.collection-selection {
+  align-items: center;
+}
+.collection-explanation {
+  line-height: 1.75;
+}
+.collection-bulk-actions > label {
+  min-width: min(220px, 100%);
+}
+.saved-words-bulk .tag-controls {
+  margin: 20px 0 10px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.tag-management,
+.collection-export,
+.entry-decks {
+  width: 100%;
+  margin-top: 8px;
+}
+.dictionary-screen .tag-controls label {
+  margin: 0;
+}
+.tag-management[open] > label {
+  display: inline-grid;
+  width: min(100%, 260px);
+  margin: 10px 12px 10px 0;
+}
+.tag-management button {
+  margin: 6px 10px 6px 0;
+}
+.entry-decks[open] {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.entry-decks .entry-deck-membership {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  gap: 8px;
+  margin: 4px 16px 4px 0;
+}
+.entry-decks label select {
+  max-width: 300px;
+}
+.dictionary-screen .review-entry-actions {
+  gap: 10px;
+  align-items: center;
+}
+.dictionary-screen .review-selection {
+  min-height: 44px;
+  align-items: center;
+  font-size: 14px;
+}
+.dictionary-entry-source > span {
+  min-width: 0;
+}
+.dictionary-screen .dictionary-entry-source > div {
+  gap: 12px;
+}
+.dictionary-screen .entry-tags {
+  align-items: center;
+}
+.dictionary-screen .entry-tags > label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.dictionary-screen .entry-tags select {
+  width: auto;
+  max-width: 100%;
+}
+.collection-notice {
+  padding: 12px 16px;
+  border-left: 3px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 6%, var(--paper));
+  line-height: 1.65;
+}
+.deck-list {
+  display: grid;
+  gap: 16px;
+  margin: 24px 0;
+}
+.deck-collection {
+  margin: 0;
+}
+.deck-collection-heading {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: start;
+  gap: 16px;
+}
+.deck-collection-heading h2 {
+  margin: 0 0 8px;
+  font-size: 22px;
+}
+.deck-collection-heading p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.deck-counts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 22px 0;
+}
+.deck-counts dt {
+  font-size: 13px;
+  color: var(--muted);
+}
+.deck-counts dd {
+  margin: 4px 0 0;
+  font-size: 24px;
+}
+.deck-settings {
+  flex: 1 1 180px;
+}
+.deck-settings[open] {
+  flex-basis: 100%;
+}
+.knowledge-definitions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.knowledge-definitions dt {
+  font-weight: 600;
+  margin-bottom: 5px;
+}
+.knowledge-definitions dd {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.dictionary-screen .word-browser-table td,
+.dictionary-screen .word-browser-table th,
+.dictionary-screen .word-browser-bulk,
+.dictionary-screen .word-browser-pagination,
+.dictionary-screen .word-browser-select {
+  font-size: 14px;
+}
+.dictionary-screen .word-browser-table {
+  max-width: 100%;
+}
+.dictionary-screen .dictionary-empty .button {
+  margin: 6px 12px 6px 0;
+}
+@media (max-width: 600px) {
+  .dictionary-screen {
+    padding: 0 16px 40px;
+  }
+  .saved-words-filters,
+  .saved-words-bulk,
+  .deck-collection,
+  .knowledge-definitions {
+    padding: 16px;
+  }
+  .knowledge-definitions {
+    grid-template-columns: 1fr;
+  }
+  .collection-bulk-actions > *,
+  .collection-tag-form > label,
+  .collection-create > label,
+  .dictionary-screen .word-browser-toolbar > label {
+    max-width: 100%;
+  }
+  .dictionary-empty {
+    padding: 20px;
+  }
+}

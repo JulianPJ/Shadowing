@@ -49,6 +49,8 @@ export function MyLibrary() {
   const [url, setUrl] = useState('');
   const [title, setTitle] = useState('');
   const [notice, setNotice] = useState('');
+  const [noticeKind, setNoticeKind] = useState<'success' | 'error' | 'info'>('info');
+  const [findingStage, setFindingStage] = useState('');
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [finding, setFinding] = useState(false);
   const [discovered, setDiscovered] = useState(false);
@@ -104,12 +106,14 @@ export function MyLibrary() {
   function queue(inputUrl: string, inputTitle: string) {
     try {
       const saved = addQueueLink(inputUrl, inputTitle);
+      setNoticeKind('success');
       setNotice(
         saved ? 'Saved to your queue.' : 'Queued for this visit. Browser storage is unavailable.',
       );
       setUrl('');
       setTitle('');
     } catch (error) {
+      setNoticeKind('error');
       setNotice(error instanceof Error ? error.message : 'This link could not be queued.');
     }
   }
@@ -118,6 +122,8 @@ export function MyLibrary() {
     const ticket = ++generation.current;
     const current = () => owner === storageAccount() && ticket === generation.current;
     setFinding(true);
+    setFindingStage('Finding prepared lessons…');
+    setNoticeKind('info');
     setNotice('');
     try {
       const response = await fetch('/api/discovery', {
@@ -136,6 +142,11 @@ export function MyLibrary() {
         if (!candidates.has(lesson.id)) candidates.set(lesson.id, lesson);
       const next: Recommendation[] = [];
       const hasWordEvidence = Object.keys(loadKnowledge()).length >= 5;
+      setFindingStage(
+        hasWordEvidence
+          ? 'Checking your marked words against lesson vocabulary…'
+          : 'Checking available lesson information…',
+      );
       for (const lesson of [...candidates.values()].slice(0, 20)) {
         if (
           lesson.segments.length > 500 ||
@@ -232,7 +243,10 @@ export function MyLibrary() {
           </Link>
         </div>
         {notice ? (
-          <p className="error-message" role="status">
+          <p
+            className={`library-notice notice-${noticeKind}`}
+            role={noticeKind === 'error' ? 'alert' : 'status'}
+          >
             {notice}
           </p>
         ) : null}
@@ -243,6 +257,10 @@ export function MyLibrary() {
               Add a video <Plus size={16} />
             </Link>
           </div>
+          <p className="small muted">
+            Prepared on this device. Your saved-library choices stay here; account lesson references
+            appear below when they can be restored.
+          </p>
           <div className="library-filters" role="group" aria-label="Filter library">
             {[
               ['all', 'All'],
@@ -284,6 +302,13 @@ export function MyLibrary() {
                         ? ` · ${savedCounts[lesson.id]} cached saved words`
                         : ''}
                     </p>
+                    <Link
+                      className="text-button"
+                      href={`/practice/${encodeURIComponent(lesson.id)}${lessonCompleted(lesson) ? `?section=${encodeURIComponent(lesson.segments[0].id)}` : ''}`}
+                    >
+                      {lessonCompleted(lesson) ? 'Practise again' : 'Resume practice'}{' '}
+                      <ArrowRight size={14} />
+                    </Link>
                     {fits[lesson.id] ? (
                       <p className="library-fit-line">
                         <span className="content-fit">{fits[lesson.id].label}</span>
@@ -301,6 +326,7 @@ export function MyLibrary() {
                       try {
                         pinLesson(lesson.id, !state.pinned.includes(lesson.id));
                       } catch (error) {
+                        setNoticeKind('error');
                         setNotice((error as Error).message);
                       }
                     }}
@@ -343,7 +369,9 @@ export function MyLibrary() {
             ))}
         </section>
         <section className="library-panel" aria-labelledby="queue-title">
-          <h2 id="queue-title">Watch later</h2>
+          <h2 id="queue-title">
+            Watch later <span className="small muted">On this device</span>
+          </h2>
           <p className="muted">
             Queue a link now. Japanese captions are checked when you prepare it; you can import a
             transcript when needed.
@@ -428,7 +456,7 @@ export function MyLibrary() {
               onClick={() => void findRecommendations()}
             >
               {finding ? <LoaderCircle className="spin" size={16} /> : <Check size={16} />}
-              {finding ? 'Reading transcripts…' : 'Find my next lesson'}
+              {finding ? 'Finding your next lesson…' : 'Find my next lesson'}
             </button>
           </div>
           <p className="muted">
@@ -436,6 +464,12 @@ export function MyLibrary() {
             word states on this device. Difficulty describes the content; fit estimates vocabulary
             familiarity.
           </p>
+          {finding ? (
+            <p role="status">
+              {findingStage} The first vocabulary check may take a moment to load the Japanese
+              dictionary. You can keep using your Library.
+            </p>
+          ) : null}
           {recommendations.length ? (
             <div className="recommendation-grid">
               {recommendations.map((item) => (

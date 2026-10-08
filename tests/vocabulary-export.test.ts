@@ -34,7 +34,10 @@ test('export preserves context, decks, Japanese and CSV escaping while neutraliz
   assert.equal(rows[0].decks, 'Inbox');
   assert.equal(rows[0].sourceUrl, '');
   assert.equal(rows[0].start, demo.segments[0].start);
-  assert.equal(contextHref(entry), `/practice/demo?section=${demo.segments[0].id}`);
+  assert.equal(
+    contextHref(entry),
+    `/practice/demo?section=${demo.segments[0].id}&transcript=${entry.source.transcriptKey}`,
+  );
   for (const url of [
     'https://example.com/a.mp4?token=SECRET',
     'https://user:pass@example.com/a.mp4',

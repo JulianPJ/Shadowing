@@ -42,7 +42,7 @@ export function Practice({
       if (
         expectedTranscript &&
         ((await transcriptKey(lesson)) !== expectedTranscript ||
-          !lesson.segments.some((s) => s.id === sectionId))
+          (sectionId !== undefined && !lesson.segments.some((s) => s.id === sectionId)))
       ) {
         if (!disposed) {
           setSession(null);

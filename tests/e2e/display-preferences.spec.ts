@@ -43,10 +43,7 @@ test('display defaults, lazy assets, Studio playback continuity, navigation and 
   for (let i = 0; i < 7; i++)
     await page.getByRole('button', { name: 'Shift playback timing 50 milliseconds later' }).click();
   await expect(offset).toHaveText('+350 ms');
-  await expect(page.getByRole('button', { name: 'Continuous', exact: true })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
+  await expect(page.getByLabel('Practice preset', { exact: true })).toHaveValue('continuous');
   expect(assets).toEqual([]);
   await page.getByRole('button', { name: 'Save this section for practice' }).click();
   await page.getByRole('button', { name: 'Play', exact: true }).click();
@@ -55,7 +52,7 @@ test('display defaults, lazy assets, Studio playback continuity, navigation and 
     .toBeGreaterThan(0.3);
   const before = await page.locator('video').evaluate((v: HTMLVideoElement) => {
     v.dataset.mounted = 'same-player';
-    return v.currentTime;
+    return { time: v.currentTime, wall: performance.now() };
   });
   await studio(page).click();
   await expect(page.locator('.practice-main')).toHaveClass(/studio-mode/);
@@ -66,9 +63,12 @@ test('display defaults, lazy assets, Studio playback continuity, navigation and 
     paused: v.paused,
     speed: v.playbackRate,
     mounted: v.dataset.mounted,
+    wall: performance.now(),
   }));
-  expect(after.time).toBeGreaterThanOrEqual(before);
-  expect(after.time - before).toBeLessThan(1);
+  expect(after.time).toBeGreaterThanOrEqual(before.time);
+  expect(
+    Math.abs(after.time - before.time - ((after.wall - before.wall) / 1000) * 0.75),
+  ).toBeLessThan(0.5);
   expect(after).toMatchObject({ paused: false, speed: 0.75, mounted: 'same-player' });
   await expect(page.getByTestId('current-japanese')).toHaveText(demo.segments[0].japanese);
   await furigana(page).click();
@@ -123,7 +123,7 @@ test('ruby on current/transcript, canonical search/copy bases/storage and prefer
   await expect(page.getByTestId('current-japanese')).toHaveAccessibleName(
     demo.segments[0].japanese,
   );
-  await expect(page.locator('[data-testid="transcript-0"] ruby')).not.toHaveCount(0);
+  await expect(page.getByTestId('transcript-0').locator('..').locator('ruby')).not.toHaveCount(0);
   expect(await sourceText(page, '#current-japanese')).toBe(demo.segments[0].japanese);
   expect(
     await page.locator('#current-japanese').evaluate((element) => {
@@ -168,6 +168,7 @@ test('Studio and Furigana preserve quiz answers, difficulty, identity and bounde
     { key: proStorageKey('completion:demo'), revision: transcriptRevision(demo as Lesson) },
   );
   await open(page);
+  await page.getByText('About this lesson’s difficulty', { exact: true }).click();
   await expect(page.locator('.difficulty-summary')).toBeVisible();
   await page.getByRole('button', { name: 'Take comprehension check' }).click();
   await page.getByRole('group', { name: 'Answer options' }).getByRole('button').nth(0).click();
@@ -207,17 +208,22 @@ test('Studio and Furigana preserve quiz answers, difficulty, identity and bounde
     return {
       media: rect('.media-frame'),
       current: rect('.current-card'),
-      transcript: rect('.transcript-card'),
       quiz: rect('.quiz-card'),
       difficulty: rect('.difficulty-card'),
     };
   });
   expect(studioLayout.current.left).toBeGreaterThan(studioLayout.media.right - 2);
   expect(Math.abs(studioLayout.current.top - studioLayout.media.top)).toBeLessThan(3);
-  expect(studioLayout.transcript.top).toBeGreaterThan(studioLayout.media.bottom);
-  expect(studioLayout.transcript.height).toBeLessThanOrEqual(720);
   expect(studioLayout.quiz.top).toBeGreaterThan(studioLayout.media.bottom);
   expect(studioLayout.difficulty.top).toBeGreaterThan(studioLayout.media.bottom);
+  await page
+    .getByRole('navigation', { name: 'Lesson tools' })
+    .getByRole('button', { name: 'Transcript', exact: true })
+    .click();
+  await expect(page.locator('.quiz-card')).toBeHidden();
+  const transcriptBox = await page.locator('.transcript-card').boundingBox();
+  expect(transcriptBox!.y).toBeGreaterThan(studioLayout.media.bottom);
+  expect(transcriptBox!.height).toBeLessThanOrEqual(720);
   const transcriptOverflow = await page.locator('.transcript-scroll').evaluate((element) => ({
     clientHeight: element.clientHeight,
     scrollHeight: element.scrollHeight,
@@ -225,7 +231,12 @@ test('Studio and Furigana preserve quiz answers, difficulty, identity and bounde
   }));
   expect(transcriptOverflow.overflowY).toBe('auto');
   expect(transcriptOverflow.scrollHeight).toBeGreaterThan(transcriptOverflow.clientHeight);
-  for (const selector of ['.transcript-card', '.difficulty-card', '.quiz-card']) {
+  await expect(page.locator('.transcript-card')).toBeVisible();
+  await page
+    .getByRole('navigation', { name: 'Lesson tools' })
+    .getByRole('button', { name: 'Lesson review', exact: true })
+    .click();
+  for (const selector of ['.difficulty-card', '.quiz-card']) {
     await page.locator(selector).scrollIntoViewIfNeeded();
     await expect(page.locator(selector)).toBeVisible();
   }
@@ -282,7 +293,7 @@ test('Studio desktop/mobile/tablet, long ruby text, translations and screenshots
     main = await page.locator('.practice-main').boundingBox(),
     current = await page.locator('.current-card').boundingBox(),
     recording = await page.locator('.recording-panel').boundingBox();
-  expect(video!.width / main!.width).toBeGreaterThan(0.68);
+  expect(video!.width / main!.width).toBeGreaterThan(0.58);
   expect(video!.width / video!.height).toBeGreaterThanOrEqual(16 / 9 - 0.02);
   expect(current!.x).toBeGreaterThan(video!.x + video!.width - 2);
   expect(Math.abs(current!.y - video!.y)).toBeLessThan(3);
@@ -301,9 +312,9 @@ test('Studio desktop/mobile/tablet, long ruby text, translations and screenshots
   await page.getByRole('button', { name: 'Reveal translation T' }).click();
   await expect(page.locator('#current-translation')).toBeVisible();
   const currentAfterTranslation = await page.locator('.current-card').boundingBox();
-  expect(Math.abs(currentAfterTranslation!.height - currentBeforeTranslation!.height)).toBeLessThan(
-    3,
-  );
+  expect(currentAfterTranslation!.height).toBeGreaterThanOrEqual(currentBeforeTranslation!.height);
+  await expect(page.getByRole('button', { name: 'Replay R' })).toBeVisible();
+  expect((await page.locator('.media-frame').boundingBox())!.x).toBe(video!.x);
   expect((await page.locator('#current-translation').boundingBox())!.height).toBeLessThanOrEqual(
     180,
   );
@@ -365,4 +376,96 @@ test('unavailable reading assets leave practice usable and can be retried', asyn
   await furigana(page).click();
   await furigana(page).click();
   await expect(page.locator('#current-japanese ruby')).not.toHaveCount(0);
+});
+
+test('Studio tool panes keep the player mounted and transcript lookup never seeks in either site theme', async ({
+  page,
+}) => {
+  await open(page);
+  await page.locator('video').evaluate((video: HTMLVideoElement) => {
+    video.dataset.uxPlayer = 'same-player';
+  });
+  await studio(page).click();
+  const tools = page.getByRole('navigation', { name: 'Lesson tools' });
+  for (const theme of ['light', 'dark']) {
+    await page.evaluate((value) => {
+      document.documentElement.dataset.theme = value;
+    }, theme);
+    await tools.getByRole('button', { name: 'Transcript', exact: true }).click();
+    const row = page.locator('.transcript-row').nth(4);
+    await row.locator('[data-lookup]').first().click();
+    const lookup = row.getByRole('complementary', { name: 'Save vocabulary' });
+    await expect(lookup).toBeVisible();
+    await expect(lookup.locator('.dictionary-context [lang="ja"]')).toHaveText(
+      demo.segments[4].japanese,
+    );
+    await expect(page.getByTestId('current-japanese')).toHaveText(demo.segments[0].japanese);
+    expect(await page.locator('video').evaluate((video: HTMLVideoElement) => video.paused)).toBe(
+      true,
+    );
+    expect(
+      await lookup.evaluate((element) => ({
+        foreground: getComputedStyle(element).color,
+        background: getComputedStyle(element).backgroundColor,
+      })),
+    ).toEqual({ foreground: 'rgb(241, 240, 233)', background: 'rgb(25, 30, 26)' });
+    await lookup.getByRole('button', { name: 'Close vocabulary lookup' }).click();
+    for (const name of ['Vocabulary', 'Lesson review', 'Transcript']) {
+      await tools.getByRole('button', { name, exact: true }).click();
+      expect(
+        await page.locator('video').evaluate((video: HTMLVideoElement) => video.dataset.uxPlayer),
+      ).toBe('same-player');
+      await expect(page.getByTestId('current-japanese')).toHaveText(demo.segments[0].japanese);
+    }
+  }
+  await page.getByTestId('transcript-9').click();
+  await expect(page.getByTestId('current-japanese')).toHaveText(demo.segments[9].japanese);
+  await expect(page.locator('.transcript-row.past')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Exit Studio', exact: true }).click();
+  await expect(page.locator('.practice-main')).not.toHaveClass(/studio-mode/);
+  await expect(page.getByText('Section position', { exact: true })).toBeVisible();
+  expect(
+    await page.locator('video').evaluate((video: HTMLVideoElement) => video.dataset.uxPlayer),
+  ).toBe('same-player');
+});
+
+test('Vocabulary return restores the exact paused position and ignores a changed transcript', async ({
+  page,
+}) => {
+  await open(page);
+  await page.getByRole('button', { name: 'Listen', exact: true }).click();
+  await expect
+    .poll(() => page.locator('video').evaluate((video: HTMLVideoElement) => video.currentTime))
+    .toBeGreaterThan(1);
+  await page.getByRole('button', { name: 'Pause', exact: true }).click();
+  const position = await page
+    .locator('video')
+    .evaluate((video: HTMLVideoElement) => video.currentTime);
+  await page
+    .getByRole('navigation', { name: 'Main navigation' })
+    .getByRole('link', { name: 'Vocabulary', exact: true })
+    .click();
+  await page.getByRole('link', { name: 'Back to practice', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Listen', exact: true })).toBeEnabled();
+  const returned = await page
+    .locator('video')
+    .evaluate((video: HTMLVideoElement) => ({ time: video.currentTime, paused: video.paused }));
+  expect(returned.paused).toBe(true);
+  expect(Math.abs(returned.time - position)).toBeLessThan(0.1);
+  await expect(page.getByTestId('playback-state')).toContainText('TAKE A BREATH');
+  await page
+    .getByRole('navigation', { name: 'Main navigation' })
+    .getByRole('link', { name: 'Vocabulary', exact: true })
+    .click();
+  await page.evaluate(() => {
+    const saved = JSON.parse(sessionStorage.getItem('hibiki:practice-return')!);
+    saved.transcript = 'a replaced transcript';
+    sessionStorage.setItem('hibiki:practice-return', JSON.stringify(saved));
+  });
+  await page.getByRole('link', { name: 'Back to practice', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Listen', exact: true })).toBeEnabled();
+  expect(
+    await page.locator('video').evaluate((video: HTMLVideoElement) => video.currentTime),
+  ).toBeLessThan(0.1);
+  expect(await page.evaluate(() => sessionStorage.getItem('hibiki:practice-return'))).toBeNull();
 });

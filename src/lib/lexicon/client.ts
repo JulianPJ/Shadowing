@@ -5,6 +5,7 @@ import { hiragana } from '../japanese-readings';
 import { lexiconShard } from './shard';
 import { lookupCandidates, matchLexicalEntries, canonicalLemma } from './lookup';
 import type { LexiconEntry, LexiconResult } from './types';
+import { selectedMorphology } from '../japanese-lexical-spans';
 
 const path = '/lexicon/' + source.version;
 const shards = new Map<string, Promise<Record<string, unknown>>>();
@@ -49,7 +50,11 @@ export async function lookupJapanese(
       /* Exact dictionary lookup remains useful. */
     }
   }
-  const token = tokens.find((value) => value.surface_form === term);
+  const contextual = selectedMorphology(term, tokens)[0];
+  // A phrase can start with a noun without being that noun's inflected form.
+  // Only prefer a contextual lemma when candidate generation validated the form.
+  const token =
+    contextual && candidates.includes(canonicalLemma(contextual)) ? contextual : undefined;
   const preferredReading = token?.reading ? hiragana(token.reading) : undefined;
   let matches: LexiconResult['matches'] = [];
   for (const candidate of candidates) {

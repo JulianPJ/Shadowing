@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { ArrowRight, Check, LoaderCircle, RotateCcw } from 'lucide-react';
 import type { Lesson, LessonQuiz, QuizAttempt, QuizEvidence } from '@/lib/types';
 import { newAttempt, object, updateAttempt, validateQuiz, validateQuizLesson } from '@/lib/quiz';
@@ -15,7 +15,7 @@ type Props = {
   ready: boolean;
   recording: boolean;
   replaying: boolean;
-  onReplay: (evidence: QuizEvidence) => void;
+  onReplay: (evidence: QuizEvidence, questionLabel?: string) => void;
   onReturn: () => void;
   onOpenChange: (open: boolean) => void;
   onAttemptChange?: (attempt: QuizAttempt) => void;
@@ -42,6 +42,20 @@ export function ComprehensionQuiz({
   const [questionIndex, setQuestionIndex] = useState(0);
   const abort = useRef<AbortController | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
+  const requestedStart = useRef(false);
+  const openRequestedQuiz = useEffectEvent(() => {
+    void start();
+  });
+  useEffect(() => {
+    if (
+      !requestedStart.current &&
+      quizAvailable &&
+      new URLSearchParams(window.location.search).get('quiz') === 'open'
+    ) {
+      requestedStart.current = true;
+      openRequestedQuiz();
+    }
+  }, [quizAvailable]);
   useEffect(() => () => abort.current?.abort(), []);
   useEffect(() => {
     if (open && !loading) heading.current?.focus();
@@ -261,7 +275,12 @@ export function ComprehensionQuiz({
                   <button
                     className="button primary quiz-replay"
                     disabled={!ready || recording}
-                    onClick={() => onReplay(question.evidence)}
+                    onClick={() =>
+                      onReplay(
+                        question.evidence,
+                        `Question ${questionIndex + 1} of ${quiz.questions.length}`,
+                      )
+                    }
                   >
                     <RotateCcw size={17} />
                     Replay relevant section

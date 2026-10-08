@@ -18,6 +18,8 @@ async function history(page: Page) {
   );
 }
 async function progress(page: Page) {
+  if (await page.getByRole('button', { name: 'Open navigation menu' }).isVisible())
+    await page.getByRole('button', { name: 'Open navigation menu' }).click();
   await page.getByRole('link', { name: 'Progress', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Your progress', exact: true })).toBeVisible();
 }
@@ -239,11 +241,14 @@ test('five practised unique analyzed lessons produce typical content and later a
     { lessons, sessions, analyses },
   );
   await page.goto('/progress');
-  await expect(page.locator('.progress-main')).toContainText('at least five different lessons');
+  await expect(page.locator('.progress-main')).toContainText(
+    '4 analyzed, practised lessons so far',
+  );
   await page.route('**/api/difficulty', (route) =>
     route.fulfill({ json: { analysis: analyses[4] } }),
   );
   await page.goto(`/practice/${lessons[4].id}`);
+  await page.getByText('About this lesson’s difficulty', { exact: true }).click();
   await expect(page.locator('.difficulty-summary')).toBeVisible();
   await progress(page);
   await expect(page.locator('.content-range')).toHaveText(
@@ -292,6 +297,7 @@ test('checkpointing is incremental, bounded and excludes a quiz/analysis wait', 
     (s: { origin: string }) => s.origin === 'practice',
   ).activeSeconds;
   await page.reload();
+  await page.getByText('About this lesson’s difficulty', { exact: true }).click();
   await expect(page.getByRole('button', { name: 'Retry difficulty analysis' })).toBeVisible();
   await progress(page);
   const final = (await history(page)).sessions.find(

@@ -64,6 +64,13 @@ before(async () => {
           );
       }),
     );
+  await db.batch(
+    (await readFile('migrations/0011_review_events.sql', 'utf8'))
+      .split(';')
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map((s) => db.prepare(s)),
+  );
   review = createD1ReviewRepository(db);
   await review.apply('scale', { action: 'deck', id: 'old-deck', name: 'Existing' });
   await review.apply('scale', {
@@ -80,7 +87,11 @@ before(async () => {
       .filter(Boolean)
       .map((s) => db.prepare(s)),
   );
-  assert.deepEqual(await review.snapshot('scale'), old);
+  const upgraded = await review.snapshot('scale');
+  assert.deepEqual(
+    { ...upgraded, historySince: undefined, historyWindowStart: undefined },
+    { ...old, historySince: undefined, historyWindowStart: undefined },
+  );
   dictionary = createD1DictionaryRepository(db);
   tags = createD1TagRepository(db);
 });

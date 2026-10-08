@@ -49,7 +49,177 @@
 .practice-current-stack {
   display: contents;
 }
-/* Studio Mode is an immersive split workspace: media dominates, current + recording stay beside it. */
+/* The same media and tool trees stay mounted in both layouts. */
+.practice-settings-stack {
+  min-width: 0;
+}
+.studio-lesson-identity {
+  display: none;
+}
+.practice-tool-navigation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 22px 0 12px;
+}
+.practice-tool-navigation .button[aria-pressed='true'] {
+  color: var(--green);
+  background: var(--green-pale);
+  border-color: var(--green);
+}
+.practice-secondary-pane {
+  min-width: 0;
+  scroll-margin-top: 20px;
+}
+.practice-secondary-pane[hidden],
+.transcript-card[hidden] {
+  display: none !important;
+}
+.drill-advanced {
+  flex: 1 1 100%;
+}
+.drill-advanced summary,
+.completion-details summary,
+.difficulty-method summary {
+  cursor: pointer;
+  min-height: 44px;
+  padding: 10px 0;
+  font-size: 13px;
+  color: var(--ink);
+}
+.drill-advanced-fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+  padding: 6px 0 12px;
+}
+.drill-advanced-fields label {
+  flex: 1 1 140px;
+}
+.drill-settings label,
+.drill-settings select,
+.drill-settings input {
+  font-size: 13px;
+}
+.drill-settings select,
+.drill-settings input {
+  min-height: 44px;
+}
+.drill-settings > label:first-child {
+  flex: 1 1 230px;
+}
+.drill-settings > label:first-child select {
+  width: 100%;
+}
+.completion-details {
+  margin-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.difficulty-disclosure > .difficulty-card {
+  margin-top: 0;
+}
+.recording-retention {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 8px 0;
+  line-height: 1.6;
+}
+.recording-compare {
+  width: 100%;
+  white-space: normal;
+}
+.evidence-banner small {
+  display: block;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.transcript-lookup-hint {
+  font-size: 12px;
+  color: var(--muted);
+  padding: 0 18px 12px;
+}
+.transcript-row {
+  cursor: default;
+  align-items: start;
+}
+.transcript-play {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 52px;
+  min-height: 52px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: var(--green);
+  background: var(--paper);
+}
+.transcript-play:hover:not(:disabled) {
+  background: var(--green-pale);
+}
+.transcript-play .row-number {
+  width: auto;
+  padding-top: 0;
+  color: inherit;
+}
+.transcript-play .row-time {
+  font-size: 11px;
+  color: var(--muted);
+}
+.transcript-row .row-content {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 0;
+}
+.transcript-row .dictionary-save-panel {
+  margin: 14px 0 0;
+}
+.transcript-row .active-dot {
+  margin-top: 17px;
+}
+
+/* Playback targets remain usable without precision taps. */
+.practice-main .offset-control > button {
+  min-width: 44px;
+  min-height: 44px;
+}
+.practice-main .speed-control select {
+  min-height: 44px;
+}
+.practice-main .practice-controls .icon-button {
+  width: 44px;
+  height: 44px;
+}
+.practice-main .transcript-tools .icon-button {
+  width: 44px;
+  height: 44px;
+}
+.practice-main .practice-controls .button {
+  min-height: 44px;
+  font-size: 13px;
+}
+.practice-main .translation-button {
+  min-height: 44px;
+  font-size: 13px;
+}
+.practice-main .practice-progress .small {
+  font-size: 12px;
+}
+.practice-main .practice-breadcrumb {
+  font-size: 13px;
+}
+.practice-main .recording-privacy {
+  display: block;
+  margin-top: 10px;
+}
+.practice-main .player-footnote,
+.practice-main .player-footnote .text-button {
+  font-size: 12px;
+}
+
+/* Studio owns every descendant token, independent of the surrounding site theme. */
 body.studio-active {
   background: #101310;
 }
@@ -57,448 +227,408 @@ body.studio-active .site-header,
 body.studio-active .site-footer {
   display: none;
 }
-.studio-mode {
-  width: 100vw;
+.practice-main.studio-mode {
+  color-scheme: dark;
+  --bg: #101310;
+  --paper: #191e1a;
+  --ink: #f1f0e9;
+  --muted: #bac2b9;
+  --line: #4b574e;
+  --accent: #d9846f;
+  --accent-hover: #eda08d;
+  --pale: #35241f;
+  --green: #c0d9bf;
+  --green-pale: #27392c;
+  width: 100%;
   max-width: none;
   min-height: 100vh;
-  margin-left: calc(50% - 50vw);
-  margin-right: calc(50% - 50vw);
-  padding: 18px clamp(18px, 3vw, 54px) 52px;
-  background: #101310;
-  color: #f1efe8;
+  margin: 0;
+  padding: 18px clamp(16px, 3vw, 48px) 40px;
+  background: var(--bg);
+  color: var(--ink);
 }
 .studio-mode .practice-breadcrumb {
-  max-width: 1720px;
-  margin: 0 auto 14px;
-  color: #aeb7ae;
+  max-width: 1600px;
+  margin: 0 auto 16px;
+  font-size: 13px;
+  gap: 12px;
 }
 .studio-mode .practice-breadcrumb > a,
 .studio-mode .practice-breadcrumb > span {
-  color: #aeb7ae;
+  color: var(--muted);
 }
-.studio-mode .private-label {
-  margin-left: auto;
-  color: #778078;
+.studio-mode .studio-lesson-identity {
+  display: block;
+  flex: 1 1 220px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.studio-navigation {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+}
+.studio-navigation a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  text-decoration: underline;
+  text-underline-offset: 4px;
 }
 .studio-mode .practice-view-controls {
-  margin-left: 16px;
-}
-.studio-mode .practice-view-controls .button {
-  background: #181d19;
-  border-color: #303832;
-  color: #dce3dc;
-}
-.studio-mode .practice-view-controls .button:hover {
-  background: #202720;
-  border-color: #465148;
-}
-.studio-mode .practice-view-controls [aria-pressed='true'] {
-  background: #29352d;
-  border-color: #607464;
-  color: #eff5ef;
+  margin-left: auto;
 }
 .studio-mode .practice-title {
   display: none;
 }
 .studio-mode .practice-grid {
-  max-width: 1720px;
-  margin: 0 auto;
+  max-width: 1600px;
+  margin: auto;
   display: grid;
-  grid-template-columns: minmax(0, 3.35fr) minmax(310px, 1fr);
-  column-gap: 14px;
-  row-gap: 10px;
+  grid-template-columns: minmax(0, 2.8fr) minmax(340px, 1.2fr);
+  gap: 16px;
   align-items: start;
 }
 .studio-mode .player-column {
   display: contents;
 }
-.studio-mode .practice-grid > *:not(.player-column),
-.studio-mode .player-column > * {
+.studio-mode .player-column > *,
+.studio-mode .practice-grid > * {
   min-width: 0;
 }
 .studio-mode .media-frame {
   grid-column: 1;
   grid-row: 1;
-  aspect-ratio: 16/9;
   width: 100%;
-  max-height: calc(100vh - 122px);
-  border-radius: 8px;
+  max-height: calc(100vh - 150px);
   background: #000;
-  box-shadow: 0 18px 55px #0008;
+  border-color: var(--line);
 }
 .studio-mode .practice-current-stack {
   grid-column: 2;
   grid-row: 1;
-  display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
-  gap: 10px;
-  min-width: 0;
-  height: 100%;
-  max-height: calc(100vh - 122px);
-  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: calc(100vh - 150px);
+  overflow: auto;
+  scrollbar-width: thin;
 }
 .studio-mode .current-card {
-  height: auto;
-  min-height: 0;
-  max-height: none;
+  flex: 0 0 auto;
+  max-height: min(500px, 56vh);
   overflow: auto;
-  padding: 18px 17px 16px;
-  border: 1px solid #313a33;
-  border-radius: 8px;
-  background: #171b18;
-  color: #f1efe8;
-  box-shadow: 0 18px 55px #0005;
+  min-height: 0;
+  margin: 0;
+  padding: 18px;
+  background: var(--paper);
+  color: var(--ink);
+  border-color: var(--line);
 }
 .studio-mode .current-card h2 {
   min-height: 0;
-  margin: 12px 0 10px;
-  font-size: 22px;
-  line-height: 1.72;
-  color: #fff;
+  margin: 12px 0;
+  font-size: 23px;
+  color: var(--ink);
 }
-.studio-mode .current-card h2:has(.with-furigana) {
-  line-height: 2.05;
+.studio-mode .practice-controls {
+  gap: 7px;
+  flex-wrap: wrap;
 }
-.studio-mode .current-heading {
-  position: sticky;
-  top: -18px;
-  z-index: 2;
-  margin: -18px -17px 0;
-  padding: 15px 17px 10px;
-  background: linear-gradient(#171b18 80%, #171b1800);
+.studio-mode .practice-controls .button {
+  min-height: 44px;
+  padding: 10px 12px;
+  font-size: 13px;
 }
-.studio-mode .state-badge {
-  background: #26332a;
-  color: #dce8de;
+.studio-mode .practice-controls .icon-button {
+  width: 44px;
+  height: 44px;
 }
-.studio-mode .section-time,
-.studio-mode .turn-instruction,
-.studio-mode .recording-hint,
-.studio-mode .translation-privacy,
-.studio-mode .translation-source {
-  color: #9ca79d;
-}
-.studio-mode .translation-button {
-  color: #d9e4da;
-}
-.studio-mode .current-translation {
-  max-height: min(180px, 22vh);
-  overflow: auto;
-  padding-right: 8px;
-  color: #c9d8c9;
-  scrollbar-width: thin;
-  scrollbar-color: #566259 transparent;
-}
-.studio-mode .current-card .button:not(.primary) {
-  background: #263029;
-  border-color: #46534a;
-  color: #eef3ef;
-}
-.studio-mode .current-card .button:not(.primary):hover {
-  background: #303a32;
-  border-color: #5c6a60;
-}
-.studio-mode .current-card .button.primary {
-  background: #b65d48;
-  border-color: #b65d48;
-  color: #fff9f4;
-}
-.studio-mode .current-card .button.primary:hover {
-  background: #c96c55;
-  border-color: #c96c55;
-}
-.studio-mode .current-card .icon-button {
-  background: #263029;
-  border: 1px solid #46534a;
-  color: #eef3ef;
-}
-.studio-mode .current-card .icon-button:hover {
-  background: #303a32;
-  border-color: #5c6a60;
-}
-.studio-mode .current-card button:disabled {
-  background: #202621 !important;
-  border-color: #303832 !important;
-  color: #89958b !important;
-  opacity: 0.72;
-}
-.studio-mode .icon-button:hover {
-  background: #273029;
-}
-.studio-mode .favorite-button.saved {
-  background: #38251f;
-  color: #e99b82;
-}
-.studio-mode .section-track {
-  background: #2b322d;
+.studio-mode .practice-settings-stack {
+  grid-column: 1 / -1;
+  grid-row: 2;
 }
 .studio-mode .player-settings {
-  grid-column: 1;
-  grid-row: 2;
-  padding: 8px 2px 0;
-  color: #c3cbc4;
+  padding: 0;
+  justify-content: flex-start;
 }
-.studio-mode .segmented-control {
-  background: #181d19;
-  border-color: #303832;
+.studio-mode .playback-adjustments {
+  margin-left: 0;
 }
-.studio-mode .segmented-control button {
-  color: #aab4ac;
+.studio-mode .drill-settings {
+  margin-bottom: 0;
 }
-.studio-mode .segmented-control button.selected {
-  background: #303a33;
-  color: #fff;
+.studio-mode .practice-tool-navigation {
+  grid-column: 1 / -1;
+  margin: 8px 0 0;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 12px;
 }
-.studio-mode .speed-control,
-.studio-mode .offset-control {
-  color: #aeb7ae;
-}
-.studio-mode .speed-control select,
-.studio-mode .offset-control > button {
-  background: #181d19;
-  border-color: #303832;
-  color: #e7ece7;
-}
-.studio-mode .offset-control > button:hover:not(:disabled) {
-  background: #242b25;
-  border-color: #465149;
-}
-.studio-mode .completion-card,
+.studio-mode .practice-secondary-pane,
+.studio-mode .transcript-card,
 .studio-mode .evidence-banner,
 .studio-mode .reattach,
-.studio-mode .quiz-card,
-.studio-mode .difficulty-card,
 .studio-mode .player-footnote,
 .studio-mode .translation-privacy,
 .studio-mode .error-message {
   grid-column: 1 / -1;
 }
-.studio-mode .recording-panel {
-  min-height: 0;
-  max-height: min(390px, 46vh);
-  overflow: auto;
-  padding: 14px 17px 16px;
-  border: 1px solid #313a33;
-  border-radius: 8px;
-  background: #171b18;
-  color: #f1efe8;
-  scrollbar-width: thin;
-  scrollbar-color: #566259 transparent;
-}
-.studio-mode .recording-panel audio {
-  filter: invert(0.88) hue-rotate(180deg);
+.studio-mode .practice-secondary-pane > :first-child {
+  margin-top: 0;
 }
 .studio-mode .transcript-card {
-  grid-column: 1 / -1;
   position: static;
-  height: min(720px, calc(100vh - 90px));
-  max-height: min(720px, calc(100vh - 90px));
-  min-height: 420px;
-  margin-top: 22px;
-  overflow: hidden;
-  background: #171b18;
-  border-color: #303832;
-  color: #e7ece7;
+  margin: 0;
+  height: min(600px, 75vh);
+  max-height: none;
+  min-height: 300px;
+  background: var(--paper);
+  color: var(--ink);
+  border-color: var(--line);
 }
-.studio-mode .transcript-heading,
-.studio-mode .transcript-tools,
-.studio-mode .transcript-bottom {
-  border-color: #303832;
-}
-.studio-mode .transcript-search {
-  background: #111512;
-  border-color: #303832;
-}
-.studio-mode .transcript-search input {
-  color: #eef2ee;
-}
-.studio-mode .transcript-row {
-  width: 100%;
-  border-color: #272e29;
-  color: #d7ddd8;
-}
-.studio-mode .transcript-row:hover,
-.studio-mode .transcript-row.current {
-  background: #222a24;
+.studio-mode .transcript-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow: auto;
+  content-visibility: visible;
+  scrollbar-color: var(--line) transparent;
 }
 .studio-mode .transcript-heading,
 .studio-mode .transcript-tools,
 .studio-mode .transcript-bottom {
   flex: 0 0 auto;
+  border-color: var(--line);
 }
-.studio-mode .transcript-scroll {
+.studio-mode .transcript-row {
+  color: var(--ink);
+  border-color: var(--line);
+}
+.studio-mode .transcript-row:hover,
+.studio-mode .transcript-row.current {
+  background: var(--green-pale);
+}
+.studio-mode .recording-panel {
+  flex: 0 0 auto;
+  max-height: 340px;
   overflow: auto;
-  content-visibility: visible;
-  flex: 1 1 auto;
-  min-height: 0;
-  overscroll-behavior: contain;
-  scrollbar-color: #566259 transparent;
-}
-.studio-mode .quiz-card,
-.studio-mode .difficulty-card {
+  margin: 0;
+  padding: 16px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
   color: var(--ink);
 }
-.studio-mode .player-footnote {
-  color: #89948b;
+.studio-mode .recording-core {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding-bottom: 12px;
+  background: var(--paper);
+}
+.studio-mode .recording-audio audio {
+  color-scheme: dark;
+}
+.studio-mode .recording-top {
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.studio-mode .recording-top .button {
+  flex: 1 1 auto;
+}
+.studio-mode .button:not(.primary),
+.studio-mode .icon-button,
+.studio-mode input,
+.studio-mode textarea,
+.studio-mode select {
+  background: var(--paper);
+  color: var(--ink);
+  border-color: var(--line);
+}
+.studio-mode .button:not(.primary):hover,
+.studio-mode .icon-button:hover {
+  background: var(--green-pale);
+  border-color: var(--green);
+}
+main.practice-main.studio-mode .button.primary {
+  background: #ac503d;
+  border-color: #ac503d;
+  color: #fff;
+}
+main.practice-main.studio-mode .button.primary:hover {
+  background: #934230;
+  border-color: #934230;
+}
+.studio-mode .button:disabled,
+.studio-mode .icon-button:disabled {
+  opacity: 0.65;
+}
+main.practice-main.studio-mode input::placeholder,
+main.practice-main.studio-mode textarea::placeholder {
+  color: var(--muted);
+}
+.studio-mode .dictionary-save-panel {
+  background: var(--paper);
+  color: var(--ink);
+  border-color: var(--line);
+}
+.studio-mode .dictionary-fields label,
+.studio-mode .dictionary-privacy,
+.studio-mode .dictionary-loading,
+.studio-mode .dictionary-reading,
+.studio-mode .dictionary-context > span,
+.studio-mode .dictionary-signin p,
+.studio-mode .dictionary-lookup-hint,
+.studio-mode .dictionary-lookup-note,
+.studio-mode .section-time,
+.studio-mode .turn-instruction,
+.studio-mode .translation-source,
+.studio-mode .small-label,
+.studio-mode .recording-hint,
+.studio-mode .recording-privacy,
+.studio-mode .recording-analysis-actions > span,
+.studio-mode .shadowing-comparison dt,
+.studio-mode .shadowing-score-label,
+.studio-mode .shadowing-suggestions ul,
+.studio-mode .transcript-heading .eyebrow,
+.studio-mode .row-time,
+.studio-mode .row-number,
+.studio-mode .transcript-bottom,
+.studio-mode .transcript-empty,
+.studio-mode .transcript-count,
+.studio-mode .speed-control,
+.studio-mode .offset-control,
+.studio-mode .player-footnote,
+.studio-mode .translation-privacy {
+  color: var(--muted);
+}
+.studio-mode .dictionary-error,
+.studio-mode .recording-error {
+  color: #ffc3b3;
+}
+.studio-mode .error-message {
+  background: var(--pale);
+  color: #ffc3b3;
+  border-color: #b07160;
+}
+.studio-mode .current-translation,
+.studio-mode .translation-button,
+.studio-mode .record-button,
+.studio-mode .shadowing-comparison dd,
+.studio-mode .shadowing-completion-heading h2 {
+  color: var(--green);
+}
+.studio-mode .state-badge,
+.studio-mode .shadowing-result,
+.studio-mode .shadowing-completion {
+  background: var(--green-pale);
+  color: var(--ink);
+  border-color: var(--line);
+}
+.studio-mode .transcript-search {
+  background: var(--bg);
+  color: var(--muted);
+  border-color: var(--line);
+}
+.studio-mode .section-track {
+  background: var(--line);
 }
 .studio-mode .practice-signoff {
-  max-width: 1720px;
-  margin: 0 auto;
-  color: #88938a;
+  max-width: 1600px;
+  margin: auto;
+  color: var(--muted);
 }
-@media (min-width: 901px) {
-  .studio-mode .practice-controls {
-    gap: 5px;
-  }
-  .studio-mode .practice-controls .button {
-    padding: 9px 10px;
-    font-size: 10px;
-    min-height: 38px;
-  }
-  .studio-mode .practice-controls .icon-button {
-    height: 38px;
-    width: 30px;
-    color: #d4ddd5;
-  }
-  .studio-mode .translation-row {
-    margin-top: 2px;
-  }
-  .studio-mode .turn-instruction {
-    margin-top: 9px;
-  }
-}
-@media (max-width: 1100px) and (min-width: 901px) {
+
+@media (max-width: 1000px) {
   .studio-mode .practice-grid {
-    grid-template-columns: minmax(0, 2.5fr) minmax(285px, 1fr);
-  }
-  .studio-mode .current-card h2 {
-    font-size: 19px;
+    grid-template-columns: minmax(0, 1.8fr) minmax(300px, 1fr);
   }
 }
-@media (max-width: 900px) {
-  body.studio-active .site-header {
-    display: block;
-    background: var(--bg);
-  }
-  .studio-mode {
-    width: auto;
-    min-height: 0;
-    margin: 0 26px;
-    padding: 21px 0;
-    background: transparent;
-    color: var(--ink);
-  }
-  .studio-mode .practice-breadcrumb {
-    margin: 0;
-    color: var(--muted);
-  }
-  .studio-mode .practice-breadcrumb > a,
-  .studio-mode .practice-breadcrumb > span {
-    color: inherit;
-  }
-  .studio-mode .practice-view-controls {
-    margin-left: auto;
-  }
-  .studio-mode .practice-view-controls .button {
-    background: var(--paper);
-    border-color: var(--line);
-    color: var(--ink);
-  }
-  .studio-mode .practice-view-controls [aria-pressed='true'] {
-    background: var(--green-pale);
-    border-color: #a9b99e;
-    color: var(--green);
-  }
-  .studio-mode .practice-title {
-    display: flex;
-  }
+@media (max-width: 800px) {
   .studio-mode .practice-grid {
     display: flex;
     flex-direction: column;
-    gap: 0;
-    margin-top: 21px;
+    gap: 14px;
   }
-  .studio-mode .practice-current-stack {
-    display: contents;
+  .studio-mode .practice-grid > *,
+  .studio-mode .player-column > * {
+    width: 100%;
   }
   .studio-mode .media-frame {
     order: 0;
-    aspect-ratio: 16/9;
     max-height: none;
-    border-radius: 10px;
   }
-  .studio-mode .player-settings {
+  .studio-mode .evidence-banner,
+  .studio-mode .reattach {
     order: 1;
-    width: 100%;
-    padding: 14px 0 16px;
-    color: inherit;
   }
-  .studio-mode .current-card {
+  .studio-mode .practice-current-stack {
     order: 2;
-    width: 100%;
-    height: auto;
     max-height: none;
     overflow: visible;
-    background: var(--paper);
-    color: var(--ink);
-    border-color: #c9d1c5;
   }
-  .studio-mode .current-card h2 {
-    color: var(--ink);
-    font-size: 22px;
+  .studio-mode .practice-settings-stack {
+    order: 3;
   }
-  .studio-mode .current-heading {
-    position: static;
-    margin: 0;
-    padding: 0;
-    background: none;
-  }
-  .studio-mode .transcript-card {
+  .studio-mode .practice-tool-navigation {
     order: 4;
-    width: 100%;
-    height: 520px;
-    max-height: 620px;
-    min-height: 0;
-    margin-top: 25px;
-    background: var(--paper);
-    color: var(--ink);
-    border-color: var(--line);
-    overflow: hidden;
   }
-  .studio-mode .transcript-scroll {
-    max-height: none;
-    overflow: auto;
+  .studio-mode .practice-secondary-pane,
+  .studio-mode .transcript-card {
+    order: 5;
   }
-  .studio-mode .recording-panel,
-  .studio-mode .completion-card,
-  .studio-mode .evidence-banner,
-  .studio-mode .reattach,
-  .studio-mode .quiz-card,
-  .studio-mode .difficulty-card,
   .studio-mode .player-footnote,
   .studio-mode .translation-privacy,
   .studio-mode .error-message {
-    order: 3;
-    width: 100%;
+    order: 6;
   }
-  .studio-mode .quiz-card,
-  .studio-mode .difficulty-card {
-    color: var(--ink);
+  .studio-mode .transcript-card {
+    height: 520px;
   }
-  .studio-mode .practice-signoff {
-    color: inherit;
+  .studio-mode .recording-core {
+    position: static;
+  }
+  .studio-mode .current-card,
+  .studio-mode .recording-panel {
+    max-height: none;
+    overflow: visible;
   }
 }
 @media (max-width: 700px) {
   .practice-view-controls {
     margin-left: 0;
     width: 100%;
-    margin-top: 6px;
   }
   .practice-view-controls .button {
     flex: 1;
   }
-  .studio-mode {
-    margin: 0 22px;
+  .studio-mode .practice-breadcrumb {
+    gap: 8px;
   }
+  .studio-mode .studio-lesson-identity {
+    flex-basis: 100%;
+  }
+  .studio-navigation {
+    width: 100%;
+    gap: 6px 12px;
+  }
+  .studio-navigation .button {
+    margin-left: auto;
+  }
+  .practice-tool-navigation .button {
+    flex: 1;
+    padding: 10px;
+    font-size: 12px;
+  }
+  .transcript-row {
+    gap: 10px;
+  }
+  .transcript-play {
+    flex-basis: 46px;
+  }
+}
+
+main.practice-main.studio-mode .dictionary-lookup-hint {
+  display: block;
 }

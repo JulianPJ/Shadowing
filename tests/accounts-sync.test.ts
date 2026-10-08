@@ -2,7 +2,12 @@ import assert from 'node:assert/strict';
 import { before, after, test } from 'node:test';
 import { readFile, readdir } from 'node:fs/promises';
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
-import { createAuth, handleAuthRequest, type AuthMail } from '../src/lib/auth/server';
+import {
+  allowedAuthRedirect,
+  createAuth,
+  handleAuthRequest,
+  type AuthMail,
+} from '../src/lib/auth/server';
 import { createD1UserProgressRepository } from '../src/lib/sync/repository';
 import { accountHandler } from '../src/lib/sync/server';
 import { emptySync, type SyncData } from '../src/lib/sync/types';
@@ -202,6 +207,32 @@ test('framework email registration, verification, persistent session and sign in
   }
   assert.notEqual(userA, userB);
 });
+test('real email sign-in accepts validated learning callbacks and rejects external or privileged paths', async () => {
+  const destination = '/practice/demo?section=segment-2&lookup=%E6%97%A5%E6%9C%AC%E8%AA%9E';
+  assert.equal(allowedAuthRedirect(destination, env.AUTH_BASE_URL), true);
+  assert.equal(allowedAuthRedirect('/dictionary?view=decks', env.AUTH_BASE_URL), true);
+  for (const invalid of [
+    'https://evil.example/account',
+    '/api/auth/sign-out',
+    '/practice/demo%0a',
+    '/\\evil.example',
+    'javascript:alert(1)',
+  ])
+    assert.equal(allowedAuthRedirect(invalid, env.AUTH_BASE_URL), false);
+  const response = await handleAuthRequest(
+    request(
+      '/api/auth/sign-in/email',
+      { email: 'a@example.com', password: 'a long test password', callbackURL: destination },
+      '',
+      '192.0.2.80',
+    ),
+    auth,
+    env,
+  );
+  assert.equal(response.status, 200);
+  assert.ok(cookies(response).includes('session_token='));
+});
+
 test('entitlements default Free, expose Pro from D1, and guard paid server routes', async () => {
   assert.equal(await access.plan(userA), 'free');
   assert.equal(await access.plan(userB), 'free');
@@ -223,6 +254,48 @@ test('entitlements default Free, expose Pro from D1, and guard paid server route
     403,
   );
   assert.equal(await requirePro(request('/api/quiz', undefined, cookieA), auth, access), null);
+});
+
+test('native D1 retains bounded review limits across preference writes from two client versions', async () => {
+  const owner = crypto.randomUUID();
+  await db
+    .prepare(
+      'INSERT INTO "user"(id,name,email,emailVerified,createdAt,updatedAt) VALUES (?,?,?,1,0,0)',
+    )
+    .bind(owner, 'Limits learner', `${owner}@example.com`)
+    .run();
+  const stamp = Date.now();
+  const preferences = {
+    schemaVersion: 1 as const,
+    mode: 'shadowing' as const,
+    speed: 1,
+    studioMode: false,
+    furigana: false,
+    updatedAt: new Date(stamp).toISOString(),
+  };
+  await repo.push(owner, { ...emptySync(), preferences });
+  assert.equal((await repo.bootstrap(owner)).data.preferences?.reviewLimits, undefined);
+  const reviewLimits = {
+    defaults: { new: 20, review: 100 },
+    decks: { inbox: { new: 5, review: 20 } },
+  };
+  await repo.push(owner, {
+    ...emptySync(),
+    preferences: { ...preferences, reviewLimits, updatedAt: new Date(stamp + 1).toISOString() },
+  });
+  assert.deepEqual((await repo.bootstrap(owner)).data.preferences?.reviewLimits, reviewLimits);
+  await repo.push(owner, {
+    ...emptySync(),
+    preferences: {
+      ...preferences,
+      mode: 'continuous',
+      updatedAt: new Date(stamp + 2).toISOString(),
+    },
+  });
+  const restored = (await repo.bootstrap(owner)).data.preferences;
+  assert.equal(restored?.mode, 'continuous');
+  assert.deepEqual(restored?.reviewLimits, reviewLimits);
+  assert.equal((await repo.bootstrap(`${owner}-other`)).data.preferences, null);
 });
 
 test('sync session-derived ownership, cross-user isolation and forged body owner rejection', async () => {

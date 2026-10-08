@@ -95,6 +95,10 @@ export function cachedDictionaryQuery(query: DictionaryQuery) {
         (!query.lessonId || e.source.lessonId === query.lessonId) &&
         (!query.transcriptKey || e.source.transcriptKey === query.transcriptKey) &&
         (!query.term || e.normalizedTerm === normalizeDictionaryTerm(query.term)) &&
+        (!query.search ||
+          [e.term, e.reading ?? '', e.translation].some((value) =>
+            normalizeDictionaryTerm(value).includes(normalizeDictionaryTerm(query.search!)),
+          )) &&
         (!query.deckId ||
           review.memberships.some((m) => m.entryId === e.id && m.deckId === query.deckId)) &&
         (!query.tagId || e.tags?.some((t) => t.id === query.tagId)),

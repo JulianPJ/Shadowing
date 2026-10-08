@@ -45,6 +45,12 @@ try {
   assert.deepEqual(ledger, files);
   const foreignKeyCheck = (await db.prepare('PRAGMA foreign_key_check').all()).results;
   assert.deepEqual(foreignKeyCheck, []);
+  const preferenceColumns = (await db.prepare('PRAGMA table_info(user_preferences)').all()).results;
+  const reviewLimitsColumn = preferenceColumns.find(
+    (column) => column.name === 'review_limits_json',
+  );
+  assert.ok(reviewLimitsColumn);
+  assert.equal(reviewLimitsColumn.notnull, 0);
   const ownership = (await db.prepare('PRAGMA foreign_key_list(user_dictionary_tags)').all())
     .results;
   for (const table of ['user_tags', 'user_dictionary_entries']) {
@@ -69,7 +75,7 @@ try {
   }
   await writeFile(
     'artifacts/local-d1-migrations.json',
-    JSON.stringify({ ledger, foreignKeyCheck, ownership }, null, 2),
+    JSON.stringify({ ledger, foreignKeyCheck, ownership, reviewLimitsColumn }, null, 2),
   );
   console.log(
     `Real local D1: ${ledger.length} migrations applied; ledger and composite ownership FKs verified; foreign_key_check empty.`,

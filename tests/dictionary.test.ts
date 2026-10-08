@@ -44,6 +44,27 @@ test('dictionary records keep bounded contextual replay metadata', () => {
   assert.equal(normalizeDictionaryTerm('  ＡＢＣ　日本語  '), 'abc 日本語');
 });
 
+test('dictionary save allows missing English while requiring exact Japanese context', () => {
+  for (const sourceSentenceTranslation of [undefined, null, '', '   ']) {
+    const entry = validateDictionarySaveInput({ ...baseEntry, sourceSentenceTranslation });
+    assert.equal(entry.sourceSentenceTranslation, '');
+    assert.equal(entry.sourceSentence, baseEntry.sourceSentence);
+  }
+  assert.throws(
+    () => validateDictionarySaveInput({ ...baseEntry, sourceSentence: '' }),
+    DictionaryValidationError,
+  );
+  assert.equal(
+    validateDictionarySaveInput({ ...baseEntry, sourceSentence: `  ${baseEntry.sourceSentence}\n` })
+      .sourceSentence,
+    `  ${baseEntry.sourceSentence}\n`,
+  );
+  assert.throws(
+    () => validateDictionarySaveInput({ ...baseEntry, sourceSentenceTranslation: 7 }),
+    DictionaryValidationError,
+  );
+});
+
 test('dictionary validation refuses signed direct-media URLs and malformed timing', () => {
   assert.throws(
     () =>
@@ -127,6 +148,18 @@ test('dictionary migration and repository save, upsert, list and delete against 
     assert.equal(saved.term, '勉強');
     assert.equal(saved.translation, 'study');
     assert.equal((await repository.list('learner')).length, 1);
+
+    const untranslated = await repository.save('learner', {
+      ...input,
+      sourceSentenceTranslation: '',
+    });
+    assert.equal(untranslated.id, saved.id);
+    assert.equal(untranslated.sourceSentenceTranslation, '');
+    for (const search of ['勉', 'べん', 'STUD'])
+      assert.equal((await repository.page('learner', { search })).entries[0]?.id, saved.id);
+    assert.equal((await repository.page('learner', { search: '%' })).entries.length, 0);
+    assert.equal((await repository.page('learner', { search: '_' })).entries.length, 0);
+    assert.equal((await repository.page('learner', { term: '勉' })).entries.length, 0);
 
     const updated = await repository.save('learner', { ...input, translation: 'studying' });
     assert.equal(updated.id, saved.id);

@@ -27,6 +27,8 @@ export function LearnerProgress() {
   const account = useAccount();
   const { profile, available, warning } = useLearnerProfile();
   const [help, setHelp] = useState(false);
+  const resumable = profile?.lessons.find((l) => available.includes(identityKey(l.lesson)));
+  const analyzedCount = profile?.lessons.filter((l) => l.practised && l.difficulty).length ?? 0;
   return (
     <>
       <Header onHelp={() => setHelp(true)} />
@@ -38,7 +40,6 @@ export function LearnerProgress() {
             ? 'Your account progress, saved locally as you practise and synced across devices.'
             : 'Saved on this device, in this browser. A history of your practice and the moments you returned to.'}
         </p>
-        <WeeklyReport />
         {warning ? (
           <p className="error-message" role="status">
             Progress for this visit may not be saved.
@@ -62,6 +63,24 @@ export function LearnerProgress() {
               </section>
             ) : (
               <>
+                <div className="progress-next-actions">
+                  {resumable ? (
+                    <Link
+                      className="button primary"
+                      href={`/practice/${encodeURIComponent(resumable.lesson.lessonId)}?transcript=${resumable.lesson.transcriptKey}`}
+                    >
+                      Resume practice <ArrowRight size={16} />
+                    </Link>
+                  ) : (
+                    <Link className="button primary" href="/library">
+                      Choose a lesson <ArrowRight size={16} />
+                    </Link>
+                  )}
+                  <Link className="text-button" href="/review">
+                    Study saved words <ArrowRight size={16} />
+                  </Link>
+                </div>
+                <WeeklyReport />
                 <dl className="progress-summary">
                   <div>
                     <dt>Active practice</dt>
@@ -103,8 +122,8 @@ export function LearnerProgress() {
                     </>
                   ) : (
                     <p>
-                      After you practise at least five different lessons with difficulty estimates,
-                      a typical content range will appear here.
+                      {analyzedCount} analyzed, practised lessons so far. Practise five different
+                      lessons with estimates to see your typical content range.
                     </p>
                   )}
                   {profile.contentTrend ? (
@@ -119,9 +138,12 @@ export function LearnerProgress() {
                     </p>
                   ) : (
                     <p className="small muted">
-                      A trend needs ten analyzed, practised lessons to compare two groups of five.
+                      {analyzedCount} / 10 analyzed, practised lessons for a content trend.
                     </p>
                   )}
+                  <Link className="text-button" href="/library">
+                    Find your next lesson <ArrowRight size={14} />
+                  </Link>
                 </section>
                 <section className="progress-panel">
                   <h2>Your practice habits</h2>
@@ -222,6 +244,21 @@ export function LearnerProgress() {
                             <span key={reason}>{reason}</span>
                           ))}
                         </div>
+                        {available.includes(identityKey(s.lesson)) ? (
+                          <Link
+                            className="text-button"
+                            href={`/practice/${encodeURIComponent(s.lesson.lessonId)}?section=${encodeURIComponent(s.sectionId)}&transcript=${encodeURIComponent(s.lesson.transcriptKey)}`}
+                          >
+                            Replay section <ArrowRight size={14} />
+                          </Link>
+                        ) : (
+                          <p className="small muted">
+                            Original transcript unavailable.{' '}
+                            <Link href="/library">
+                              Open your Library to restore or reattach it.
+                            </Link>
+                          </p>
+                        )}
                       </div>
                     </li>
                   ))}
@@ -253,6 +290,22 @@ export function LearnerProgress() {
                             ? `${a.score} / ${a.totalQuestions} correct`
                             : `${a.results.length} / ${a.totalQuestions} answered · In progress`}
                         </p>
+                        {available.includes(
+                          identityKey({ lessonId: a.lessonId, transcriptKey: a.transcriptKey }),
+                        ) ? (
+                          <Link
+                            className="text-button"
+                            href={`/practice/${encodeURIComponent(a.lessonId)}?quiz=open&transcript=${encodeURIComponent(a.transcriptKey)}`}
+                          >
+                            {a.completedAt ? 'Review check' : 'Resume check'}{' '}
+                            <ArrowRight size={14} />
+                          </Link>
+                        ) : (
+                          <p className="small muted">
+                            Restore the original lesson in <Link href="/library">your Library</Link>{' '}
+                            to open this check.
+                          </p>
+                        )}
                       </div>
                     </li>
                   ))}
@@ -270,6 +323,15 @@ export function LearnerProgress() {
             </p>
           </>
         )}
+        {profile &&
+        !profile.distinctLessons &&
+        !profile.comprehension.attempts &&
+        !profile.bookmarks ? (
+          <details className="progress-panel">
+            <summary>Set a daily goal and see your weekly report</summary>
+            <WeeklyReport />
+          </details>
+        ) : null}
       </main>
       <Footer />
       <HelpDialog open={help} onClose={() => setHelp(false)} />

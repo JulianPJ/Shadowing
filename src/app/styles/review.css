@@ -65,3 +65,101 @@
     flex-wrap: wrap;
   }
 }
+.review-actions,
+.review-session-toolbar,
+.review-context-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  margin: 1rem 0;
+}
+.review-session-toolbar,
+.review-context-toolbar {
+  justify-content: space-between;
+}
+.review-counts {
+  font-weight: 600;
+}
+.review-reading-default {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 0;
+}
+.review-screen .button,
+.review-screen .text-button,
+.review-screen select {
+  min-height: 44px;
+}
+.review-screen .text-button {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.5rem;
+}
+.review-screen .small {
+  font-size: 0.875rem;
+  line-height: 1.55;
+}
+.review-screen .dictionary-empty .text-button {
+  margin: 0;
+}
+.review-card h2:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 8px;
+}
+.review-card p,
+.review-card strong,
+.review-context-toolbar strong {
+  overflow-wrap: anywhere;
+}
+.review-grades .button {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.85rem 0.5rem;
+  white-space: normal;
+}
+.review-screen kbd {
+  font: inherit;
+  font-size: 0.75rem;
+  opacity: 0.75;
+}
+.review-card > .primary kbd {
+  margin-left: 0.75rem;
+}
+.review-answer {
+  margin-top: 1.5rem;
+  border-top: 1px solid var(--line);
+  padding-top: 1.5rem;
+}
+.review-context,
+.review-notice {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 1rem;
+  margin: 1rem 0;
+  background: var(--paper);
+  color: var(--ink);
+}
+.review-context .media-frame {
+  aspect-ratio: 16 / 9;
+  width: 100%;
+  min-height: 0;
+  margin: 1rem 0;
+}
+.review-undo {
+  display: block;
+  margin: 1rem auto;
+}
+@media (max-width: 600px) {
+  .review-screen select {
+    width: 100%;
+  }
+  .review-context {
+    padding: 0.75rem;
+  }
+  .review-card h2 {
+    font-size: 2rem;
+  }
+}

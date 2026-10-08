@@ -156,10 +156,17 @@ function DifficultyCard({
             ))}
           </dl>
           <p className="small muted">
-            Classification uses the full Japanese transcript where it fits in one decision request,
-            with full-coverage chunking for larger scripts. Speech pace is calculated from caption
-            timing.
+            An approximate guide to the vocabulary, grammar and conversation in this lesson. Speech
+            pace comes from caption timing; this does not measure your ability.
           </p>
+          <details className="difficulty-method">
+            <summary>How this estimate works</summary>
+            <p className="small muted">
+              The estimate considers the whole Japanese transcript, in parts for longer lessons.
+              Caption timing gives an approximate speech pace. These labels describe the content and
+              are not an official JLPT rating.
+            </p>
+          </details>
           {storageWarning ? (
             <p className="small" role="status">
               This browser could not save the estimate. It is available for this visit.
@@ -192,8 +199,8 @@ function DifficultyCard({
             <p className="small muted">Not enough Japanese transcript for a useful estimate.</p>
           ) : (
             <p className="small muted">
-              The semantic classifier receives only the Japanese transcript. The result stays on
-              this device.
+              Only the Japanese transcript is sent for this optional estimate. You can keep
+              practising while it loads.
             </p>
           )}
         </>

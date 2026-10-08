@@ -1,9 +1,9 @@
 import type { DictionaryEntry } from './types';
 export function contextHref(entry: DictionaryEntry) {
-  return `/practice/${encodeURIComponent(entry.source.lessonId)}?section=${encodeURIComponent(entry.source.segmentId)}`;
+  return `/practice/${encodeURIComponent(entry.source.lessonId)}?section=${encodeURIComponent(entry.source.segmentId)}&transcript=${encodeURIComponent(entry.source.transcriptKey)}`;
 }
 export function reviewContextHref(entry: DictionaryEntry) {
-  return `${contextHref(entry)}&transcript=${encodeURIComponent(entry.source.transcriptKey)}`;
+  return contextHref(entry);
 }
 export function externalReplay(entry: DictionaryEntry) {
   const { mediaType, mediaId, mediaUrl, start } = entry.source;

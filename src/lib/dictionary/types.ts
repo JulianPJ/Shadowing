@@ -36,6 +36,8 @@ export type DictionaryQuery = {
   limit?: number;
   cursor?: string | null;
   term?: string;
+  /** Bounded partial search across Japanese term, reading and chosen meaning. */
+  search?: string;
   deckId?: string;
   tagId?: string;
   lessonId?: string;

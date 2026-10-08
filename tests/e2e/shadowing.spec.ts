@@ -39,7 +39,7 @@ test('listen → automatic pause → repeat → next; translation, speed, contin
   await expect(page.getByTestId('current-japanese')).toHaveText(demo.segments[2].japanese);
   await page.getByRole('button', { name: 'Previous section', exact: true }).click();
   await expect(page.getByTestId('current-japanese')).toHaveText(demo.segments[1].japanese);
-  await page.getByRole('button', { name: 'Continuous', exact: true }).click();
+  await page.getByLabel('Practice preset', { exact: true }).selectOption('continuous');
   await expect(page.getByTestId('current-japanese')).toHaveText(demo.segments[2].japanese);
   expect(await page.locator('video').evaluate((video: HTMLVideoElement) => video.paused)).toBe(
     false,
@@ -47,7 +47,7 @@ test('listen → automatic pause → repeat → next; translation, speed, contin
   const before = await page
     .locator('video')
     .evaluate((video: HTMLVideoElement) => video.currentTime);
-  await page.getByRole('button', { name: 'Shadowing', exact: true }).click();
+  await page.getByLabel('Practice preset', { exact: true }).selectOption('focus');
   const after = await page
     .locator('video')
     .evaluate((video: HTMLVideoElement) => video.currentTime);
@@ -282,6 +282,7 @@ test('shadowing analysis is explicit, scores one recording, and shows aggregate 
   await expect(page.getByTestId('playback-state')).toContainText('YOUR TURN');
   await page.getByRole('button', { name: 'Finish practice', exact: true }).click();
 
+  await page.getByText('Saved words and practice details', { exact: true }).click();
   const topicOverview = page.locator('.topic-vocabulary-card');
   await expect(topicOverview.getByRole('heading', { name: 'Topic vocabulary' })).toBeVisible();
   await expect(topicOverview.getByText('Local · no AI', { exact: true })).toBeVisible();

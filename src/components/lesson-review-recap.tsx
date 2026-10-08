@@ -75,13 +75,30 @@ export function LessonReviewRecap({ lesson }: { lesson: Lesson }) {
   }
   return (
     <section className="completion-vocabulary" aria-label="Lesson recap">
-      <h3>Vocabulary</h3>
-      <p>
-        {entries.length}
-        {nextCursor ? '+' : ''} saved words
-        {enrolled ? ` · ${enrolled} in review` : ''}
-      </p>
-      {entries.length ? <p>Choose saved words from this lesson for a short review later.</p> : null}
+      <h3>Saved words from this lesson</h3>
+      {loaded && loaded.owner === account.user?.id ? (
+        <p>
+          {entries.length}
+          {nextCursor ? '+' : ''} saved words
+          {enrolled ? ` · ${enrolled} in review` : ''}
+        </p>
+      ) : account.user ? (
+        <p className="small muted" role="status">
+          {message || 'Loading this lesson’s saved words…'}
+        </p>
+      ) : (
+        <p className="small muted">
+          Sign in to keep useful words from this lesson in your vocabulary.
+        </p>
+      )}
+      {entries.some(
+        (entry) =>
+          !review.data.cards.some(
+            (card) => card.entryId === entry.id && card.status !== 'suspended',
+          ),
+      ) ? (
+        <p>Choose any saved words that you want to add to your review queue.</p>
+      ) : null}
       {entries.map((e) => {
         const added = review.data.cards.some((c) => c.entryId === e.id && c.status !== 'suspended');
         return (
@@ -101,7 +118,7 @@ export function LessonReviewRecap({ lesson }: { lesson: Lesson }) {
           </label>
         );
       })}
-      {!entries.length ? (
+      {!entries.length && loaded && loaded.owner === account.user?.id ? (
         <p className="small muted">
           Save a useful word from a practice sentence to keep it for later.
         </p>

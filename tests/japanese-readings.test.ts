@@ -15,6 +15,8 @@ import { JapaneseText } from '../src/components/japanese-text';
 import { createQuiz, transcriptKey, transcriptRevision, validateQuiz } from '../src/lib/quiz';
 import { transcriptHash } from '../src/lib/linked-transcripts';
 import type { Lesson } from '../src/lib/types';
+import { japaneseLexicalSpans } from '../src/lib/japanese-lexical-spans';
+import { lookupCandidates } from '../src/lib/lexicon/lookup';
 
 const require = createRequire(import.meta.url);
 let tokenizer: { tokenize: (text: string) => MorphologicalToken[] };
@@ -28,6 +30,45 @@ before(async () => {
 function readings(text: string) {
   return annotateJapanese(text, tokenizer.tokenize(text));
 }
+test('canonical lookup spans retain inflected forms and source offsets across display views', () => {
+  for (const [sentence, surface, lemma] of [
+    ['日本語を話せます。', '話せます', '話せる'],
+    ['日本語を勉強しています。', '勉強しています', '勉強'],
+    ['食べませんでした。', '食べませんでした', '食べる'],
+    ['読んでいます。', '読んでいます', '読む'],
+    ['行きたくなかった。', '行きたくなかった', '行く'],
+    ['高くないです。', '高くないです', '高い'],
+    ['静かでした。', '静かでした', '静か'],
+  ]) {
+    const morphology = tokenizer.tokenize(sentence);
+    const spans = japaneseLexicalSpans(sentence, morphology);
+    assert.equal(spans.map((span) => span.text).join(''), sentence);
+    const span = spans.find((value) => value.text === surface);
+    assert.ok(span, surface);
+    assert.equal(span.lemma, lemma);
+    assert.equal(sentence.slice(span.start, span.end), surface);
+    assert.equal(
+      annotateJapanese(span.text, span.tokens)
+        .map((value) => value.text)
+        .join(''),
+      surface,
+    );
+    assert.ok(lookupCandidates(surface, morphology).includes(lemma));
+    if (sentence.startsWith('日本語'))
+      assert.equal(spans.find((value) => value.text === 'を')?.text, 'を');
+  }
+  assert.ok(japaneseLexicalSpans('日本語を話せます。').some((span) => span.text === '話せます'));
+  assert.deepEqual(lookupCandidates('日本語を話せます', tokenizer.tokenize('日本語を話せます。')), [
+    '日本語を話せます',
+  ]);
+  for (const text of [' 日本語\nHello🙂。 ', '食べました。', '𠮷野XYZ'])
+    assert.equal(
+      japaneseLexicalSpans(text, tokenizer.tokenize('違う'))
+        .map((span) => span.text)
+        .join(''),
+      text,
+    );
+});
 test('deterministic dictionary readings, inflection and okurigana', () => {
   const examples = [
     [

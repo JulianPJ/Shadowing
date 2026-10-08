@@ -124,6 +124,8 @@ export function validateSession(v: unknown): PracticeSession {
     'completedAt',
     'activeSeconds',
     'activeByDay',
+    'localActiveByDay',
+    'legacyActiveByDay',
     'lastSectionId',
     'sections',
   ]);
@@ -165,6 +167,44 @@ export function validateSession(v: unknown): PracticeSession {
     activeByDay[day] = count(seconds);
   }
   const activeSeconds = count(r.activeSeconds);
+  const localActiveByDay: Record<string, number> = {};
+  if (r.localActiveByDay !== undefined) {
+    for (const [day, seconds] of Object.entries(obj(r.localActiveByDay))) {
+      if (
+        !/^\d{4}-\d{2}-\d{2}$/.test(day) ||
+        !Number.isFinite(Date.parse(day)) ||
+        new Date(day).toISOString().slice(0, 10) !== day
+      )
+        throw new Error('Invalid local study day');
+      localActiveByDay[day] = count(seconds);
+    }
+    if (
+      Object.values(localActiveByDay).reduce((sum, seconds) => sum + seconds, 0) >
+      activeSeconds + 0.01
+    )
+      throw new Error('Invalid local active time');
+  }
+  const legacyActiveByDay: Record<string, number> = {};
+  if (r.legacyActiveByDay !== undefined) {
+    if (r.localActiveByDay === undefined) throw new Error('Invalid mixed activity');
+    const entries = Object.entries(obj(r.legacyActiveByDay));
+    if (entries.length > 10000) throw new Error('Invalid legacy day count');
+    for (const [day, seconds] of entries) {
+      if (
+        !/^\d{4}-\d{2}-\d{2}$/.test(day) ||
+        !Number.isFinite(Date.parse(day)) ||
+        new Date(day).toISOString().slice(0, 10) !== day
+      )
+        throw new Error('Invalid legacy study day');
+      legacyActiveByDay[day] = count(seconds);
+      if (legacyActiveByDay[day] > (activeByDay[day] ?? 0) + 0.01)
+        throw new Error('Invalid legacy bucket');
+    }
+    const attributed =
+      Object.values(localActiveByDay).reduce((a, b) => a + b, 0) +
+      Object.values(legacyActiveByDay).reduce((a, b) => a + b, 0);
+    if (Math.abs(attributed - activeSeconds) > 0.01) throw new Error('Invalid mixed active time');
+  }
   if (
     Math.abs(Object.values(activeByDay).reduce((a, b) => a + b, 0) - activeSeconds) > 0.01 ||
     (r.origin === 'legacy' && activeSeconds !== 0)
@@ -182,6 +222,8 @@ export function validateSession(v: unknown): PracticeSession {
     completedAt,
     activeSeconds,
     activeByDay,
+    ...(r.localActiveByDay === undefined ? {} : { localActiveByDay }),
+    ...(r.legacyActiveByDay === undefined ? {} : { legacyActiveByDay }),
     lastSectionId: r.lastSectionId === null ? null : str(r.lastSectionId, 200),
     sections,
   };

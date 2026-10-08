@@ -6,6 +6,7 @@ node_modules/
 test-results/
 playwright-report/
 artifacts/
+work/
 .demo-build/
 *.tsbuildinfo
 __pycache__/

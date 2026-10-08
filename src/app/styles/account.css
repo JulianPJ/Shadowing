@@ -101,3 +101,220 @@
     margin: 30px auto;
   }
 }
+
+/* Shared navigation remains usable when text is enlarged or the viewport is narrow. */
+.site-header .header-inner {
+  gap: 24px;
+}
+.site-header nav.desktop-navigation {
+  gap: 20px;
+  flex-wrap: nowrap;
+}
+.site-header .nav-link,
+.site-header .nav-demo {
+  font-size: 13px;
+  min-height: 44px;
+}
+.navigation-toggle {
+  display: none;
+}
+.navigation-dialog,
+.account-drawer {
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  width: min(440px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: 24px;
+  overflow-y: auto;
+}
+.navigation-dialog::backdrop,
+.account-drawer::backdrop {
+  background: #17231cb3;
+}
+.navigation-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.navigation-heading h2 {
+  font-size: 20px;
+}
+.site-header .navigation-dialog nav {
+  display: grid;
+  gap: 4px;
+  justify-content: stretch;
+  align-items: stretch;
+}
+.site-header .navigation-dialog .nav-link,
+.site-header .navigation-dialog .nav-demo {
+  padding: 10px 12px;
+  font-size: 16px;
+  min-height: 44px;
+}
+.navigation-dialog .theme-toggle {
+  margin: 8px 12px;
+  width: 44px;
+  height: 44px;
+}
+.navigation-heading .icon-button,
+.account-drawer .dialog-close {
+  width: 44px;
+  height: 44px;
+}
+.standalone-navigation {
+  width: min(1128px, calc(100% - 40px));
+  margin: 24px auto 0;
+}
+.task-return {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.vocabulary-navigation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+}
+.vocabulary-navigation a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  font-size: 14px;
+}
+.vocabulary-navigation a[aria-current='page'] {
+  background: var(--green-pale);
+  border-color: var(--green);
+  color: var(--green);
+  font-weight: 600;
+}
+.vocabulary-navigation a:hover {
+  border-color: var(--line);
+}
+.account-screen {
+  margin-top: 24px;
+}
+.account-email {
+  overflow-wrap: anywhere;
+}
+.account-drawer {
+  position: fixed;
+  margin: 16px 16px 16px auto;
+  min-height: min(520px, calc(100dvh - 32px));
+}
+.account-drawer h2 {
+  font-size: 23px;
+  margin: 4px 44px 16px 0;
+}
+.account-drawer p {
+  margin: 14px 0;
+  line-height: 1.65;
+}
+.account-sync {
+  padding: 16px;
+  margin: 24px 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.account-sync h2 {
+  font-size: 17px;
+  margin: 0 0 12px;
+}
+.account-sync .button {
+  margin: 8px 8px 0 0;
+}
+.plan-comparison {
+  margin: 32px 0;
+  border-top: 1px solid var(--line);
+  padding-top: 24px;
+}
+.plan-comparison h2 {
+  font-size: 22px;
+  margin-bottom: 20px;
+}
+.plan-comparison dl {
+  display: grid;
+  gap: 18px;
+}
+.plan-comparison dt {
+  font-size: 16px;
+  font-weight: 600;
+}
+.plan-comparison dd {
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.password-field {
+  display: grid;
+  gap: 8px;
+  font-weight: 500;
+}
+.password-field > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.password-field input {
+  min-width: 0;
+}
+.password-field button {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+}
+.account-import {
+  background: var(--paper);
+  color: var(--ink);
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+}
+@media (max-width: 1050px) {
+  .site-header nav.desktop-navigation {
+    display: none;
+  }
+  .site-header .navigation-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    font-size: 14px;
+  }
+  .site-header .header-inner {
+    min-height: 70px;
+    gap: 12px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+  .site-header {
+    height: auto;
+    min-height: 70px;
+  }
+}
+@media (max-width: 390px) {
+  .account-screen {
+    padding: 20px;
+  }
+  .standalone-navigation {
+    width: calc(100% - 32px);
+  }
+  .vocabulary-navigation {
+    gap: 4px;
+  }
+  .vocabulary-navigation a {
+    flex: 1 0 calc(50% - 4px);
+    padding: 10px 8px;
+  }
+}

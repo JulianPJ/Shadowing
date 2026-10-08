@@ -10,6 +10,7 @@ import {
 import { progressStorageFailed } from '@/lib/storage';
 import type { LearnerProfile } from '@/lib/learner-types';
 import { accountBookmarks } from '@/lib/sync/client';
+import { transcriptKey } from '@/lib/transcript';
 
 export function useLearnerProfile() {
   const [profile, setProfile] = useState<LearnerProfile | null>(null);
@@ -55,13 +56,22 @@ export function useLearnerProfile() {
               bookmarks,
               new Date().toISOString(),
             );
+            const revisions = new Map<string, Promise<string | null>>();
+            const availableIdentities = await Promise.all(
+              bookmarks.map(async (bookmark) => {
+                const id = bookmark.lesson.lessonId;
+                if (!revisions.has(id)) {
+                  const local = availableLesson(id);
+                  revisions.set(id, local ? transcriptKey(local) : Promise.resolve(null));
+                }
+                return (await revisions.get(id)) === bookmark.lesson.transcriptKey
+                  ? identityKey(bookmark.lesson)
+                  : null;
+              }),
+            );
             if (active) {
               setProfile(next);
-              setAvailable(
-                bookmarks
-                  .filter((b) => !!availableLesson(b.lesson.lessonId))
-                  .map((b) => identityKey(b.lesson)),
-              );
+              setAvailable(availableIdentities.filter((key): key is string => key !== null));
               setWarning(progressStorageFailed());
             }
           } catch {
