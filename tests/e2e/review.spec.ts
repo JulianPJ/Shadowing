@@ -27,7 +27,7 @@ for (const plan of ['free', 'pro'] as const)
     await expect(page.getByRole('heading', { name: '1 due now' })).toBeVisible();
     await page.getByRole('button', { name: 'Start review' }).click();
     await expect(page.getByText(meaning, { exact: true })).toHaveCount(0);
-    await page.getByRole('button', { name: /Reveal answer/ }).click();
+    await page.getByRole('button', { name: /Show answer/ }).click();
     await expect(page.getByText(meaning, { exact: true })).toBeVisible();
     await page.screenshot({ path: `artifacts/review-${plan}.png`, fullPage: true });
     const popupPromise = page.waitForEvent('popup');
@@ -57,7 +57,7 @@ test('all four grades advance the session and persist deterministic state across
     await expect(page.getByRole('heading', { name: '4 due now' })).toBeVisible();
     await page.getByRole('button', { name: 'Start review' }).click();
     for (const grade of ['Again', 'Hard', 'Good', 'Easy']) {
-      await page.getByRole('button', { name: /Reveal answer/ }).click();
+      await page.getByRole('button', { name: /Show answer/ }).click();
       await page.getByRole('button', { name: new RegExp(`^${grade}`) }).click();
     }
     await expect(page.getByRole('heading', { name: 'Caught up for now' })).toBeVisible();
@@ -185,7 +185,7 @@ test('offline grading survives reload and retries without duplicating reviews', 
   await expect(page.getByRole('heading', { name: '1 due now' })).toBeVisible();
   await page.getByRole('button', { name: 'Start review' }).click();
   remote.offline = true;
-  await page.getByRole('button', { name: /Reveal answer/ }).click();
+  await page.getByRole('button', { name: /Show answer/ }).click();
   await page.getByRole('button', { name: /^Easy/ }).click();
   await expect(page.getByText(/changes saved on this device/)).toBeVisible();
   expect(remote.review.cards[0].revision).toBe(0);
@@ -228,7 +228,7 @@ test('review source links refuse a changed transcript revision', async ({ page, 
   remote.entries[0].source.transcriptKey = 'a'.repeat(64);
   await page.goto('/review');
   await page.getByRole('button', { name: 'Start review' }).click();
-  await page.getByRole('button', { name: /Reveal answer/ }).click();
+  await page.getByRole('button', { name: /Show answer/ }).click();
   const promise = page.waitForEvent('popup');
   await page.getByRole('link', { name: 'Open full lesson ↗', exact: true }).click();
   const popup = await promise;
@@ -251,7 +251,7 @@ test('an account-cookie mismatch preserves the old account review outbox', async
   await context.route('**/api/review', (route) =>
     route.fulfill({ status: 409, json: { error: 'Account changed. Refresh your session.' } }),
   );
-  await page.getByRole('button', { name: /Reveal answer/ }).click();
+  await page.getByRole('button', { name: /Show answer/ }).click();
   await page.getByRole('button', { name: /^Good/ }).click();
   await expect(page.getByText(/changes saved on this device/)).toBeVisible();
   await expect
@@ -291,7 +291,7 @@ test('a competing device grade restores its schedule and reports a review confli
         })
       : route.fulfill({ json: remote.review }),
   );
-  await page.getByRole('button', { name: /Reveal answer/ }).click();
+  await page.getByRole('button', { name: /Show answer/ }).click();
   await page.getByRole('button', { name: /^Good/ }).click();
   await expect(
     page.getByText('A review changed on another device. Its latest schedule was restored.'),

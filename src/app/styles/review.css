@@ -163,3 +163,26 @@
     font-size: 2rem;
   }
 }
+
+.review-limit-control {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+.review-limit-control label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.review-limit-control input {
+  width: 9rem;
+  max-width: 100%;
+  min-height: 44px;
+  padding: 0.5rem;
+  background: var(--paper);
+  color: inherit;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
