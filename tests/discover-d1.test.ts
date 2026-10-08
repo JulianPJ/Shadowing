@@ -67,6 +67,7 @@ beforeEach(async () => {
     'discovery_quota',
     'user_watch_later',
     'user_discovery_preferences',
+    'user_practice_sessions',
     'linked_transcripts',
     'generated_artifacts',
   ])
@@ -404,6 +405,44 @@ test('actual auth routing cannot read another account by supplying a stale owner
     }),
   );
   assert.equal(response.status, 409);
+});
+test('completion metrics use the real practice day and reject expired or missing completion evidence', async () => {
+  await saveVideos(db, [video(0), video(1), video(2)]);
+  const recent = new Date(Date.now() - 5 * 86400000).toISOString();
+  const expired = new Date(Date.now() - 60 * 86400000).toISOString();
+  for (const [id, completedAt] of [
+    [0, recent],
+    [1, expired],
+  ] as const) {
+    await db
+      .prepare(
+        'INSERT INTO user_practice_sessions(user_id,id,lesson_id,transcript_key,payload_json,updated_at) VALUES(?,?,?,?,?,?)',
+      )
+      .bind(
+        'one',
+        `completion-${id}`,
+        `youtube-video${String(id).padStart(6, '0')}`,
+        'fixture-key',
+        JSON.stringify({ completed: true, completedAt }),
+        completedAt,
+      )
+      .run();
+  }
+  const events = [0, 1, 2].map((i) => ({
+    videoId: `video${String(i).padStart(6, '0')}`,
+    action: 'complete',
+  }));
+  for (let retry = 0; retry < 2; retry++) {
+    const response = await handleDiscoverAccountRequest(
+      request('/api/discover/events', 'POST', { events }),
+      'one',
+      true,
+      db,
+    );
+    assert.equal(response.status, 200);
+  }
+  const rows = (await db.prepare('SELECT day,video_id FROM discovery_metric_events').all()).results;
+  assert.deepEqual(rows, [{ day: recent.slice(0, 10), video_id: 'video000000' }]);
 });
 test('popularity remains private below ten learners and raw events expire', async () => {
   await saveVideos(db, [video()]);

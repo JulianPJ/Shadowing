@@ -627,6 +627,42 @@ try {
     transcription: 6,
   });
 
+  const completedAt = new Date(Date.now() - 5 * 86400000).toISOString();
+  await db
+    .prepare(
+      'INSERT INTO user_practice_sessions(user_id,id,lesson_id,transcript_key,payload_json,updated_at) VALUES(?,?,?,?,?,?)',
+    )
+    .bind(
+      identity.user.id,
+      'runtime-completion-day',
+      lesson.id,
+      'runtime-fixture-key',
+      JSON.stringify({ completed: true, completedAt }),
+      completedAt,
+    )
+    .run();
+  assert.equal(
+    (
+      await mf.dispatchFetch('https://example.com/api/discover/events', {
+        method: 'POST',
+        headers: watchHeaders,
+        body: JSON.stringify({ events: [{ videoId: lesson.videoId, action: 'complete' }] }),
+      })
+    ).status,
+    200,
+  );
+  assert.equal(
+    (
+      await db
+        .prepare(
+          "SELECT day FROM discovery_metric_events WHERE user_id=? AND video_id=? AND action='complete'",
+        )
+        .bind(identity.user.id, lesson.videoId)
+        .first()
+    )?.day,
+    completedAt.slice(0, 10),
+  );
+
   // Exercise rollback through the public request adapter, retaining the configured HTTPS origin.
   await mf.setOptions({
     ...options,

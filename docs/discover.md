@@ -60,7 +60,7 @@ Records keep original added time, edit time, position and deletion tombstones. N
 
 Local edits are immediate, including blocked storage with a visit-only notice. Reconnection, focus and Sync now retry the outbox. Awaited responses check identity before hydrating/clearing writes; learner-profile hydration discards old-account work too. Discover joins aggregate account sync status, so a failed queue/preference/feedback channel cannot claim everything is synced.
 
-Deletion tombstones and feedback expire after 180 days; reconciliation for a device offline beyond that horizon is best effort. Raw signed-in events and aggregates expire after 30 days. Events are unique per learner/day/video/action. Prepared/save/complete events require corresponding server evidence. Popularity is exposed only for video/day cohorts of ten distinct authenticated learners. Anonymous visitors produce no server browsing-event records. Safe logs include candidate/eligible counts, latency, refresh counts and quota/provider codes, never tokens, private text or learner history.
+Deletion tombstones and feedback expire after 180 days; reconciliation for a device offline beyond that horizon is best effort. Raw signed-in events and aggregates expire after 30 days. Events are unique per learner/day/video/action. Prepared/save/complete events require corresponding server evidence. Completion events use the actual saved practice day and reject out-of-retention history, so reconnecting cannot inflate current popularity. Popularity is exposed only for video/day cohorts of ten distinct authenticated learners. Anonymous visitors produce no server browsing-event records. Safe logs include candidate/eligible counts, latency, refresh counts and quota/provider codes, never tokens, private text or learner history.
 
 ## Release and rollback
 
@@ -85,7 +85,7 @@ Run typecheck, lint, formatting, unit tests, both builds, `test:d1:migrations`, 
 
 | Check | Result |
 | --- | --- |
-| Unit/integration | 334 passing, including real D1 and account-switch migration isolation |
+| Unit/integration | 335 passing, including real D1, historical-completion event dates and account-switch migration isolation |
 | Typecheck, ESLint, Prettier | Passing |
 | Next production / canonical Cloudflare builds | Passing |
 | Persisted native D1 migrations | All twelve applied; ledger/ownership and empty foreign-key check verified |

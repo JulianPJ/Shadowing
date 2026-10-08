@@ -142,7 +142,8 @@ export async function handleDiscoverAccountRequest(
     if (path === '/api/discover/events' && request.method === 'POST') {
       const body = JSON.parse(await readBoundedText(request, 4096));
       if (!Array.isArray(body.events) || body.events.length > 24) throw new Error('Invalid events');
-      const accepted: { videoId: string; action: string }[] = [];
+      const now = Date.now();
+      const accepted: { videoId: string; action: string; day: string }[] = [];
       for (const event of body.events) {
         if (
           !validVideoId(event.videoId) ||
@@ -166,16 +167,24 @@ export async function handleDiscoverAccountRequest(
             .first())
         )
           continue;
-        if (
-          event.action === 'complete' &&
-          !(await db
+        let day = new Date(now).toISOString().slice(0, 10);
+        if (event.action === 'complete') {
+          const completion = await db
             .prepare(
-              "SELECT id FROM user_practice_sessions WHERE user_id=? AND json_extract(payload_json,'$.completed')=1 AND lesson_id=?",
+              "SELECT json_extract(payload_json,'$.completedAt') AS completed_at FROM user_practice_sessions WHERE user_id=? AND json_extract(payload_json,'$.completed')=1 AND lesson_id=? ORDER BY completed_at DESC LIMIT 1",
             )
             .bind(userId, `youtube-${event.videoId}`)
-            .first())
-        )
-          continue;
+            .first<{ completed_at: string }>();
+          const finished = Date.parse(completion?.completed_at ?? '');
+          if (
+            !Number.isFinite(finished) ||
+            finished < now - 30 * 86400000 ||
+            finished > now + 300000
+          )
+            continue;
+          // Offline history backfills its actual practice day, never today's popularity.
+          day = new Date(finished).toISOString().slice(0, 10);
+        }
         if (
           event.action === 'save' &&
           !(await db
@@ -186,7 +195,7 @@ export async function handleDiscoverAccountRequest(
             .first())
         )
           continue;
-        accepted.push(event);
+        accepted.push({ videoId: event.videoId, action: event.action, day });
       }
       if (accepted.length)
         await db.batch(
@@ -195,7 +204,7 @@ export async function handleDiscoverAccountRequest(
               .prepare(
                 'INSERT OR IGNORE INTO discovery_metric_events(user_id,day,video_id,action) VALUES(?,?,?,?)',
               )
-              .bind(userId, new Date().toISOString().slice(0, 10), e.videoId, e.action),
+              .bind(userId, e.day, e.videoId, e.action),
           ),
         );
       return respond({ ok: true });
