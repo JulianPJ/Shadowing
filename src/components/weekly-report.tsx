@@ -9,6 +9,7 @@ import { cachedDictionary } from '@/lib/dictionary/cache';
 import { reviewHistory } from '@/lib/review/history';
 import { pendingReview } from '@/lib/review/client';
 import { loadAllShadowingSessions } from '@/lib/shadowing-session';
+import { studyTimeZone } from '@/lib/study-day';
 import {
   validateGoal,
   weeklyReport,
@@ -22,8 +23,12 @@ export function WeeklyReport() {
   const [minutes, setMinutes] = useState('5');
   const [pending, setPending] = useState(0);
   const [notice, setNotice] = useState('');
+  const [timeZone, setTimeZone] = useState('');
+  const [editingGoal, setEditingGoal] = useState(false);
   useEffect(() => {
     const refresh = () => {
+      const zone = studyTimeZone();
+      setTimeZone(zone);
       setReport(
         weeklyReport(
           {
@@ -36,6 +41,7 @@ export function WeeklyReport() {
             ),
           },
           new Date().toISOString(),
+          zone,
         ),
       );
       setGoal(validateGoal(readStorage('goal:daily', null)));
@@ -62,6 +68,7 @@ export function WeeklyReport() {
     const next = validateGoal({ version: 1, minutes: value });
     const saved = writeStorage('goal:daily', next);
     setGoal(next);
+    setEditingGoal(false);
     setNotice(
       saved
         ? value === null
@@ -86,7 +93,7 @@ export function WeeklyReport() {
       ) : (
         <>
           <p className="small muted">
-            {report.from} – {report.to} · last seven days · UTC practice days
+            {report.from} – {report.to} · last seven days · {timeZone} · day starts at midnight
           </p>
           <dl className="weekly-metrics">
             <div>
@@ -98,7 +105,7 @@ export function WeeklyReport() {
               <dd>{report.sectionsPractised}</dd>
             </div>
             <div>
-              <dt>Saved terms in device cache</dt>
+              <dt>Cached saved words</dt>
               <dd>{report.savedTerms}</dd>
             </div>
             <div>
@@ -106,20 +113,26 @@ export function WeeklyReport() {
               <dd>{report.markedKnown}</dd>
             </div>
             <div>
-              <dt>Review recall</dt>
+              <dt>Self-rated recall</dt>
               <dd>{report.reviewRecall === null ? 'No answers yet' : `${report.reviewRecall}%`}</dd>
               <span>
                 {report.reviewRemembered} Good/Easy of {report.reviewAnswers} self-rated answers
               </span>
             </div>
             <div>
-              <dt>Average Shadowing Match</dt>
+              <dt>Speech recognition match</dt>
               <dd>
                 {report.averageMatch === null ? 'No recorded matches' : `${report.averageMatch}%`}
               </dd>
               <span>{report.shadowingAttempts} analyzed attempts</span>
             </div>
           </dl>
+          {report.legacyUtcSeconds > 0 && (
+            <p className="small muted">
+              Includes {Math.round(report.legacyUtcSeconds / 60)} minutes of earlier UTC-day
+              records. They remain in your history; the daily goal uses exact local-day samples.
+            </p>
+          )}
           <p className="small muted">
             Practised content:{' '}
             {report.contentLevels.length
@@ -142,9 +155,9 @@ export function WeeklyReport() {
               excluded. Saved terms reflect the bounded device dictionary cache, which may be a
               partial account view. Marked Known counts your current Known states updated this week,
               not a proven memory gain. Review recall is your chosen Good/Easy answers, not a
-              retention prediction. Match describes recognizer text and recording pace, not a
-              pronunciation grade. Review and Match histories begin when these features are used;
-              older evidence is never invented.
+              retention prediction; Hard and Again are excluded from the remembered count. Match
+              describes recognizer text and recording pace, not a pronunciation grade. Review and
+              Match histories begin when these features are used; older evidence is never invented.
             </p>
           </details>
           <div className="daily-goal">
@@ -157,7 +170,7 @@ export function WeeklyReport() {
                 penalties.
               </p>
             </div>
-            {goal.minutes === null ? (
+            {goal.minutes === null || editingGoal ? (
               <form
                 onSubmit={(event) => {
                   event.preventDefault();
@@ -175,7 +188,7 @@ export function WeeklyReport() {
                   </select>
                 </label>
                 <button className="button" type="submit">
-                  Set a daily goal
+                  {goal.minutes === null ? 'Set a daily goal' : 'Save daily goal'}
                 </button>
               </form>
             ) : (
@@ -195,6 +208,15 @@ export function WeeklyReport() {
                 </p>
                 <button className="text-button" onClick={() => saveGoal(null)}>
                   Turn off daily goal
+                </button>
+                <button
+                  className="text-button"
+                  onClick={() => {
+                    setMinutes(String(goal.minutes));
+                    setEditingGoal(true);
+                  }}
+                >
+                  Edit daily goal
                 </button>
               </div>
             )}

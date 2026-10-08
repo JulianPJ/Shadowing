@@ -2,6 +2,13 @@ import type { LearnerHistory, PracticeSession } from '../learner-types';
 import { DETAIL_SESSION_LIMIT, identityKey } from './constants';
 
 export function mergeActivity(target: PracticeSession, s: PracticeSession) {
+  if (target.localActiveByDay || s.localActiveByDay) {
+    const legacy = target.localActiveByDay ? (target.legacyActiveByDay ?? {}) : target.activeByDay;
+    const incoming = s.localActiveByDay ? (s.legacyActiveByDay ?? {}) : s.activeByDay;
+    target.legacyActiveByDay = { ...legacy };
+    for (const [day, seconds] of Object.entries(incoming))
+      target.legacyActiveByDay[day] = (target.legacyActiveByDay[day] ?? 0) + seconds;
+  }
   if (s.origin === 'practice' && target.origin === 'legacy') {
     target.origin = 'practice';
     target.startedAt = s.startedAt;
@@ -12,6 +19,11 @@ export function mergeActivity(target: PracticeSession, s: PracticeSession) {
   target.completed ||= s.completed;
   for (const [day, seconds] of Object.entries(s.activeByDay))
     target.activeByDay[day] = (target.activeByDay[day] ?? 0) + seconds;
+  if (s.localActiveByDay) {
+    target.localActiveByDay ??= {};
+    for (const [day, seconds] of Object.entries(s.localActiveByDay))
+      target.localActiveByDay[day] = (target.localActiveByDay[day] ?? 0) + seconds;
+  }
   if (s.completedAt && (!target.completedAt || s.completedAt > target.completedAt))
     target.completedAt = s.completedAt;
   if (s.updatedAt > target.updatedAt) {

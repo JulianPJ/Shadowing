@@ -5,6 +5,8 @@ import { mockProAccount } from '../helpers/pro-account';
 async function openDemo(page: Page) {
   await page.goto('/practice/demo');
   await expect(page.getByRole('button', { name: 'Listen', exact: true })).toBeEnabled();
+  await expect(page.locator('.drill-advanced')).not.toHaveAttribute('open');
+  await page.getByText('Advanced settings', { exact: true }).click();
 }
 async function reachBoundary(page: Page, index = 0) {
   await expect(page.getByTestId('current-japanese')).toHaveText(demo.segments[index].japanese);
@@ -275,5 +277,5 @@ test('denied hands-free permission leaves manual practice usable; final boundary
     .locator('video')
     .evaluate((video: HTMLVideoElement) => video.dispatchEvent(new Event('ended')));
   await expect(page.getByRole('heading', { name: 'Lesson complete', exact: true })).toBeVisible();
-  await expect(page.getByTestId('playback-state')).toContainText('WELL PRACTICED');
+  await expect(page.getByTestId('playback-state')).toContainText('SESSION FINISHED');
 });

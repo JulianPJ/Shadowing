@@ -10,9 +10,10 @@ import type { SyncData } from './types';
 export async function hydrateSync(data: SyncData) {
   const owner = storageAccount();
   if (data.preferences) {
-    const { updatedAt, mode, speed, studioMode, furigana } = data.preferences;
+    const { updatedAt, mode, speed, studioMode, furigana, reviewLimits } = data.preferences;
     // Timing alignment is intentionally device-local: preserve it when account preferences hydrate.
-    const { playbackOffsetMs } = loadPreferences();
+    const local = loadPreferences();
+    const { playbackOffsetMs } = local;
     writeStorage('preferences', {
       mode,
       speed,
@@ -20,6 +21,9 @@ export async function hydrateSync(data: SyncData) {
       furigana,
       playbackOffsetMs,
       translation: false,
+      ...((reviewLimits ?? local.reviewLimits)
+        ? { reviewLimits: reviewLimits ?? local.reviewLimits }
+        : {}),
     });
     writeStorage('sync:preferences-date', updatedAt);
   }

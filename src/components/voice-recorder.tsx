@@ -39,6 +39,7 @@ export function VoiceRecorder({
   recentAttempts = [],
   onManualStop,
   referenceAudio,
+  onReplayNative,
 }: {
   ref?: Ref<VoiceRecorderHandle>;
   enabled: boolean;
@@ -54,6 +55,7 @@ export function VoiceRecorder({
   recentAttempts?: ShadowingRecentAttempt[];
   onManualStop?: () => void;
   referenceAudio?: (signal: AbortSignal) => Promise<VoiceRecorderReference>;
+  onReplayNative?: () => void;
 }) {
   const { isPro } = useProAccess();
   const [recording, setRecording] = useState(false);
@@ -356,79 +358,100 @@ export function VoiceRecorder({
 
   return (
     <div className={`recording-panel ${recording ? 'is-recording' : ''}`}>
-      <div className="recording-top">
-        <div>
-          <span className="small-label">MAKE IT YOUR OWN</span>
-          <span className="recording-hint">
-            {recording
-              ? `Recording · 0:${String(seconds).padStart(2, '0')}`
-              : recorded
-                ? 'Listen back, or analyse this attempt against the section.'
-                : 'Say it aloud. Record it if you like.'}
-          </span>
+      <div className="recording-core">
+        <div className="recording-top">
+          <div>
+            <span className="small-label">MAKE IT YOUR OWN</span>
+            <span className="recording-hint">
+              {recording
+                ? `Recording · 0:${String(seconds).padStart(2, '0')}`
+                : recorded
+                  ? 'Listen to your voice, then replay the source to compare.'
+                  : 'Say it aloud. Record it if you like.'}
+            </span>
+          </div>
+          <button
+            className={`button record-button ${recording ? 'recording' : ''}`}
+            disabled={(!enabled && !recording) || requesting || analyzing}
+            onClick={() => {
+              if (recording) {
+                const instance = recorder.current;
+                if (instance?.state === 'recording') instance.stop();
+                onManualStop?.();
+                if (instance)
+                  manuallyStopped.current = { recorder: instance, request: requestId.current };
+              } else void start();
+            }}
+          >
+            {recording ? (
+              <>
+                <Square size={13} fill="currentColor" />
+                Stop recording
+              </>
+            ) : requesting ? (
+              <>
+                <LoaderCircle className="spin" size={15} />
+                Allow microphone…
+              </>
+            ) : (
+              <>
+                <Mic size={15} />
+                {recorded ? 'Record again' : 'Record yourself'}
+              </>
+            )}
+          </button>
         </div>
-        <button
-          className={`button record-button ${recording ? 'recording' : ''}`}
-          disabled={(!enabled && !recording) || requesting || analyzing}
-          onClick={() => {
-            if (recording) {
-              const instance = recorder.current;
-              if (instance?.state === 'recording') instance.stop();
+        <p className="recording-retention">
+          {recorded
+            ? 'This recording will be cleared when you leave this section.'
+            : 'Recording is optional. Audio stays here until you change sections.'}
+        </p>
+
+        {requesting ? (
+          <button
+            className="text-button small"
+            onClick={() => {
               onManualStop?.();
-              if (instance)
-                manuallyStopped.current = { recorder: instance, request: requestId.current };
-            } else void start();
-          }}
-        >
-          {recording ? (
-            <>
-              <Square size={13} fill="currentColor" />
-              Stop recording
-            </>
-          ) : requesting ? (
-            <>
-              <LoaderCircle className="spin" size={15} />
-              Allow microphone…
-            </>
-          ) : (
-            <>
-              <Mic size={15} />
-              {recorded ? 'Record again' : 'Record yourself'}
-            </>
-          )}
-        </button>
+              cancel();
+            }}
+          >
+            Cancel microphone request
+          </button>
+        ) : null}
+
+        {recorded ? (
+          <>
+            <div className="recording-audio">
+              <audio
+                ref={audio}
+                src={recorded}
+                controls
+                aria-label="Your recorded attempt"
+                onPlay={() => onBeforeRecord()}
+              />
+              <button
+                className="icon-button"
+                aria-label="Delete your recording"
+                onClick={clearRecording}
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
+            {onReplayNative ? (
+              <button
+                className="button recording-compare"
+                disabled={recording || requesting}
+                onClick={onReplayNative}
+              >
+                <RotateCcw size={15} />
+                Replay source to compare
+              </button>
+            ) : null}
+          </>
+        ) : null}
       </div>
-
-      {requesting ? (
-        <button
-          className="text-button small"
-          onClick={() => {
-            onManualStop?.();
-            cancel();
-          }}
-        >
-          Cancel microphone request
-        </button>
-      ) : null}
-
       {recorded ? (
         <>
-          <div className="recording-audio">
-            <audio
-              ref={audio}
-              src={recorded}
-              controls
-              aria-label="Your recorded attempt"
-              onPlay={() => onBeforeRecord()}
-            />
-            <button
-              className="icon-button"
-              aria-label="Delete your recording"
-              onClick={clearRecording}
-            >
-              <Trash2 size={16} />
-            </button>
-          </div>
           <div className="recording-analysis-actions">
             <button
               className="text-button small"

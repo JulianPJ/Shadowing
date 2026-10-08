@@ -5,6 +5,7 @@ import type {
   PracticeSession,
 } from '../learner-types';
 import type { Mode, QuizAnswerResult } from '../types';
+import type { ReviewLimits } from '../review/limits';
 
 export type SyncedPreferences = {
   schemaVersion: 1;
@@ -12,6 +13,7 @@ export type SyncedPreferences = {
   speed: number;
   studioMode: boolean;
   furigana: boolean;
+  reviewLimits?: ReviewLimits;
   updatedAt: string;
 };
 export type SyncedLesson = {

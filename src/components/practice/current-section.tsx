@@ -71,7 +71,14 @@ export function CurrentSection({
   continuePractice,
   lastIndex,
 }: CurrentSectionProps) {
-  const [lookup, setLookup] = useState<{ segmentId: string; term: string } | null>(null);
+  const [lookup, setLookup] = useState<{ segmentId: string; term: string } | null>(() => {
+    if (typeof window === 'undefined') return null;
+    const query = new URLSearchParams(window.location.search);
+    const term = query.get('lookup')?.trim();
+    return query.get('section') === segment.id && term && term.length <= 300
+      ? { segmentId: segment.id, term }
+      : null;
+  });
   const lookupTerm = lookup?.segmentId === segment.id ? lookup.term : '';
   return (
     <section
@@ -107,7 +114,9 @@ export function CurrentSection({
           onLookup={(term) => setLookup({ segmentId: segment.id, term })}
         />
       </h2>
-      <p className="dictionary-lookup-hint">Click a word or select a phrase to save it.</p>
+      <p className="dictionary-lookup-hint">
+        Choose a word or select a phrase to look it up and save it.
+      </p>
       {lookupTerm ? (
         <DictionarySavePanel
           key={`${segment.id}:${lookupTerm}`}

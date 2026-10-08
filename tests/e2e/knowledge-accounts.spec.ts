@@ -6,6 +6,7 @@ import { transcriptKey } from '../../src/lib/transcript';
 import { lessonIdentity } from '../../src/lib/learner-progress';
 import { lessonSyncId } from '../../src/lib/sync/validation';
 import type { Lesson } from '../../src/lib/types';
+import { emptyReview } from '../../src/lib/review/local';
 
 const user: AccountUser = {
   id: 'knowledge-account-one',
@@ -33,6 +34,11 @@ async function services(context: BrowserContext, state: { user: AccountUser | nu
     route.fulfill({ json: { data: emptySync(), nextCursor: null } }),
   );
   await context.route('**/api/sync/push', (route) => route.fulfill({ json: { ok: true } }));
+  await context.route('**/api/review', (route) => {
+    if (!state.user || route.request().headers()['x-hibiki-account'] !== state.user.id)
+      return route.fulfill({ status: 409, json: { error: 'Account changed' } });
+    return route.fulfill({ json: emptyReview() });
+  });
   await context.route('**/api/knowledge*', (route) => {
     const owner = route.request().headers()['x-hibiki-account'];
     if (!state.user || owner !== state.user.id)

@@ -33,6 +33,10 @@ export type PracticeSession = {
   completedAt: string | null;
   activeSeconds: number;
   activeByDay: Record<string, number>;
+  // Exact local study-day samples, when available. Legacy UTC totals stay intact.
+  localActiveByDay?: Record<string, number>;
+  // Exact legacy UTC buckets retained when mixed with local-day samples.
+  legacyActiveByDay?: Record<string, number>;
   lastSectionId: string | null;
   sections: SectionActivity[];
 };

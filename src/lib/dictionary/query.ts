@@ -56,7 +56,14 @@ export function validateDictionaryQuery(
     throw new DictionaryValidationError('Invalid transcript identity');
   if (query.term !== undefined && (!query.term.trim() || query.term.length > 120))
     throw new DictionaryValidationError('Invalid dictionary term');
-  return { ...query, limit, ...(query.term ? { term: normalizeDictionaryTerm(query.term) } : {}) };
+  if (query.search !== undefined && (!query.search.trim() || query.search.length > 120))
+    throw new DictionaryValidationError('Invalid dictionary search');
+  return {
+    ...query,
+    limit,
+    ...(query.term ? { term: normalizeDictionaryTerm(query.term) } : {}),
+    ...(query.search ? { search: normalizeDictionaryTerm(query.search) } : {}),
+  };
 }
 export function dictionaryQueryParams(query: DictionaryQuery) {
   const params = new URLSearchParams();
@@ -67,16 +74,24 @@ export function dictionaryQueryParams(query: DictionaryQuery) {
 export function readDictionaryQuery(params: URLSearchParams) {
   for (const key of params.keys())
     if (
-      !['limit', 'cursor', 'term', 'deckId', 'tagId', 'lessonId', 'transcriptKey', 'ids'].includes(
-        key,
-      ) ||
+      ![
+        'limit',
+        'cursor',
+        'term',
+        'search',
+        'deckId',
+        'tagId',
+        'lessonId',
+        'transcriptKey',
+        'ids',
+      ].includes(key) ||
       params.getAll(key).length !== 1
     )
       throw new DictionaryValidationError('Invalid dictionary query');
   return validateDictionaryQuery({
     ...(params.has('limit') ? { limit: Number(params.get('limit')) } : {}),
     ...Object.fromEntries(
-      ['cursor', 'term', 'deckId', 'tagId', 'lessonId', 'transcriptKey']
+      ['cursor', 'term', 'search', 'deckId', 'tagId', 'lessonId', 'transcriptKey']
         .filter((k) => params.has(k))
         .map((k) => [k, params.get(k)]),
     ),

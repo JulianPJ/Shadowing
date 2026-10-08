@@ -22,10 +22,13 @@ import type { Lesson } from '../types';
 import { sanitizeDeviceData } from './sanitize';
 import { loadKnowledge, importKnowledgeRecords } from '../knowledge/client';
 import type { WordKnowledgeRecord } from '../knowledge/types';
+import { reportChannel, setChannelOwner, syncFailure } from './channel-status';
 
 export type SyncStatus = {
   user: AccountUser | null;
-  state: 'local' | 'syncing' | 'saved' | 'offline';
+  state: 'local' | 'syncing' | 'saved' | 'offline' | 'attention';
+  loaded: boolean;
+  error: string;
   lastSync: string | null;
   importPending: boolean;
   googleEnabled: boolean;
@@ -34,6 +37,8 @@ export type SyncStatus = {
 let status: SyncStatus = {
   user: null,
   state: 'local',
+  loaded: false,
+  error: '',
   lastSync: null,
   importPending: false,
   googleEnabled: false,
@@ -55,7 +60,25 @@ export const subscribeSync = (callback: () => void) => {
 };
 function publish(patch: Partial<SyncStatus>) {
   status = { ...status, ...patch };
+  setChannelOwner(status.user?.id ?? null);
+  if (status.user && patch.state) {
+    reportChannel(status.user.id, 'learner', {
+      state: patch.state === 'attention' ? 'error' : patch.state === 'local' ? 'idle' : patch.state,
+      pending: readStorage('sync:pending', false) ? 1 : 0,
+      lastSync: status.lastSync,
+      message: status.error,
+    });
+  }
   for (const listener of listeners) listener();
+}
+function failed(error: unknown) {
+  const failure = syncFailure(error);
+  publish({
+    loaded: true,
+    state: status.user ? (failure.state === 'offline' ? 'offline' : 'attention') : 'local',
+    error: failure.message,
+  });
+  if (status.user) reportChannel(status.user.id, 'learner', failure);
 }
 async function transport(path: string, body?: unknown) {
   const response = await fetch(path, {
@@ -71,7 +94,10 @@ async function transport(path: string, body?: unknown) {
     body: body ? JSON.stringify(body) : undefined,
     signal: AbortSignal.timeout(15000),
   });
-  if (!response.ok) throw new Error(response.status === 401 ? 'Signed out' : 'Sync unavailable');
+  if (!response.ok)
+    throw Object.assign(new Error(response.status === 401 ? 'Signed out' : 'Sync unavailable'), {
+      status: response.status,
+    });
   return response;
 }
 function cache(): SyncData {
@@ -85,7 +111,8 @@ function hasData(data: SyncData) {
 }
 export function scheduleSync() {
   if (!status.user || applying) return;
-  publish({ state: 'syncing' });
+  writeStorage('sync:pending', true);
+  publish({ state: 'syncing', error: '' });
   clearTimeout(timer);
   timer = setTimeout(() => void synchronize(), 1500);
 }
@@ -126,6 +153,8 @@ export async function refreshAccount() {
     const saved = readStorage<string | null>('sync:last', null);
     publish({
       user: info.user,
+      loaded: true,
+      error: '',
       googleEnabled: info.googleEnabled,
       emailEnabled: info.emailEnabled,
       lastSync: saved,
@@ -137,8 +166,8 @@ export async function refreshAccount() {
     });
     if (info.user) await synchronize();
     else window.dispatchEvent(new Event('hibiki:sync-hydrated'));
-  } catch {
-    publish({ state: status.user ? 'offline' : 'local' });
+  } catch (error) {
+    if (ticket === generation) failed(error);
   }
 }
 
@@ -178,7 +207,7 @@ export async function synchronize() {
   const owner = status.user.id,
     ticket = generation;
   try {
-    publish({ state: 'syncing' });
+    publish({ state: 'syncing', error: '' });
     let data = mergeSync(cache(), await deviceSnapshot());
     if (storageAccount() !== owner || ticket !== generation) return;
     saveCache(data); // Durable retry state before the first network operation.
@@ -253,11 +282,12 @@ export async function synchronize() {
     if (storageAccount() !== owner || ticket !== generation) return;
     const lastSync = new Date().toISOString();
     writeStorage('sync:last', lastSync);
+    if (!rerun) writeStorage('sync:pending', false);
     if (readStorage('sync:import-decision', null) === 'accepted')
       writeStorage('sync:import-complete', true);
-    publish({ state: 'saved', lastSync });
-  } catch {
-    if (storageAccount() === owner) publish({ state: 'offline' });
+    publish({ state: rerun ? 'syncing' : 'saved', lastSync, error: '' });
+  } catch (error) {
+    if (storageAccount() === owner && ticket === generation) failed(error);
   } finally {
     running = false;
     if (rerun) {

@@ -36,7 +36,7 @@ export function LessonVocabulary({
           <h2>Your vocabulary in this lesson</h2>
         </div>
         <Link className="text-button" href="/words">
-          Word Browser
+          Word knowledge
         </Link>
       </div>
       {!enabled ? (
@@ -76,7 +76,8 @@ export function LessonVocabulary({
           <p className="small muted">
             Vocabulary coverage uses your explicit word states. Unmarked words count as Unknown;
             particles and auxiliary words are excluded, and Ignored words leave the denominator.
-            This is a vocabulary estimate, not a comprehension score.
+            Repeated words count each time they appear. This is vocabulary coverage based on your
+            marks, rather than a measure of comprehension.
           </p>
           <div className="vocabulary-counts">
             <span>{analysis.learningTokens} Learning</span>
@@ -109,24 +110,34 @@ export function LessonVocabulary({
             </button>
           ) : null}
           {lines.length ? (
-            <ul className="good-lines">
-              {lines.slice(0, 12).map((line) => {
-                const segment = lesson.segments.find((value) => value.id === line.segmentId)!;
-                return (
-                  <li key={line.segmentId}>
-                    <button className="good-line" onClick={() => onPractice(line.segmentId)}>
-                      <span lang="ja">
-                        <JapaneseText text={segment.japanese} />
-                      </span>
-                      <small>
-                        {filter === 'value' ? line.highValueReason : line.reason} ·{' '}
-                        {Math.round(segment.end - segment.start)}s
-                      </small>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
+            <>
+              <p className="small muted">
+                Choose a line to replay it in the player, then look up its unfamiliar word.
+                High-value lines practise unfamiliar words that recur in this lesson.
+              </p>
+              <ul className="good-lines">
+                {lines.slice(0, 12).map((line) => {
+                  const segment = lesson.segments.find((value) => value.id === line.segmentId)!;
+                  return (
+                    <li key={line.segmentId}>
+                      <button
+                        className="good-line"
+                        onClick={() => onPractice(line.segmentId)}
+                        aria-label={`Practise this line: ${segment.japanese}`}
+                      >
+                        <span lang="ja">
+                          <JapaneseText text={segment.japanese} />
+                        </span>
+                        <small>
+                          {filter === 'value' ? line.highValueReason : line.reason} ·{' '}
+                          {Math.round(segment.end - segment.start)}s
+                        </small>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
           ) : (
             <p className="small muted">
               {filter === 'one'

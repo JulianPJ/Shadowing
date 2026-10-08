@@ -9,6 +9,7 @@ import { validateSync } from '../../src/lib/sync/validation';
 import { verifyAttempt } from '../../src/lib/sync/quiz-verification';
 import type { Lesson } from '../../src/lib/types';
 import type { DictionaryEntry } from '../../src/lib/dictionary/types';
+import { emptyReview } from '../../src/lib/review/local';
 const user: AccountUser = {
   id: 'account-one',
   email: 'learner@example.com',
@@ -62,6 +63,10 @@ async function connect(
     remote.data = mergeSync(remote.data, data);
     await route.fulfill({ json: { ok: true } });
   });
+  await context.route('**/api/review', (route) => route.fulfill({ json: emptyReview() }));
+  await context.route('**/api/knowledge*', (route) =>
+    route.fulfill({ json: { records: [], nextCursor: null } }),
+  );
   await context.route('**/api/dictionary*', async (route) => {
     if (route.request().method() === 'GET') {
       await route.fulfill({ json: { entries: remote.dictionary } });
@@ -170,7 +175,7 @@ test('account plan controls paid UI without hiding the core account experience',
   const remote = new Remote();
   await connect(context, remote, { user: freeUser });
   await account(page);
-  await expect(page.getByText('Hibiki Free', { exact: true })).toBeVisible();
+  await expect(page.locator('.account-plan').filter({ hasText: 'Hibiki Free' })).toBeVisible();
   await page.goto('/dictionary');
   await expect(page.getByText('No saved vocabulary yet.')).toBeVisible();
   await expect(page.getByText('Opening your dictionary…')).toHaveCount(0);
@@ -298,7 +303,9 @@ test('two devices sync preferences, bookmarks, completion and retakes; offline e
       .toBeGreaterThan(0.2);
     await pageB.getByRole('button', { name: 'Studio Mode', exact: true }).click();
     await pageB.goto('/account');
-    await expect(pageB.getByText(/Progress is saved on this device/)).toBeVisible();
+    await expect(
+      pageB.getByText(/Saved on this device\. The sync service is unavailable/),
+    ).toBeVisible();
     expect(
       await pageB.evaluate(() =>
         JSON.parse(localStorage.getItem('hibiki:v1:account:account-one:favorites:demo')!),
@@ -336,13 +343,13 @@ test('auth screens expose configured providers without offering unavailable emai
   await expect(page.getByText('Google sign-in is awaiting configuration.')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Create account' })).toBeDisabled();
   await expect(page.getByRole('status')).toContainText(
-    'Email sign-up is awaiting email service setup.',
+    'Email registration is temporarily unavailable.',
   );
 
   await page.goto('/reset-password');
   await expect(page.getByRole('button', { name: 'Send password link' })).toBeDisabled();
   await expect(page.getByRole('status')).toContainText(
-    'Email password reset is awaiting email service setup.',
+    'Email password recovery is temporarily unavailable.',
   );
 
   await page.goto('/sign-in');
@@ -358,14 +365,24 @@ test('selected Japanese saves to the account dictionary with source context and 
 }) => {
   const remote = new Remote();
   await connect(context, remote, { user });
+  await context.addInitScript((id) => {
+    localStorage.setItem(
+      `hibiki:v1:account:${id}:sync:import-decision`,
+      JSON.stringify('declined'),
+    );
+  }, user.id);
   await context.route('**/api/translate', (route) =>
     route.fulfill({ json: { translation: 'lookup meaning', provider: 'Test translator' } }),
   );
-  await account(page);
   await page.goto('/practice/demo');
   await expect(page.getByRole('button', { name: 'Listen', exact: true })).toBeEnabled();
+  await expect
+    .poll(() =>
+      page.evaluate(() => JSON.parse(localStorage.getItem('hibiki:v1:active-account') ?? 'null')),
+    )
+    .toBe(user.id);
 
-  const token = page.locator('#current-japanese .lookup-token').first();
+  const token = page.locator('#current-japanese [data-lookup="今日"]');
   const term = (await token.textContent())!.trim();
   expect(term.length).toBeGreaterThan(0);
   await token.click();
@@ -377,29 +394,30 @@ test('selected Japanese saves to the account dictionary with source context and 
   await expect(page.getByLabel('Source sentence meaning')).toHaveValue(
     demo.segments[0].translation,
   );
-  await page.getByRole('button', { name: 'Save to dictionary' }).click();
-  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Save only', exact: true }).click();
+  await expect(panel).toContainText('Saved for reference');
   await expect.poll(() => remote.dictionary.length).toBe(1);
   expect(remote.dictionary[0].term).toBe(term);
   expect(remote.dictionary[0].source.segmentId).toBe(demo.segments[0].id);
   expect(remote.dictionary[0].source.start).toBe(demo.segments[0].start);
   expect(remote.dictionary[0].source.end).toBe(demo.segments[0].end);
 
-  await page.getByRole('link', { name: 'View dictionary' }).click();
-  await expect(page.getByRole('heading', { name: 'Personal dictionary' })).toBeVisible();
+  await page.getByRole('link', { name: 'View saved words' }).click();
+  await expect(page.getByRole('heading', { name: 'Saved words', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: term })).toBeVisible();
   await expect(page.getByText(demo.segments[0].japanese, { exact: true })).toBeVisible();
   const open = page.getByRole('link', { name: 'Open section' });
   await expect(open).toHaveAttribute(
     'href',
-    `/practice/demo?section=${encodeURIComponent(demo.segments[0].id)}`,
+    `/practice/demo?section=${encodeURIComponent(demo.segments[0].id)}&transcript=${remote.dictionary[0].source.transcriptKey}`,
   );
   await open.click();
   await expect(page).toHaveURL(new RegExp(`section=${demo.segments[0].id}`));
   await expect(page.getByTestId('current-japanese')).toHaveText(demo.segments[0].japanese);
 
   await page.goto('/dictionary');
-  await page.getByRole('button', { name: 'Remove' }).click();
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.getByRole('button', { name: 'Delete saved word', exact: true }).click();
   await expect(page.getByText('No saved vocabulary yet.')).toBeVisible();
   expect(remote.dictionary).toHaveLength(0);
 });

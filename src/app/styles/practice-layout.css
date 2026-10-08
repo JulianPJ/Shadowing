@@ -30,74 +30,74 @@
   font-size: 12px;
 }
 .state-badge {
-  font-size: 9px;
+  font-size: 12px;
   letter-spacing: 0.7px;
 }
 .section-time {
-  font-size: 10px;
-  color: #808976;
+  font-size: 13px;
+  color: var(--muted);
 }
 .translation-button {
-  color: #7c866c;
-  font-size: 11px;
+  color: var(--muted);
+  font-size: 13px;
 }
 .turn-instruction {
-  font-size: 10px;
-  color: #7e886f;
+  font-size: 13px;
+  color: var(--muted);
 }
 .recording-hint {
-  color: #778169;
-  font-size: 11px;
+  color: var(--muted);
+  font-size: 13px;
 }
 .small-label {
-  color: #7f896e;
-  font-size: 9px;
+  color: var(--muted);
+  font-size: 12px;
 }
 .record-button {
-  font-size: 11px;
+  font-size: 13px;
   color: #667c4f;
 }
 .row-content > [lang='ja'] {
   font-size: 13px;
 }
 .row-time {
-  font-size: 9px;
-  color: #84946f;
+  font-size: 12px;
+  color: var(--muted);
 }
 .row-number {
-  color: #89977b;
+  color: var(--muted);
 }
 .past .row-content > [lang='ja'] {
-  color: #7c8a6c;
+  color: var(--muted);
 }
 .transcript-heading .eyebrow {
-  color: #7f8c6d;
+  color: var(--muted);
 }
 .transcript-bottom {
-  color: #7c8b6a;
-  font-size: 9px;
+  color: var(--muted);
+  font-size: 12px;
 }
 .player-footnote {
-  color: #808c70;
-  font-size: 9px;
+  color: var(--muted);
+  font-size: 12px;
 }
 .player-footnote .text-button {
-  color: #71825d;
-  font-size: 10px;
+  color: var(--muted);
+  font-size: 13px;
 }
 .recording-privacy {
-  color: #879375;
-  font-size: 9px;
+  color: var(--muted);
+  font-size: 12px;
 }
 .transcript-search input::placeholder {
-  color: #859271;
+  color: var(--muted);
 }
 .transcript-search input {
-  font-size: 11px;
+  font-size: 13px;
 }
 .speed-control {
-  color: #7d896c;
-  font-size: 11px;
+  color: var(--muted);
+  font-size: 13px;
 }
 .hero-description {
   color: #72786c;
@@ -119,12 +119,12 @@
   color: #6c795f;
 }
 .translation-privacy {
-  color: #879476;
-  font-size: 9px;
+  color: var(--muted);
+  font-size: 12px;
 }
 .translation-source {
-  color: #879476;
-  font-size: 9px;
+  color: var(--muted);
+  font-size: 12px;
 }
 .current-translation {
   color: #657750;
@@ -140,10 +140,10 @@
     font-size: 22px;
   }
   .practice-controls .button {
-    font-size: 11px;
+    font-size: 13px;
   }
   .record-button {
-    font-size: 10px;
+    font-size: 13px;
   }
   .row-content > [lang='ja'] {
     font-size: 12px;
@@ -175,27 +175,27 @@
     font-size: 14px;
   }
   .state-badge {
-    font-size: 9px;
+    font-size: 12px;
   }
   .recording-hint {
-    font-size: 10px;
+    font-size: 13px;
   }
   .section-time {
-    font-size: 9px;
+    font-size: 12px;
   }
   .transcript-bottom {
-    font-size: 9px;
+    font-size: 12px;
   }
   .recording-privacy {
-    font-size: 9px;
+    font-size: 12px;
   }
   .turn-instruction {
-    font-size: 10px;
+    font-size: 13px;
   }
   .speed-control {
-    font-size: 10px;
+    font-size: 13px;
   }
   .small-label {
-    font-size: 8px;
+    font-size: 12px;
   }
 }

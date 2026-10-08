@@ -173,8 +173,8 @@ test('weekly report uses genuine local evidence and a calm goal survives reload 
   await expect(page.locator('.weekly-metrics')).toContainText('Minutes practised6');
   await expect(page.locator('.weekly-metrics')).toContainText('Sections revisited1');
   await expect(page.locator('.weekly-metrics')).toContainText('Marked Known this week1');
-  await expect(page.locator('.weekly-metrics')).toContainText('Review recall50%');
-  await expect(page.locator('.weekly-report')).toContainText('UTC practice days');
+  await expect(page.locator('.weekly-metrics')).toContainText('Self-rated recall50%');
+  await expect(page.locator('.weekly-report')).toContainText('day starts at midnight');
   await page.getByRole('button', { name: 'Set a daily goal' }).click();
   await expect(page.getByRole('progressbar', { name: 'Daily practice goal' })).toHaveAttribute(
     'value',

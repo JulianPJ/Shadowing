@@ -1,6 +1,7 @@
 import type { MorphologicalToken } from '../japanese-readings';
 import { hiragana } from '../japanese-readings';
 import type { LexicalMatch, LexiconEntry } from './types';
+import { selectedMorphology } from '../japanese-lexical-spans';
 
 export function canonicalLemma(token: MorphologicalToken) {
   return (token.basic_form && token.basic_form !== '*' ? token.basic_form : token.surface_form)
@@ -9,6 +10,8 @@ export function canonicalLemma(token: MorphologicalToken) {
 }
 export function lookupCandidates(selected: string, tokens: readonly MorphologicalToken[]) {
   const term = selected.normalize('NFC').trim();
+  const contextual = selectedMorphology(term, tokens);
+  if (contextual.length) tokens = contextual;
   const exact = tokens.find((token) => token.surface_form === term);
   const whole = tokens.map((token) => token.surface_form).join('') === term;
   const stem = tokens[0];
@@ -28,13 +31,24 @@ export function lookupCandidates(selected: string, tokens: readonly Morphologica
     stem?.pos === '名詞' &&
     stem.pos_detail_1 === 'サ変接続' &&
     canonicalLemma(tokens[1] ?? { surface_form: '' }) === 'する' &&
-    tokens.slice(2).every((token) => ['助動詞', '助詞'].includes(token.pos ?? ''));
+    tokens
+      .slice(2)
+      .every(
+        (token) =>
+          ['助動詞', '助詞'].includes(token.pos ?? '') ||
+          (['動詞', '形容詞'].includes(token.pos ?? '') && token.pos_detail_1 === '非自立'),
+      );
+  const adjectivalNoun =
+    whole &&
+    stem?.pos === '名詞' &&
+    stem.pos_detail_1 === '形容動詞語幹' &&
+    tokens.slice(1).every((token) => token.pos === '助動詞');
   return [
     ...new Set([
       term,
       ...(exact ? [canonicalLemma(exact)] : []),
       ...(tokens.length === 1 ? [canonicalLemma(tokens[0])] : []),
-      ...(inflection || verbalNoun ? [canonicalLemma(stem)] : []),
+      ...(inflection || verbalNoun || adjectivalNoun ? [canonicalLemma(stem)] : []),
     ]),
   ];
 }

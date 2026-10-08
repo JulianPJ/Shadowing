@@ -19,6 +19,7 @@ import { LessonReviewRecap } from './lesson-review-recap';
 import { TopicVocabularyOverview } from './topic-vocabulary-overview';
 import { ComprehensionQuiz } from './comprehension-quiz';
 import { LessonDifficulty } from './lesson-difficulty';
+import { useProAccess } from './pro-feature';
 export function LessonCompletionSummary({
   lesson,
   finished,
@@ -51,6 +52,8 @@ export function LessonCompletionSummary({
   const account = useAccount(),
     review = useReview();
   const owner = account.user?.id ?? 'anonymous';
+  const { isPro } = useProAccess();
+  const dueCount = dueReviews(review.data.cards, new Date().toISOString()).length;
   const [result, setResult] = useState<{
     owner: string;
     attempt: QuizAttempt | null;
@@ -91,65 +94,91 @@ export function LessonCompletionSummary({
           <header>
             <span className="eyebrow">KEEP WHAT YOU LEARNED</span>
             <h2>Lesson complete</h2>
-            <p>{lesson.segments.length} sections completed</p>
+            <p>
+              You reached the end of this lesson. Keep a few useful words or check what you
+              understood.
+            </p>
+            <p className="small muted">
+              {dueCount ? `${dueCount} saved words due for review` : 'No saved words due right now'}
+              {attempt?.completedAt
+                ? ` · Understanding check ${attempt.score}/${attempt.totalQuestions}`
+                : ''}
+            </p>
           </header>
-          <div className="completion-results">
-            {aggregate ? (
-              <div>
-                <ShadowingCompletion
-                  aggregate={aggregate}
-                  summary={summary}
-                  loading={summaryLoading}
-                />
-                {onSummarize && !summary ? (
-                  <button className="text-button" disabled={summaryLoading} onClick={onSummarize}>
-                    Summarise Shadowing Match
-                  </button>
-                ) : null}
-              </div>
-            ) : null}
-            {attempt?.completedAt ? (
-              <div className="completion-comprehension">
-                <h3>Comprehension</h3>
-                <strong>
-                  {attempt.score} / {attempt.totalQuestions}
-                </strong>
-              </div>
-            ) : null}
-          </div>
-          <LessonReviewRecap lesson={lesson} />
-          {revisit.length ? (
-            <div className="completion-revisit">
-              <h3>Worth another listen</h3>
-              <ul>
-                {revisit.map((s) => (
-                  <li key={s.index}>
-                    <button className="text-button" onClick={() => onReview(s.index)}>
-                      Section {s.index + 1}
-                    </button>
-                    <span className="small muted">{s.reason}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-          <TopicVocabularyOverview lesson={lesson} onReview={onReview} />
           <div className="completion-next">
-            <div>
-              <strong>
-                {dueReviews(review.data.cards, new Date().toISOString()).length} reviews due
-              </strong>
+            {dueCount > 0 ? (
               <Link className="button primary" href="/review">
-                Start Daily Review
+                Review saved words · {dueCount} due
               </Link>
-            </div>
-            <button className="button" onClick={onPracticeAgain}>
+            ) : null}
+            {quiz.available && isPro ? (
+              <button
+                className={`button ${dueCount ? '' : 'primary'}`}
+                onClick={() => {
+                  const target = document.getElementById('lesson-quiz');
+                  target?.scrollIntoView({
+                    behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+                      ? 'instant'
+                      : 'smooth',
+                    block: 'start',
+                  });
+                  target?.focus({ preventScroll: true });
+                }}
+              >
+                Check understanding
+              </button>
+            ) : null}
+            <Link className={`button ${dueCount || isPro ? '' : 'primary'}`} href="/library">
+              Choose next lesson
+            </Link>
+            <button className="text-button" onClick={onPracticeAgain}>
               Practice again
             </button>
-            <Link className="text-button" href="/">
-              Choose another lesson
-            </Link>
           </div>
+          <details className="completion-details">
+            <summary>Saved words and practice details</summary>
+            <div className="completion-results">
+              {aggregate ? (
+                <div>
+                  <ShadowingCompletion
+                    aggregate={aggregate}
+                    summary={summary}
+                    loading={summaryLoading}
+                  />
+                  {onSummarize && !summary ? (
+                    <button className="text-button" disabled={summaryLoading} onClick={onSummarize}>
+                      Summarise Shadowing Match
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+              {attempt?.completedAt ? (
+                <div className="completion-comprehension">
+                  <h3>Comprehension</h3>
+                  <strong>
+                    {attempt.score} / {attempt.totalQuestions}
+                  </strong>
+                </div>
+              ) : null}
+            </div>
+            <LessonReviewRecap lesson={lesson} />
+            {revisit.length ? (
+              <div className="completion-revisit">
+                <h3>Worth another listen</h3>
+                <ul>
+                  {revisit.map((s) => (
+                    <li key={s.index}>
+                      <button className="text-button" onClick={() => onReview(s.index)}>
+                        Section {s.index + 1}
+                      </button>
+                      <span className="small muted">{s.reason}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            <TopicVocabularyOverview lesson={lesson} onReview={onReview} />
+          </details>
         </>
       ) : null}
       {quiz.available ? (
@@ -159,7 +188,10 @@ export function LessonCompletionSummary({
           onAttemptChange={(attempt) => setResult({ owner, attempt, key: attempt.transcriptKey })}
         />
       ) : null}
-      <LessonDifficulty lesson={lesson} onWaitingChange={onDifficultyWaiting} />
+      <details className="completion-details difficulty-disclosure">
+        <summary>About this lesson’s difficulty</summary>
+        <LessonDifficulty lesson={lesson} onWaitingChange={onDifficultyWaiting} />
+      </details>
     </section>
   );
 }

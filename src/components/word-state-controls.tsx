@@ -2,6 +2,12 @@
 import { markWords } from '@/lib/knowledge/client';
 import { wordStates } from '@/lib/knowledge/types';
 import { useWordKnowledge } from './use-word-knowledge';
+const descriptions = {
+  unknown: 'A word you want to learn; unmarked words count as Unknown.',
+  learning: 'You are working on recognising this word.',
+  known: 'You choose to count this word as familiar in vocabulary coverage.',
+  ignored: 'Excluded from vocabulary coverage without deleting the word.',
+};
 export function WordStateControls({ lemma, reading }: { lemma: string; reading?: string | null }) {
   const { states } = useWordKnowledge();
   const state = states[lemma]?.state ?? 'unknown';
@@ -15,6 +21,7 @@ export function WordStateControls({ lemma, reading }: { lemma: string; reading?:
             key={value}
             className={`word-state-choice word-state-${value}`}
             aria-pressed={state === value}
+            title={descriptions[value]}
             disabled={!valid}
             onClick={() => markWords([{ lemma, reading }], value)}
           >
@@ -23,10 +30,8 @@ export function WordStateControls({ lemma, reading }: { lemma: string; reading?:
         ))}
       </div>
       <small>
-        {states[lemma]
-          ? 'Saved across transcripts on this device.'
-          : 'Unmarked words are treated as Unknown.'}{' '}
-        States are separate from review scheduling.
+        {descriptions[state]} Marks apply across lessons. Saving a card and scheduling reviews are
+        separate choices.
       </small>
     </div>
   );

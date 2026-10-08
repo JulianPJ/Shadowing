@@ -9,7 +9,8 @@ async function finishLesson(page: Page, continuous = false) {
   await page.goto('/practice/demo');
   await expect(page.getByRole('button', { name: 'Listen', exact: true })).toBeEnabled();
   await expect(page.getByRole('button', { name: 'Take comprehension check' })).toHaveCount(0);
-  if (continuous) await page.getByRole('button', { name: 'Continuous', exact: true }).click();
+  if (continuous)
+    await page.getByLabel('Practice preset', { exact: true }).selectOption('continuous');
   await page.getByTestId(`transcript-${demo.segments.length - 1}`).click();
   // Let the final short section end naturally: seeking while play() is pending
   // aborts native playback in Chromium and tests a different recovery path.

@@ -1,5 +1,6 @@
 import type { Lesson, Mode } from '../types';
 import { readStorage } from './browser';
+import { normalizeReviewLimits, type ReviewLimits } from '../review/limits';
 export const PLAYBACK_OFFSET_MIN_MS = -2000;
 export const PLAYBACK_OFFSET_MAX_MS = 2000;
 export const PLAYBACK_OFFSET_STEP_MS = 50;
@@ -11,6 +12,7 @@ export type Preferences = {
   studioMode: boolean;
   furigana: boolean;
   playbackOffsetMs: number;
+  reviewLimits?: ReviewLimits;
 };
 
 export function normalizePlaybackOffsetMs(value: unknown) {
@@ -31,6 +33,9 @@ export function loadPreferences(): Preferences {
     studioMode: raw?.studioMode === true,
     furigana: raw?.furigana === true,
     playbackOffsetMs: normalizePlaybackOffsetMs(raw?.playbackOffsetMs),
+    ...(raw?.reviewLimits === undefined
+      ? {}
+      : { reviewLimits: normalizeReviewLimits(raw.reviewLimits) }),
   };
 }
 

@@ -2,6 +2,7 @@ import type { DictionaryDatabase, DictionaryStatement } from '../dictionary/repo
 import type { Deck, DeckMembership } from '../decks/types';
 import { scheduleReview } from '../review-scheduler';
 import type { ReviewRepository, ReviewState } from './types';
+import type { ReviewEvent } from './history';
 export class ReviewConflict extends Error {}
 export interface ReviewDatabase extends DictionaryDatabase {
   batch(statements: DictionaryStatement[]): Promise<unknown>;
@@ -19,7 +20,18 @@ export function createD1ReviewRepository(db: ReviewDatabase): ReviewRepository {
       .bind(userId, now, now);
   return {
     async snapshot(userId) {
-      await inbox(userId, new Date().toISOString()).run();
+      const now = new Date();
+      const recentSince = new Date(now.getTime() - 7 * 86_400_000).toISOString();
+      const metadata = await db
+        .prepare(
+          'SELECT first_recorded_at AS firstRecordedAt FROM review_event_metadata WHERE id=1',
+        )
+        .first<{ firstRecordedAt: string }>();
+      const historySince =
+        metadata?.firstRecordedAt && metadata.firstRecordedAt > recentSince
+          ? metadata.firstRecordedAt
+          : recentSince;
+      await inbox(userId, now.toISOString()).run();
       const decks = await db
         .prepare(
           `SELECT id,name,created_at AS createdAt,updated_at AS updatedAt FROM user_decks WHERE user_id=? ORDER BY id='inbox' DESC,name,id`,
@@ -38,7 +50,22 @@ export function createD1ReviewRepository(db: ReviewDatabase): ReviewRepository {
         )
         .bind(userId)
         .all<ReviewState>();
-      return { decks: decks.results, memberships: memberships.results, cards: cards.results };
+      const history = await db
+        .prepare(
+          `SELECT operation_id AS operationId,entry_id AS entryId,grade,status,reviewed_at AS reviewedAt FROM user_review_events WHERE user_id=? AND reviewed_at>=? ORDER BY reviewed_at DESC,operation_id DESC LIMIT 10000`,
+        )
+        // Queued offline ratings may predate migration; retain them as accepted
+        // additions without claiming older device history is authoritative.
+        .bind(userId, recentSince)
+        .all<ReviewEvent>();
+      return {
+        decks: decks.results,
+        memberships: memberships.results,
+        cards: cards.results,
+        history: history.results.reverse(),
+        historySince,
+        historyWindowStart: recentSince,
+      };
     },
     async apply(userId, op) {
       const now = new Date().toISOString();
@@ -48,8 +75,14 @@ export function createD1ReviewRepository(db: ReviewDatabase): ReviewRepository {
             .prepare('SELECT id FROM user_decks WHERE user_id=? AND id=?')
             .bind(userId, op.id)
             .first()
-        )
+        ) {
+          if (op.id !== 'inbox')
+            await db
+              .prepare('UPDATE user_decks SET name=?,updated_at=? WHERE user_id=? AND id=?')
+              .bind(op.name.trim(), now, userId, op.id)
+              .run();
           return;
+        }
         const count = await db
           .prepare('SELECT count(*) AS n FROM user_decks WHERE user_id=?')
           .bind(userId)
@@ -131,13 +164,24 @@ export function createD1ReviewRepository(db: ReviewDatabase): ReviewRepository {
           if (card.revision === op.revision + 1 && card.lastOperationId === op.operationId) return;
           throw new ReviewConflict('This word changed on another device. Refresh review.');
         }
+        if (
+          op.action === 'undo' &&
+          (card.lastOperationId !== op.targetOperationId ||
+            op.previous.entryId !== card.entryId ||
+            op.previous.revision !== card.revision - 1 ||
+            op.previous.createdAt !== card.createdAt ||
+            Date.parse(op.undoneAt) < Date.parse(card.updatedAt))
+        )
+          throw new ReviewConflict('The last rating changed. Refresh before correcting it.');
         const next =
           op.action === 'grade'
             ? scheduleReview(card, op.grade, op.reviewedAt)
-            : { ...card, status: 'suspended', updatedAt: now, revision: card.revision + 1 };
-        await db
+            : op.action === 'undo'
+              ? { ...op.previous, revision: card.revision + 1, updatedAt: op.undoneAt }
+              : { ...card, status: 'suspended', updatedAt: now, revision: card.revision + 1 };
+        const update = db
           .prepare(
-            `UPDATE user_review_states SET status=?,due_at=?,last_reviewed_at=?,interval_days=?,ease=?,repetitions=?,lapses=?,revision=?,updated_at=?,last_operation_id=? WHERE user_id=? AND entry_id=? AND revision=?`,
+            `UPDATE user_review_states SET status=?,due_at=?,last_reviewed_at=?,interval_days=?,ease=?,repetitions=?,lapses=?,revision=?,updated_at=?,last_operation_id=? WHERE user_id=? AND entry_id=? AND revision=?${op.action === 'grade' ? ' AND NOT EXISTS (SELECT 1 FROM user_review_events WHERE user_id=? AND operation_id=?)' : ''}`,
           )
           .bind(
             next.status,
@@ -153,8 +197,47 @@ export function createD1ReviewRepository(db: ReviewDatabase): ReviewRepository {
             userId,
             op.entryId,
             op.revision,
-          )
-          .run();
+            ...(op.action === 'grade' ? [userId, op.operationId] : []),
+          );
+        const mutations: DictionaryStatement[] = [update];
+        if (op.action === 'grade')
+          mutations.push(
+            db
+              .prepare(
+                `INSERT OR IGNORE INTO user_review_events(user_id,operation_id,entry_id,grade,status,reviewed_at) SELECT ?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM user_review_states WHERE user_id=? AND entry_id=? AND revision=? AND last_operation_id=?)`,
+              )
+              .bind(
+                userId,
+                op.operationId,
+                op.entryId,
+                op.grade,
+                card.status,
+                op.reviewedAt,
+                userId,
+                op.entryId,
+                next.revision,
+                op.operationId,
+              ),
+          );
+        else if (op.action === 'undo')
+          mutations.push(
+            db
+              .prepare(
+                `DELETE FROM user_review_events WHERE user_id=? AND entry_id=? AND operation_id=? AND EXISTS (SELECT 1 FROM user_review_states WHERE user_id=? AND entry_id=? AND revision=? AND last_operation_id=?)`,
+              )
+              .bind(
+                userId,
+                op.entryId,
+                op.targetOperationId,
+                userId,
+                op.entryId,
+                next.revision,
+                op.operationId,
+              ),
+          );
+        // D1 batches are atomic: an accepted schedule and its rating record commit
+        // together, and a losing revision cannot add or erase another rating.
+        await db.batch(mutations);
         const saved = await db
           .prepare(`SELECT ${cardColumns} FROM user_review_states WHERE user_id=? AND entry_id=?`)
           .bind(userId, op.entryId)

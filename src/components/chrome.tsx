@@ -1,12 +1,73 @@
 'use client';
 import Link from 'next/link';
-import { AudioLines, ArrowUpRight, X, Headphones, Mic, Repeat2, Keyboard } from 'lucide-react';
-import { useEffect, useRef } from 'react';
+import {
+  AudioLines,
+  ArrowUpRight,
+  ArrowLeft,
+  Menu,
+  X,
+  Headphones,
+  Mic,
+  Repeat2,
+  Keyboard,
+} from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { AccountEntry } from './account';
 import { ThemeToggle } from './theme-toggle';
 import { ReviewLink } from './review-link';
+import { useTaskReturn } from './task-return';
 
 export function Header({ onHelp, player = false }: { onHelp: () => void; player?: boolean }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menu = useRef<HTMLDialogElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  useTaskReturn();
+  useEffect(() => {
+    if (menuOpen) menu.current?.showModal();
+    else menu.current?.close();
+  }, [menuOpen]);
+  function closeMenu() {
+    setMenuOpen(false);
+    menu.current?.close();
+    trigger.current?.focus();
+  }
+  function navigation(mobile = false) {
+    return (
+      <>
+        <Link className="nav-link" href="/library">
+          Library
+        </Link>
+        <Link className="nav-link" href="/dictionary">
+          Vocabulary
+        </Link>
+        <ReviewLink />
+        <Link className="nav-link" href="/progress">
+          Progress
+        </Link>
+        <AccountEntry drawer={!mobile} />
+        <button
+          className="nav-link"
+          onClick={() => {
+            closeMenu();
+            onHelp();
+          }}
+        >
+          {player ? (
+            <>
+              <Keyboard size={16} /> Shortcuts
+            </>
+          ) : (
+            'How it works'
+          )}
+        </button>
+        <ThemeToggle />
+        <Link className="nav-demo" href={player ? '/' : '/practice/demo'}>
+          {player ? 'New practice' : 'Try a practice'}
+          <ArrowUpRight size={15} />
+        </Link>
+      </>
+    );
+  }
   return (
     <header className={`site-header ${player ? 'practice-header' : ''}`}>
       <div className="header-inner">
@@ -21,38 +82,86 @@ export function Header({ onHelp, player = false }: { onHelp: () => void; player?
             </span>
           </span>
         </Link>
-        <nav aria-label="Main navigation">
-          <AccountEntry />
-          <ReviewLink />
-          <Link className="nav-link" href="/library">
-            Library
-          </Link>
-          <Link className="nav-link" href="/progress">
-            Progress
-          </Link>
-          <Link className="nav-link" href="/dictionary">
-            Dictionary
-          </Link>
-          <Link className="nav-link" href="/words">
-            Words
-          </Link>
-          <button className="nav-link" onClick={onHelp}>
-            {player ? (
-              <>
-                <Keyboard size={16} /> Shortcuts
-              </>
-            ) : (
-              'How it works'
-            )}
-          </button>
-          <ThemeToggle />
-          <Link className="nav-demo" href={player ? '/' : '/practice/demo'}>
-            {player ? 'New practice' : 'Try a practice'}
-            <ArrowUpRight size={15} />
-          </Link>
+        <nav className="desktop-navigation" aria-label="Main navigation">
+          {navigation()}
         </nav>
+        <button
+          ref={trigger}
+          className="button navigation-toggle"
+          aria-label="Open navigation menu"
+          aria-expanded={menuOpen}
+          aria-controls="mobile-navigation"
+          onClick={() => setMenuOpen(true)}
+        >
+          <Menu size={19} /> Menu
+        </button>
       </div>
+      <dialog
+        ref={menu}
+        id="mobile-navigation"
+        className="navigation-dialog"
+        aria-labelledby="navigation-title"
+        onCancel={closeMenu}
+        onClick={(event) => {
+          if (event.target === event.currentTarget) closeMenu();
+        }}
+      >
+        <div className="navigation-heading">
+          <h2 id="navigation-title">Navigate Hibiki</h2>
+          <button className="icon-button" aria-label="Close navigation menu" onClick={closeMenu}>
+            <X size={20} />
+          </button>
+        </div>
+        <nav
+          aria-label="Mobile navigation"
+          onClick={(event) => {
+            if ((event.target as Element).closest('a')) closeMenu();
+          }}
+        >
+          {navigation(true)}
+        </nav>
+      </dialog>
     </header>
+  );
+}
+export function StandaloneNavigation({
+  vocabularyView,
+}: {
+  vocabularyView?: 'saved' | 'decks' | 'review' | 'knowledge';
+}) {
+  const [help, setHelp] = useState(false);
+  const { practice } = useTaskReturn();
+  return (
+    <>
+      <Header onHelp={() => setHelp(true)} />
+      <div className="standalone-navigation">
+        <Link className="task-return" href={practice}>
+          <ArrowLeft size={18} />
+          {practice.startsWith('/practice/') ? 'Back to practice' : 'Home'}
+        </Link>
+        {vocabularyView ? (
+          <nav className="vocabulary-navigation" aria-label="Vocabulary views">
+            {(
+              [
+                ['saved', 'Saved words', '/dictionary'],
+                ['decks', 'Decks', '/dictionary?view=decks'],
+                ['review', 'Review', '/review'],
+                ['knowledge', 'Word knowledge', '/words'],
+              ] as const
+            ).map(([view, label, href]) => (
+              <Link
+                key={view}
+                href={href}
+                aria-current={view === vocabularyView ? 'page' : undefined}
+              >
+                {label}
+              </Link>
+            ))}
+          </nav>
+        ) : null}
+      </div>
+      <HelpDialog open={help} onClose={() => setHelp(false)} />
+    </>
   );
 }
 export function Footer() {

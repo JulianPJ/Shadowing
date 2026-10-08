@@ -259,6 +259,10 @@ try {
       speed: 0.75,
       studioMode: true,
       furigana: true,
+      reviewLimits: {
+        defaults: { new: 20, review: 100 },
+        decks: { inbox: { new: 5, review: 25 } },
+      },
       updatedAt: new Date().toISOString(),
     },
     lessons: [],
@@ -274,6 +278,19 @@ try {
     body: JSON.stringify(sync),
   });
   assert.equal(saved.status, 200);
+  const limits = await db
+    .prepare('SELECT review_limits_json FROM user_preferences WHERE user_id=?')
+    .bind(identity.user.id)
+    .first();
+  assert.deepEqual(JSON.parse(limits.review_limits_json), sync.preferences.reviewLimits);
+  const restoredPreferences = await mf.dispatchFetch('https://example.com/api/sync/bootstrap', {
+    headers: { Cookie: cookie },
+  });
+  assert.equal(restoredPreferences.status, 200);
+  assert.deepEqual(
+    (await restoredPreferences.json()).data.preferences.reviewLimits,
+    sync.preferences.reviewLimits,
+  );
   assert.equal(
     (
       await db
@@ -414,7 +431,21 @@ try {
     await mf.dispatchFetch('https://example.com/api/review', { headers: { Cookie: cookie } })
   ).json();
   assert.equal(graded.cards[0].revision, 1);
-  assert.equal(graded.cards[0].intervalDays, 1);
+  assert.equal(graded.cards[0].intervalDays, 0);
+  assert.equal(graded.cards[0].status, 'learning');
+  assert.equal(graded.cards[0].repetitions, 1);
+  assert.equal(Date.parse(graded.cards[0].dueAt) - Date.parse(grade.reviewedAt), 600_000);
+  assert.deepEqual(graded.history, [
+    {
+      operationId: grade.operationId,
+      entryId,
+      grade: 'good',
+      status: 'new',
+      reviewedAt: grade.reviewedAt,
+    },
+  ]);
+  assert.ok(Number.isFinite(Date.parse(graded.historySince)));
+  assert.ok(Number.isFinite(Date.parse(graded.historyWindowStart)));
   assert.equal((await tagPost({ action: 'delete', id: tagId })).status, 200);
   const afterTagDelete = await (
     await mf.dispatchFetch('https://example.com/api/review', { headers: { Cookie: cookie } })

@@ -1,6 +1,7 @@
 'use client';
 import { readStorage, writeStorage, storageAccount } from '../storage/browser';
 import { syncStatus, subscribeSync } from '../sync/client';
+import { channelStatus, reportChannel, syncFailure } from '../sync/channel-status';
 import { mergeKnowledge, normalizeLemma, validateKnowledgeRecord } from './validation';
 import type { KnowledgeStates, WordKnowledgeRecord, WordState, KnowledgePage } from './types';
 
@@ -16,6 +17,14 @@ export function knowledgePending() {
   return outbox().length;
 }
 function publish() {
+  const owner = storageAccount();
+  if (owner) {
+    const pending = knowledgePending();
+    reportChannel(owner, 'knowledge', {
+      pending,
+      ...(pending && channelStatus().knowledge.state === 'saved' ? { state: 'pending' } : {}),
+    });
+  }
   if (typeof window !== 'undefined') window.dispatchEvent(new Event('hibiki:knowledge-change'));
 }
 /** Called only after the existing first-login device import consent is accepted. */
@@ -61,12 +70,21 @@ let runningOwner: string | null = null,
 export async function syncWordKnowledge() {
   const owner = storageAccount(),
     user = syncStatus().user;
-  if (!owner || user?.id !== owner || !user.emailVerified) return;
+  if (!owner || user?.id !== owner) return;
+  if (!user.emailVerified) {
+    reportChannel(owner, 'knowledge', {
+      state: 'auth',
+      pending: knowledgePending(),
+      message: 'Verify your email to sync word knowledge.',
+    });
+    return;
+  }
   if (runningOwner) {
     rerun = true;
     return;
   }
   runningOwner = owner;
+  reportChannel(owner, 'knowledge', { state: 'syncing', pending: knowledgePending(), message: '' });
   const validOwner = () => storageAccount() === owner && syncStatus().user?.id === owner;
   async function request(cursor?: string | null, records?: WordKnowledgeRecord[]) {
     const response = await fetch(
@@ -84,7 +102,8 @@ export async function syncWordKnowledge() {
       },
     );
     if (!validOwner()) throw new Error('Account changed');
-    if (!response.ok) throw new Error('Word sync unavailable');
+    if (!response.ok)
+      throw Object.assign(new Error('Word sync unavailable'), { status: response.status });
     const data = await response.json();
     if (!validOwner()) throw new Error('Account changed');
     return data;
@@ -121,8 +140,15 @@ export async function syncWordKnowledge() {
       Object.values(mergeKnowledge(records, Object.values(loadKnowledge()))),
     );
     publish();
-  } catch {
-    /* Durable local edits stay available, with retries on focus/online. */
+    reportChannel(owner, 'knowledge', {
+      state: knowledgePending() ? 'pending' : 'saved',
+      pending: knowledgePending(),
+      lastSync: new Date().toISOString(),
+      message: '',
+    });
+  } catch (error) {
+    if (validOwner())
+      reportChannel(owner, 'knowledge', { ...syncFailure(error), pending: knowledgePending() });
   } finally {
     runningOwner = null;
     if (rerun) {

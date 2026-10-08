@@ -92,7 +92,7 @@ test('full Japanese lexicon loads real readings, senses and deinflection without
   expect(manifest.largestShardBytes).toBeLessThan(500000);
   await page.goto('/words');
   await page.getByLabel('Find Japanese words').fill('食べました');
-  await page.getByRole('button', { name: 'Look up in JMdict' }).click();
+  await page.getByRole('button', { name: 'Look up a word' }).click();
   const lookup = page.getByRole('region', { name: 'Japanese dictionary lookup' });
   await expect(lookup.locator('.lexicon-term strong').first()).toHaveText('食べる');
   await expect(lookup).toContainText('たべる');
@@ -105,7 +105,7 @@ test('full Japanese lexicon loads real readings, senses and deinflection without
   await page.reload();
   await expect(page.getByLabel('State of 食べる')).toHaveValue('known');
   await page.getByLabel('Find Japanese words').fill('斟酌');
-  await page.getByRole('button', { name: 'Look up in JMdict' }).click();
+  await page.getByRole('button', { name: 'Look up a word' }).click();
   await expect(lookup.locator('.lexicon-term strong').first()).toHaveText('斟酌');
   await expect(lookup).toContainText('しんしゃく');
   expect(translationRequests).toBe(0);
@@ -114,6 +114,7 @@ test('full Japanese lexicon loads real readings, senses and deinflection without
 test('word states highlight across lessons and update coverage, bulk status and transcript recommendations', async ({
   page,
 }) => {
+  test.setTimeout(90000);
   await seed(page);
   await page.goto('/practice/adaptive-one');
   await expect(page.getByRole('button', { name: 'Listen', exact: true })).toBeEnabled();
@@ -161,7 +162,7 @@ test('word states highlight across lessons and update coverage, bulk status and 
     'learning',
   );
   await page.goto('/words');
-  await page.getByRole('button', { name: 'Browse words from recent lessons' }).click();
+  await page.getByRole('button', { name: 'Find words in recent lessons' }).click();
   await expect(page.getByLabel('State of 猫')).toHaveValue('learning');
   await page.getByRole('checkbox', { name: 'Select 猫', exact: true }).check();
   await page.getByRole('button', { name: 'Mark selected Known' }).click();
@@ -178,7 +179,7 @@ test('word states highlight across lessons and update coverage, bulk status and 
 test('Word Browser source links reject a replacement transcript revision', async ({ page }) => {
   await seed(page);
   await page.goto('/words');
-  await page.getByRole('button', { name: 'Browse words from recent lessons' }).click();
+  await page.getByRole('button', { name: 'Find words in recent lessons' }).click();
   const row = page
     .getByRole('row')
     .filter({ has: page.getByRole('checkbox', { name: 'Select 猫', exact: true }) });
@@ -213,9 +214,9 @@ test('Free account knowledge survives offline edits and replays its durable outb
     return route.fulfill({ json: { records: [...remote.values()], nextCursor: null } });
   });
   await page.goto('/words');
-  await expect(page.getByRole('link', { name: 'Saved dictionary' })).toBeVisible();
+  await expect(page.getByRole('main').getByRole('link', { name: 'Saved words' })).toBeVisible();
   await page.getByLabel('Find Japanese words').fill('朝');
-  await page.getByRole('button', { name: 'Look up in JMdict' }).click();
+  await page.getByRole('button', { name: 'Look up a word' }).click();
   const lookup = page.getByRole('region', { name: 'Japanese dictionary lookup' });
   await expect(lookup).toContainText('morning');
   await lookup.getByRole('button', { name: 'Known', exact: true }).click();

@@ -1,4 +1,5 @@
 import type { Deck, DeckMembership } from '../decks/types';
+import type { ReviewEvent } from './history';
 export type ReviewGrade = 'again' | 'hard' | 'good' | 'easy';
 export type ReviewState = {
   entryId: string;
@@ -15,13 +16,32 @@ export type ReviewState = {
   createdAt: string;
   updatedAt: string;
 };
-export type ReviewSnapshot = { decks: Deck[]; memberships: DeckMembership[]; cards: ReviewState[] };
+export type ReviewSnapshot = {
+  decks: Deck[];
+  memberships: DeckMembership[];
+  cards: ReviewState[];
+  /** Accepted account ratings in the bounded authoritative window, when supplied by the server. */
+  history?: ReviewEvent[];
+  /** Replace local history from here; earlier returned events are accepted additions. */
+  historySince?: string;
+  /** Bounds returned events and removal of previously downloaded authoritative event IDs. */
+  historyWindowStart?: string;
+};
 export type ReviewOperation =
   | { action: 'deck'; id: string; name: string }
   | { action: 'delete-deck'; deckId: string }
   | { action: 'membership'; deckId: string; entryIds: string[]; remove: boolean }
   | { action: 'enroll'; entryIds: string[]; deckId: string; enrolledAt: string }
   | { action: 'suspend'; entryId: string; revision: number; operationId: string }
+  | {
+      action: 'undo';
+      entryId: string;
+      revision: number;
+      operationId: string;
+      targetOperationId: string;
+      previous: ReviewState;
+      undoneAt: string;
+    }
   | {
       action: 'grade';
       entryId: string;

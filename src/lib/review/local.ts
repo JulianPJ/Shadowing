@@ -6,9 +6,13 @@ export function emptyReview(): ReviewSnapshot {
 /** The same typed operation drives immediate local UI and the durable account outbox. */
 export function applyLocalReview(data: ReviewSnapshot, op: ReviewOperation): ReviewSnapshot {
   const next = structuredClone(data);
-  if (op.action === 'deck' && !next.decks.some((d) => d.id === op.id)) {
+  if (op.action === 'deck') {
     const now = new Date().toISOString();
-    next.decks.push({ id: op.id, name: op.name, createdAt: now, updatedAt: now });
+    const existing = next.decks.find((deck) => deck.id === op.id);
+    if (existing) {
+      if (existing.id !== 'inbox')
+        Object.assign(existing, { name: op.name.trim(), updatedAt: now });
+    } else next.decks.push({ id: op.id, name: op.name.trim(), createdAt: now, updatedAt: now });
   } else if (op.action === 'delete-deck') {
     next.decks = next.decks.filter((d) => d.id !== op.deckId);
     next.memberships = next.memberships.filter((m) => m.deckId !== op.deckId);
@@ -32,13 +36,15 @@ export function applyLocalReview(data: ReviewSnapshot, op: ReviewOperation): Rev
           });
       }
     }
-  } else if (op.action === 'grade' || op.action === 'suspend') {
+  } else if (op.action === 'grade' || op.action === 'suspend' || op.action === 'undo') {
     next.cards = next.cards.map((c) =>
       c.entryId !== op.entryId || c.revision !== op.revision
         ? c
         : op.action === 'grade'
           ? scheduleReview(c, op.grade, op.reviewedAt)
-          : { ...c, status: 'suspended', revision: c.revision + 1 },
+          : op.action === 'undo'
+            ? { ...op.previous, revision: c.revision + 1, updatedAt: op.undoneAt }
+            : { ...c, status: 'suspended', revision: c.revision + 1 },
     );
   }
   return next;

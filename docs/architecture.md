@@ -43,6 +43,8 @@ Hibiki runs on Cloudflare Workers via vinext. Standard Next.js is also supported
 
 ## Behaviour to preserve
 
+The UX contracts and audit coverage are documented in [UX core loops](ux-core-loops.md). Canonical lexical spans live in `japanese-lexical-spans.ts`; safe task return paths in `auth/return-path.ts`; paused browser-session playback return in `practice-return.ts`; local study days in `study-day.ts`; aggregate sync status in `sync/channel-status.ts`. Review limits are plain validated preference data in `review/limits.ts`, with device-only today extensions in `review/study-settings.ts`. Accepted recent rating history belongs to the account-owned review repository, never deck/tag schedules.
+
 - Keep the same mounted media player when changing display preferences. Browser recordings, local object URLs and the media adapter belong to the active practice tree.
 - Preserve playback tolerances and automatic pause timing. `section-lookup.ts` reproduces the original predicate, including gaps and legacy ordering.
 - Keep the `hibiki:v1:` keys and existing JSON formats. Lesson history and quiz attempts retain all existing compatibility rules; unchanged lesson payloads skip redundant writes. Failed writes still retain visit data in memory and show the existing warning.

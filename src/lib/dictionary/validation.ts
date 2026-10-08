@@ -14,6 +14,12 @@ function optionalText(value: unknown, max: number, label: string) {
   return requiredText(value, max, label);
 }
 
+function exactSentence(value: unknown) {
+  if (typeof value !== 'string' || !value.trim() || value.length > 5000)
+    throw new DictionaryValidationError('Invalid source sentence');
+  return value;
+}
+
 export function normalizeDictionaryTerm(term: string) {
   return term.normalize('NFKC').replace(/\s+/g, ' ').trim().toLocaleLowerCase();
 }
@@ -100,12 +106,15 @@ export function validateDictionarySaveInput(value: unknown): DictionarySaveInput
     term: requiredText(raw.term, 120, 'term'),
     reading: optionalText(raw.reading, 240, 'reading'),
     translation: requiredText(raw.translation, 2000, 'translation'),
-    sourceSentence: requiredText(raw.sourceSentence, 5000, 'source sentence'),
-    sourceSentenceTranslation: requiredText(
-      raw.sourceSentenceTranslation,
-      10000,
-      'source sentence translation',
-    ),
+    sourceSentence: exactSentence(raw.sourceSentence),
+    // Keep the v1 storage shape and existing NOT NULL column; absent English is
+    // an empty string. Japanese source context remains required above.
+    sourceSentenceTranslation:
+      raw.sourceSentenceTranslation === null ||
+      raw.sourceSentenceTranslation === undefined ||
+      (typeof raw.sourceSentenceTranslation === 'string' && !raw.sourceSentenceTranslation.trim())
+        ? ''
+        : requiredText(raw.sourceSentenceTranslation, 10000, 'source sentence translation'),
     source: {
       lessonId: requiredText(source.lessonId, 500, 'lesson ID'),
       segmentId: requiredText(source.segmentId, 500, 'segment ID'),

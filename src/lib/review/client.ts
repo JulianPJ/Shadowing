@@ -1,11 +1,37 @@
 'use client';
 import { readStorage, writeStorage, storageAccount } from '../storage/browser';
 import { syncStatus } from '../sync/client';
+import { channelStatus, reportChannel, syncFailure } from '../sync/channel-status';
 import { applyLocalReview, emptyReview } from './local';
 import type { ReviewOperation, ReviewSnapshot } from './types';
-import { rememberReview } from './history';
-let running: Promise<void> | null = null;
-const notify = () => window.dispatchEvent(new Event('hibiki:review-change'));
+import { rememberReview, forgetReview, reconcileReviewHistory } from './history';
+const running = new Map<string, Promise<void>>();
+const notify = () => {
+  const owner = storageAccount();
+  if (owner) {
+    const pending = pendingReview().length;
+    const conflict = readStorage('review:conflict', '');
+    reportChannel(owner, 'review', {
+      pending,
+      ...(conflict
+        ? { state: 'conflict', message: conflict }
+        : pending && channelStatus().review.state === 'saved'
+          ? { state: 'pending' }
+          : {}),
+    });
+  }
+  window.dispatchEvent(new Event('hibiki:review-change'));
+};
+export function acknowledgeReviewConflict() {
+  writeStorage('review:conflict', '');
+  const owner = storageAccount();
+  if (owner)
+    reportChannel(owner, 'review', {
+      state: pendingReview().length ? 'pending' : 'saved',
+      message: '',
+    });
+  notify();
+}
 export const cachedReview = () => readStorage<ReviewSnapshot>('review:data', emptyReview());
 export const pendingReview = () => readStorage<ReviewOperation[]>('review:pending', []);
 async function request(owner: string, operation?: ReviewOperation) {
@@ -21,7 +47,7 @@ async function request(owner: string, operation?: ReviewOperation) {
     signal: AbortSignal.timeout(15000),
   });
   if (!response.ok) {
-    const data = (await response.json()) as { code?: string; error?: string };
+    const data = (await response.json().catch(() => ({}))) as { code?: string; error?: string };
     const conflict = response.status === 409 && data.code === 'review-conflict';
     const error = new Error(
       conflict
@@ -58,15 +84,23 @@ export function changeReview(op: ReviewOperation) {
       entryId: op.entryId,
       grade: op.grade,
       reviewedAt: op.reviewedAt,
+      status: before.cards.find((card) => card.entryId === op.entryId)?.status as
+        'new' | 'learning' | 'review',
     });
   notify();
   void refreshReview().catch(() => {});
 }
 export async function refreshReview(): Promise<void> {
-  if (running) return running;
   const owner = syncStatus().user?.id;
   if (!owner || owner !== storageAccount()) return;
+  const active = running.get(owner);
+  if (active) return active;
   const current = () => owner === storageAccount() && syncStatus().user?.id === owner;
+  reportChannel(owner, 'review', {
+    state: 'syncing',
+    pending: pendingReview().length,
+    message: '',
+  });
   const synchronize = async () => {
     do {
       while (current() && pendingReview().length) {
@@ -76,6 +110,10 @@ export async function refreshReview(): Promise<void> {
         } catch (error) {
           if (current() && (error as { conflict?: boolean }).conflict) {
             // Stop dependent grades; remote state wins. Keep conflict visible until acknowledged.
+            for (const discarded of pendingReview().filter(
+              (p) => 'entryId' in p && 'entryId' in op && p.entryId === op.entryId,
+            ))
+              if (discarded.action === 'grade') forgetReview(discarded.operationId);
             writeStorage(
               'review:pending',
               pendingReview()
@@ -87,20 +125,38 @@ export async function refreshReview(): Promise<void> {
               'A review changed on another device. Its latest schedule was restored.',
             );
             const remote = (await request(owner)) as ReviewSnapshot;
-            if (current())
-              writeStorage('review:data', pendingReview().reduce(applyLocalReview, remote));
+            if (current()) {
+              reconcileReviewHistory(remote, pendingReview());
+              writeStorage(
+                'review:data',
+                pendingReview().reduce(applyLocalReview, {
+                  decks: remote.decks,
+                  memberships: remote.memberships,
+                  cards: remote.cards,
+                }),
+              );
+            }
             notify();
           }
           throw error;
         }
         if (!current()) return;
+        if (op.action === 'undo') forgetReview(op.targetOperationId);
         const pending = pendingReview();
         if (JSON.stringify(pending[0]) === JSON.stringify(op))
           writeStorage('review:pending', pending.slice(1));
       }
       const remote = (await request(owner)) as ReviewSnapshot;
       if (!current()) return;
-      writeStorage('review:data', pendingReview().reduce(applyLocalReview, remote));
+      reconcileReviewHistory(remote, pendingReview());
+      writeStorage(
+        'review:data',
+        pendingReview().reduce(applyLocalReview, {
+          decks: remote.decks,
+          memberships: remote.memberships,
+          cards: remote.cards,
+        }),
+      );
       notify();
       // An edit can arrive while the final snapshot is in flight. Drain it under
       // the same lock instead of leaving it queued until the next focus/timer.
@@ -111,10 +167,28 @@ export async function refreshReview(): Promise<void> {
     if (navigator.locks) await navigator.locks.request(`hibiki-review:${owner}`, synchronize);
     else await synchronize();
   };
-  running = drain().finally(() => {
-    running = null;
-  });
-  return running;
+  const task = drain()
+    .then(() => {
+      if (current()) {
+        const conflict = readStorage('review:conflict', '');
+        reportChannel(owner, 'review', {
+          state: conflict ? 'conflict' : 'saved',
+          pending: pendingReview().length,
+          lastSync: new Date().toISOString(),
+          message: conflict,
+        });
+      }
+    })
+    .catch((error) => {
+      if (current())
+        reportChannel(owner, 'review', { ...syncFailure(error), pending: pendingReview().length });
+      throw error;
+    })
+    .finally(() => {
+      running.delete(owner);
+    });
+  running.set(owner, task);
+  return task;
 }
 export function startReviewSync() {
   const refresh = () => {

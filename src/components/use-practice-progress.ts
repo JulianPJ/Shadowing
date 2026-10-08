@@ -1,4 +1,5 @@
 'use client';
+import { studyDay } from '@/lib/study-day';
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { storageAccount } from '@/lib/storage/browser';
 const subscribeAccount = (callback: () => void) => {
@@ -88,8 +89,12 @@ export function usePracticeProgress(
       if (Date.parse(timestamp) - Date.parse(session.updatedAt) >= RESUME_WINDOW_MS)
         renew(timestamp);
       if (!session) return;
+      if (!session.localActiveByDay) session.legacyActiveByDay = { ...session.activeByDay };
       session.activeSeconds += seconds;
       session.activeByDay[day] = (session.activeByDay[day] ?? 0) + seconds;
+      session.localActiveByDay ??= {};
+      const localDay = studyDay(timestamp);
+      session.localActiveByDay[localDay] = (session.localActiveByDay[localDay] ?? 0) + seconds;
       session.updatedAt = timestamp;
       session.endedAt = null;
       checkpoint.mark();

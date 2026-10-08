@@ -3,9 +3,11 @@ import type { LexiconResult } from '@/lib/lexicon/types';
 export function LexiconDefinitions({
   result,
   onSense,
+  selectedSense,
 }: {
   result: LexiconResult;
-  onSense?: (meaning: string, reading: string) => void;
+  onSense?: (meaning: string, reading: string, lemma: string, senseId: string) => void;
+  selectedSense?: string;
 }) {
   return (
     <div className="lexicon-definitions">
@@ -47,9 +49,24 @@ export function LexiconDefinitions({
                   {onSense ? (
                     <button
                       className="text-button"
-                      onClick={() => onSense(sense.gloss.join('; ').slice(0, 1000), match.reading)}
+                      type="button"
+                      aria-pressed={
+                        selectedSense ===
+                        `${match.entry.id}:${match.lemma}:${match.reading}:${index}`
+                      }
+                      onClick={() =>
+                        onSense(
+                          sense.gloss.join('; ').slice(0, 1000),
+                          match.reading,
+                          match.lemma,
+                          `${match.entry.id}:${match.lemma}:${match.reading}:${index}`,
+                        )
+                      }
                     >
-                      Use sense {index + 1}
+                      {selectedSense ===
+                      `${match.entry.id}:${match.lemma}:${match.reading}:${index}`
+                        ? 'Selected'
+                        : `Use sense ${index + 1}`}
                     </button>
                   ) : null}
                 </li>

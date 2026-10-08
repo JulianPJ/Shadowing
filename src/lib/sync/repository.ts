@@ -5,6 +5,7 @@ import {
   type UserProgressRepository,
 } from './types';
 import { validateSync } from './validation';
+import { validateReviewLimits } from '../review/limits';
 export interface ProgressStatement {
   bind(...values: (string | number | null)[]): ProgressStatement;
   first<T>(): Promise<T | null>;
@@ -60,6 +61,9 @@ export function createD1UserProgressRepository(db: ProgressDatabase): UserProgre
           speed: prefs.speed as number,
           studioMode: prefs.studio_mode === 1,
           furigana: prefs.furigana === 1,
+          ...(typeof prefs.review_limits_json === 'string'
+            ? { reviewLimits: validateReviewLimits(JSON.parse(prefs.review_limits_json)) }
+            : {}),
           updatedAt: prefs.updated_at as string,
         };
       const kind = syncCollections[index];
@@ -108,10 +112,18 @@ export function createD1UserProgressRepository(db: ProgressDatabase): UserProgre
         statements.push(
           db
             .prepare(
-              `INSERT INTO user_preferences(user_id,schema_version,mode,speed,studio_mode,furigana,updated_at) VALUES (?,1,?,?,?,?,?)
-          ON CONFLICT(user_id) DO UPDATE SET mode=excluded.mode,speed=excluded.speed,studio_mode=excluded.studio_mode,furigana=excluded.furigana,updated_at=excluded.updated_at WHERE excluded.updated_at>user_preferences.updated_at`,
+              `INSERT INTO user_preferences(user_id,schema_version,mode,speed,studio_mode,furigana,review_limits_json,updated_at) VALUES (?,1,?,?,?,?,?,?)
+          ON CONFLICT(user_id) DO UPDATE SET mode=excluded.mode,speed=excluded.speed,studio_mode=excluded.studio_mode,furigana=excluded.furigana,review_limits_json=COALESCE(excluded.review_limits_json,user_preferences.review_limits_json),updated_at=excluded.updated_at WHERE excluded.updated_at>user_preferences.updated_at`,
             )
-            .bind(userId, p.mode, p.speed, +p.studioMode, +p.furigana, p.updatedAt),
+            .bind(
+              userId,
+              p.mode,
+              p.speed,
+              +p.studioMode,
+              +p.furigana,
+              p.reviewLimits === undefined ? null : JSON.stringify(p.reviewLimits),
+              p.updatedAt,
+            ),
         );
       }
       for (const kind of syncCollections)

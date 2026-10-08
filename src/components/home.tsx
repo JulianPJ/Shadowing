@@ -25,9 +25,12 @@ import { saveLesson } from '@/lib/storage';
 import type { Lesson, ResolvedMedia } from '@/lib/types';
 import { LibraryPreview } from './library-preview';
 import { addQueueLink } from '@/lib/library/client';
+import { useLibrary } from './use-library';
 
 export function Home() {
   const router = useRouter();
+  const { lessons, remote, ready } = useLibrary();
+  const returning = ready && (lessons.length > 0 || remote.length > 0);
   const [url, setUrl] = useState('');
   const [help, setHelp] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -51,8 +54,9 @@ export function Home() {
     saveLesson(lesson, 0);
     router.push(`/practice/${lesson.id}`);
   }
-  async function prepare(event: React.FormEvent) {
-    event.preventDefault();
+  async function prepare(event?: React.FormEvent) {
+    event?.preventDefault();
+    if (busy || !url.trim()) return;
     setError('');
     setResolved(undefined);
     setNeedsTranscript(false);
@@ -133,7 +137,11 @@ export function Home() {
   return (
     <>
       <Header onHelp={() => setHelp(true)} />
-      <main className="home-main">
+      <main className={`home-main${returning ? ' returning-home' : ''}`}>
+        {returning ? (
+          <h1 className="returning-home-title">Make a little room for Japanese.</h1>
+        ) : null}
+        {returning ? <LibraryPreview /> : null}
         <section className="hero">
           <div className="hero-intro">
             <span className="hero-tag">
@@ -187,12 +195,16 @@ export function Home() {
             </form>
             <div className="input-meta">
               <span id="url-hint">
-                <Check size={14} /> No account. Just your curiosity.
+                <Check size={14} /> YouTube captions prepare automatically when available.
               </span>
               <button className="text-button" onClick={() => setImportOpen(true)}>
                 <Upload size={14} /> Import media or subtitles
               </button>
             </div>
+            <p className="source-guidance">
+              Vimeo and direct audio/video links work with your subtitles. Import your own media or
+              transcript below. No account needed to practise.
+            </p>
             {busy ? (
               <div className="preparing" role="status">
                 <div className="prepare-top">
@@ -260,6 +272,9 @@ export function Home() {
               <div role="alert" className="error-message">
                 <p>{error}</p>
                 <div>
+                  <button className="text-button" onClick={() => void prepare()}>
+                    Retry preparation <ArrowRight size={14} />
+                  </button>
                   <button className="text-button" onClick={() => setImportOpen(true)}>
                     Import a transcript <ArrowRight size={14} />
                   </button>
@@ -271,7 +286,7 @@ export function Home() {
             ) : null}
           </div>
         </section>
-        <LibraryPreview />
+        {!returning ? <LibraryPreview /> : null}
         <section className="demo-section" aria-labelledby="demo-title">
           <div className="demo-art">
             <Image

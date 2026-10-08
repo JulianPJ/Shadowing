@@ -22,6 +22,11 @@ export function mergeSync(a: SyncData, b: SyncData): SyncData {
       : a.preferences.updatedAt > b.preferences.updatedAt
         ? a.preferences
         : b.preferences;
+  // Older clients omit this optional field; omission is never a request to erase limits.
+  if (result.preferences && result.preferences.reviewLimits === undefined) {
+    const reviewLimits = a.preferences?.reviewLimits ?? b.preferences?.reviewLimits;
+    if (reviewLimits) result.preferences = { ...result.preferences, reviewLimits };
+  }
   for (const kind of syncCollections) {
     const rows = new Map<string, SyncData[typeof kind][number]>();
     for (const item of [...a[kind], ...b[kind]]) {

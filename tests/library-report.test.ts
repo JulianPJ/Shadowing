@@ -160,13 +160,16 @@ test('local self-rated recall events are idempotent, bounded and account scoped'
   rememberReview(event);
   assert.equal(reviewHistory().length, 1);
   writeStorage('review:history', [
-    ...Array.from({ length: 2100 }, (_, i) => ({ ...event, operationId: `event-${i}` })),
+    ...Array.from({ length: 10100 }, (_, i) => ({ ...event, operationId: `event-${i}` })),
     { ...event, grade: 'invented' },
   ]);
-  assert.equal(reviewHistory().length, 2000);
+  assert.equal(reviewHistory().length, 10000);
+  rememberReview({ ...event, operationId: 'latest' });
+  assert.equal(reviewHistory().length, 10000);
+  assert.equal(reviewHistory().at(-1)?.operationId, 'latest');
   setStorageAccount('report-owner-b');
   assert.equal(reviewHistory().length, 0);
   setStorageAccount('report-owner-a');
-  assert.equal(reviewHistory().length, 2000);
+  assert.equal(reviewHistory().length, 10000);
   setStorageAccount(null);
 });

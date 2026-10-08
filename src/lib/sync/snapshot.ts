@@ -30,13 +30,14 @@ export async function deviceSnapshot(): Promise<SyncData> {
   }));
   const preferencesDate = readStorage<string | null>('sync:preferences-date', null);
   if (preferencesDate || storageKeys().includes('preferences')) {
-    const { mode, speed, studioMode, furigana } = loadPreferences();
+    const { mode, speed, studioMode, furigana, reviewLimits } = loadPreferences();
     result.preferences = {
       schemaVersion: 1,
       mode,
       speed,
       studioMode,
       furigana,
+      ...(reviewLimits === undefined ? {} : { reviewLimits }),
       updatedAt: preferencesDate ?? new Date(0).toISOString(),
     };
   }

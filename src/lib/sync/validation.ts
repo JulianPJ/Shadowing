@@ -11,6 +11,7 @@ import {
 import { identityKey, validateHistory } from '../learner-progress';
 import { validContentKey } from '../linked-transcripts';
 import { QUESTION_KINDS } from '../quiz';
+import { validateReviewLimits } from '../review/limits';
 import {
   emptySync,
   syncCollections,
@@ -139,6 +140,7 @@ export function validateSync(value: unknown, now = Date.now()): SyncData {
       'speed',
       'studioMode',
       'furigana',
+      'reviewLimits',
       'updatedAt',
     ]);
     if (
@@ -153,6 +155,9 @@ export function validateSync(value: unknown, now = Date.now()): SyncData {
       speed: p.speed as number,
       studioMode: bool(p.studioMode),
       furigana: bool(p.furigana),
+      ...(p.reviewLimits === undefined
+        ? {}
+        : { reviewLimits: validateReviewLimits(p.reviewLimits) }),
       updatedAt: date(p.updatedAt),
     };
   }

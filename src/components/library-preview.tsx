@@ -3,8 +3,14 @@ import Link from 'next/link';
 import { ArrowRight, Headphones } from 'lucide-react';
 import { useLibrary } from './use-library';
 import { lessonCompleted } from '@/lib/storage/learning';
+import { useReview } from './use-review';
+import { useAccount } from './account';
+import { dueReviews } from '@/lib/review-scheduler';
 export function LibraryPreview() {
-  const { lessons, state, remote } = useLibrary();
+  const { lessons, state, remote, ready } = useLibrary();
+  const account = useAccount();
+  const review = useReview();
+  const due = account.user ? dueReviews(review.data.cards, new Date().toISOString()).length : 0;
   const unfinished = lessons.filter((item) => !lessonCompleted(item.lesson)).slice(0, 3);
   const synced = remote
     .filter((item) => !item.completed && !lessons.some((l) => l.lesson.id === item.lesson.lessonId))
@@ -17,7 +23,9 @@ export function LibraryPreview() {
           My Library <ArrowRight size={15} />
         </Link>
       </div>
-      {unfinished.length || synced.length ? (
+      {!ready ? (
+        <p role="status">Opening your recent lessons…</p>
+      ) : unfinished.length || synced.length ? (
         <div className="recent-grid">
           {unfinished.map((item) => (
             <Link
@@ -29,7 +37,7 @@ export function LibraryPreview() {
               <div>
                 <strong>{item.lesson.title}</strong>
                 <span>
-                  Section {item.index + 1} of {item.lesson.segments.length}
+                  Resume · Section {item.index + 1} of {item.lesson.segments.length}
                 </span>
               </div>
               <ArrowRight size={16} />
@@ -58,6 +66,11 @@ export function LibraryPreview() {
           Your next visit starts where you paused. Prepare a video or try the studio sample.
         </p>
       )}
+      {due > 0 ? (
+        <Link className="button" href="/review">
+          Study {due} due {due === 1 ? 'word' : 'words'} <ArrowRight size={15} />
+        </Link>
+      ) : null}
       {state.queue.length ? (
         <p className="library-queue-note">
           <Link href="/library">
