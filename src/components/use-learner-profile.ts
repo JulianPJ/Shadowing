@@ -11,6 +11,7 @@ import { progressStorageFailed } from '@/lib/storage';
 import type { LearnerProfile } from '@/lib/learner-types';
 import { accountBookmarks } from '@/lib/sync/client';
 import { transcriptKey } from '@/lib/transcript';
+import { storageAccount } from '@/lib/storage/browser';
 
 export function useLearnerProfile() {
   const [profile, setProfile] = useState<LearnerProfile | null>(null);
@@ -28,13 +29,22 @@ export function useLearnerProfile() {
         // Coalesce bursts while retaining one trailing refresh for the latest browser data.
         while (active && pending) {
           pending = false;
+          const owner = storageAccount();
           try {
             const history = await migrateLearnerHistory();
+            if (owner !== storageAccount()) {
+              pending = true;
+              continue;
+            }
             const identities = [
               ...history.sessions.map((s) => s.lesson),
               ...history.archives.map((a) => a.lesson),
             ];
             const bookmarks = await currentBookmarks(identities, history);
+            if (owner !== storageAccount()) {
+              pending = true;
+              continue;
+            }
             for (const remote of accountBookmarks()) {
               let snapshot = bookmarks.find(
                 (b) => identityKey(b.lesson) === identityKey(remote.lesson),
@@ -69,6 +79,10 @@ export function useLearnerProfile() {
                   : null;
               }),
             );
+            if (owner !== storageAccount()) {
+              pending = true;
+              continue;
+            }
             if (active) {
               setProfile(next);
               setAvailable(availableIdentities.filter((key): key is string => key !== null));
@@ -89,12 +103,17 @@ export function useLearnerProfile() {
     window.addEventListener('storage', change);
     const synced = () => void refresh();
     window.addEventListener('hibiki:sync-hydrated', synced);
-    window.addEventListener('hibiki:account-change', synced);
+    const accountChanged = () => {
+      setProfile(null);
+      setAvailable([]);
+      void refresh();
+    };
+    window.addEventListener('hibiki:account-change', accountChanged);
     return () => {
       active = false;
       window.removeEventListener('storage', change);
       window.removeEventListener('hibiki:sync-hydrated', synced);
-      window.removeEventListener('hibiki:account-change', synced);
+      window.removeEventListener('hibiki:account-change', accountChanged);
     };
   }, []);
   return { profile, available, warning };

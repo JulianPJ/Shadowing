@@ -25,6 +25,8 @@ Hibiki runs on Cloudflare Workers via vinext. Standard Next.js is also supported
 | Local-first word knowledge, D1 ownership, vocabulary coverage and Word Browser | `src/lib/knowledge/`, `src/components/use-word-knowledge.ts`, `src/components/lesson-vocabulary.tsx`, `src/components/word-browser.tsx` |
 | Explicit presets, local recording automation and bounded Match trends | `src/lib/drill-presets.ts`, `src/lib/shadowing-session.ts`, `src/components/voice-recorder.tsx` |
 | My Library/queue, trusted public discovery and personal next lessons | `src/lib/library/`, `src/lib/discovery-api.ts`, `src/components/my-library.tsx` |
+| Discover catalogue, scheduled YouTube metadata, ranking and account queue/feedback | `src/lib/discover/`, `src/components/discover/`, `src/app/discover/` |
+| Explicit URL hand-off into existing preparation | `src/app/prepare/`, `src/lib/prepare-client.ts`, `src/components/home.tsx` |
 | Weekly evidence, self-rated review history and local daily goal | `src/lib/reports/weekly.ts`, `src/lib/review/history.ts`, `src/components/weekly-report.tsx` |
 | Collections and entry memberships | `src/lib/decks/`, `src/lib/review/repository.ts` |
 | Pure scheduling, local review outbox and authenticated D1 review | `src/lib/review-scheduler.ts`, `src/lib/review/` |
@@ -42,6 +44,8 @@ Hibiki runs on Cloudflare Workers via vinext. Standard Next.js is also supported
 `storage.ts`, `learner-progress.ts`, `learner-storage.ts`, `quiz.ts` and `providers/quiz.ts` retain their existing exports as compatibility facades. Internal modules should import the specific module they need, especially for transcript utilities that are also used outside quizzes. Avoid importing server providers into client components.
 
 ## Behaviour to preserve
+
+Discover contracts, account merge/retention rules, quota/freshness bounds and release flags are documented in [Discover](discover.md). Metadata reads and saves never acquire captions or infer difficulty. `/api/discovery` remains the existing trusted prepared-lesson endpoint; `/api/discover` is the separate catalogue feed.
 
 The UX contracts and audit coverage are documented in [UX core loops](ux-core-loops.md). Canonical lexical spans live in `japanese-lexical-spans.ts`; safe task return paths in `auth/return-path.ts`; paused browser-session playback return in `practice-return.ts`; local study days in `study-day.ts`; aggregate sync status in `sync/channel-status.ts`. Review limits are plain validated preference data in `review/limits.ts`, with device-only today extensions in `review/study-settings.ts`. Accepted recent rating history belongs to the account-owned review repository, never deck/tag schedules.
 

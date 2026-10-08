@@ -16,8 +16,10 @@ import { AccountEntry } from './account';
 import { ThemeToggle } from './theme-toggle';
 import { ReviewLink } from './review-link';
 import { useTaskReturn } from './task-return';
+import { usePathname } from 'next/navigation';
 
 export function Header({ onHelp, player = false }: { onHelp: () => void; player?: boolean }) {
+  const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const menu = useRef<HTMLDialogElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -34,6 +36,15 @@ export function Header({ onHelp, player = false }: { onHelp: () => void; player?
   function navigation(mobile = false) {
     return (
       <>
+        {process.env.NEXT_PUBLIC_DISCOVER_ENABLED !== 'false' ? (
+          <Link
+            className="nav-link"
+            href="/discover"
+            aria-current={pathname === '/discover' ? 'page' : undefined}
+          >
+            Discover
+          </Link>
+        ) : null}
         <Link className="nav-link" href="/library">
           Library
         </Link>

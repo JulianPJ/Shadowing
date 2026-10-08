@@ -2,6 +2,7 @@ import { expect, test, type BrowserContext } from '@playwright/test';
 import { emptySync, type AccountUser } from '../../src/lib/sync/types';
 import { emptyReview } from '../../src/lib/review/local';
 import demo from '../../src/data/demo.json' with { type: 'json' };
+import { mockDiscoverSync } from '../helpers/discover-account';
 const user: AccountUser = {
   id: 'navigation-learner',
   email: 'learner@example.com',
@@ -13,6 +14,7 @@ async function services(
   context: BrowserContext,
   state: { user: AccountUser | null; reviewError?: number; knowledgeError?: number },
 ) {
+  await mockDiscoverSync(context);
   await context.route('**/api/account/me', (route) =>
     route.fulfill({ json: { user: state.user, googleEnabled: false, emailEnabled: true } }),
   );

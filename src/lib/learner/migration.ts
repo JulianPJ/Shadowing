@@ -53,6 +53,7 @@ export async function migrateLearnerHistory(): Promise<LearnerHistory> {
     if (!lesson) continue;
     const key = await transcriptKey(lesson),
       identity = lessonIdentity(lesson, key);
+    if (storageAccount()) return loadLearnerHistory();
     const history = loadLearnerHistory(),
       known =
         history.sessions.some((s) => identityKey(s.lesson) === identityKey(identity)) ||
@@ -97,6 +98,7 @@ export async function migrateLearnerHistory(): Promise<LearnerHistory> {
         dates.at(-1) ?? '1970-01-01T00:00:00.000Z',
         await legacyId(identityKey(identity)),
       );
+      if (storageAccount()) return loadLearnerHistory();
       s.origin = 'legacy';
       s.startedAt = null;
       s.completedAt = completedAt;
@@ -113,6 +115,7 @@ export async function migrateLearnerHistory(): Promise<LearnerHistory> {
       savePracticeSession(s);
     }
     const analysis = await loadDifficulty(lesson);
+    if (storageAccount()) return loadLearnerHistory();
     if (analysis) {
       // Re-read after awaits: never overwrite a concurrent session checkpoint.
       const current = loadLearnerHistory();

@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
 import { emptySync, type AccountUser } from '../../src/lib/sync/types';
+import { mockDiscoverSync } from './discover-account';
 
 export const proTestUser: AccountUser = {
   id: 'e2e-pro-account',
@@ -12,6 +13,7 @@ export const proTestUser: AccountUser = {
 export const proStorageKey = (key: string) => `hibiki:v1:account:${proTestUser.id}:${key}`;
 
 export async function mockProAccount(page: Page) {
+  await mockDiscoverSync(page);
   await page.addInitScript(
     ({ userId }) => {
       localStorage.setItem(

@@ -21,6 +21,7 @@ export async function localAccountHandler(request: Request) {
     services.review,
     services.tags,
     services.knowledge,
+    services.database,
   )(request);
 }
 

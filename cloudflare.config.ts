@@ -1,4 +1,4 @@
-import { bindings, defineConfig, defineWorker } from 'cf/config';
+import { bindings, defineConfig, defineWorker, triggers } from 'cf/config';
 import { createWorkersCacheConfig } from '@vinext/cloudflare/cache/config';
 
 const cache = await createWorkersCacheConfig();
@@ -11,6 +11,7 @@ export const worker = defineWorker({
   // Public routing is required when fetching the relay's workers.dev endpoint.
   compatibilityFlags: ['nodejs_compat', 'global_fetch_strictly_public'],
   assets: { notFoundHandling: 'none', runWorkerFirst: ['/demo.mp4'] },
+  triggers: [triggers.scheduled({ schedule: '17 * * * *' })],
   env: {
     ...cache.env,
     ASSETS: bindings.assets(),
@@ -21,6 +22,12 @@ export const worker = defineWorker({
       simple: { limit: 6, period: 60 },
     }),
     HIBIKI_DB: bindings.d1({ id: 'cf88fe7d-16bb-4f58-8839-2b27718a7847' }),
+    DISCOVER_ENABLED: bindings.text('true'),
+    DISCOVERY_RATE_LIMIT: bindings.rateLimit({
+      namespace: '19002',
+      simple: { limit: 90, period: 60 },
+    }),
+    YOUTUBE_DATA_API_KEY: bindings.secret(),
     // Better Auth must have one canonical production origin for trusted callbacks and secure cookies.
     AUTH_BASE_URL: bindings.text('https://shadowing.julianpopovskijones.workers.dev'),
     AUTH_SECRET: bindings.secret(),

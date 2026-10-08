@@ -15,7 +15,7 @@ export function storageAccount() {
   return account;
 }
 const owned = (key: string) =>
-  /^(preferences$|history$|learner-history$|learner-migration|position:|favorites:|completion:|quiz-attempt|sync:|review:|dictionary:|knowledge:|library:|report:|goal:|shadowing:|drill:)/.test(
+  /^(preferences$|history$|learner-history$|learner-migration|position:|favorites:|completion:|quiz-attempt|sync:|review:|dictionary:|knowledge:|library:|discover:|report:|goal:|shadowing:|drill:)/.test(
     key,
   );
 function physicalKey(key: string) {
@@ -103,6 +103,17 @@ function persistStorage(key: string, value: unknown, onlyIfChanged: boolean) {
     reportStorageFailure();
     notify();
     return false; /* Playback still works. */
+  }
+}
+
+/** Anonymous data can be read for an explicit import without changing the active account. */
+export function readDeviceStorage<T>(key: string, fallback: T): T {
+  if (unsaved.has(key)) return structuredClone(unsaved.get(key)) as T;
+  try {
+    const value = localStorage.getItem(PREFIX + key);
+    return value ? (JSON.parse(value) as T) : fallback;
+  } catch {
+    return fallback;
   }
 }
 

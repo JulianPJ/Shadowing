@@ -1,4 +1,4 @@
-export type SyncChannel = 'learner' | 'review' | 'knowledge';
+export type SyncChannel = 'learner' | 'review' | 'knowledge' | 'discovery';
 export type ChannelState =
   'idle' | 'syncing' | 'saved' | 'pending' | 'offline' | 'error' | 'auth' | 'conflict';
 export type ChannelStatus = {
@@ -14,6 +14,7 @@ export const initialChannels: SyncChannels = {
   learner: empty(),
   review: empty(),
   knowledge: empty(),
+  discovery: empty(),
 };
 let snapshot = initialChannels;
 const listeners = new Set<() => void>();
@@ -26,7 +27,7 @@ export const subscribeChannels = (listener: () => void) => {
 };
 export function setChannelOwner(owner: string | null) {
   if (snapshot.owner === owner) return;
-  snapshot = { owner, learner: empty(), review: empty(), knowledge: empty() };
+  snapshot = { owner, learner: empty(), review: empty(), knowledge: empty(), discovery: empty() };
   for (const listener of listeners) listener();
 }
 export function reportChannel(owner: string, channel: SyncChannel, patch: Partial<ChannelStatus>) {
@@ -66,7 +67,7 @@ export function aggregateSync(channels: SyncChannels) {
       pending: 0,
       lastSync: null,
     };
-  const all = [channels.learner, channels.review, channels.knowledge];
+  const all = [channels.learner, channels.review, channels.knowledge, channels.discovery];
   const pending = all.reduce((sum, value) => sum + value.pending, 0);
   const problem =
     all.find((value) => value.state === 'auth') ??
@@ -79,7 +80,7 @@ export function aggregateSync(channels: SyncChannels) {
   if (all.some((value) => value.state === 'syncing'))
     return {
       state: 'syncing' as const,
-      message: 'Syncing your progress, reviews and word knowledge…',
+      message: 'Syncing your progress, reviews, word knowledge and Watch Later…',
       pending,
       lastSync,
     };

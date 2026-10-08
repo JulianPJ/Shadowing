@@ -43,6 +43,7 @@ import {
 import { createQuiz, newAttempt, transcriptKey, updateAttempt } from '../src/lib/quiz';
 import { createDifficultyAnalysis } from '../src/lib/difficulty';
 import type { LearnerProfile, PracticeSession } from '../src/lib/learner-types';
+import { setStorageAccount } from '../src/lib/storage/browser';
 
 const lesson = demo as Lesson,
   time = '2026-10-04T12:00:00.000Z';
@@ -426,6 +427,34 @@ test('migration scans uncapped lessons, is idempotent, preserves known completio
   for (let i = 0; i < 10; i++) saveLesson({ ...lesson, id: `extra-${i}` }, 0);
   assert.equal((await migrateLearnerHistory()).sessions.length, 11);
   assert.equal(availableLesson('missing'), null);
+});
+test('anonymous history migration cannot write its pending transcript into a newly signed-in account', async () => {
+  saveLesson(lesson, 0);
+  const digest = crypto.subtle.digest.bind(crypto.subtle);
+  let entered!: () => void, release!: () => void;
+  const waiting = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const paused = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  crypto.subtle.digest = async (...args: Parameters<SubtleCrypto['digest']>) => {
+    entered();
+    await paused;
+    return digest(...args);
+  };
+  try {
+    const migration = migrateLearnerHistory();
+    await waiting;
+    setStorageAccount('newly-signed-in');
+    release();
+    assert.deepEqual(await migration, emptyHistory());
+    assert.equal(memory.has('hibiki:v1:account:newly-signed-in:learner-history'), false);
+  } finally {
+    release();
+    crypto.subtle.digest = digest;
+    setStorageAccount(null);
+  }
 });
 test('malformed history/legacy storage isolates damage and never crashes', async () => {
   memory.set('hibiki:v1:history', '{}');

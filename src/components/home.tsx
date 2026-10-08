@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -19,15 +19,15 @@ import {
 } from 'lucide-react';
 import { Header, Footer, HelpDialog } from './chrome';
 import { ImportDialog } from './import-dialog';
-import { resolveMediaLink } from '@/lib/media-discovery';
-import { needsUserTranscript } from '@/lib/linked-transcripts';
+import { prepareLinkedVideo } from '@/lib/prepare-client';
+import { recordDiscoveryEvents } from '@/lib/discover/client';
 import { saveLesson } from '@/lib/storage';
 import type { Lesson, ResolvedMedia } from '@/lib/types';
 import { LibraryPreview } from './library-preview';
 import { addQueueLink } from '@/lib/library/client';
 import { useLibrary } from './use-library';
 
-export function Home() {
+export function Home({ autoPrepare = false }: { autoPrepare?: boolean }) {
   const router = useRouter();
   const { lessons, remote, ready } = useLibrary();
   const returning = ready && (lessons.length > 0 || remote.length > 0);
@@ -42,21 +42,17 @@ export function Home() {
   const [message, setMessage] = useState('Finding your video…');
   const [queueNotice, setQueueNotice] = useState('');
   const abort = useRef<AbortController | null>(null);
-  useEffect(() => {
-    const queuedUrl = new URL(window.location.href).searchParams.get('video');
-    // Browser-only navigation state is read after hydration.
-    if (queuedUrl && queuedUrl.length <= 2000)
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setUrl(queuedUrl);
-    return () => abort.current?.abort();
-  }, []);
   function openLesson(lesson: Lesson) {
     saveLesson(lesson, 0);
-    router.push(`/practice/${lesson.id}`);
+    if (autoPrepare && lesson.videoId)
+      void recordDiscoveryEvents([{ videoId: lesson.videoId, action: 'prepared' }]);
+    const destination = `/practice/${encodeURIComponent(lesson.id)}`;
+    if (autoPrepare) router.replace(destination);
+    else router.push(destination);
   }
-  async function prepare(event?: React.FormEvent) {
+  async function prepare(event?: React.FormEvent, input = url) {
     event?.preventDefault();
-    if (busy || !url.trim()) return;
+    if ((abort.current && !abort.current.signal.aborted) || !input.trim()) return;
     setError('');
     setResolved(undefined);
     setNeedsTranscript(false);
@@ -66,62 +62,23 @@ export function Home() {
     setStage('identify');
     setMessage('Finding your video…');
     try {
-      const selected = await resolveMediaLink(url, controller.signal);
-      if (controller.signal.aborted) return;
-      setResolved(selected);
-      if (selected.media.type !== 'youtube') {
-        setNeedsTranscript(true);
-        setMessage(
-          'No Japanese subtitles were found automatically. Add your own transcript to continue.',
-        );
-        setImportOpen(true);
-        return;
-      }
-      const response = await fetch('/api/prepare', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: selected.media.canonicalUrl }),
-        signal: AbortSignal.any([controller.signal, AbortSignal.timeout(35000)]),
-      });
-      if (!response.ok) {
-        const body = await response.json();
-        throw new Error(body.error || 'We couldn’t prepare this video. Try again.');
-      }
-      if (!response.body) throw new Error('The connection ended unexpectedly. Please try again.');
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-      let finished = false;
-      for (;;) {
-        const { value, done } = await reader.read();
-        buffer += decoder.decode(value, { stream: !done });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() ?? '';
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          const data = JSON.parse(line);
+      const result = await prepareLinkedVideo(
+        input,
+        controller.signal,
+        (nextStage, nextMessage, selected) => {
           if (controller.signal.aborted) return;
-          if (data.resolved) setResolved({ ...data.resolved, originalUrl: selected.originalUrl });
-          if (data.error) {
-            if (needsUserTranscript(data.code)) {
-              setNeedsTranscript(true);
-              setMessage(data.error);
-              setImportOpen(true);
-              return;
-            }
-            throw new Error(data.error);
-          }
-          if (data.stage) setStage(data.stage);
-          if (data.message) setMessage(data.message);
-          if (data.lesson) {
-            finished = true;
-            openLesson(data.lesson);
-          }
-        }
-        if (done) break;
-      }
-      if (!finished)
-        throw new Error('The connection ended before the transcript was ready. Please try again.');
+          setStage(nextStage);
+          setMessage(nextMessage);
+          if (selected) setResolved(selected);
+        },
+      );
+      if (controller.signal.aborted) return;
+      if (result.needsTranscript) {
+        setResolved(result.resolved);
+        setNeedsTranscript(true);
+        setMessage(result.needsTranscript);
+        setImportOpen(true);
+      } else if (result.lesson) openLesson(result.lesson);
     } catch (error) {
       if (!controller.signal.aborted)
         setError(
@@ -130,14 +87,38 @@ export function Home() {
             : 'The connection took too long. Try again, import subtitles, or use the demo.',
         );
     } finally {
-      if (abort.current === controller) setBusy(false);
+      if (abort.current === controller) {
+        abort.current = null;
+        setBusy(false);
+      }
     }
   }
+  const autoStart = useEffectEvent((queuedUrl: string) => {
+    setUrl(queuedUrl);
+    if (autoPrepare) void prepare(undefined, queuedUrl);
+  });
+  useEffect(() => {
+    const queuedUrl = new URL(window.location.href).searchParams.get('video');
+    if (queuedUrl && queuedUrl.length <= 2000) {
+      // An explicitly opened preparation route starts its browser-only URL hand-off after hydration.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      autoStart(queuedUrl);
+    }
+    return () => {
+      abort.current?.abort();
+      abort.current = null;
+    };
+  }, [autoPrepare]);
   const stages = ['identify', 'captions', 'segment'];
   return (
     <>
       <Header onHelp={() => setHelp(true)} />
       <main className={`home-main${returning ? ' returning-home' : ''}`}>
+        {autoPrepare ? (
+          <Link className="text-button" href="/discover">
+            ← Back to Discover
+          </Link>
+        ) : null}
         {returning ? (
           <h1 className="returning-home-title">Make a little room for Japanese.</h1>
         ) : null}

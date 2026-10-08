@@ -16,10 +16,12 @@ export function createPrepareHandler({
   captions,
   repository = linkedTranscripts,
   fetchImpl = fetch,
+  onOutcome,
 }: {
   captions: TranscriptionProvider;
   repository?: LinkedTranscriptRepository;
   fetchImpl?: typeof fetch;
+  onOutcome?: (videoId: string, code: string | null) => Promise<void>;
 }) {
   return async function POST(request: Request) {
     let resolved: ResolvedMedia;
@@ -196,6 +198,10 @@ export function createPrepareHandler({
               elapsedMs: Date.now() - started,
             }),
           );
+          if (videoId && onOutcome)
+            await storageFallback('discover.preparation.state_failed', undefined, () =>
+              onOutcome(videoId, null),
+            );
           emit({ stage: 'done', lesson });
         } catch (error) {
           const failure = logPreparationError(error, {
@@ -205,6 +211,10 @@ export function createPrepareHandler({
             signal,
             elapsedMs: Date.now() - started,
           });
+          if (videoId && onOutcome && !signal.aborted)
+            await storageFallback('discover.preparation.state_failed', undefined, () =>
+              onOutcome(videoId, failure.code),
+            );
           emit({ ...failure, resolved, video: { videoId, title, author } });
         } finally {
           try {
