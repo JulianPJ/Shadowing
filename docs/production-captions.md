@@ -1,6 +1,6 @@
 # Production caption operations
 
-The production app runs on Cloudflare Workers/vinext at `shadowing.julianpopovskijones.workers.dev`. Automatic YouTube caption preparation is an implemented, verified subsystem.
+The production app runs on Cloudflare Workers/vinext at `hibikiapp.net`; the old `workers.dev` app hostname redirects browser navigation to the new site. The separate `shadowing-caption-relay.julianpopovskijones.workers.dev` broker URL remains unchanged. Automatic YouTube caption preparation is an implemented, verified subsystem.
 
 ## Current architecture
 
@@ -67,9 +67,9 @@ Expect HTTP 200 with a connected host. Without authentication, expect HTTP 401.
 Real-network verification remains separate from deterministic tests:
 
 ```sh
-node scripts/check-integrations.mjs https://shadowing.julianpopovskijones.workers.dev
-node scripts/check-youtube-browser.mjs https://shadowing.julianpopovskijones.workers.dev IJ6R4u05ppw
-node scripts/check-youtube-browser.mjs https://shadowing.julianpopovskijones.workers.dev KJblreFQ2R8
+node scripts/check-integrations.mjs https://hibikiapp.net
+node scripts/check-youtube-browser.mjs https://hibikiapp.net IJ6R4u05ppw
+node scripts/check-youtube-browser.mjs https://hibikiapp.net KJblreFQ2R8
 ```
 
 The deployed flow has been verified with Japanese-caption fixtures through preparation, practice navigation, real playback, automatic pause, replay, transcript navigation and refresh persistence.

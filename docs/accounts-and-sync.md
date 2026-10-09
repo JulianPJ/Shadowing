@@ -159,12 +159,14 @@ Metadata that contains a URL or local path is rejected. The one exception is a p
 
 ## Production setup
 
-- **Origin:** `https://shadowing.julianpopovskijones.workers.dev`.
-- **Google redirect URI:** `…/api/auth/callback/google`. For local OAuth, add `http://localhost:3000` and its callback.
+- **Origin:** `https://hibikiapp.net`. The former `workers.dev` hostname redirects browser visits to this origin; existing login cookies do not migrate between hosts.
+- **Google redirect URI:** `https://hibikiapp.net/api/auth/callback/google`. Add it to the Google OAuth client before deploying this canonical-origin change. For local OAuth, add `http://localhost:3000` and its callback.
 - **Secret names:** `AUTH_SECRET` (stable, at least 32 random characters), `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `RESEND_API_KEY`, `AUTH_EMAIL_FROM`.
-- **`AUTH_BASE_URL`** is a plain-text binding.
+- **`AUTH_BASE_URL`** and **`AUTH_EMAIL_FROM`** are plain-text bindings in `cloudflare.config.ts`; `RESEND_API_KEY` is a secret binding.
 - Set secrets with the cf CLI or the dashboard, never Git or chat.
-- Resend needs a verified sending domain; email sign-up stays unavailable until one is set.
+- Verify `hibikiapp.net` in Resend; configure the sending API key securely on the `shadowing` Worker. Sender: `Hibiki <accounts@hibikiapp.net>`.
+- Ensure `hibikiapp.net` routes to the `shadowing` Worker before switching the canonical origin; keep the relay URL and shared token unchanged.
+- After deployment, test email verification, password reset and Google sign-in on `hibikiapp.net`, then reload Hibiki Bridge and check its production origin setting.
 
 **Release order**
 

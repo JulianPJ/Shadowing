@@ -27,7 +27,7 @@ A web page cannot control a video embedded on another site, so Hibiki uses a sma
 
 ## Security and privacy
 
-- Commands are accepted only from Hibiki origins (production, `localhost`, `127.0.0.1`), and only for tabs the learner connected from the popup.
+- Commands are accepted only from Hibiki origins (`https://hibikiapp.net`, the former `workers.dev` production origin during migration, `localhost`, `127.0.0.1`), and only for tabs the learner connected from the popup.
 - The extension needs no host permission for ordinary pages: `activeTab` covers the clicked tab. Embedded players on other origins prompt for optional access.
 - Page lessons store the page URL and a `pageKey`, never a shared content identity. They sync as metadata with `mediaAvailable: false`.
 - Captured audio goes only to Hibiki's own transcription endpoint, under the same Pro check and rate limit as file transcription.
@@ -41,7 +41,7 @@ A web page cannot control a video embedded on another site, so Hibiki uses a sma
 
 ## Install (development)
 
-`chrome://extensions` → Developer mode → **Load unpacked** → choose the `extension/` folder. For a local Hibiki, set the address under **Settings** in the popup (for example `http://localhost:3000`).
+`chrome://extensions` → Developer mode → **Load unpacked** → choose the `extension/` folder. The default production address is `https://hibikiapp.net`; if you installed an older build, reload the extension and update **Settings** in the popup. For a local Hibiki, use `http://localhost:3000`.
 
 ## Tests
 

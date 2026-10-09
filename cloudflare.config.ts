@@ -34,10 +34,12 @@ export const worker = defineWorker({
     }),
     YOUTUBE_DATA_API_KEY: bindings.secret(),
     // Better Auth must have one canonical production origin for trusted callbacks and secure cookies.
-    AUTH_BASE_URL: bindings.text('https://shadowing.julianpopovskijones.workers.dev'),
+    AUTH_BASE_URL: bindings.text('https://hibikiapp.net'),
     AUTH_SECRET: bindings.secret(),
     GOOGLE_CLIENT_ID: bindings.secret(),
     GOOGLE_CLIENT_SECRET: bindings.secret(),
+    RESEND_API_KEY: bindings.secret(),
+    AUTH_EMAIL_FROM: bindings.text('Hibiki <accounts@hibikiapp.net>'),
     DEEPL_AUTH_KEY: bindings.secret(),
     YOUTUBE_CAPTION_RELAY_URL: bindings.secret(),
     YOUTUBE_CAPTION_RELAY_TOKEN: bindings.secret(),
