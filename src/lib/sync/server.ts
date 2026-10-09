@@ -14,6 +14,8 @@ import type { TagRepository } from '../tags/types';
 import { handleTagRequest } from '../tags/server';
 import type { KnowledgeRepository } from '../knowledge/types';
 import { handleKnowledgeRequest } from '../knowledge/server';
+import { handleDiscoverAccountRequest } from '../discover/account-server';
+import type { Database } from '../discover/types';
 
 export function accountHandler(
   auth: HibikiAuth,
@@ -25,6 +27,7 @@ export function accountHandler(
   review?: ReviewRepository,
   tags?: TagRepository,
   knowledge?: KnowledgeRepository,
+  discoverDb: Database | undefined = db,
 ) {
   return async (request: Request): Promise<Response> => {
     const headers = { 'Cache-Control': 'no-store', Vary: 'Cookie' };
@@ -61,6 +64,18 @@ export function accountHandler(
       const expectedAccount = request.headers.get('X-Hibiki-Account');
       if (expectedAccount && expectedAccount !== userId)
         return respond({ error: 'Account changed. Refresh your session.' }, 409);
+      if (
+        url.pathname.startsWith('/api/discover/') ||
+        url.pathname.startsWith('/api/watch-later')
+      ) {
+        if (!discoverDb) return respond({ error: 'Discover storage unavailable' }, 503);
+        return handleDiscoverAccountRequest(
+          request,
+          userId,
+          session.user.emailVerified,
+          discoverDb,
+        );
+      }
       if (url.pathname === '/api/dictionary') {
         if (!dictionary) return respond({ error: 'Dictionary storage unavailable' }, 503);
         return handleDictionaryRequest(request, userId, session.user.emailVerified, dictionary);

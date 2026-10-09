@@ -11,6 +11,7 @@ import type { Lesson } from '../../src/lib/types';
 import type { DictionaryEntry } from '../../src/lib/dictionary/types';
 import { applyLocalReview, emptyReview } from '../../src/lib/review/local';
 import type { ReviewOperation } from '../../src/lib/review/types';
+import { mockDiscoverSync } from '../helpers/discover-account';
 const user: AccountUser = {
   id: 'account-one',
   email: 'learner@example.com',
@@ -37,6 +38,7 @@ async function connect(
   remote: Remote,
   state: { user: AccountUser | null },
 ) {
+  await mockDiscoverSync(context);
   await context.route('**/api/account/me', (route) =>
     route.fulfill({ json: { user: state.user, googleEnabled: true, emailEnabled: true } }),
   );

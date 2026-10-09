@@ -40,6 +40,7 @@ test('account sync is complete only when learner, review and knowledge have all 
   assert.equal(aggregateSync(channelStatus()).state, 'pending');
   reportChannel('learner', 'review', { state: 'saved', lastSync: date });
   reportChannel('learner', 'knowledge', { state: 'saved', lastSync: date });
+  reportChannel('learner', 'discovery', { state: 'saved', lastSync: date });
   assert.equal(aggregateSync(channelStatus()).state, 'saved');
   reportChannel('learner', 'review', { state: 'saved', pending: 1 });
   assert.equal(aggregateSync(channelStatus()).state, 'pending');
@@ -57,6 +58,7 @@ test('last complete sync uses the oldest channel confirmation and account change
     ['learner', '2026-10-07T12:00:00.000Z'],
     ['review', '2026-10-07T11:00:00.000Z'],
     ['knowledge', '2026-10-07T10:00:00.000Z'],
+    ['discovery', '2026-10-07T10:30:00.000Z'],
   ] as const)
     reportChannel('one', channel, { state: 'saved', lastSync: date });
   assert.equal(aggregateSync(channelStatus()).lastSync, '2026-10-07T10:00:00.000Z');

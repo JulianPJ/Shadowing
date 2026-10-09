@@ -7,7 +7,8 @@ import { Header, Footer, HelpDialog } from './chrome';
 import { useLibrary } from './use-library';
 import { useLearnerProfile } from './use-learner-profile';
 import { useAccount } from './account';
-import { addQueueLink, pinLesson, saveLibrary } from '@/lib/library/client';
+import { addQueueLink, pinLesson, saveLibrary, importDeviceQueue } from '@/lib/library/client';
+import { hiddenAccountSaveCount } from '@/lib/discover/client';
 import { contentFit, type ContentFit } from '@/lib/library/model';
 import { cachedDictionary } from '@/lib/dictionary/cache';
 import { cachedReview } from '@/lib/review/client';
@@ -231,8 +232,10 @@ export function MyLibrary() {
         <h1>My Library</h1>
         <p className="library-intro">
           Continue a lesson, save something for later, or find a little stretch. Your queue and
-          saved-library choices stay on this device
-          {account.user ? ', separately for your account' : ''}.
+          saved-library choices stay on this device.{' '}
+          {account.user
+            ? 'YouTube Watch Later links sync with your account.'
+            : 'Sign in to sync YouTube Watch Later across devices.'}
         </p>
         <div className="library-utilities">
           <Link className="button" href="/review">
@@ -370,12 +373,43 @@ export function MyLibrary() {
         </section>
         <section className="library-panel" aria-labelledby="queue-title">
           <h2 id="queue-title">
-            Watch later <span className="small muted">On this device</span>
+            Watch later{' '}
+            <span className="small muted">
+              {account.user ? 'Account queue · available offline' : 'On this device'}
+            </span>
           </h2>
           <p className="muted">
             Queue a link now. Japanese captions are checked when you prepare it; you can import a
             transcript when needed.
           </p>
+          {account.user && hiddenAccountSaveCount() > 0 ? (
+            <p className="small muted" role="status">
+              {hiddenAccountSaveCount()} account save{hiddenAccountSaveCount() === 1 ? '' : 's'}{' '}
+              remain in your synced queue beyond this device’s 40-link view. Remove a device-only
+              media link to make room; your account saves are retained.
+            </p>
+          ) : null}
+          {account.user ? (
+            <button
+              className="text-button"
+              onClick={() => {
+                try {
+                  const count = importDeviceQueue();
+                  setNoticeKind('success');
+                  setNotice(
+                    `${count} device save${count === 1 ? '' : 's'} added to your account queue.`,
+                  );
+                } catch (error) {
+                  setNoticeKind('error');
+                  setNotice(
+                    error instanceof Error ? error.message : 'Device saves could not be imported.',
+                  );
+                }
+              }}
+            >
+              Add this device’s anonymous saves to my account
+            </button>
+          ) : null}
           <form
             className="queue-form"
             onSubmit={(event) => {
@@ -416,7 +450,7 @@ export function MyLibrary() {
                       {new URL(item.url).hostname} · Vocabulary fit awaiting transcript
                     </span>
                   </div>
-                  <Link className="button" href={`/?video=${encodeURIComponent(item.url)}`}>
+                  <Link className="button" href={`/prepare?video=${encodeURIComponent(item.url)}`}>
                     Prepare <ArrowRight size={14} />
                   </Link>
                   <button

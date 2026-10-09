@@ -1,4 +1,5 @@
 import { remoteUrl } from '../media';
+import { parseYouTubeUrl } from '../youtube';
 
 export const LIBRARY_LIMIT = 60;
 export const QUEUE_LIMIT = 40;
@@ -8,9 +9,10 @@ export const emptyLibrary = (): LibraryState => ({ version: 1, pinned: [], queue
 
 export function normalizeQueueUrl(input: string) {
   const url = remoteUrl(input);
-  if (['youtube.com', 'www.youtube.com', 'm.youtube.com', 'youtu.be'].includes(url.hostname)) {
-    const video = url.hostname === 'youtu.be' ? url.pathname.slice(1) : url.searchParams.get('v');
-    if (video && /^[\w-]{11}$/.test(video)) return `https://www.youtube.com/watch?v=${video}`;
+  try {
+    return `https://www.youtube.com/watch?v=${parseYouTubeUrl(url.href)}`;
+  } catch {
+    /* Other supported media keep their existing URL. */
   }
   return url.href;
 }

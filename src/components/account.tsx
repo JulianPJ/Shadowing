@@ -6,6 +6,7 @@ import { authClient } from '@/lib/auth/client';
 import { authPath } from '@/lib/auth/return-path';
 import { refreshReview, startReviewSync } from '@/lib/review/client';
 import { syncWordKnowledge, startKnowledgeSync } from '@/lib/knowledge/client';
+import { syncDiscover, startDiscoverSync } from '@/lib/discover/client';
 import {
   chooseImport,
   refreshAccount,
@@ -41,7 +42,7 @@ export function useAggregateSync() {
   return { ...aggregateSync(channels), channels };
 }
 async function retrySync() {
-  await Promise.allSettled([synchronize(), refreshReview(), syncWordKnowledge()]);
+  await Promise.allSettled([synchronize(), refreshReview(), syncWordKnowledge(), syncDiscover()]);
 }
 export function AccountBridge() {
   const account = useAccount();
@@ -49,6 +50,7 @@ export function AccountBridge() {
   useEffect(() => startSync(), []);
   useEffect(() => startReviewSync(), []);
   useEffect(() => startKnowledgeSync(), []);
+  useEffect(() => startDiscoverSync(), []);
   return account.importPending ? (
     <aside className="account-import" aria-label="Import device progress">
       <strong>Add this device’s Hibiki progress to your account?</strong>

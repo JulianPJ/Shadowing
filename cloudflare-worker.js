@@ -10,6 +10,9 @@ import { D1KnowledgeRepository } from './src/lib/knowledge/repository';
 import { createD1AccessRepository, requirePro } from './src/lib/access';
 import { serveDemoAsset } from './src/lib/demo-asset';
 import { handleDiscoveryRequest } from './src/lib/discovery-api';
+import { handleFeedRequest } from './src/lib/discover/server';
+import { refreshCatalog } from './src/lib/discover/refresh';
+import { recordPreparationState } from './src/lib/discover/preparation-state';
 import { handleQuizRequest } from './src/lib/quiz-api';
 import { createWorkersAiQuizProvider } from './src/lib/providers/quiz';
 import { handleDifficultyRequest } from './src/lib/difficulty-api';
@@ -86,6 +89,48 @@ const worker = {
    */
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    const discoveryApi =
+      url.pathname === '/api/discover' || url.pathname.startsWith('/api/discover/');
+    if (url.pathname === '/discover' || discoveryApi) {
+      if (String(env.DISCOVER_ENABLED) === 'false')
+        return Response.json(
+          { error: 'Discover is unavailable.' },
+          { status: 404, headers: { 'Cache-Control': 'no-store' } },
+        );
+    }
+    if (discoveryApi || url.pathname.startsWith('/api/watch-later')) {
+      try {
+        const limited = await env.DISCOVERY_RATE_LIMIT.limit({
+          key: request.headers.get('cf-connecting-ip') || 'unknown',
+        });
+        if (!limited.success)
+          return Response.json(
+            { error: 'Too many Discover requests. Try again shortly.' },
+            { status: 429, headers: { 'Retry-After': '60', 'Cache-Control': 'no-store' } },
+          );
+      } catch {
+        return Response.json(
+          { error: 'Discover is temporarily unavailable.' },
+          { status: 503, headers: { 'Cache-Control': 'no-store' } },
+        );
+      }
+    }
+    if (url.pathname === '/api/discover') {
+      const rawRegion = request.headers.get('cf-ipcountry');
+      const region = rawRegion && /^[A-Z]{2}$/.test(rawRegion) ? rawRegion : 'JP';
+      if (request.method === 'GET') {
+        const keyUrl = new URL(request.url);
+        keyUrl.searchParams.set('__region', region);
+        const key = new Request(keyUrl, { method: 'GET' });
+        const cache = await caches.open('hibiki-discover');
+        const cached = await cache.match(key);
+        if (cached) return cached;
+        const response = await handleFeedRequest(request, env.HIBIKI_DB, region);
+        if (response.ok) ctx.waitUntil(cache.put(key, response.clone()));
+        return response;
+      }
+      return handleFeedRequest(request, env.HIBIKI_DB, region);
+    }
     if (url.pathname === '/api/discovery') {
       return handleDiscoveryRequest(request, env.HIBIKI_DB);
     }
@@ -96,7 +141,9 @@ const worker = {
       url.pathname === '/api/dictionary' ||
       url.pathname === '/api/review' ||
       url.pathname === '/api/tags' ||
-      url.pathname === '/api/knowledge'
+      url.pathname === '/api/knowledge' ||
+      url.pathname.startsWith('/api/discover/') ||
+      url.pathname.startsWith('/api/watch-later')
     ) {
       if (!env.HIBIKI_DB || !env.AUTH_SECRET || !env.AUTH_BASE_URL) {
         return url.pathname === '/api/account/me'
@@ -143,6 +190,9 @@ const worker = {
           env.YOUTUBE_CAPTION_RELAY_TOKEN,
         ),
         repository: storage.transcripts,
+        onOutcome: env.HIBIKI_DB
+          ? (videoId, code) => recordPreparationState(env.HIBIKI_DB, videoId, code)
+          : undefined,
       })(request);
     }
 
@@ -188,6 +238,17 @@ const worker = {
     }
 
     return vinextHandler.fetch(request, env, ctx);
+  },
+  /**
+   * @param {import('@cloudflare/workers-types').ScheduledController} controller
+   * @param {WorkerEnv} env
+   * @param {import('@cloudflare/workers-types').ExecutionContext} ctx
+   */
+  scheduled(controller, env, ctx) {
+    if (env.HIBIKI_DB)
+      ctx.waitUntil(
+        refreshCatalog(env.HIBIKI_DB, env.YOUTUBE_DATA_API_KEY, fetch, controller.scheduledTime),
+      );
   },
 };
 export default worker;

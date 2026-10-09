@@ -19,6 +19,7 @@ let local:
       review: ReturnType<typeof createD1ReviewRepository>;
       tags: ReturnType<typeof createD1TagRepository>;
       knowledge: D1KnowledgeRepository;
+      database: ReturnType<typeof localProgressDatabase>;
     } | null>
   | undefined;
 export function localAuth() {
@@ -35,7 +36,7 @@ export function localAuth() {
     );
     for (const file of (await readdir('migrations'))
       .sort()
-      .filter((x) => /^\d{4}_.+\.sql$/.test(x) && Number(x.slice(0, 4)) >= 2)) {
+      .filter((x) => /^\d{4}_.+\.sql$/.test(x))) {
       if (db.prepare('SELECT name FROM local_auth_migrations WHERE name=?').get(file)) continue;
       db.exec(await readFile(path.join('migrations', file), 'utf8'));
       db.prepare('INSERT INTO local_auth_migrations VALUES (?)').run(file);
@@ -49,6 +50,7 @@ export function localAuth() {
       review: createD1ReviewRepository(database),
       tags: createD1TagRepository(database),
       knowledge: new D1KnowledgeRepository(database),
+      database,
     };
   })();
   return local;

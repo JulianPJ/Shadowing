@@ -24,6 +24,13 @@ test.beforeEach(async ({ page }) => {
 test('queue persists, reorders, removes and carries a validated link into preparation', async ({
   page,
 }) => {
+  await page.route('**/api/prepare', (route) =>
+    route.fulfill({
+      contentType: 'application/x-ndjson',
+      body:
+        JSON.stringify({ code: 'no-japanese-captions', error: 'Fixture has no captions.' }) + '\n',
+    }),
+  );
   await page.goto('/library');
   await expect(page.getByRole('heading', { name: 'My Library', exact: true })).toBeVisible();
   for (const [url, title] of [
@@ -46,6 +53,8 @@ test('queue persists, reorders, removes and carries a validated link into prepar
   await expect(page.getByLabel('Paste a Japanese video link')).toHaveValue(
     'https://www.youtube.com/watch?v=abcdefghijk',
   );
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await page.getByRole('button', { name: 'Close import', exact: true }).click();
   await page.getByRole('link', { name: 'Library', exact: true }).click();
   await page.getByRole('button', { name: 'Remove Evening video from queue' }).click();
   await expect(page.locator('.library-queue li')).toHaveCount(1);

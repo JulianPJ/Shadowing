@@ -24,6 +24,7 @@ const options = convertV4MiniflareOptions({
       d1Databases: { HIBIKI_DB: 'runtime-test' },
       ratelimits: {
         SHADOWING_AI_RATE_LIMIT: { namespace_id: '19001', simple: { limit: 6, period: 60 } },
+        DISCOVERY_RATE_LIMIT: { namespace_id: '19002', simple: { limit: 90, period: 60 } },
       },
       serviceBindings: { AI: 'ai-mock' },
       bindings: {
@@ -548,6 +549,147 @@ try {
   );
   await db.prepare("UPDATE linked_transcripts SET visibility='system', owner_user_id=NULL").run();
 
+  // The new feed is metadata-only; saving a card cannot acquire captions or run AI.
+  const catalogueTime = new Date().toISOString();
+  await db
+    .prepare(
+      `INSERT INTO discovery_videos(video_id,canonical_url,title,channel_id,channel_title,duration_seconds,
+    published_at,caption_flag,embeddable,status,fetched_at,expires_at,indexed_at,topic_keys_json)
+    VALUES(?,?,?,?,?,540,?,1,1,'available',?,?,?,'["everyday"]')`,
+    )
+    .bind(
+      lesson.videoId,
+      `https://www.youtube.com/watch?v=${lesson.videoId}`,
+      'Discover runtime fixture',
+      'creator',
+      'Runtime creator',
+      catalogueTime,
+      catalogueTime,
+      new Date(Date.now() + 86400000).toISOString(),
+      catalogueTime,
+    )
+    .run();
+  const feed = await mf.dispatchFetch('https://example.com/api/discover');
+  assert.equal(feed.status, 200);
+  const feedData = await feed.json();
+  assert.equal(feedData.items.length, 1);
+  assert.equal(feedData.items[0].band, null);
+  assert.ok(!('segments' in feedData.items[0]));
+  const watchHeaders = {
+    Cookie: cookie,
+    Origin: 'https://example.com',
+    'Content-Type': 'application/json',
+    'X-Hibiki-Account': identity.user.id,
+  };
+  for (let repeat = 0; repeat < 2; repeat++)
+    assert.equal(
+      (
+        await mf.dispatchFetch('https://example.com/api/watch-later', {
+          method: 'POST',
+          headers: watchHeaders,
+          body: JSON.stringify({ videoId: lesson.videoId, title: 'Discover runtime fixture' }),
+        })
+      ).status,
+      200,
+    );
+  const savedQueue = await mf.dispatchFetch('https://example.com/api/watch-later', {
+    headers: watchHeaders,
+  });
+  assert.equal(savedQueue.headers.get('Cache-Control'), 'no-store');
+  assert.equal((await savedQueue.json()).records.length, 1);
+  assert.equal(
+    (
+      await mf.dispatchFetch('https://example.com/api/discover/preferences', {
+        method: 'PATCH',
+        headers: watchHeaders,
+        body: JSON.stringify({
+          preferredBand: 'n4_n3',
+          topics: ['travel'],
+          duration: '5to10',
+          diversity: 'wide',
+        }),
+      })
+    ).status,
+    200,
+  );
+  assert.equal(
+    (
+      await mf.dispatchFetch('https://example.com/api/watch-later', {
+        headers: { ...watchHeaders, 'X-Hibiki-Account': 'another-user' },
+      })
+    ).status,
+    409,
+  );
+  assert.equal(captions, 1);
+  assert.deepEqual(await (await ai.fetch('https://example.com/counts')).json(), {
+    quiz: 1,
+    difficulty: 1,
+    transcription: 6,
+  });
+
+  const completedAt = new Date(Date.now() - 5 * 86400000).toISOString();
+  await db
+    .prepare(
+      'INSERT INTO user_practice_sessions(user_id,id,lesson_id,transcript_key,payload_json,updated_at) VALUES(?,?,?,?,?,?)',
+    )
+    .bind(
+      identity.user.id,
+      'runtime-completion-day',
+      lesson.id,
+      'runtime-fixture-key',
+      JSON.stringify({ completed: true, completedAt }),
+      completedAt,
+    )
+    .run();
+  assert.equal(
+    (
+      await mf.dispatchFetch('https://example.com/api/discover/events', {
+        method: 'POST',
+        headers: watchHeaders,
+        body: JSON.stringify({ events: [{ videoId: lesson.videoId, action: 'complete' }] }),
+      })
+    ).status,
+    200,
+  );
+  assert.equal(
+    (
+      await db
+        .prepare(
+          "SELECT day FROM discovery_metric_events WHERE user_id=? AND video_id=? AND action='complete'",
+        )
+        .bind(identity.user.id, lesson.videoId)
+        .first()
+    )?.day,
+    completedAt.slice(0, 10),
+  );
+
+  // Exercise rollback through the public request adapter, retaining the configured HTTPS origin.
+  await mf.setOptions({
+    ...options,
+    workers: options.workers.map((worker, index) =>
+      index !== 0
+        ? worker
+        : {
+            ...worker,
+            config: {
+              ...worker.config,
+              env: { ...worker.config.env, DISCOVER_ENABLED: { type: 'text', value: 'false' } },
+            },
+          },
+    ),
+  });
+  assert.equal((await mf.dispatchFetch('https://example.com/api/discover')).status, 404);
+  assert.equal((await mf.dispatchFetch('https://example.com/discover')).status, 404);
+  assert.equal((await mf.dispatchFetch('https://example.com/api/discovery')).status, 200);
+  const disabledWatch = await mf.dispatchFetch('https://example.com/api/watch-later', {
+    headers: watchHeaders,
+  });
+  assert.equal(
+    disabledWatch.status,
+    200,
+    disabledWatch.status !== 200 ? await disabledWatch.text() : undefined,
+  );
+
   const signedOut = await mf.dispatchFetch('https://example.com/api/auth/sign-out', {
     method: 'POST',
     headers: { Cookie: cookie, Origin: 'https://example.com', 'Content-Type': 'application/json' },
@@ -571,7 +713,7 @@ try {
     401,
   );
   console.log(
-    'Built Worker + D1: Free word states and paid-feature denial, D1 Pro upgrade, sync, dictionary, public discovery, quiz/difficulty cache and sign-out passed.',
+    'Built Worker + D1: accounts, Discover metadata feed, idempotent Watch Later, preferences, ownership, unchanged caption/AI counts, existing cache and sign-out passed.',
   );
 } finally {
   await mf.dispose();

@@ -7,6 +7,7 @@ import { lessonIdentity } from '../../src/lib/learner-progress';
 import { lessonSyncId } from '../../src/lib/sync/validation';
 import type { Lesson } from '../../src/lib/types';
 import { emptyReview } from '../../src/lib/review/local';
+import { mockDiscoverSync } from '../helpers/discover-account';
 
 const user: AccountUser = {
   id: 'knowledge-account-one',
@@ -23,6 +24,7 @@ const anonymousWord: WordKnowledgeRecord = {
 };
 
 async function services(context: BrowserContext, state: { user: AccountUser | null }) {
+  await mockDiscoverSync(context);
   const remote = new Map<string, WordKnowledgeRecord[]>();
   await context.route('**/api/account/me', (route) =>
     route.fulfill({ json: { user: state.user, googleEnabled: false, emailEnabled: true } }),
