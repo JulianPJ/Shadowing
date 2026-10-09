@@ -22,7 +22,8 @@ const resolvedYoutube = {
     contentKey: `youtube:${id}`,
   },
 };
-async function mockYouTube(page: Page) {
+/** `resumeLagSeconds` mimics YouTube reporting a slightly earlier time just after playback resumes. */
+async function mockYouTube(page: Page, resumeLagSeconds = 0) {
   const origin = new URL(page.url()).origin;
   await page.route('https://www.youtube.com/iframe_api', (route) =>
     route.fulfill({
@@ -36,8 +37,8 @@ async function mockYouTube(page: Page) {
       this.video.addEventListener('pause', () => options.events.onStateChange({data:2}));
       this.video.addEventListener('ended', () => options.events.onStateChange({data:0}));
     }
-    playVideo(){ void this.video.play(); } pauseVideo(){this.video.pause();} seekTo(t){this.video.currentTime=t;}
-    getCurrentTime(){return this.video.currentTime;} setPlaybackRate(r){this.video.playbackRate=r;}
+    playVideo(){ this.resumedAt = Date.now(); void this.video.play(); } pauseVideo(){this.video.pause();} seekTo(t){this.video.currentTime=t;}
+    getCurrentTime(){ const t = this.video.currentTime; return Date.now() - (this.resumedAt || 0) < 600 ? Math.max(0, t - ${resumeLagSeconds}) : t; } setPlaybackRate(r){this.video.playbackRate=r;}
     getPlayerState(){return this.video.ended ? 0 : this.video.paused ? 2 : 1;} getIframe(){return this.iframe;}
     destroy(){this.video.pause();this.video.remove();this.iframe.remove();}
   }}; window.onYouTubeIframeAPIReady();`,
@@ -120,6 +121,47 @@ test('auto-generated YouTube captions are labelled and hand the link to Whisper 
     dialog.getByRole('button', { name: 'Auto-generate subtitles', exact: true }),
   ).toHaveAttribute('aria-pressed', 'true');
   await expect(dialog.getByLabel('Audio or video for subtitle generation')).toBeAttached();
+});
+test('Continue into a touching YouTube section moves on the first time despite a lagging resume time', async ({
+  page,
+}) => {
+  const lesson = {
+    ...demo,
+    id: `youtube-${id}`,
+    videoId: id,
+    source: 'youtube',
+    mediaUrl: undefined,
+    mediaSource: resolvedYoutube.media,
+    transcriptSource: 'production-relay',
+    // Sections that touch, like 3:06–3:17 → 3:17–3:24 in the reported recording.
+    segments: [
+      { ...demo.segments[0], start: 5, end: 7 },
+      { ...demo.segments[1], start: 7, end: 9 },
+      { ...demo.segments[2], start: 9, end: 11 },
+    ],
+  };
+  await page.goto('/');
+  await mockYouTube(page, 0.15);
+  await page.evaluate((value) => {
+    localStorage.setItem(`hibiki:v1:lesson:${value.id}`, JSON.stringify(value));
+    localStorage.setItem('hibiki:v1:preferences', JSON.stringify({ mode: 'shadowing', speed: 1 }));
+  }, lesson);
+  await page.goto(`/practice/${lesson.id}`);
+  const state = page.getByTestId('playback-state');
+  const current = page.getByTestId('current-japanese');
+  await page.getByRole('button', { name: 'Listen', exact: true }).click();
+  await expect(state).toContainText('YOUR TURN', { timeout: 10000 });
+  await expect(current).toHaveText(lesson.segments[0].japanese);
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  // A bounced Continue re-selects the first section and pauses at its end again.
+  await expect(current).toHaveText(lesson.segments[1].japanese);
+  await expect(state).toContainText('LISTEN CLOSELY');
+  await expect
+    .poll(() => page.locator('video').evaluate((v: HTMLVideoElement) => v.currentTime))
+    .toBeGreaterThan(7.5);
+  await expect(current).toHaveText(lesson.segments[1].japanese);
+  await expect(state).toContainText('YOUR TURN', { timeout: 10000 });
+  await expect(current).toHaveText(lesson.segments[1].japanese);
 });
 test('no-captions → own transcript retains link, identity, title and author without a second preparation request', async ({
   page,

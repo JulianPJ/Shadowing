@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useMemo } from 'react';
-import { createSectionLookup } from '@/lib/section-lookup';
+import { continuingIntoSection, createSectionLookup } from '@/lib/section-lookup';
 import type { Lesson, Mode, PlaybackState, QuizEvidence } from '@/lib/types';
 import { type MediaHandle } from '../media-player';
 import type { Dispatch, RefObject, SetStateAction } from 'react';
@@ -90,14 +90,13 @@ export function usePlaybackBoundary({
           onSectionEnd?.();
           return;
         }
-        // Continue arms the next section while playing the gap before its speech starts.
-        // The lookup retains the preceding row through that gap; do not re-arm its old end.
-        const continuingGap =
+        // Continue arms the next section while playing up to its speech; do not re-arm the
+        // previous section's end on the way there.
+        if (
           match >= 0 &&
-          match === index - 1 &&
-          time >= lesson.segments[match].end - 0.025 &&
-          time < segment.start - 0.02;
-        if (match >= 0 && match !== index && !continuingGap) {
+          match !== index &&
+          !continuingIntoSection(lesson.segments, index, match, time)
+        ) {
           setIndex(match);
           resetTranslation();
         }
