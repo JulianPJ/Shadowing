@@ -51,6 +51,7 @@ The UX contracts and audit coverage are documented in [UX core loops](ux-core-lo
 
 - Keep the same mounted media player when changing display preferences. Browser recordings, local object URLs and the media adapter belong to the active practice tree.
 - Preserve playback tolerances and automatic pause timing. `section-lookup.ts` reproduces the original predicate, including gaps and legacy ordering.
+- Manual Continue and timed/hands-free continuation resume the media clock through subtitle gaps. The next shadowing section is armed during the gap without reselecting the preceding section. Transcript clicks, previous/next and replay still seek to authored speech starts; subtitle timing is never stretched. Continuous playback runs to the media's actual end, including footage after the last subtitle. Finish practice remains an explicit shadowing completion action.
 - Keep the `hibiki:v1:` keys and existing JSON formats. Lesson history and quiz attempts retain all existing compatibility rules; unchanged lesson payloads skip redundant writes. Failed writes still retain visit data in memory and show the existing warning.
 - Transcript hashes include section IDs, timing and trimmed Japanese text; media URLs are excluded. Model selection thresholds, prompts, inference options and evidence validation are unchanged.
 - Styles are imported in their original cascade order. Later responsive and display rules intentionally override earlier rules. Do not merge distant duplicate selectors without checking intervening declarations.

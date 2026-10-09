@@ -90,7 +90,14 @@ export function usePlaybackBoundary({
           onSectionEnd?.();
           return;
         }
-        if (match >= 0 && match !== index) {
+        // Continue arms the next section while playing the gap before its speech starts.
+        // The lookup retains the preceding row through that gap; do not re-arm its old end.
+        const continuingGap =
+          match >= 0 &&
+          match === index - 1 &&
+          time >= lesson.segments[match].end - 0.025 &&
+          time < segment.start - 0.02;
+        if (match >= 0 && match !== index && !continuingGap) {
           setIndex(match);
           resetTranslation();
         }
@@ -118,6 +125,7 @@ export function usePlaybackBoundary({
     isPlaying,
     mode,
     index,
+    segment.start,
     segment.end,
     lesson.segments,
     duration,

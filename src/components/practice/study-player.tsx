@@ -342,7 +342,13 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
   }
 
   const navigate = useCallback(
-    (nextIndex: number, play = true, evidenceReplay = false, preserveAutomation = false) => {
+    (
+      nextIndex: number,
+      play = true,
+      evidenceReplay = false,
+      preserveAutomation = false,
+      resume = false,
+    ) => {
       if (!preserveAutomation) stopAutomation();
       boundaryGeneration.current++;
       scoreAbort.current?.abort();
@@ -360,11 +366,15 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
       const target = lesson.segments[next];
       if (!evidenceReplay) recordSignal(target, 'navigate');
       const mediaTarget = mediaTimeFor(target.start);
-      media.current?.pause();
-      media.current?.seek(mediaTarget);
-      seeking.current = { target: mediaTarget, deadline: Date.now() + 4000 };
+      // Continuing after a response resumes the media clock, including uncaptioned footage.
+      // Explicit navigation and replay still seek to the authored speech start.
+      if (!resume) {
+        media.current?.pause();
+        media.current?.seek(mediaTarget);
+        seeking.current = { target: mediaTarget, deadline: Date.now() + 4000 };
+      }
       setIndex(next);
-      setElapsed(target.start);
+      setElapsed(resume ? readPlaybackTime() : target.start);
       setStatus(play ? 'listening' : 'ready');
       if (!evidenceReplay) setFinished(false);
       setPlaybackError('');
@@ -375,7 +385,15 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
           setPlaybackError('Playback didn’t start. Press play inside the video, then try again.');
         });
     },
-    [lesson.segments, index, resetTranslation, recordSignal, mediaTimeFor, stopAutomation],
+    [
+      lesson.segments,
+      index,
+      resetTranslation,
+      recordSignal,
+      mediaTimeFor,
+      stopAutomation,
+      readPlaybackTime,
+    ],
   );
   const replaySection = useCallback(() => {
     recordSignal(segment, 'replay');
@@ -432,7 +450,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
       return;
     }
     setPracticeCount((n) => n + 1);
-    navigate(index + 1);
+    navigate(index + 1, true, false, false, true);
   }, [index, lesson, navigate, recordCompletion, stopAutomation]);
 
   const automaticContinue = useCallback(() => {
@@ -446,7 +464,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
       setCompleted(true);
       completeLesson(lesson);
       recordCompletion();
-    } else navigate(index + 1, true, false, true);
+    } else navigate(index + 1, true, false, true, true);
   }, [index, lesson, navigate, recordCompletion, stopAutomation]);
 
   const onSectionEnd = useCallback(() => {
