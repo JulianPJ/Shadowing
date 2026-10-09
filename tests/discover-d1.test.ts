@@ -5,7 +5,12 @@ import { readdir, readFile } from 'node:fs/promises';
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
 import type { D1Database } from '../src/lib/d1';
 import { readCatalog, saveVideos } from '../src/lib/discover/catalog';
-import { refreshCatalog, verifyAnalyses } from '../src/lib/discover/refresh';
+import {
+  DISCOVER_DAILY_BUDGET,
+  refreshCatalog,
+  verifyAnalyses,
+  youtubeQuotaWindow,
+} from '../src/lib/discover/refresh';
 import { handleFeedRequest } from '../src/lib/discover/server';
 import { handleDiscoverAccountRequest } from '../src/lib/discover/account-server';
 import { readWatchLater, writeWatchLater, type WatchRecord } from '../src/lib/discover/watch-later';
@@ -238,18 +243,121 @@ test('scheduled refresh budgets and batches official API calls, releases lease a
     metadata++;
     return Response.json({ items: [youtubeMetadata('video000000')] });
   };
-  await refreshCatalog(db, 'key', fetchImpl, now());
+  const time = Date.parse(`${youtubeQuotaWindow(now()).day}T20:00:00Z`);
+  await refreshCatalog(db, 'key', fetchImpl, time);
   assert.equal(searches, 2);
   assert.equal(metadata, 2);
   assert.equal((await readCatalog(db)).length, 1);
   assert.equal((await db.prepare('SELECT * FROM discovery_jobs').all()).results.length, 0);
-  await db.prepare('UPDATE discovery_seed_queries SET enabled=0').run();
-  await refreshCatalog(db, 'key', fetchImpl, now());
+  await db.prepare('UPDATE discovery_seed_queries SET enabled=0 WHERE last_run_at IS NULL').run();
+  await refreshCatalog(db, 'key', fetchImpl, time);
   assert.equal(searches, 2);
   assert.equal(metadata, 2);
   assert.equal(
     (await db.prepare('SELECT units FROM discovery_quota').first<{ units: number }>())?.units,
     202,
+  );
+  // Existing deployments may still have yesterday's 24-hour seed schedule.
+  await db
+    .prepare('UPDATE discovery_seed_queries SET next_run_at=?')
+    .bind(new Date(time + 86400000).toISOString())
+    .run();
+  await refreshCatalog(db, 'key', fetchImpl, time + 3600000);
+  assert.equal(searches, 4);
+  assert.equal(metadata, 4);
+});
+test('YouTube quota days follow Pacific midnight in summer, winter and DST transitions', () => {
+  for (const [instant, day] of [
+    ['2026-07-01T06:59:59Z', '2026-06-30'],
+    ['2026-07-01T07:00:00Z', '2026-07-01'],
+    ['2026-01-01T07:59:59Z', '2025-12-31'],
+    ['2026-01-01T08:00:00Z', '2026-01-01'],
+    ['2026-03-08T09:59:59Z', '2026-03-08'],
+    ['2026-03-08T10:00:00Z', '2026-03-08'],
+    ['2026-11-01T08:59:59Z', '2026-11-01'],
+    ['2026-11-01T09:00:00Z', '2026-11-01'],
+  ])
+    assert.equal(youtubeQuotaWindow(Date.parse(instant)).day, day);
+});
+test('a full refresh day uses nearly 9000 points with paced searches and varied result ordering', async () => {
+  let searches = 0;
+  const orders = new Set<string>();
+  const queries = new Set<string>();
+  const fetchImpl: typeof fetch = async (input) => {
+    const url = new URL(String(input));
+    if (url.pathname.endsWith('/search')) {
+      searches++;
+      orders.add(url.searchParams.get('order')!);
+      queries.add(url.searchParams.get('q')!);
+      return Response.json({ items: [{ id: { videoId: 'video000000' } }] });
+    }
+    return Response.json({ items: [youtubeMetadata('video000000')] });
+  };
+  const start = Date.parse('2026-07-01T07:00:00Z');
+  for (let slot = 0; slot < 96; slot++) {
+    await refreshCatalog(db, 'key', fetchImpl, start + slot * 15 * 60000);
+    if (slot === 0) assert.equal(searches, 0);
+    if (slot === 47) assert.ok(searches >= 40 && searches <= 44);
+  }
+  const quota = await db.prepare('SELECT day,units FROM discovery_quota').first<{
+    day: string;
+    units: number;
+  }>();
+  assert.equal(quota?.day, '2026-07-01');
+  assert.ok(quota!.units >= 8800 && quota!.units <= DISCOVER_DAILY_BUDGET);
+  assert.ok(searches >= 87 && searches <= 89);
+  assert.equal(queries.size, 9);
+  assert.deepEqual([...orders].sort(), ['date', 'relevance', 'viewCount']);
+});
+test('exhausted quota blocks network calls and resets only at Pacific midnight', async () => {
+  const start = Date.parse('2026-07-01T07:00:00Z');
+  await db
+    .prepare('INSERT INTO discovery_quota(day,units) VALUES(?,?)')
+    .bind('2026-07-01', DISCOVER_DAILY_BUDGET)
+    .run();
+  let requests = 0;
+  const fetchImpl: typeof fetch = async () => {
+    requests++;
+    return Response.json({ items: [] });
+  };
+  await refreshCatalog(db, 'key', fetchImpl, start + 18 * 3600000); // UTC date already changed.
+  assert.equal(requests, 0);
+  await refreshCatalog(db, 'key', fetchImpl, start + 86400000 + 15 * 60000);
+  assert.equal(requests, 1);
+  assert.equal(
+    (
+      await db
+        .prepare('SELECT units FROM discovery_quota WHERE day=?')
+        .bind('2026-07-02')
+        .first<{ units: number }>()
+    )?.units,
+    100,
+  );
+});
+test('searches reserve metadata headroom while stale metadata can use the last point', async () => {
+  const time = Date.parse(`${youtubeQuotaWindow(now()).day}T20:00:00Z`);
+  await db
+    .prepare('INSERT INTO discovery_quota(day,units) VALUES(?,?)')
+    .bind(youtubeQuotaWindow(time).day, DISCOVER_DAILY_BUDGET - 1)
+    .run();
+  await saveVideos(db, [{ ...video(), fetchedAt: new Date(time - 2 * 86400000).toISOString() }]);
+  let searches = 0;
+  let metadata = 0;
+  await refreshCatalog(
+    db,
+    'key',
+    async (input) => {
+      if (new URL(String(input)).pathname.endsWith('/search')) searches++;
+      else metadata++;
+      return Response.json({ items: [youtubeMetadata('video000000')] });
+    },
+    time,
+  );
+  assert.equal(searches, 0);
+  assert.equal(metadata, 1);
+  assert.equal(
+    (await db.prepare('SELECT units FROM discovery_quota').first<{ units: number }>())?.units,
+    DISCOVER_DAILY_BUDGET,
   );
 });
 test('quota failure never extends stale metadata and expiry purge works without key', async () => {

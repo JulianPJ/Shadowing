@@ -36,7 +36,9 @@ Classification stays in `generated_artifacts`. Scheduled verification checks eli
 
 Additive migration `0012_video_discovery.sql` creates catalogue, seed schedule, observed preparation state, account preferences, synced Watch Later, feedback, events/aggregates, lease and quota tables. It copies no transcripts or lessons. Account records cascade on account deletion. Watch Later has no catalogue foreign key, so saved links survive expired/removed provider metadata.
 
-The hourly `17 * * * *` trigger uses a 15-minute D1 lease. Each execution performs at most two stale-metadata batches of 50 IDs and two Japanese-oriented seeded searches. Each seed reschedules for 24 hours; `videos.list` separately validates search results. Atomic quota reservations enforce 2,000 UTC daily units before calls (100 per search, one per metadata batch), including failed attempts. Acquisition has no public endpoint and never runs on feed requests.
+The `*/15 * * * *` trigger runs every 15 minutes with a 15-minute D1 lease. Each execution performs at most two stale-metadata batches of 50 IDs and two Japanese-oriented seeded searches. Seeds have a one-hour cooldown and oldest-run-first rotation; existing 24-hour seed schedules automatically adopt the new cooldown. Search ordering rotates hourly between relevance, newest and most viewed. `videos.list` separately validates search results. Atomic reservations enforce a conservative 9,000-point daily budget before calls (100 internal points per search, one per metadata batch), including failed attempts. Search allowance is released gradually through the Pacific local-clock day, leaving one point to validate results; stale metadata can use the full allowance independently. Quota days reset at midnight `America/Los_Angeles`, including daylight saving. Acquisition has no public endpoint and never runs on feed requests.
+
+[Google's current quota documentation](https://developers.google.com/youtube/v3/determine_quota_cost) lists 100 search calls/day separately from 10,000 daily units for other endpoints. The internal weighted budget conservatively allows roughly 89 search calls plus metadata checks per day, leaving search headroom; it is not a claim that these are one shared Google quota pool. Verify the actual project's quotas and other consumers before release. Bounded provider failures stop acquisition for the invocation while cached browsing, saving, practice and independent maintenance continue. A late initial deployment or provider outage may use less than the budget: useful acquisition takes priority over spending every available point.
 
 The adapter uses fixed official Google endpoints, allowlisted parameters, a server-only API-key header, 10-second requests, a 512 KB response bound and no followed redirects. It rejects private/unembeddable/live/age-restricted/invalid entries, constrains duration and thumbnail hosts, and retains reported country restrictions. Titles do not determine level/speed/orientation. Topic tags are coarse query-seed labels, not verified semantic classification.
 
@@ -85,7 +87,7 @@ Run typecheck, lint, formatting, unit tests, both builds, `test:d1:migrations`, 
 
 | Check | Result |
 | --- | --- |
-| Unit/integration | 335 passing, including real D1, historical-completion event dates and account-switch migration isolation |
+| Unit/integration | 339 passing, including real D1, historical-completion event dates and account-switch migration isolation |
 | Typecheck, ESLint, Prettier | Passing |
 | Next production / canonical Cloudflare builds | Passing |
 | Persisted native D1 migrations | All twelve applied; ledger/ownership and empty foreign-key check verified |
@@ -95,3 +97,7 @@ Run typecheck, lint, formatting, unit tests, both builds, `test:d1:migrations`, 
 | Visual inspection | Desktop, mobile advanced-filter sheet and dark theme using explicit demonstration metadata/thumbnails |
 
 Provider/player boundaries are mocked or use authored local demo media. These results do not claim live YouTube acquisition, remote inference, a production migration or a deployment. GitHub CI independently runs the complete suites on the PR head.
+
+### Refresh-budget follow-up — 9 October 2026
+
+The 15-minute schedule and higher weighted budget need a code deployment only; migration `0012` is unchanged. Real D1 tests simulate an entire Pacific day, check near-budget acquisition and topic/order variety, deny exhausted-quota network calls, allow final-point stale metadata refresh, adopt existing seed schedules and test summer/winter/DST reset boundaries. The follow-up does not apply production SQL or deploy a Worker.

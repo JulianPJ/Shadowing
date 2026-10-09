@@ -11,7 +11,7 @@ export const worker = defineWorker({
   // Public routing is required when fetching the relay's workers.dev endpoint.
   compatibilityFlags: ['nodejs_compat', 'global_fetch_strictly_public'],
   assets: { notFoundHandling: 'none', runWorkerFirst: ['/demo.mp4'] },
-  triggers: [triggers.scheduled({ schedule: '17 * * * *' })],
+  triggers: [triggers.scheduled({ schedule: '*/15 * * * *' })],
   env: {
     ...cache.env,
     ASSETS: bindings.assets(),

@@ -69,13 +69,22 @@ export function youtubeDataApi(
     }
   }
   return {
-    async search(query: string): Promise<string[]> {
-      if (!query.trim() || query.length > 160) throw new Error('Invalid seed');
+    async search(
+      query: string,
+      order: 'relevance' | 'date' | 'viewCount' = 'relevance',
+    ): Promise<string[]> {
+      if (
+        !query.trim() ||
+        query.length > 160 ||
+        !['relevance', 'date', 'viewCount'].includes(order)
+      )
+        throw new Error('Invalid seed');
       const items = await request(
         'search',
         {
           part: 'id',
           q: query,
+          order,
           type: 'video',
           relevanceLanguage: 'ja',
           regionCode: 'JP',

@@ -11,6 +11,32 @@ import { validateDifficultyAnalysis } from '../difficulty';
 import { TOPICS, type Topic } from './types';
 import { saveVideos } from './catalog';
 import { youtubeDataApi, YoutubeDataError } from './youtube-data-api';
+
+// Conservative internal weights: a search costs 100 points, a metadata batch costs one.
+// This also keeps searches below Google's separate default 100-search/day allowance.
+export const DISCOVER_DAILY_BUDGET = 9000;
+const quotaClock = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'America/Los_Angeles',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+});
+export function youtubeQuotaWindow(now: number) {
+  const parts = Object.fromEntries(quotaClock.formatToParts(now).map((p) => [p.type, p.value]));
+  const minute = Number(parts.hour) * 60 + Number(parts.minute);
+  return {
+    day: `${parts.year}-${parts.month}-${parts.day}`,
+    // Release budget gradually; an outage can catch up in later bounded executions.
+    // Local-clock pacing tolerates DST's skipped/repeated hour; the daily cap stays strict.
+    searchLimit: Math.min(
+      DISCOVER_DAILY_BUDGET - 1,
+      Math.floor(((minute + 15) / 1440) * DISCOVER_DAILY_BUDGET),
+    ),
+  };
+}
 /** Only scheduled execution calls this. Existing validated artifacts are reused without inference. */
 export async function verifyAnalyses(db: D1Database, now = Date.now()) {
   const rows = await db
@@ -114,18 +140,20 @@ export async function refreshCatalog(
     ]);
     try {
       if (apiKey) {
-        const day = time.slice(0, 10);
-        const api = youtubeDataApi(
-          apiKey,
-          fetchImpl,
-          async (units) =>
-            !!(await db
-              .prepare(
-                `INSERT INTO discovery_quota(day,units) VALUES(?,?) ON CONFLICT(day) DO UPDATE SET units=discovery_quota.units+excluded.units WHERE discovery_quota.units+excluded.units<=2000 RETURNING day`,
-              )
-              .bind(day, units)
-              .first()),
-        );
+        const { day, searchLimit } = youtubeQuotaWindow(now);
+        const api = youtubeDataApi(apiKey, fetchImpl, async (units) => {
+          // Searches leave at least one point to validate their results. Stale metadata
+          // can use the full daily allowance independently of search pacing.
+          const limit = units === 100 ? searchLimit : DISCOVER_DAILY_BUDGET;
+          return !!(await db
+            .prepare(
+              `INSERT INTO discovery_quota(day,units) SELECT ?,? WHERE ?<=?
+                ON CONFLICT(day) DO UPDATE SET units=discovery_quota.units+excluded.units
+                WHERE discovery_quota.units+excluded.units<=? RETURNING day`,
+            )
+            .bind(day, units, units, limit, limit)
+            .first());
+        });
         // Refresh stale metadata independently of discovery. Two 50-ID batches per invocation.
         const stale = await db
           .prepare(
@@ -149,18 +177,23 @@ export async function refreshCatalog(
         }
         const seeds = await db
           .prepare(
-            'SELECT id,topic,query FROM discovery_seed_queries WHERE enabled=1 AND next_run_at<=? ORDER BY next_run_at,id LIMIT 2',
+            `SELECT id,topic,query FROM discovery_seed_queries WHERE enabled=1
+            AND (next_run_at<=? OR (last_run_at IS NOT NULL AND last_run_at<=?))
+            ORDER BY COALESCE(last_run_at,'1970-01-01T00:00:00.000Z'),id LIMIT 2`,
           )
-          .bind(time)
+          .bind(time, new Date(now - 3600000).toISOString())
           .all<{ id: string; topic: Topic; query: string }>();
         for (const seed of seeds.results) {
           if (!(seed.topic in TOPICS)) continue;
-          const ids = await api.search(seed.query);
+          const order = (['relevance', 'date', 'viewCount'] as const)[
+            Math.floor(now / 3600000) % 3
+          ];
+          const ids = await api.search(seed.query, order);
           searches++;
           await saveVideos(db, await api.videos(ids, [seed.topic], now));
           await db
             .prepare('UPDATE discovery_seed_queries SET last_run_at=?,next_run_at=? WHERE id=?')
-            .bind(time, new Date(now + 86400000).toISOString(), seed.id)
+            .bind(time, new Date(now + 3600000).toISOString(), seed.id)
             .run();
         }
       }
