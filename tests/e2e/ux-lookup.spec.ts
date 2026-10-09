@@ -90,12 +90,11 @@ test('full forms, sense choice and keyboard/touch phrase lookup retain exact con
   await expect(panel.locator('.dictionary-save-heading')).not.toContainText('にほんご');
 });
 
-test('translation failure permits save only, default study enrolls chosen deck, and retry is duplicate safe', async ({
+test('translation failure preserves Japanese context and add to review is duplicate safe', async ({
   context,
   page,
 }) => {
   const remote = await open(context, page);
-  remote.review.decks.push({ id: 'travel', name: 'Travel', createdAt: '', updatedAt: '' });
   await context.route('**/api/translate', (route) =>
     route.fulfill({ status: 503, json: { error: 'Translation unavailable' } }),
   );
@@ -109,17 +108,15 @@ test('translation failure permits save only, default study enrolls chosen deck, 
   });
   await page.locator('#current-japanese [data-lookup="話せます"]').click();
   const panel = page.getByRole('complementary', { name: 'Save vocabulary' });
-  await expect(panel).toContainText('Sentence translation is unavailable');
+  await panel.getByText('Edit before saving', { exact: true }).click();
   await expect(panel.getByLabel('Vocabulary meaning')).not.toHaveValue('');
   await expect(panel.getByLabel('Source sentence meaning')).toHaveValue('');
-  await panel.getByLabel('Save vocabulary to deck').selectOption('travel');
-  await panel.getByLabel('Vocabulary tag').fill('useful expression');
-  const saveOnly = panel.getByRole('button', { name: 'Save only', exact: true });
+  const saveOnly = panel.getByRole('button', { name: 'Add to review', exact: true });
   await saveOnly.evaluate((button: HTMLButtonElement) => {
     button.click();
     button.click();
   });
-  await expect(panel).toContainText('Saved for reference');
+  await expect(panel).toContainText('In review');
   await expect.poll(() => saves).toBe(1);
   expect(remote.entries).toHaveLength(1);
   expect(remote.entries[0]).toMatchObject({
@@ -127,26 +124,12 @@ test('translation failure permits save only, default study enrolls chosen deck, 
     sourceSentence: sentence,
     sourceSentenceTranslation: '',
   });
-  expect(remote.review.cards).toHaveLength(0);
-  expect(remote.entries[0].tags?.[0]?.name).toBe('useful expression');
-  expect(remote.review.memberships).toContainEqual({
-    deckId: 'travel',
-    entryId: remote.entries[0].id,
-  });
-
-  await panel.getByRole('button', { name: 'Add saved word to study' }).click();
-  await expect(panel.getByRole('button', { name: 'Saved and ready to study' })).toBeDisabled();
   await expect.poll(() => remote.review.cards.length).toBe(1);
   expect(saves).toBe(1);
-  await expect(panel.getByRole('link', { name: 'Study this deck' })).toHaveAttribute(
-    'href',
-    '/review?deck=travel',
-  );
-  // Saving and enrollment do not infer a word knowledge state.
   const records = await page.evaluate(() =>
     JSON.parse(localStorage.getItem('hibiki:v1:account:retention-free:knowledge:records') ?? '[]'),
   );
-  expect(records).toEqual([]);
+  expect(records).toEqual([expect.objectContaining({ lemma: '話せる', state: 'learning' })]);
 });
 
 test('lookup failure offers retry and preserves a typed meaning', async ({ context, page }) => {
@@ -158,74 +141,13 @@ test('lookup failure offers retry and preserves a typed meaning', async ({ conte
   await page.locator('#current-japanese [data-lookup="話せます"]').click();
   const panel = page.getByRole('complementary', { name: 'Save vocabulary' });
   await expect(panel.getByRole('button', { name: 'Retry dictionary lookup' })).toBeVisible();
+  await panel.getByText('Edit before saving', { exact: true }).click();
   await panel.getByLabel('Vocabulary meaning').fill('my contextual meaning');
   unavailable = false;
   await panel.getByRole('button', { name: 'Retry dictionary lookup' }).click();
   await expect(panel.locator('.lexicon-match')).not.toHaveCount(0);
   await expect(panel.getByLabel('Vocabulary meaning')).toHaveValue('my contextual meaning');
-  await expect(panel.getByRole('button', { name: 'Save and study', exact: true })).toBeEnabled();
-});
-
-test('tag failure preserves one saved word and permits save-only recovery without enrolling it', async ({
-  context,
-  page,
-}) => {
-  const remote = await open(context, page);
-  let fail = true;
-  await context.route('**/api/tags', (route) =>
-    route.request().method() === 'POST' && fail
-      ? route.fulfill({ status: 503, json: { error: 'Tag service unavailable' } })
-      : route.fallback(),
-  );
-  await page.locator('#current-japanese [data-lookup="話せます"]').click();
-  const panel = page.getByRole('complementary', { name: 'Save vocabulary' });
-  await panel.getByLabel('Vocabulary tag').fill('practice');
-  await panel.getByRole('button', { name: 'Save and study', exact: true }).click();
-  await expect(panel.getByRole('alert')).toContainText('The word is saved');
-  expect(remote.entries).toHaveLength(1);
-  expect(remote.review.cards).toHaveLength(0);
-  fail = false;
-  await panel.getByRole('button', { name: 'Save only', exact: true }).click();
-  await expect(panel).toContainText('Saved for reference');
-  expect(remote.entries).toHaveLength(1);
-  expect(remote.review.cards).toHaveLength(0);
-  expect(remote.entries[0].tags?.[0]?.name).toBe('practice');
-});
-
-test('rejected deck enrollment clears the ready claim and allows enrollment in a surviving deck', async ({
-  context,
-  page,
-}) => {
-  const remote = await open(context, page);
-  remote.review.decks.push({ id: 'deleted', name: 'Temporary', createdAt: '', updatedAt: '' });
-  await context.route('**/api/review', (route) => {
-    if (
-      route.request().method() === 'POST' &&
-      route.request().postDataJSON().deckId === 'deleted'
-    ) {
-      remote.review.decks = remote.review.decks.filter((deck) => deck.id !== 'deleted');
-      return route.fulfill({
-        status: 409,
-        json: { code: 'review-conflict', error: 'The deck was removed.' },
-      });
-    }
-    return route.fallback();
-  });
-  await page.locator('#current-japanese [data-lookup="話せます"]').click();
-  const panel = page.getByRole('complementary', { name: 'Save vocabulary' });
-  await panel.getByLabel('Save vocabulary to deck').selectOption('deleted');
-  await panel.getByRole('button', { name: 'Save and study', exact: true }).click();
-  await expect(panel.getByRole('alert')).toContainText('The word is saved');
-  await expect(panel.getByRole('link', { name: 'Study this deck' })).toHaveCount(0);
-  await expect(panel.getByRole('button', { name: 'Saved and ready to study' })).toHaveCount(0);
-  await panel.getByLabel('Save vocabulary to deck').selectOption('inbox');
-  await panel.getByRole('button', { name: 'Add saved word to study' }).click();
-  await expect.poll(() => remote.review.cards.length).toBe(1);
-  await expect(panel.getByRole('link', { name: 'Study this deck' })).toHaveAttribute(
-    'href',
-    '/review?deck=inbox',
-  );
-  expect(remote.entries).toHaveLength(1);
+  await expect(panel.getByRole('button', { name: 'Add to review', exact: true })).toBeEnabled();
 });
 
 test('a chosen lexical sense and retry preserve one contextual saved word', async ({
@@ -258,14 +180,15 @@ test('a chosen lexical sense and retry preserve one contextual saved word', asyn
     'aria-pressed',
     'true',
   );
+  await panel.getByText('Edit before saving', { exact: true }).click();
   await expect(panel.getByLabel('Vocabulary meaning')).toHaveValue(meaning);
   await panel.getByLabel('Source sentence meaning').fill('The voice rose.');
-  await panel.getByRole('button', { name: 'Save only', exact: true }).click();
+  await panel.getByRole('button', { name: 'Add to review', exact: true }).click();
   await expect(panel.getByRole('alert')).toContainText('Saving is temporarily unavailable');
   await expect(panel.getByLabel('Vocabulary meaning')).toHaveValue(meaning);
   fail = false;
-  await panel.getByRole('button', { name: 'Save only', exact: true }).click();
-  await expect(panel).toContainText('Saved for reference');
+  await panel.getByRole('button', { name: 'Add to review', exact: true }).click();
+  await expect(panel).toContainText('In review');
   expect(remote.entries).toHaveLength(1);
   expect(remote.entries[0]).toMatchObject({
     term: '上がる',

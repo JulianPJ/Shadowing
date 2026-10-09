@@ -11,7 +11,7 @@ import {
 } from '../src/lib/dictionary/validation';
 import type { Lesson } from '../src/lib/types';
 import { createD1DictionaryRepository } from '../src/lib/dictionary/repository';
-import { localProgressDatabase } from '../src/lib/sync/local-database';
+import { localProgressDatabase } from './helpers/sqlite-d1';
 
 const baseEntry = {
   schemaVersion: 1 as const,

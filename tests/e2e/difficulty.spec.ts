@@ -4,7 +4,8 @@ import demo from '../../src/data/demo.json' with { type: 'json' };
 import authored from '../../src/data/demo-difficulty.json' with { type: 'json' };
 import questions from '../../src/data/demo-quiz.json' with { type: 'json' };
 import { createDifficultyAnalysis } from '../../src/lib/difficulty';
-import { createQuiz, transcriptRevision } from '../../src/lib/quiz';
+import { createQuiz } from '../../src/lib/quiz/document';
+import { transcriptRevision } from '../../src/lib/transcript';
 import type { Lesson } from '../../src/lib/types';
 import { mockProAccount, proStorageKey } from '../helpers/pro-account';
 

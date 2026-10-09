@@ -279,7 +279,7 @@ The intended UX change is a continuous loop rather than separate feature pages:
 
 ## Recommended build order
 
-Implementation status: **Phases A–D implemented**. Phase A's A.2 contracts remain documented in [retention](retention-implementation.md). The integrated B–D implementation adds licensed lexical lookup and cumulative word knowledge, explicit speaking drills/diagnostics, and personal library/report/discovery surfaces: [implementation and verification](post-mvp-phases-b-d.md). Fit thresholds and recognizer quality remain calibration work; optional Grammar Coach/conversation, AnkiConnect/APKG, inline review playback and broader content capture remain separate follow-up work.
+Implementation status: **Phases A–D implemented**. Phases B–D add licensed lexical lookup and cumulative word knowledge, speaking drills and diagnostics, and personal library, report and discovery surfaces. Decks and tags from Phase A were later folded into one vocabulary model ([vocabulary](vocabulary.md)). Fit thresholds and recognizer quality remain calibration work; optional Grammar Coach/conversation, AnkiConnect/APKG, inline review playback and broader content capture remain separate follow-up work.
 
 ### Phase A — close the retention loop
 

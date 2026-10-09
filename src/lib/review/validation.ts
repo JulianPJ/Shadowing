@@ -11,27 +11,20 @@ export function validateReviewOperation(value: unknown): ReviewOperation {
     Number.isFinite(Date.parse(x));
   let valid = false;
   switch (v.action) {
-    case 'deck':
-      valid =
-        id(v.id) &&
-        v.id !== 'inbox' &&
-        typeof v.name === 'string' &&
-        v.name.trim().length > 0 &&
-        v.name.length <= 80;
-      break;
-    case 'delete-deck':
-      valid = id(v.deckId) && v.deckId !== 'inbox';
-      break;
-    case 'membership':
-      valid = id(v.deckId) && ids(v.entryIds) && typeof v.remove === 'boolean';
-      break;
     case 'enroll':
+      // Operations queued before decks were removed may still carry a deckId; it is ignored.
       valid =
-        id(v.deckId) &&
+        (v.deckId === undefined || id(v.deckId)) &&
         ids(v.entryIds) &&
         typeof v.enrolledAt === 'string' &&
         Number.isFinite(Date.parse(v.enrolledAt)) &&
         Date.parse(v.enrolledAt) <= Date.now() + 300000;
+      if (valid)
+        return {
+          action: 'enroll',
+          entryIds: v.entryIds as string[],
+          enrolledAt: v.enrolledAt as string,
+        };
       break;
     case 'suspend':
       valid = id(v.operationId) && id(v.entryId) && revision;

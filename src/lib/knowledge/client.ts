@@ -1,9 +1,11 @@
 'use client';
 import { readStorage, writeStorage, storageAccount } from '../storage/browser';
-import { syncStatus, subscribeSync } from '../sync/client';
-import { channelStatus, reportChannel, syncFailure } from '../sync/channel-status';
+import { createSyncChannel } from '../sync/channel';
 import { mergeKnowledge, normalizeLemma, validateKnowledgeRecord } from './validation';
 import type { KnowledgeStates, WordKnowledgeRecord, WordState, KnowledgePage } from './types';
+
+const SYNCED_THROUGH_KEY = 'knowledge:synced-through';
+const PULL_OVERLAP_MS = 60_000;
 
 export function loadKnowledge(): KnowledgeStates {
   const raw = readStorage<unknown>('knowledge:records', []);
@@ -17,14 +19,6 @@ export function knowledgePending() {
   return outbox().length;
 }
 function publish() {
-  const owner = storageAccount();
-  if (owner) {
-    const pending = knowledgePending();
-    reportChannel(owner, 'knowledge', {
-      pending,
-      ...(pending && channelStatus().knowledge.state === 'saved' ? { state: 'pending' } : {}),
-    });
-  }
   if (typeof window !== 'undefined') window.dispatchEvent(new Event('hibiki:knowledge-change'));
 }
 /** Called only after the existing first-login device import consent is accepted. */
@@ -65,56 +59,30 @@ export function markWords(words: { lemma: string; reading?: string | null }[], s
   publish();
   if (storageAccount()) void syncWordKnowledge();
 }
-let runningOwner: string | null = null,
-  rerun = false;
-export async function syncWordKnowledge() {
-  const owner = storageAccount(),
-    user = syncStatus().user;
-  if (!owner || user?.id !== owner) return;
-  if (!user.emailVerified) {
-    reportChannel(owner, 'knowledge', {
-      state: 'auth',
-      pending: knowledgePending(),
-      message: 'Verify your email to sync word knowledge.',
-    });
-    return;
-  }
-  if (runningOwner) {
-    rerun = true;
-    return;
-  }
-  runningOwner = owner;
-  reportChannel(owner, 'knowledge', { state: 'syncing', pending: knowledgePending(), message: '' });
-  const validOwner = () => storageAccount() === owner && syncStatus().user?.id === owner;
-  async function request(cursor?: string | null, records?: WordKnowledgeRecord[]) {
-    const response = await fetch(
-      '/api/knowledge' + (cursor ? '?cursor=' + encodeURIComponent(cursor) : ''),
-      {
-        method: records ? 'POST' : 'GET',
-        credentials: 'same-origin',
-        cache: 'no-store',
-        headers: {
-          'X-Hibiki-Account': owner!,
-          ...(records ? { 'Content-Type': 'application/json' } : {}),
-        },
-        body: records ? JSON.stringify({ records }) : undefined,
-        signal: AbortSignal.timeout(15000),
-      },
-    );
-    if (!validOwner()) throw new Error('Account changed');
-    if (!response.ok)
-      throw Object.assign(new Error('Word sync unavailable'), { status: response.status });
-    const data = await response.json();
-    if (!validOwner()) throw new Error('Account changed');
-    return data;
-  }
-  try {
+
+function persistRecords(records: WordKnowledgeRecord[]) {
+  if (
+    !writeStorage(
+      'knowledge:records',
+      Object.values(mergeKnowledge(records, Object.values(loadKnowledge()))),
+    )
+  )
+    throw new Error('Word states could not be saved on this device.');
+}
+
+export const knowledgeSync = createSyncChannel({
+  channel: 'knowledge',
+  pending: knowledgePending,
+  async run({ request }) {
     const pending = outbox();
     for (let offset = 0; offset < pending.length; offset += 100) {
-      if (!validOwner()) return;
       const batch = pending.slice(offset, offset + 100);
-      await request(null, batch);
-      if (!validOwner()) return;
+      const accepted = await request<{ records?: unknown[] }>('/api/knowledge', {
+        body: { records: batch },
+      });
+      // Adopt the server's value for each upload, including ones a newer device write beat.
+      const stored = (accepted.records ?? []).map(validateKnowledgeRecord);
+      if (stored.length) persistRecords(stored);
       const sent = new Map(batch.map((record) => [record.lemma, record.updatedAt]));
       writeStorage(
         'knowledge:outbox',
@@ -122,74 +90,36 @@ export async function syncWordKnowledge() {
       );
       publish();
     }
+    // Pull only what the server changed since the previous pull. The overlap re-reads writes
+    // committed while that pull was running; merging is idempotent last-writer-wins.
+    const previous = readStorage<string | null>(SYNCED_THROUGH_KEY, null);
+    const since =
+      previous && Number.isFinite(Date.parse(previous))
+        ? new Date(Date.parse(previous) - PULL_OVERLAP_MS).toISOString()
+        : null;
     let cursor: string | null = null;
+    let syncedThrough: string | null = null;
     const records: WordKnowledgeRecord[] = [];
     let pages = 0;
     do {
-      if (!validOwner()) return;
-      const page = (await request(cursor)) as KnowledgePage;
+      const query = new URLSearchParams({
+        ...(cursor ? { cursor } : {}),
+        ...(since ? { since } : {}),
+      }).toString();
+      const page: KnowledgePage = await request('/api/knowledge' + (query ? '?' + query : ''));
+      syncedThrough ??= page.syncedThrough ?? null;
       records.push(...page.records.map(validateKnowledgeRecord));
       if (++pages > 1000 || records.length > 250000)
         throw new Error('Word state collection too large');
       if (page.nextCursor === cursor && cursor) throw new Error('Invalid word state cursor');
       cursor = page.nextCursor;
     } while (cursor);
-    if (!validOwner()) return;
-    writeStorage(
-      'knowledge:records',
-      Object.values(mergeKnowledge(records, Object.values(loadKnowledge()))),
-    );
+    if (records.length) persistRecords(records);
+    // Only advance the watermark once the pulled records are durably stored.
+    if (syncedThrough) writeStorage(SYNCED_THROUGH_KEY, syncedThrough);
     publish();
-    reportChannel(owner, 'knowledge', {
-      state: knowledgePending() ? 'pending' : 'saved',
-      pending: knowledgePending(),
-      lastSync: new Date().toISOString(),
-      message: '',
-    });
-  } catch (error) {
-    if (validOwner())
-      reportChannel(owner, 'knowledge', { ...syncFailure(error), pending: knowledgePending() });
-  } finally {
-    runningOwner = null;
-    if (rerun) {
-      rerun = false;
-      void syncWordKnowledge();
-    }
-  }
-}
-let started = false;
-export function startKnowledgeSync() {
-  if (started) return () => {};
-  started = true;
-  let identity = '';
-  const changed = () => {
-    const user = syncStatus().user;
-    const current = `${storageAccount() ?? ''}:${user?.id ?? ''}:${user?.emailVerified ?? false}`;
-    if (current !== identity) {
-      identity = current;
-      publish();
-      void syncWordKnowledge();
-    }
-  };
-  const hydrate = () => {
-    publish();
-    void syncWordKnowledge();
-  };
-  const storage = (event: StorageEvent) => {
-    if (event.key?.includes(':knowledge:')) hydrate();
-  };
-  const unsubscribe = subscribeSync(changed);
-  window.addEventListener('hibiki:sync-hydrated', hydrate);
-  window.addEventListener('online', hydrate);
-  window.addEventListener('focus', hydrate);
-  window.addEventListener('storage', storage);
-  changed();
-  return () => {
-    started = false;
-    unsubscribe();
-    window.removeEventListener('hibiki:sync-hydrated', hydrate);
-    window.removeEventListener('online', hydrate);
-    window.removeEventListener('focus', hydrate);
-    window.removeEventListener('storage', storage);
-  };
-}
+  },
+});
+
+/** Pushes local word states and pulls remote changes. Failures stay queued for the next run. */
+export const syncWordKnowledge = () => knowledgeSync.sync().catch(() => {});

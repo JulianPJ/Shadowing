@@ -51,6 +51,13 @@ let applying = false,
   initialized = false;
 let timer: ReturnType<typeof setTimeout> | undefined;
 let generation = 0;
+// Focus, reconnect and the account poll reuse a recent full sync unless local changes are pending.
+const LEARNER_FRESH_MS = 5 * 60_000;
+let lastSynced: { owner: string; at: number } | null = null;
+const fresh = (owner: string) =>
+  lastSynced?.owner === owner &&
+  Date.now() - lastSynced.at < LEARNER_FRESH_MS &&
+  !readStorage('sync:pending', false);
 export const syncStatus = () => status;
 export const subscribeSync = (callback: () => void) => {
   listeners.add(callback);
@@ -64,14 +71,13 @@ function publish(patch: Partial<SyncStatus>) {
   if (status.user && patch.state) {
     reportChannel(status.user.id, 'learner', {
       state: patch.state === 'attention' ? 'error' : patch.state === 'local' ? 'idle' : patch.state,
-      pending: readStorage('sync:pending', false) ? 1 : 0,
-      lastSync: status.lastSync,
       message: status.error,
     });
   }
   for (const listener of listeners) listener();
 }
 function failed(error: unknown) {
+  lastSynced = null;
   const failure = syncFailure(error);
   publish({
     loaded: true,
@@ -128,6 +134,7 @@ export async function refreshAccount() {
     };
     if (ticket !== generation) return;
     if (info.user?.id !== storageAccount()) {
+      lastSynced = null;
       // Freeze anonymous eligibility before switching. Declined data remains in its own namespace.
       let anonymous: SyncData | null = null;
       let anonymousKnowledge: WordKnowledgeRecord[] = [];
@@ -151,6 +158,7 @@ export async function refreshAccount() {
       applying = false;
     }
     const saved = readStorage<string | null>('sync:last', null);
+    const skip = !!info.user && fresh(info.user.id);
     publish({
       user: info.user,
       loaded: true,
@@ -158,14 +166,15 @@ export async function refreshAccount() {
       googleEnabled: info.googleEnabled,
       emailEnabled: info.emailEnabled,
       lastSync: saved,
-      state: info.user ? 'syncing' : 'local',
+      state: info.user ? (skip ? status.state : 'syncing') : 'local',
       importPending:
         !!info.user &&
         !!readStorage('sync:import-candidate', null) &&
         !readStorage('sync:import-decision', null),
     });
-    if (info.user) await synchronize();
-    else window.dispatchEvent(new Event('hibiki:sync-hydrated'));
+    if (info.user) {
+      if (!skip) await synchronize();
+    } else window.dispatchEvent(new Event('hibiki:sync-hydrated'));
   } catch (error) {
     if (ticket === generation) failed(error);
   }
@@ -282,6 +291,7 @@ export async function synchronize() {
     if (storageAccount() !== owner || ticket !== generation) return;
     const lastSync = new Date().toISOString();
     writeStorage('sync:last', lastSync);
+    lastSynced = { owner, at: Date.now() };
     if (!rerun) writeStorage('sync:pending', false);
     if (readStorage('sync:import-decision', null) === 'accepted')
       writeStorage('sync:import-complete', true);

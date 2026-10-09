@@ -14,9 +14,11 @@ import { emptySync, type SyncData } from '../src/lib/sync/types';
 import { mergeSync } from '../src/lib/sync/merge';
 import { validateSync } from '../src/lib/sync/validation';
 import { sanitizeDeviceData } from '../src/lib/sync/sanitize';
-import { lessonIdentity, createSession } from '../src/lib/learner-progress';
+import { lessonIdentity } from '../src/lib/learner/constants';
+import { createSession } from '../src/lib/learner/sessions';
 import { transcriptKey } from '../src/lib/transcript';
-import { createQuiz, newAttempt, updateAttempt } from '../src/lib/quiz';
+import { createQuiz } from '../src/lib/quiz/document';
+import { newAttempt, updateAttempt } from '../src/lib/quiz/attempts';
 import { verifyAttempt } from '../src/lib/sync/quiz-verification';
 import demo from '../src/data/demo.json';
 import demoQuiz from '../src/data/demo-quiz.json';
@@ -82,7 +84,7 @@ before(async () => {
   });
   repo = createD1UserProgressRepository(db);
   access = createD1AccessRepository(db);
-  api = accountHandler(auth, repo, env, db, undefined, access);
+  api = accountHandler({ auth, progress: repo, env, db, access });
   data = emptySync();
   const key = await transcriptKey(demo),
     identity = lessonIdentity(demo as Lesson, key),
@@ -211,6 +213,7 @@ test('real email sign-in accepts validated learning callbacks and rejects extern
   const destination = '/practice/demo?section=segment-2&lookup=%E6%97%A5%E6%9C%AC%E8%AA%9E';
   assert.equal(allowedAuthRedirect(destination, env.AUTH_BASE_URL), true);
   assert.equal(allowedAuthRedirect('/dictionary?view=decks', env.AUTH_BASE_URL), true);
+  assert.equal(allowedAuthRedirect('/profile', env.AUTH_BASE_URL), true);
   for (const invalid of [
     'https://evil.example/account',
     '/api/auth/sign-out',

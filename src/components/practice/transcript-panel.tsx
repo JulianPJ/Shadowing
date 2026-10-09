@@ -1,7 +1,7 @@
 'use client';
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type Ref } from 'react';
 import { Bookmark, Search, AudioLines, Play } from 'lucide-react';
-import type { Lesson, Mode } from '@/lib/types';
+import type { Lesson, Mode, Segment } from '@/lib/types';
 import { timestamp } from '@/lib/youtube';
 import { JapaneseText } from '../japanese-text';
 import { DictionarySavePanel } from '../dictionary-save';
@@ -39,6 +39,17 @@ export const TranscriptPanel = memo(function TranscriptPanel({
   const activeRow = useRef<HTMLDivElement>(null);
   const [lookup, setLookup] = useState<{ segmentId: string; term: string } | null>(null);
   const savedIds = useMemo(() => new Set(favorites), [favorites]);
+  // Rows are memoized; route their actions through stable callbacks.
+  const navigateRef = useRef(navigate);
+  useEffect(() => {
+    navigateRef.current = navigate;
+  }, [navigate]);
+  const play = useCallback((target: number) => navigateRef.current(target, true), []);
+  const openLookup = useCallback(
+    (segmentId: string, term: string) => setLookup({ segmentId, term }),
+    [],
+  );
+  const closeLookup = useCallback(() => setLookup(null), []);
   const filtered = useMemo(() => {
     const phrase = search.trim();
     return lesson.segments
@@ -122,52 +133,21 @@ export const TranscriptPanel = memo(function TranscriptPanel({
       >
         <div>
           {filtered.map((item) => (
-            <div
+            <TranscriptRow
               key={item.segment.id}
               ref={item.index === index ? activeRow : undefined}
-              aria-current={item.index === index ? 'true' : undefined}
-              className={`transcript-row ${item.index === index ? 'current' : ''}`}
-            >
-              <button
-                className="transcript-play"
-                data-testid={`transcript-${item.index}`}
-                aria-label={`Play section ${item.index + 1} at ${timestamp(item.segment.start)}`}
-                disabled={recording || !ready}
-                onClick={() => navigate(item.index, true)}
-              >
-                <span className="row-number" aria-hidden="true">
-                  {item.index === index ? <AudioLines size={16} /> : <Play size={15} />}
-                </span>
-                <span className="row-time">
-                  {timestamp(item.segment.start)}
-                  {savedIds.has(item.segment.id) ? (
-                    <Bookmark size={11} fill="currentColor" />
-                  ) : null}
-                </span>
-              </button>
-              <div className="row-content">
-                <span lang="ja">
-                  <JapaneseText
-                    text={item.segment.japanese}
-                    furigana={furigana}
-                    highlightWords
-                    analysisPriority="background"
-                    onLookup={(term) => setLookup({ segmentId: item.segment.id, term })}
-                  />
-                </span>
-                {lookup?.segmentId === item.segment.id ? (
-                  <DictionarySavePanel
-                    key={`${item.segment.id}:${lookup.term}`}
-                    term={lookup.term}
-                    lesson={lesson}
-                    segment={item.segment}
-                    sourceTranslation={item.segment.translation}
-                    onClose={() => setLookup(null)}
-                  />
-                ) : null}
-              </div>
-              {item.index === index ? <span className="active-dot" /> : null}
-            </div>
+              lesson={lesson}
+              segment={item.segment}
+              index={item.index}
+              current={item.index === index}
+              saved={savedIds.has(item.segment.id)}
+              disabled={recording || !ready}
+              furigana={furigana}
+              lookupTerm={lookup?.segmentId === item.segment.id ? lookup.term : null}
+              onPlay={play}
+              onLookup={openLookup}
+              onCloseLookup={closeLookup}
+            />
           ))}
         </div>
         {!filtered.length ? (
@@ -188,5 +168,80 @@ export const TranscriptPanel = memo(function TranscriptPanel({
         <span>{practiceCount ? `${practiceCount} repetitions` : 'Your own pace'}</span>
       </div>
     </aside>
+  );
+});
+
+type TranscriptRowProps = {
+  ref?: Ref<HTMLDivElement>;
+  lesson: Lesson;
+  segment: Segment;
+  index: number;
+  current: boolean;
+  saved: boolean;
+  disabled: boolean;
+  furigana: boolean;
+  lookupTerm: string | null;
+  onPlay: (index: number) => void;
+  onLookup: (segmentId: string, term: string) => void;
+  onCloseLookup: () => void;
+};
+const TranscriptRow = memo(function TranscriptRow({
+  ref,
+  lesson,
+  segment,
+  index,
+  current,
+  saved,
+  disabled,
+  furigana,
+  lookupTerm,
+  onPlay,
+  onLookup,
+  onCloseLookup,
+}: TranscriptRowProps) {
+  return (
+    <div
+      ref={ref}
+      aria-current={current ? 'true' : undefined}
+      className={`transcript-row ${current ? 'current' : ''}`}
+    >
+      <button
+        className="transcript-play"
+        data-testid={`transcript-${index}`}
+        aria-label={`Play section ${index + 1} at ${timestamp(segment.start)}`}
+        disabled={disabled}
+        onClick={() => onPlay(index)}
+      >
+        <span className="row-number" aria-hidden="true">
+          {current ? <AudioLines size={16} /> : <Play size={15} />}
+        </span>
+        <span className="row-time">
+          {timestamp(segment.start)}
+          {saved ? <Bookmark size={11} fill="currentColor" /> : null}
+        </span>
+      </button>
+      <div className="row-content">
+        <span lang="ja">
+          <JapaneseText
+            text={segment.japanese}
+            furigana={furigana}
+            highlightWords
+            analysisPriority="background"
+            onLookup={(term) => onLookup(segment.id, term)}
+          />
+        </span>
+        {lookupTerm !== null ? (
+          <DictionarySavePanel
+            key={`${segment.id}:${lookupTerm}`}
+            term={lookupTerm}
+            lesson={lesson}
+            segment={segment}
+            sourceTranslation={segment.translation}
+            onClose={onCloseLookup}
+          />
+        ) : null}
+      </div>
+      {current ? <span className="active-dot" /> : null}
+    </div>
   );
 });

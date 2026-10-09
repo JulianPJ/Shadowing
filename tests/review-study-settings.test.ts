@@ -1,25 +1,16 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { newReview } from '../src/lib/review-scheduler';
-import { limitStudyQueue, studyLimits, type StudySettings } from '../src/lib/review/study-settings';
+import {
+  limitStudyQueue,
+  loadStudyLimits,
+  saveStudyLimits,
+} from '../src/lib/review/study-settings';
 import type { ReviewEvent } from '../src/lib/review/history';
+import { installMemoryStorage } from './helpers/memory-storage';
+import { readStorage, writeStorage } from '../src/lib/storage/browser';
 const at = '2026-10-07T12:00:00.000Z';
-const settings: StudySettings = {
-  defaults: { new: 20, review: 100 },
-  decks: { travel: { new: 5, review: 50 } },
-  extensions: {},
-};
-test('daily defaults, per-deck overrides and today-only extension never alter schedules', () => {
-  assert.deepEqual(studyLimits(settings, 'all', '2026-10-07'), { new: 20, review: 100 });
-  assert.deepEqual(studyLimits(settings, 'travel', '2026-10-07'), { new: 5, review: 50 });
-  const extended = { ...settings, extensions: { travel: '2026-10-07' } };
-  assert.deepEqual(studyLimits(extended, 'travel', '2026-10-07'), { new: null, review: null });
-  assert.deepEqual(studyLimits(extended, 'travel', '2026-10-08'), { new: 5, review: 50 });
-  assert.deepEqual(
-    studyLimits({ ...settings, extensions: { all: '2026-10-07' } }, 'travel', '2026-10-07'),
-    { new: null, review: null },
-  );
-});
+
 test('unlimited queue includes more than 20 due cards and still excludes future/suspended cards', () => {
   const cards = Array.from({ length: 45 }, (_, i) => newReview(`word-${i}`, at));
   cards.push({ ...newReview('tomorrow', at), dueAt: '2026-10-08T12:00:00.000Z' });
@@ -28,7 +19,8 @@ test('unlimited queue includes more than 20 due cards and still excludes future/
   assert.equal(limitStudyQueue(cards, [], at, { new: null, review: null }).cards.length, 45);
   assert.deepEqual(cards, copy);
 });
-test('allowances count unique graded cards including those no longer due; learning retries stay available', () => {
+
+test('allowances count unique graded cards today, including deleted words; learning retries stay available', () => {
   const cards = Array.from({ length: 6 }, (_, i) => newReview(`word-${i}`, at));
   cards[0] = { ...cards[0], status: 'review', dueAt: '2026-10-11T12:00:00.000Z' };
   cards[1] = { ...cards[1], status: 'learning' };
@@ -49,13 +41,6 @@ test('allowances count unique graded cards including those no longer due; learni
       status: 'learning',
     },
     {
-      operationId: 'other-deck',
-      entryId: 'unrelated',
-      grade: 'good',
-      reviewedAt: at,
-      status: 'new',
-    },
-    {
       operationId: 'yesterday',
       entryId: 'word-2',
       grade: 'good',
@@ -69,100 +54,36 @@ test('allowances count unique graded cards including those no longer due; learni
     result.cards.map((card) => card.entryId),
     ['word-1', 'word-2'],
   );
-});
-
-test('all-decks queue honours deck overrides and counts words in multiple collections once', async () => {
-  const { limitDeckStudyQueue } = await import('../src/lib/review/study-settings');
-  const cards = Array.from({ length: 5 }, (_, i) => newReview(`word-${i}`, at));
-  const memberships = cards.flatMap((card) => [
-    { entryId: card.entryId, deckId: 'travel' },
-    { entryId: card.entryId, deckId: 'inbox' },
-  ]);
-  const constrained = { ...settings, decks: { travel: { new: 2, review: 50 } } };
-  const result = limitDeckStudyQueue(cards, memberships, [], at, constrained, 'all');
-  assert.equal(result.cards.length, 2);
-  assert.equal(new Set(result.cards.map((card) => card.entryId)).size, 2);
-  assert.equal(
-    limitDeckStudyQueue(
-      cards,
-      memberships,
-      [],
-      at,
-      { ...constrained, extensions: { all: '2026-10-07' } },
-      'all',
-    ).cards.length,
-    5,
-  );
-});
-
-test('deleting a previously rated word does not reset the global daily allowance', async () => {
-  const { limitDeckStudyQueue } = await import('../src/lib/review/study-settings');
-  const cards = [newReview('remaining', at)];
-  const history: ReviewEvent[] = [
-    {
-      operationId: 'deleted-grade',
-      entryId: 'deleted',
-      grade: 'easy',
-      reviewedAt: at,
-      status: 'new',
-    },
-  ];
-  const limited = limitDeckStudyQueue(
-    cards,
-    [],
-    history,
-    at,
-    { ...settings, defaults: { new: 1, review: null } },
-    'all',
-  );
-  assert.equal(limited.cards.length, 0);
-  assert.deepEqual(limited.reviewed, { new: 1, review: 0 });
-});
-
-test('an exhausted deck never consumes the global allowance before other due decks can enter', async () => {
-  const { limitDeckStudyQueue } = await import('../src/lib/review/study-settings');
-  const cards = Array.from({ length: 4 }, (_, i) => newReview(`word-${i}`, at));
-  const memberships = [
-    { entryId: 'word-0', deckId: 'blocked' },
-    { entryId: 'word-1', deckId: 'blocked' },
-  ];
-  const result = limitDeckStudyQueue(
-    cards,
-    memberships,
-    [],
-    at,
-    {
-      defaults: { new: 2, review: null },
-      decks: { blocked: { new: 0, review: null } },
-      extensions: {},
-    },
-    'all',
-  );
-  assert.deepEqual(
-    result.cards.map((card) => card.entryId),
-    ['word-2', 'word-3'],
-  );
-});
-
-test('overlapping deck quotas charge admitted cards once and keep unused capacity available', async () => {
-  const { limitDeckStudyQueue } = await import('../src/lib/review/study-settings');
-  const cards = Array.from({ length: 4 }, (_, i) => newReview(`word-${i}`, at));
-  const memberships = [
-    { entryId: 'word-0', deckId: 'travel' },
-    { entryId: 'word-0', deckId: 'blocked' },
-    { entryId: 'word-1', deckId: 'travel' },
-    { entryId: 'word-2', deckId: 'travel' },
-  ];
-  const options = {
-    defaults: { new: 3, review: null },
-    decks: { travel: { new: 2, review: null }, blocked: { new: 0, review: null } },
-    extensions: {},
+  // A deleted word's rating still used today's allowance.
+  const deleted: ReviewEvent = {
+    operationId: 'deleted-grade',
+    entryId: 'deleted',
+    grade: 'easy',
+    reviewedAt: at,
+    status: 'new',
   };
-  const original = structuredClone({ cards, memberships, options });
-  const result = limitDeckStudyQueue(cards, memberships, [], at, options, 'all');
+  const exhausted = limitStudyQueue(cards, [...history, deleted], at, { new: 2, review: 0 });
+  assert.deepEqual(exhausted.reviewed, { new: 2, review: 0 });
   assert.deepEqual(
-    result.cards.map((card) => card.entryId),
-    ['word-1', 'word-2', 'word-3'],
+    exhausted.cards.map((card) => card.entryId),
+    ['word-1'],
   );
-  assert.deepEqual({ cards, memberships, options }, original);
+});
+
+test('one daily limit is stored in synced preferences and ignores legacy deck overrides', () => {
+  installMemoryStorage();
+  assert.deepEqual(loadStudyLimits(), { new: null, review: null });
+  // Device-only settings from before limits synced are still read once.
+  writeStorage('review:study-settings', {
+    defaults: { new: 7, review: null },
+    decks: { travel: { new: 1, review: 1 } },
+    extensions: { travel: '2026-10-07' },
+  });
+  assert.deepEqual(loadStudyLimits(), { new: 7, review: null });
+  saveStudyLimits({ new: 15, review: 200 });
+  assert.deepEqual(readStorage<{ reviewLimits?: unknown }>('preferences', {}).reviewLimits, {
+    defaults: { new: 15, review: 200 },
+    decks: {},
+  });
+  assert.deepEqual(loadStudyLimits(), { new: 15, review: 200 });
 });

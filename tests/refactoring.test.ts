@@ -4,7 +4,7 @@ import demo from '../src/data/demo.json';
 import type { Lesson, Segment } from '../src/lib/types';
 import { createSectionLookup } from '../src/lib/section-lookup';
 import { BodyLimitError, readBoundedText } from '../src/lib/http-body';
-import { saveLesson, loadLesson, recentLessons } from '../src/lib/storage';
+import { saveLesson, loadLesson, recentLessons } from '../src/lib/storage/lessons';
 import { installMemoryStorage } from './helpers/memory-storage';
 import { handleTranslationRequest } from '../src/lib/translation-api';
 import { createPrepareHandler } from '../src/lib/prepare';

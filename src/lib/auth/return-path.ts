@@ -12,7 +12,7 @@ export function safeReturnPath(value: string | null | undefined, fallback = '/ac
     const url = new URL(value, 'https://hibiki.invalid');
     if (url.origin !== 'https://hibiki.invalid') return fallback;
     if (
-      !/^\/(?:$|practice\/[^/]+$|discover$|prepare$|library$|progress$|dictionary$|words$|review$|account$)/.test(
+      !/^\/(?:$|practice\/[^/]+$|discover$|prepare$|library$|progress$|profile$|dictionary$|words$|review$|account$)/.test(
         url.pathname,
       )
     )

@@ -30,7 +30,9 @@ export async function dictionarySource(
     segmentId: segment.id,
     lessonTitle: lesson.title,
     lessonAuthor: lesson.author,
-    mediaType: media.type,
+    // Web-page media plays only through the page's own tab, so, like a local file, a saved word
+    // replays through its Hibiki lesson rather than a media link.
+    mediaType: media.type === 'page' ? 'local' : media.type,
     mediaId,
     mediaUrl,
     mediaContentKey,

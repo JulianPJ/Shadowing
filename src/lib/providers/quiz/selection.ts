@@ -1,4 +1,4 @@
-import { object } from '../../quiz';
+import { object } from '../../transcript-validation';
 import type { QuestionKind, QuizLesson, Segment } from '../../types';
 import { runWorkersAi, type WorkersAiBindingLike } from '../workers-ai';
 import {

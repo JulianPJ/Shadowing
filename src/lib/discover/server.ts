@@ -1,10 +1,15 @@
 import { readBoundedText, BodyLimitError } from '../http-body';
 import { storageEvent } from '../d1';
-import { EMPTY_CONTEXT, type Database } from './types';
+import { EMPTY_CONTEXT, type Database, type Video } from './types';
 import { normalizeFilters, validateContext } from './validation';
 import { readCatalog } from './catalog';
 import { buildFeed } from './rank';
-export async function handleFeedRequest(request: Request, db?: Database, region = 'JP') {
+export async function handleFeedRequest(
+  request: Request,
+  db?: Database,
+  region = 'JP',
+  read: (db: Database) => Promise<Video[]> = readCatalog,
+) {
   const privateRead = request.method === 'POST';
   const headers = {
     'Cache-Control': privateRead ? 'no-store' : 'public, max-age=60',
@@ -40,7 +45,7 @@ export async function handleFeedRequest(request: Request, db?: Database, region 
         { status: 503, headers: { 'Cache-Control': 'no-store' } },
       );
     const started = performance.now();
-    const videos = await readCatalog(db);
+    const videos = await read(db);
     const feed = await buildFeed(videos, filters, context, cursor, region);
     console.info(
       JSON.stringify({

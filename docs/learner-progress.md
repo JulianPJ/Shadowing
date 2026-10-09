@@ -210,10 +210,9 @@ The browser suite uses a real MediaRecorder with Chromium's fake microphone.
 On this Windows environment, bundled Chromium returns `NotSupportedError` before
 recording and does not reproduce permission denial correctly. Use the existing
 `PLAYWRIGHT_CHROME_PATH` option to select installed Chrome, as documented in
-`content-difficulty.md`. Browser checks run on both the standard production server
-and the built Cloudflare preview. The local Cloudflare preview uses
-`CLOUDFLARE_VITE_FORCE_LOCAL=true` and placeholder relay secrets, so no live
-caption or AI service is contacted.
+`content-difficulty.md`. Browser checks run against the built preview
+(`npm run start:test`), which has no remote bindings, so no live caption or AI
+service is contacted.
 
 This feature cannot know whether the learner actually spoke during the response
 window, reconstruct pre-feature replay/recording counts, or infer unseen historical
@@ -221,24 +220,3 @@ transcript revisions. History links require a locally available lesson; historic
 section rows show compact timestamps/reasons without building weak-section review.
 Local media still needs reattachment after a full reload. Concurrent tabs are
 best-effort and not a substitute for future transactional account sync.
-
-Verified on 2026-10-04 (Windows uses `npm.cmd`):
-
-| Command | Result |
-| --- | --- |
-| `npm.cmd test` | 75 passed; no skips |
-| `npm.cmd run lint` | Passed, no warnings/errors |
-| `npm.cmd run typecheck` | Passed, including caption-relay Worker types |
-| `npm.cmd run build` | Passed; `/progress` included |
-| `npm.cmd run build:vinext` | Passed; existing vinext dependency-import/route-classification warnings |
-| `npm.cmd run test:e2e -- --output=test-results/next-progress` | 24 passed on the Next.js production server |
-| `npm.cmd run test:e2e -- --output=test-results/cloudflare-progress` | 24 passed on built local Cloudflare preview |
-
-Both browser runs set
-`PLAYWRIGHT_CHROME_PATH=C:\Program Files\Google\Chrome\Application\chrome.exe`;
-the Cloudflare run also sets `PLAYWRIGHT_BASE_URL=http://localhost:3001`.
-The Next.js server is at port 3000. Initial bundled-Chromium runs exposed the
-documented Windows microphone limitation; the final full runs use installed
-Chrome and retain the original microphone success/denial assertions. There was
-no live inference, production deployment or caption-provider smoke test for this
-feature. Screenshots and command logs are in the ignored `artifacts/` directory.

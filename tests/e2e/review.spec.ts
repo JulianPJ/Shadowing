@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test';
-import { readFile } from 'node:fs/promises';
 import demo from '../../src/data/demo.json' with { type: 'json' };
 import { applyLocalReview } from '../../src/lib/review/local';
 import { connect, seed } from '../helpers/retention-account';
@@ -16,11 +15,11 @@ for (const plan of ['free', 'pro'] as const)
     await expect(page.getByRole('button', { name: 'Listen', exact: true })).toBeEnabled();
     await page.locator('#current-japanese .lookup-token').first().click();
     const meaning = 'good morning';
-    await expect(page.getByLabel('Vocabulary meaning')).toHaveValue(meaning);
-    await page.getByRole('button', { name: 'Save and study', exact: true }).click();
-    await expect(
-      page.getByRole('button', { name: 'Saved and ready to study', exact: true }),
-    ).toBeVisible();
+    await page.getByText('Edit before saving', { exact: true }).click();
+    await expect(page.getByLabel('Vocabulary meaning')).not.toHaveValue('');
+    await page.getByLabel('Vocabulary meaning').fill(meaning);
+    await page.getByRole('button', { name: 'Add to review', exact: true }).click();
+    await expect(page.getByText('In review', { exact: true })).toBeVisible();
     await expect.poll(() => remote.entries[0]?.translation).toBe(meaning);
     await expect.poll(() => remote.review.cards.length).toBe(1);
     await page.goto('/review');
@@ -77,103 +76,6 @@ test('all four grades advance the session and persist deterministic state across
     await context.close();
   }
 });
-test('deck filtering, membership removal, bulk enrollment and context CSV export', async ({
-  page,
-  context,
-}) => {
-  const remote = await connect(context);
-  await seed(remote, 2);
-  remote.review.cards = [];
-  await page.goto('/dictionary?view=decks');
-  await page.getByLabel('New deck').fill('Travel');
-  await page.getByRole('button', { name: 'Create deck' }).click();
-  await expect.poll(() => remote.review.decks.length).toBe(2);
-  await page.goto('/dictionary');
-  await expect(page.getByRole('heading', { name: '朝', exact: true })).toBeVisible();
-  // Hold the local-first membership edit until the filtered server query has returned.
-  // The dictionary must refresh on acknowledgment without a manual reload.
-  let releaseMembership!: () => void;
-  const membershipPending = new Promise<void>((resolve) => {
-    releaseMembership = resolve;
-  });
-  await context.route('**/api/review', async (route) => {
-    if (
-      route.request().method() === 'POST' &&
-      route.request().postDataJSON().action === 'membership'
-    )
-      await membershipPending;
-    await route.fallback();
-  });
-  const first = page
-    .locator('.dictionary-entry')
-    .filter({ has: page.getByRole('heading', { name: '朝', exact: true }) });
-  await first.getByText('Decks · Inbox', { exact: true }).click();
-  await first
-    .getByRole('combobox', { name: 'Add to deck', exact: true })
-    .selectOption({ label: 'Travel' });
-  const initialFilter = page.waitForResponse(
-    (response) =>
-      response.url().includes('/api/dictionary?') &&
-      new URL(response.url()).searchParams.has('deckId'),
-  );
-  await page.getByLabel('Filter by deck').selectOption({ label: 'Travel' });
-  expect((await (await initialFilter).json()).entries).toHaveLength(0);
-  releaseMembership();
-  await expect(page.locator('.dictionary-entry')).toHaveCount(1);
-  await page.getByLabel('Select 朝', { exact: true }).check();
-  await page.getByLabel('Destination deck').selectOption({ label: 'Travel' });
-  await page.getByRole('button', { name: 'Add selected to review', exact: true }).click();
-  await expect.poll(() => remote.review.cards.length).toBe(1);
-  await page.getByText('Export saved words', { exact: true }).click();
-  const downloadPromise = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Export selected CSV' }).click();
-  const download = await downloadPromise;
-  const csv = await readFile((await download.path())!, 'utf8');
-  expect(csv).toContain('"朝"');
-  expect(csv).toContain('Meaning 0');
-  expect(csv).toContain(demo.segments[1].japanese);
-  expect(csv).toContain('Travel');
-  await page.getByRole('button', { name: 'Remove selected from deck' }).click();
-  await expect(page.locator('.dictionary-entry')).toHaveCount(0);
-  expect(remote.entries).toHaveLength(2);
-});
-test('review edits queued during snapshot hydration sync without waiting for a timer', async ({
-  page,
-  context,
-}) => {
-  const remote = await connect(context);
-  await page.goto('/dictionary?view=decks');
-  await expect(page.getByLabel('New deck')).toBeVisible();
-  let holdSnapshot = false;
-  let releaseSnapshot!: () => void;
-  let snapshotStarted!: () => void;
-  const started = new Promise<void>((resolve) => {
-    snapshotStarted = resolve;
-  });
-  const release = new Promise<void>((resolve) => {
-    releaseSnapshot = resolve;
-  });
-  await context.route('**/api/review', async (route) => {
-    if (route.request().method() === 'POST' && route.request().postDataJSON().name === 'First')
-      holdSnapshot = true;
-    else if (route.request().method() === 'GET' && holdSnapshot) {
-      holdSnapshot = false;
-      snapshotStarted();
-      await release;
-    }
-    await route.fallback();
-  });
-  await page.getByLabel('New deck').fill('First');
-  await page.getByRole('button', { name: 'Create deck' }).click();
-  await started;
-  await page.getByLabel('New deck').fill('Second');
-  await page.getByRole('button', { name: 'Create deck' }).click();
-  releaseSnapshot();
-  await expect
-    .poll(() => remote.review.decks.map((d) => d.name))
-    .toEqual(['Inbox', 'First', 'Second']);
-  await expect(page.getByText(/changes saved on this device/)).toHaveCount(0);
-});
 
 test('offline grading survives reload and retries without duplicating reviews', async ({
   page,
@@ -187,24 +89,32 @@ test('offline grading survives reload and retries without duplicating reviews', 
   remote.offline = true;
   await page.getByRole('button', { name: /Show answer/ }).click();
   await page.getByRole('button', { name: /^Easy/ }).click();
-  await expect(page.getByText(/changes saved on this device/)).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          JSON.parse(
+            localStorage.getItem('hibiki:v1:account:retention-free:review:pending') || '[]',
+          ).length,
+      ),
+    )
+    .toBeGreaterThan(0);
   expect(remote.review.cards[0].revision).toBe(0);
   await page.reload();
-  await expect(page.getByRole('heading', { name: 'Today’s due queue is complete' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Today’s review is complete' })).toBeVisible();
   remote.offline = false;
   await page.evaluate(() => window.dispatchEvent(new Event('online')));
   await expect.poll(() => remote.review.cards[0].revision).toBe(1);
   await page.reload();
-  await expect(page.getByRole('heading', { name: 'Today’s due queue is complete' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Today’s review is complete' })).toBeVisible();
   expect(remote.writes.filter((w) => w.action === 'grade')).toHaveLength(1);
 });
-test('completion recap explicitly hands selected saved lesson words to review', async ({
+test('completion recap links saved lesson words already enrolled in review to the daily queue', async ({
   page,
   context,
 }) => {
   const remote = await connect(context);
   await seed(remote, 1);
-  remote.review.cards = [];
   await page.goto('/practice/demo');
   await expect(page.getByRole('button', { name: 'Listen', exact: true })).toBeEnabled();
   await page.getByTestId('transcript-13').click();
@@ -214,12 +124,12 @@ test('completion recap explicitly hands selected saved lesson words to review', 
     'You reached the end of this lesson.',
   );
   await page.getByText('Saved words and practice details', { exact: true }).click();
-  await expect(recap).toContainText('1 saved words');
-  expect(remote.review.cards).toHaveLength(0);
-  await recap.getByRole('checkbox').check();
-  await recap.getByRole('button', { name: 'Add selected words to review' }).click();
-  await expect.poll(() => remote.review.cards.length).toBe(1);
-  await expect(recap).toContainText('In review');
+  await expect(recap).toContainText('1 saved word · 1 in review');
+  expect(remote.review.cards).toHaveLength(1);
+  await recap.getByRole('link', { name: 'Review your words' }).click();
+  await expect(page.getByRole('heading', { name: '1 due now' })).toBeVisible();
+  await page.getByRole('button', { name: 'Start review', exact: true }).click();
+  await expect(page.locator('.review-card h2')).toHaveText(remote.entries[0].term);
 });
 
 test('review source links refuse a changed transcript revision', async ({ page, context }) => {
@@ -253,7 +163,16 @@ test('an account-cookie mismatch preserves the old account review outbox', async
   );
   await page.getByRole('button', { name: /Show answer/ }).click();
   await page.getByRole('button', { name: /^Good/ }).click();
-  await expect(page.getByText(/changes saved on this device/)).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          JSON.parse(
+            localStorage.getItem('hibiki:v1:account:retention-free:review:pending') || '[]',
+          ).length,
+      ),
+    )
+    .toBeGreaterThan(0);
   await expect
     .poll(() =>
       page.evaluate(

@@ -76,6 +76,7 @@ test('playback offset shifts authored pause and navigation timing', async ({ pag
     );
   });
   await openDemo(page);
+  await page.getByText('Advanced settings', { exact: true }).click();
   await expect(page.getByRole('button', { name: 'Reset playback timing offset' })).toHaveText(
     '+400 ms',
   );
@@ -109,17 +110,16 @@ test('real MediaRecorder captures and replays; native replay stops the recording
 }) => {
   await context.grantPermissions(['microphone']);
   await openDemo(page);
-  await page.getByRole('button', { name: 'Record yourself', exact: true }).click();
+  await page.locator('body').click({ position: { x: 3, y: 3 } });
+  await page.keyboard.press('m');
   await expect(page.getByTestId('playback-state')).toContainText('RECORDING');
   await expect(page.getByRole('button', { name: 'Stop recording' })).toBeVisible();
   await page.waitForTimeout(1200);
-  await page.getByRole('button', { name: 'Stop recording' }).click();
+  await page.keyboard.press('m');
   await expect(page.getByRole('button', { name: 'Record again' })).toBeVisible();
   const audio = page.getByLabel('Your recorded attempt');
   await expect(audio).toHaveAttribute('src', /^blob:/);
-  await audio.evaluate(async (element: HTMLAudioElement) => {
-    await element.play();
-  });
+  await page.keyboard.press('p');
   await expect
     .poll(() => audio.evaluate((element: HTMLAudioElement) => element.currentTime))
     .toBeGreaterThan(0);
@@ -181,6 +181,12 @@ test('invalid URL, shortcut typing guard, bookmarks, search, and mobile layout',
   await page.locator('body').click({ position: { x: 3, y: 3 } });
   await page.keyboard.press('ArrowRight');
   await expect(page.getByTestId('current-japanese')).toHaveText(demo.segments[1].japanese);
+  await page.keyboard.press('?');
+  const help = page.getByRole('dialog', { name: 'Listen. Pause. Make it yours.' });
+  await expect(help).toBeVisible();
+  await expect(help).toContainText('Record / stop');
+  await expect(help).toContainText('Play your recording');
+  await page.getByRole('button', { name: 'Close help' }).click();
   await page.keyboard.press('t');
   await expect(page.locator('#current-translation')).toContainText(demo.segments[1].translation);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(

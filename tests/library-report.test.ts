@@ -8,12 +8,8 @@ import {
   validateLibrary,
 } from '../src/lib/library/model';
 import { validateGoal, weeklyReport } from '../src/lib/reports/weekly';
-import {
-  createSession,
-  emptyHistory,
-  lessonIdentity,
-  sectionActivity,
-} from '../src/lib/learner-progress';
+import { createSession, sectionActivity } from '../src/lib/learner/sessions';
+import { emptyHistory, lessonIdentity } from '../src/lib/learner/constants';
 import demo from '../src/data/demo.json';
 import type { Lesson } from '../src/lib/types';
 import { installMemoryStorage } from './helpers/memory-storage';

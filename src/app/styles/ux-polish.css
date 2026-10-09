@@ -3,12 +3,6 @@
   outline: 3px solid var(--accent, #64765b);
   outline-offset: 3px;
 }
-.source-guidance {
-  font-size: 13px;
-  line-height: 1.6;
-  color: var(--muted);
-  margin: 12px 0;
-}
 .returning-home .hero-intro {
   display: none;
 }
@@ -19,9 +13,7 @@
 .returning-home .start-card {
   max-width: none;
 }
-.returning-home .demo-section,
-.returning-home .rhythm-section,
-.returning-home .home-signoff {
+.returning-home .demo-section {
   display: none;
 }
 .progress-next-actions {
@@ -57,7 +49,6 @@
 }
 .weekly-metrics dt,
 .weekly-metrics span,
-.weekly-evidence p,
 .daily-goal p {
   font-size: 13px;
 }
@@ -67,9 +58,6 @@
   }
 }
 @media (max-width: 700px) {
-  .source-guidance {
-    font-size: 13px;
-  }
   .library-queue li,
   .library-remote {
     flex-wrap: wrap;
@@ -112,7 +100,6 @@
   color: var(--ink);
 }
 .dictionary-save-panel .eyebrow,
-.dictionary-save-panel .dictionary-reading,
 .dictionary-lookup-hint,
 .dictionary-loading,
 .dictionary-signin p,
@@ -131,19 +118,14 @@
   width: 44px;
   height: 44px;
 }
-.dictionary-save-actions {
-  flex-wrap: wrap;
-}
 .dictionary-save-panel .lexicon-definitions button {
   min-height: 44px;
   font-size: 13px;
 }
-.dictionary-save-panel .dictionary-privacy,
 .dictionary-save-panel .dictionary-error,
 .dictionary-save-panel .dictionary-context > span {
   font-size: 13px;
 }
-.dictionary-save-panel .dictionary-privacy,
 .dictionary-save-panel .dictionary-context > span {
   color: var(--muted);
 }
@@ -151,9 +133,6 @@
 .dictionary-save-panel .dictionary-fields textarea {
   font-size: 14px;
 }
-.practice-main .drill-settings label,
-.practice-main .drill-settings select,
-.practice-main .drill-settings input,
 .practice-main .offset-control > span,
 .practice-main .offset-control button,
 .practice-main .practice-view-controls .button {
@@ -163,7 +142,6 @@
   flex-wrap: wrap;
 }
 .dictionary-save-panel .dictionary-fields :is(input, select, textarea),
-.practice-main .speed-control select,
-.practice-main .drill-settings :is(input, select) {
+.practice-main .speed-control select {
   border-color: color-mix(in srgb, var(--muted) 75%, var(--paper));
 }

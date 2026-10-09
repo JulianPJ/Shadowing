@@ -34,13 +34,13 @@ test('a second device uses accepted ratings for daily limits and removes undone 
     assert.deepEqual(reviewHistory(), [older, accepted]);
     const cards = [newReview('studied', date), newReview('remaining', date)];
     assert.equal(
-      limitStudyQueue(cards, reviewHistory(), date, { new: 1, review: null }, true).cards.length,
+      limitStudyQueue(cards, reviewHistory(), date, { new: 1, review: null }).cards.length,
       0,
     );
     reconcileReviewHistory({ ...emptyReview(), history: [], historySince: since }, []);
     assert.deepEqual(reviewHistory(), [older]);
     assert.equal(
-      limitStudyQueue(cards, reviewHistory(), date, { new: 1, review: null }, true).cards.length,
+      limitStudyQueue(cards, reviewHistory(), date, { new: 1, review: null }).cards.length,
       1,
     );
   }

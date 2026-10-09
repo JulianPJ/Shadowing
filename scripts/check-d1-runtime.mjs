@@ -25,6 +25,7 @@ const options = convertV4MiniflareOptions({
       ratelimits: {
         SHADOWING_AI_RATE_LIMIT: { namespace_id: '19001', simple: { limit: 6, period: 60 } },
         DISCOVERY_RATE_LIMIT: { namespace_id: '19002', simple: { limit: 90, period: 60 } },
+        PUBLIC_API_RATE_LIMIT: { namespace_id: '19003', simple: { limit: 60, period: 60 } },
       },
       serviceBindings: { AI: 'ai-mock' },
       bindings: {
@@ -127,7 +128,7 @@ try {
   assert.equal(emails.length, 1);
   const link = emails[0].text.slice(emails[0].text.indexOf('https://'));
   const verification = await mf.dispatchFetch(link, { redirect: 'manual' });
-  assert.equal(verification.status, 302);
+  assert.equal(verification.status, 302, await verification.clone().text());
   const cookie = verification.headers
     .getSetCookie()
     .map((c) => c.split(';')[0])
@@ -355,38 +356,16 @@ try {
     'Content-Type': 'application/json',
   };
   const entryId = dictionaryPayload.entry.id;
-  const tagId = crypto.randomUUID();
-  const tagPost = (body) =>
-    mf.dispatchFetch('https://example.com/api/tags', {
-      method: 'POST',
-      headers: reviewHeaders,
-      body: JSON.stringify(body),
-    });
-  assert.equal((await tagPost({ action: 'create', id: tagId, name: '旅行' })).status, 200);
-  assert.equal(
-    (await tagPost({ action: 'membership', tagId, entryIds: [entryId], remove: false })).status,
-    200,
-  );
   const exact = await mf.dispatchFetch('https://example.com/api/dictionary?ids=' + entryId, {
     headers: { Cookie: cookie },
   });
   assert.equal(exact.status, 200);
-  assert.equal((await exact.json()).entries[0].tags[0].name, '旅行');
-  const filtered = await mf.dispatchFetch(
-    'https://example.com/api/dictionary?tagId=' + tagId + '&limit=1',
-    { headers: { Cookie: cookie } },
-  );
-  assert.equal(filtered.status, 200);
-  assert.equal((await filtered.json()).entries.length, 1);
-  assert.equal((await tagPost({ action: 'rename', id: tagId, name: '日本旅行' })).status, 200);
-  assert.equal((await mf.dispatchFetch('https://example.com/api/tags')).status, 401);
+  assert.equal((await exact.json()).entries[0].id, entryId);
+  // Tags were removed; their route no longer exists.
   assert.equal(
-    (
-      await mf.dispatchFetch('https://example.com/api/tags', {
-        headers: { Cookie: cookie, 'X-Hibiki-Account': 'other' },
-      })
-    ).status,
-    409,
+    (await mf.dispatchFetch('https://example.com/api/tags', { headers: { Cookie: cookie } }))
+      .status,
+    404,
   );
   assert.equal(
     (
@@ -400,7 +379,7 @@ try {
   const enrolled = await mf.dispatchFetch('https://example.com/api/review', {
     method: 'POST',
     headers: reviewHeaders,
-    body: JSON.stringify({ action: 'enroll', entryIds: [entryId], deckId: 'inbox', enrolledAt }),
+    body: JSON.stringify({ action: 'enroll', entryIds: [entryId], enrolledAt }),
   });
   assert.equal(enrolled.status, 200);
   const reviewSnapshot = await mf.dispatchFetch('https://example.com/api/review', {
@@ -447,11 +426,6 @@ try {
   ]);
   assert.ok(Number.isFinite(Date.parse(graded.historySince)));
   assert.ok(Number.isFinite(Date.parse(graded.historyWindowStart)));
-  assert.equal((await tagPost({ action: 'delete', id: tagId })).status, 200);
-  const afterTagDelete = await (
-    await mf.dispatchFetch('https://example.com/api/review', { headers: { Cookie: cookie } })
-  ).json();
-  assert.equal(afterTagDelete.cards[0].revision, 1);
   assert.deepEqual((await db.prepare('PRAGMA foreign_key_check').all()).results, []);
   assert.equal((await mf.dispatchFetch('https://example.com/api/review')).status, 401);
   assert.equal(
@@ -529,25 +503,6 @@ try {
   });
   assert.equal((await db.prepare('SELECT COUNT(*) AS n FROM linked_transcripts').first()).n, 1);
   assert.equal((await db.prepare('SELECT COUNT(*) AS n FROM generated_artifacts').first()).n, 2);
-
-  const discovered = await mf.dispatchFetch('https://example.com/api/discovery');
-  assert.equal(discovered.status, 200);
-  const discovery = await discovered.json();
-  assert.equal(discovery.lessons.length, 1);
-  assert.equal(discovery.lessons[0].title, 'Runtime fixture');
-  assert.equal(discovery.lessons[0].videoId, lesson.videoId);
-  assert.deepEqual(discovery.lessons[0].segments, lesson.segments);
-  assert.equal(discovery.difficulties.length, 1);
-  assert.match(discovery.difficulties[0].transcriptKey, /^[a-f0-9]{64}$/);
-  await db
-    .prepare("UPDATE linked_transcripts SET visibility='private', owner_user_id=?")
-    .bind(identity.user.id)
-    .run();
-  assert.deepEqual(
-    (await (await mf.dispatchFetch('https://example.com/api/discovery')).json()).lessons,
-    [],
-  );
-  await db.prepare("UPDATE linked_transcripts SET visibility='system', owner_user_id=NULL").run();
 
   // The new feed is metadata-only; saving a card cannot acquire captions or run AI.
   const catalogueTime = new Date().toISOString();
@@ -680,7 +635,6 @@ try {
   });
   assert.equal((await mf.dispatchFetch('https://example.com/api/discover')).status, 404);
   assert.equal((await mf.dispatchFetch('https://example.com/discover')).status, 404);
-  assert.equal((await mf.dispatchFetch('https://example.com/api/discovery')).status, 200);
   const disabledWatch = await mf.dispatchFetch('https://example.com/api/watch-later', {
     headers: watchHeaders,
   });

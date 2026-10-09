@@ -3,7 +3,7 @@ import { emptySync, type AccountUser } from '../../src/lib/sync/types';
 import type { WordKnowledgeRecord } from '../../src/lib/knowledge/types';
 import demo from '../../src/data/demo.json' with { type: 'json' };
 import { transcriptKey } from '../../src/lib/transcript';
-import { lessonIdentity } from '../../src/lib/learner-progress';
+import { lessonIdentity } from '../../src/lib/learner/constants';
 import { lessonSyncId } from '../../src/lib/sync/validation';
 import type { Lesson } from '../../src/lib/types';
 import { emptyReview } from '../../src/lib/review/local';
@@ -66,11 +66,11 @@ test('word states import only after consent and stay isolated across accounts an
   const state: { user: AccountUser | null } = { user: null };
   const remote = await services(context, state);
   await page.goto('/account');
-  await expect(page.getByRole('heading', { name: 'Your account' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Your progress' })).toBeVisible();
   state.user = user;
   await page.reload();
   await expect(page.getByRole('complementary', { name: 'Import device progress' })).toBeVisible();
-  await expect(page.getByText('word knowledge states', { exact: false })).toBeVisible();
+  await expect(page.getByText('word states', { exact: false })).toBeVisible();
   expect(remote.get(user.id) ?? []).toEqual([]);
   await page.getByRole('button', { name: 'Add device progress' }).click();
   await expect.poll(() => remote.get(user.id)).toEqual([anonymousWord]);
@@ -111,7 +111,7 @@ test('declining device import never sends anonymous vocabulary states', async ({
   const state: { user: AccountUser | null } = { user: null };
   const remote = await services(context, state);
   await page.goto('/account');
-  await expect(page.getByRole('heading', { name: 'Your account' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Your progress' })).toBeVisible();
   state.user = user;
   await page.reload();
   await page.getByRole('button', { name: 'Keep it on this device' }).click();
@@ -282,7 +282,7 @@ test('switching account during accepted-import hydration preserves the new accou
   );
   await page.goto('/account');
   await expect(page.getByRole('complementary', { name: 'Import device progress' })).toBeVisible();
-  await expect(page.getByText('Your progress is synced.', { exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Account', exact: true })).toBeVisible();
   await page.evaluate(() => {
     (window as unknown as { holdDigest?: boolean }).holdDigest = true;
   });

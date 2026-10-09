@@ -1,8 +1,13 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { installMemoryStorage } from './helpers/memory-storage';
-import { setStorageAccount, writeStorage } from '../src/lib/storage/browser';
-import { loadKnowledge, syncWordKnowledge, knowledgePending } from '../src/lib/knowledge/client';
+import { readStorage, setStorageAccount, writeStorage } from '../src/lib/storage/browser';
+import {
+  knowledgeSync,
+  loadKnowledge,
+  syncWordKnowledge,
+  knowledgePending,
+} from '../src/lib/knowledge/client';
 import { syncStatus } from '../src/lib/sync/client';
 import type { AccountUser } from '../src/lib/sync/types';
 import type { WordKnowledgeRecord } from '../src/lib/knowledge/types';
@@ -129,4 +134,43 @@ test('new local reset during sync survives a stale response and keeps its retry 
     await running;
     assert.equal(knowledgePending(), 1);
     assert.equal(loadKnowledge()['朝'].state, 'unknown');
+  }));
+
+test('an upload that loses to a newer write on another device adopts the stored winner', async () =>
+  setup(async () => {
+    const mine = word('learning', '2026-10-09T09:00:00.000Z'),
+      theirs = word('known', '2026-10-09T09:30:00.000Z');
+    writeStorage('knowledge:records', [mine]);
+    writeStorage('knowledge:outbox', [mine]);
+    globalThis.fetch = (async (_input, init) =>
+      ({
+        ok: true,
+        json: async () =>
+          init?.method === 'POST'
+            ? { ok: true, records: [theirs] }
+            : { records: [], nextCursor: null, syncedThrough: '2026-10-09T10:00:00.000Z' },
+      }) as Response) as typeof fetch;
+    await syncWordKnowledge();
+    assert.equal(knowledgePending(), 0);
+    assert.equal(loadKnowledge()['朝'].state, 'known');
+  }));
+test('the pull watermark only advances once pulled word states are stored', async () =>
+  setup(async () => {
+    const storage = globalThis.localStorage;
+    const original = storage.setItem.bind(storage);
+    storage.setItem = (key: string, value: string) => {
+      if (key.endsWith(':knowledge:records')) throw new Error('QuotaExceededError');
+      original(key, value);
+    };
+    globalThis.fetch = (async () =>
+      ({
+        ok: true,
+        json: async () => ({
+          records: [word('known')],
+          nextCursor: null,
+          syncedThrough: '2026-10-09T10:00:00.000Z',
+        }),
+      }) as Response) as typeof fetch;
+    await assert.rejects(knowledgeSync.sync({ force: true }), /could not be saved/);
+    assert.equal(readStorage('knowledge:synced-through', null), null);
   }));

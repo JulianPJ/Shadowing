@@ -1,5 +1,5 @@
 import type { Cue } from './types';
-import { mapChunkCues, mergeChunkCues } from './media-audio/cues';
+import { mapChunkCues, mergeChunkCues, type TimedChunk } from './media-audio/cues';
 import { audioDigest, openTranscriptionCheckpoints } from './media-audio/checkpoint';
 import {
   MEDIA_AUDIO_WORKER_URL,
@@ -75,7 +75,8 @@ function delay(ms: number, signal: AbortSignal) {
   });
 }
 
-async function transcribeChunk(
+/** Sends one prepared 16 kHz mono WAV window for Whisper subtitles. */
+export async function transcribeAudioChunk(
   audio: ArrayBuffer,
   signal: AbortSignal,
   mimeType: 'audio/wav' | 'audio/mp4' = 'audio/wav',
@@ -194,7 +195,7 @@ export async function transcribeMediaFile(
     if (initialized.type !== 'ready') throw new Error('The local audio track could not be read.');
     const { total } = initialized.info;
     const checkpoints = await openTranscriptionCheckpoints(file, options.checkpointScope);
-    const completed: Cue[][] = [];
+    const completed: TimedChunk[] = [];
     let provider = 'Cloudflare Whisper large-v3-turbo';
     for (let index = 0; index < total; index++) {
       signal.throwIfAborted();
@@ -223,8 +224,8 @@ export async function transcribeMediaFile(
       signal.throwIfAborted();
       const saved = checkpoints.load(index, digest, chunk.start, chunk.end);
       if (saved) {
-        completed.push(saved.cues);
-        if (completed.reduce((count, cues) => count + cues.length, 0) > 15000)
+        completed.push({ start: chunk.start, end: chunk.end, cues: saved.cues });
+        if (completed.reduce((count, chunk) => count + chunk.cues.length, 0) > 15000)
           mergeChunkCues(completed);
         provider = saved.provider;
         onProgress?.({
@@ -242,11 +243,11 @@ export async function transcribeMediaFile(
         total,
         message: `Generating subtitles ${index + 1} of ${total}…`,
       });
-      const result = await transcribeChunk(chunk.audio, signal, chunk.mimeType);
+      const result = await transcribeAudioChunk(chunk.audio, signal, chunk.mimeType);
       signal.throwIfAborted();
       const cues = result.cues.length ? mapChunkCues(result.cues, chunk.start, chunk.end) : [];
-      completed.push(cues);
-      if (completed.reduce((count, cues) => count + cues.length, 0) > 15000)
+      completed.push({ start: chunk.start, end: chunk.end, cues });
+      if (completed.reduce((count, chunk) => count + chunk.cues.length, 0) > 15000)
         mergeChunkCues(completed);
       provider = result.provider;
       checkpoints.save(index, { digest, start: chunk.start, end: chunk.end, cues, provider });

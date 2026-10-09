@@ -1,8 +1,11 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 import demo from '../../src/data/demo.json' with { type: 'json' };
 import questions from '../../src/data/demo-quiz.json' with { type: 'json' };
-import { createQuiz, newAttempt, transcriptKey, updateAttempt } from '../../src/lib/quiz';
-import { createSession, lessonIdentity } from '../../src/lib/learner-progress';
+import { createQuiz } from '../../src/lib/quiz/document';
+import { newAttempt, updateAttempt } from '../../src/lib/quiz/attempts';
+import { transcriptKey } from '../../src/lib/transcript';
+import { createSession } from '../../src/lib/learner/sessions';
+import { lessonIdentity } from '../../src/lib/learner/constants';
 import { emptySync, type AccountUser } from '../../src/lib/sync/types';
 import { mergeSync } from '../../src/lib/sync/merge';
 import { validateSync } from '../../src/lib/sync/validation';
@@ -119,10 +122,8 @@ async function connect(
   });
 }
 async function account(page: Page) {
-  await page.goto('/account');
-  await expect(page.getByRole('button', { name: 'Sync now' })).toBeVisible();
-  await page.getByRole('button', { name: 'Sync now' }).click();
-  await expect(page.getByText('Your progress is synced.', { exact: true })).toBeVisible();
+  await page.goto('/profile');
+  await expect(page.getByRole('heading', { name: 'Account', exact: true })).toBeVisible();
 }
 async function anonymousFixture() {
   const key = await transcriptKey(demo),
@@ -193,8 +194,8 @@ test('account plan controls paid UI without hiding the core account experience',
   await account(page);
   await expect(page.locator('.account-plan').filter({ hasText: 'Hibiki Free' })).toBeVisible();
   await page.goto('/dictionary');
-  await expect(page.getByText('No saved vocabulary yet.')).toBeVisible();
-  await expect(page.getByText('Opening your dictionary…')).toHaveCount(0);
+  await expect(page.getByText('No saved words yet.')).toBeVisible();
+  await expect(page.getByText('Opening your words…')).toHaveCount(0);
 });
 
 test('explicit first-login import preserves local data and excludes private content, recordings and signed URLs', async ({
@@ -228,7 +229,7 @@ test('explicit first-login import preserves local data and excludes private cont
   const count = remote.data.sessions.length;
   await account(page);
   await page.reload();
-  await expect(page.getByRole('button', { name: 'Sync now' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Account', exact: true })).toBeVisible();
   expect(remote.data.sessions.length).toBe(count);
   expect(await page.evaluate(() => !!localStorage.getItem('hibiki:v1:learner-history'))).toBe(true);
 });
@@ -253,7 +254,9 @@ test('declining device import leaves anonymous history local across reloads and 
   await page.reload();
   await expect(page.getByRole('complementary', { name: 'Import device progress' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Sign out', exact: true }).click();
-  await expect(page.getByRole('link', { name: 'Sign in', exact: true })).toBeVisible();
+  await expect(
+    page.getByRole('main').getByRole('link', { name: 'Sign in', exact: true }),
+  ).toBeVisible();
   await page.goto('/progress');
   await expect(page.locator('.progress-summary')).toContainText('Lessons practised');
 });
@@ -293,10 +296,15 @@ test('two devices sync preferences, bookmarks, completion and retakes; offline e
           true,
         ),
       );
+    // Mirror writeStorage: persist, then announce the local write that schedules a push.
     await pageA.evaluate((attempts) => {
       localStorage.setItem('hibiki:v1:account:account-one:quiz-attempts', JSON.stringify(attempts));
+      window.dispatchEvent(
+        new CustomEvent('hibiki:local-write', {
+          detail: { key: 'quiz-attempts', value: attempts, previous: null },
+        }),
+      );
     }, attempts);
-    await pageA.getByRole('button', { name: 'Sync now' }).click();
     await expect.poll(() => remote.data.attempts.length).toBe(2);
     await account(pageB);
     await pageB.goto('/practice/demo');
@@ -319,17 +327,15 @@ test('two devices sync preferences, bookmarks, completion and retakes; offline e
       .toBeGreaterThan(0.2);
     await pageB.getByRole('button', { name: 'Studio Mode', exact: true }).click();
     await pageB.goto('/account');
-    await expect(
-      pageB.getByText(/Saved on this device\. The sync service is unavailable/),
-    ).toBeVisible();
+    await expect(pageB.getByRole('heading', { name: 'Account', exact: true })).toBeVisible();
     expect(
       await pageB.evaluate(() =>
         JSON.parse(localStorage.getItem('hibiki:v1:account:account-one:favorites:demo')!),
       ),
     ).toEqual([]);
     remote.outage = false;
-    await pageB.getByRole('button', { name: 'Sync now' }).click();
-    await expect(pageB.getByText('Your progress is synced.', { exact: true })).toBeVisible();
+    await pageB.evaluate(() => window.dispatchEvent(new Event('online')));
+    await expect.poll(() => remote.data.bookmarks.filter((b) => !b.deleted).length).toBe(0);
     await account(pageA);
     await pageA.goto('/practice/demo');
     await pageA.getByTestId('transcript-0').click();
@@ -406,20 +412,21 @@ test('selected Japanese saves to the account dictionary with source context and 
   const panel = page.getByRole('complementary', { name: 'Save vocabulary' });
   await expect(panel).toBeVisible();
   await expect(panel.locator('.lexicon-match')).not.toHaveCount(0);
+  await panel.getByText('Edit before saving', { exact: true }).click();
   await expect(page.getByLabel('Vocabulary meaning')).not.toHaveValue('');
   await expect(page.getByLabel('Source sentence meaning')).toHaveValue(
     demo.segments[0].translation,
   );
-  await page.getByRole('button', { name: 'Save only', exact: true }).click();
-  await expect(panel).toContainText('Saved for reference');
+  await page.getByRole('button', { name: 'Add to review', exact: true }).click();
+  await expect(panel).toContainText('In review');
   await expect.poll(() => remote.dictionary.length).toBe(1);
   expect(remote.dictionary[0].term).toBe(term);
   expect(remote.dictionary[0].source.segmentId).toBe(demo.segments[0].id);
   expect(remote.dictionary[0].source.start).toBe(demo.segments[0].start);
   expect(remote.dictionary[0].source.end).toBe(demo.segments[0].end);
 
-  await page.getByRole('link', { name: 'View saved words' }).click();
-  await expect(page.getByRole('heading', { name: 'Saved words', exact: true })).toBeVisible();
+  await page.getByRole('link', { name: 'View your words' }).click();
+  await expect(page.getByRole('heading', { name: 'Vocabulary', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: term })).toBeVisible();
   await expect(page.getByText(demo.segments[0].japanese, { exact: true })).toBeVisible();
   const open = page.getByRole('link', { name: 'Open section' });
@@ -433,7 +440,7 @@ test('selected Japanese saves to the account dictionary with source context and 
 
   await page.goto('/dictionary');
   page.once('dialog', (dialog) => dialog.accept());
-  await page.getByRole('button', { name: 'Delete saved word', exact: true }).click();
-  await expect(page.getByText('No saved vocabulary yet.')).toBeVisible();
+  await page.getByRole('button', { name: `Delete ${term}`, exact: true }).click();
+  await expect(page.getByText('No saved words yet.')).toBeVisible();
   expect(remote.dictionary).toHaveLength(0);
 });

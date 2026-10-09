@@ -1,4 +1,4 @@
-import { MyLibrary } from '@/components/my-library';
+import { Home } from '@/components/home';
 export default function Page() {
-  return <MyLibrary />;
+  return <Home tab="library" />;
 }

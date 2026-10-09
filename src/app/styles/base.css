@@ -246,15 +246,6 @@ svg {
 .nav-link:hover {
   color: var(--ink);
 }
-.nav-demo {
-  display: flex;
-  gap: 11px;
-  align-items: center;
-  font-weight: 500;
-}
-.nav-demo:hover {
-  color: var(--accent);
-}
 .site-footer {
   max-width: 1128px;
   margin: 0 auto;

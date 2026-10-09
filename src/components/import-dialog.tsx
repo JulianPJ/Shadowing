@@ -11,16 +11,23 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { parseSubtitles } from '@/lib/subtitles';
-import { resolveMediaLink } from '@/lib/media-discovery';
-import { MEDIA_ACCEPT, validateMediaFile } from '@/lib/media';
+import { MEDIA_ACCEPT, resolveMediaUrl, validateMediaFile } from '@/lib/media';
 import { createImportedLesson } from '@/lib/import-lesson';
 import { localMediaUrl } from '@/lib/local-media-file';
-import { localWhisper } from '@/lib/providers/local-whisper';
 import { transcribeMediaFile, type TranscriptionProgress } from '@/lib/transcription-client';
-import type { Lesson, ResolvedMedia } from '@/lib/types';
+import { finishPageCapture, transcribePageAudio } from '@/lib/extension/capture';
+import { timestamp } from '@/lib/youtube';
+import type { Lesson, PageMediaSource, ResolvedMedia } from '@/lib/types';
 import { ProFeatureNotice, useProAccess } from './pro-feature';
 
 type SubtitleChoice = 'manual' | 'generate' | null;
+/** A video handed over by Hibiki Bridge that came without Japanese subtitles. */
+export type PageImport = {
+  tabId: number;
+  media: PageMediaSource;
+  title: string;
+  duration: number;
+};
 
 export function ImportDialog({
   open,
@@ -29,6 +36,8 @@ export function ImportDialog({
   initialUrl = '',
   initialResolved,
   transcriptUnavailable = false,
+  initialSubtitleChoice = null,
+  page,
 }: {
   open: boolean;
   onClose: () => void;
@@ -36,6 +45,8 @@ export function ImportDialog({
   initialUrl?: string;
   initialResolved?: ResolvedMedia;
   transcriptUnavailable?: boolean;
+  initialSubtitleChoice?: SubtitleChoice;
+  page?: PageImport;
 }) {
   const { isPro, account } = useProAccess();
   const dialog = useRef<HTMLDialogElement>(null);
@@ -45,7 +56,7 @@ export function ImportDialog({
   const [resolved, setResolved] = useState(initialResolved);
   const [file, setFile] = useState<File | null>(null);
   const [generationFile, setGenerationFile] = useState<File | null>(null);
-  const [subtitleChoice, setSubtitleChoice] = useState<SubtitleChoice>(null);
+  const [subtitleChoice, setSubtitleChoice] = useState<SubtitleChoice>(initialSubtitleChoice);
   const [text, setText] = useState('');
   const [subtitleName, setSubtitleName] = useState('');
   const [error, setError] = useState('');
@@ -84,11 +95,6 @@ export function ImportDialog({
   }
 
   async function generateSubtitles(file: File, signal: AbortSignal) {
-    if (process.env.NEXT_PUBLIC_WHISPER_URL) {
-      const timedSignal = AbortSignal.any([signal, AbortSignal.timeout(300000)]);
-      const result = await localWhisper.transcribe(file, timedSignal);
-      return { ...result, provider: 'Local Whisper' };
-    }
     return transcribeMediaFile(
       file,
       signal,
@@ -134,10 +140,11 @@ export function ImportDialog({
     abort.current = controller;
     try {
       const selected =
-        kind === 'link' ? resolved || (await resolveMediaLink(url, controller.signal)) : undefined;
+        !page && kind === 'link' ? resolved || (await resolveMediaUrl(url)) : undefined;
       if (selected) setResolved(selected);
-      if (kind === 'upload' && !file) throw new Error('Choose an audio or video file first.');
-      if (kind === 'upload' && file) validateMediaFile(file);
+      if (!page && kind === 'upload' && !file)
+        throw new Error('Choose an audio or video file first.');
+      if (!page && kind === 'upload' && file) validateMediaFile(file);
 
       let cues;
       let source = 'Imported subtitles';
@@ -151,6 +158,18 @@ export function ImportDialog({
         cues = parseSubtitles(text);
         transcriptType = subtitleName ? 'user-upload' : 'user-paste';
         source = subtitleName ? 'Imported subtitles' : 'Pasted transcript';
+      } else if (page) {
+        const result = await transcribePageAudio(
+          page.tabId,
+          page.duration,
+          controller.signal,
+          (value) => {
+            if (!controller.signal.aborted) setProgress(value);
+          },
+        );
+        source = result.provider;
+        transcriptType = 'generated';
+        cues = result.cues;
       } else {
         const mediaForTranscription = kind === 'upload' ? file : generationFile;
         if (!mediaForTranscription)
@@ -168,12 +187,13 @@ export function ImportDialog({
 
       const lesson = await createImportedLesson({
         resolved: selected,
-        fileName: kind === 'upload' ? file?.name : undefined,
+        page: page ? { media: page.media, title: page.title } : undefined,
+        fileName: !page && kind === 'upload' ? file?.name : undefined,
         cues,
         transcriptType,
         provenance: source,
       });
-      if (kind === 'upload' && file && !controller.signal.aborted)
+      if (!page && kind === 'upload' && file && !controller.signal.aborted)
         lesson.mediaUrl = localMediaUrl(file);
       if (!controller.signal.aborted) {
         onLesson(lesson);
@@ -215,7 +235,16 @@ export function ImportDialog({
         </p>
       ) : null}
 
-      <div className="segmented-control import-tabs">
+      {page ? (
+        <p className="page-import-source">
+          <SquarePlay size={16} />
+          <span>
+            <strong>{page.title || new URL(page.media.canonicalUrl).hostname}</strong>
+            {new URL(page.media.canonicalUrl).hostname} · {timestamp(page.duration)}
+          </span>
+        </p>
+      ) : null}
+      <div className="segmented-control import-tabs" hidden={!!page}>
         <button
           type="button"
           aria-pressed={kind === 'link'}
@@ -237,7 +266,7 @@ export function ImportDialog({
       </div>
 
       <form onSubmit={submit}>
-        {kind === 'link' ? (
+        {page ? null : kind === 'link' ? (
           <label className="field-label">
             Video link
             <input
@@ -269,7 +298,7 @@ export function ImportDialog({
           </label>
         )}
 
-        {kind === 'link' && resolved ? (
+        {!page && kind === 'link' && resolved ? (
           <p className="small muted">
             {resolved.title ||
               (resolved.media.type === 'youtube'
@@ -354,7 +383,13 @@ export function ImportDialog({
         ) : null}
 
         {subtitleChoice === 'generate' ? (
-          kind === 'link' ? (
+          page ? (
+            <p className="small muted">
+              Hibiki plays the video in its own tab from the start, at normal speed, and writes
+              subtitles as it listens (about {timestamp(page.duration)}). Keep that tab open. You
+              can finish early and keep what was heard.
+            </p>
+          ) : kind === 'link' ? (
             <label className="field-label">
               Audio/video to transcribe
               <span className="small muted">
@@ -376,14 +411,8 @@ export function ImportDialog({
             </label>
           ) : (
             <p className="small muted">
-              Hibiki will generate timed Japanese subtitles from the media you selected using{' '}
-              {process.env.NEXT_PUBLIC_WHISPER_URL
-                ? 'your local Whisper service'
-                : 'Cloudflare Whisper'}
-              .{' '}
-              {process.env.NEXT_PUBLIC_WHISPER_URL
-                ? 'The local service accepts media up to 250 MB.'
-                : 'Your video stays on this device; only audio is sent in small parts, up to four hours.'}
+              Hibiki generates timed Japanese subtitles with Whisper. Your video stays on this
+              device; only its audio is sent, in small parts, up to four hours.
             </p>
           )
         ) : null}
@@ -401,6 +430,15 @@ export function ImportDialog({
           </p>
         ) : null}
 
+        {busy && page && subtitleChoice === 'generate' ? (
+          <button
+            type="button"
+            className="button full-width"
+            onClick={() => void finishPageCapture(page.tabId).catch(() => {})}
+          >
+            Finish with what was heard so far
+          </button>
+        ) : null}
         {busy ? (
           <button
             type="button"

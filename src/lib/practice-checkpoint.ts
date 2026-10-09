@@ -1,4 +1,4 @@
-import { CHECKPOINT_MS } from './learner-progress';
+import { CHECKPOINT_MS } from './learner/constants';
 
 /** The 1s sampling loop only marks dirty. It never writes on every sample. */
 export class PracticeCheckpoint {

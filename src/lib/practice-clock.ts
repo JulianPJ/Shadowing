@@ -1,4 +1,4 @@
-import { INTERACTION_WINDOW_MS } from './learner-progress';
+import { INTERACTION_WINDOW_MS } from './learner/constants';
 
 export type ClockState = {
   visible: boolean;

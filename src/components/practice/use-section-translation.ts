@@ -1,14 +1,10 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Lesson } from '@/lib/types';
-import {
-  readStorage,
-  writeStorage,
-  loadTranslationCache,
-  translationCacheKey,
-} from '@/lib/storage';
+import { readStorage, writeStorage } from '@/lib/storage/browser';
+import { loadTranslationCache, translationCacheKey } from '@/lib/storage/preferences';
 import type { Segment } from '@/lib/types';
-import type { PracticeSignal } from '@/lib/learner-progress';
+import type { PracticeSignal } from '@/lib/learner/sessions';
 export function useSectionTranslation(
   lesson: Lesson,
   index: number,

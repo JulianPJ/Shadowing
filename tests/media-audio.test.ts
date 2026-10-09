@@ -13,13 +13,13 @@ import { canonicalizeAudioMp4 } from '../src/lib/media-audio/mp4';
 
 const cue = (start: number, end: number, text = 'はい。') => ({ start, end, text });
 
-test('media audio windows retain track offset and remain far below upload body bounds', () => {
+test('media audio windows retain track offset, overlap by four seconds and stay below upload bounds', () => {
   const windows = audioChunkWindows(3.5, 365);
   assert.deepEqual(windows, [
-    { index: 0, start: 3.5, end: 123.5 },
-    { index: 1, start: 123.5, end: 243.5 },
-    { index: 2, start: 243.5, end: 363.5 },
-    { index: 3, start: 363.5, end: 365 },
+    { index: 0, start: 3.5, end: 119.5 },
+    { index: 1, start: 115.5, end: 235.5 },
+    { index: 2, start: 231.5, end: 351.5 },
+    { index: 3, start: 347.5, end: 365 },
   ]);
   for (const window of windows)
     assert.ok(allocateWave(window.end - window.start).buffer.byteLength < 4 * 1024 * 1024);
@@ -51,16 +51,105 @@ test('chunk cues restore original timestamps and reject out-of-range provider ti
   assert.throws(() => mapChunkCues([cue(122, 123)], 118, 240), /outside/);
 });
 
-test('overlap reconciliation preserves actual repetitions and same-chunk overlapping cues', () => {
+test('overlapping chunks keep the complete version of an utterance cut at a boundary', () => {
+  const plain = (cues: ReturnType<typeof mergeChunkCues>) =>
+    cues.map(({ start, end, text }) => ({ start, end, text }));
+  // The first chunk ends at 120 mid-utterance; the second started at 116 and heard it whole. Its
+  // opening fragment is the end of a sentence the first chunk heard across 116.
   const merged = mergeChunkCues([
-    [cue(119, 120), cue(119.1, 120.1)],
-    [cue(119, 120), cue(120.5, 121.5), cue(122, 123, 'はいはい。')],
+    { start: 0, end: 120, cues: [cue(110, 116.3, '前の文でした。'), cue(117, 120, '途中で')] },
+    {
+      start: 116,
+      end: 236,
+      cues: [cue(116.05, 116.4, 'た。'), cue(117.02, 121.5, '途中で切れた文。'), cue(123, 125)],
+    },
   ]);
+  assert.deepEqual(plain(merged), [
+    cue(110, 116.3, '前の文でした。'),
+    cue(117.02, 121.5, '途中で切れた文。'),
+    cue(123, 125),
+  ]);
+  // Same-chunk overlapping cues and genuine repetitions after the overlap survive.
   assert.deepEqual(
-    merged.map(({ start, end, text }) => ({ start, end, text })),
-    [cue(119, 120), cue(119.1, 120.1), cue(120.5, 121.5), cue(122, 123, 'はいはい。')],
+    plain(
+      mergeChunkCues([
+        { start: 0, end: 120, cues: [cue(100, 101), cue(100.1, 101.1)] },
+        { start: 116, end: 236, cues: [cue(122, 123), cue(124, 125)] },
+      ]),
+    ),
+    [cue(100, 101), cue(100.1, 101.1), cue(122, 123), cue(124, 125)],
+  );
+  // A cue that began before the next chunk's start cannot be replaced, so it is kept.
+  assert.deepEqual(
+    plain(
+      mergeChunkCues([
+        { start: 0, end: 120, cues: [cue(110, 120, '長い文。')] },
+        { start: 116, end: 236, cues: [cue(121, 122)] },
+      ]),
+    ),
+    [cue(110, 120, '長い文。'), cue(121, 122)],
   );
   assert.throws(() => mergeChunkCues([]), /No timestamped/);
+});
+
+test('an utterance starting exactly at the overlap is kept once, from the fuller hearing', () => {
+  const plain = (cues: ReturnType<typeof mergeChunkCues>) =>
+    cues.map(({ start, end, text }) => ({ start, end, text }));
+  // Windows [0,116] and [112,232]: the first cuts the sentence, the second hears all of it.
+  assert.deepEqual(
+    plain(
+      mergeChunkCues([
+        { start: 0, end: 116, cues: [cue(112, 116, 'こんにちは')] },
+        { start: 112, end: 232, cues: [cue(112.02, 118, 'こんにちは、世界。')] },
+      ]),
+    ),
+    [cue(112.02, 118, 'こんにちは、世界。')],
+  );
+});
+
+test('overlap merging splices continuations and never drops speech only one chunk heard', () => {
+  const plain = (cues: ReturnType<typeof mergeChunkCues>) =>
+    cues.map(({ start, end, text }) => ({ start, end, text }));
+  // Whisper grouped the seam differently: the shared words are kept once with both ends.
+  assert.deepEqual(
+    plain(
+      mergeChunkCues([
+        { start: 0, end: 116, cues: [cue(110, 116, '今日はいい天気')] },
+        { start: 112, end: 232, cues: [cue(113, 120, 'いい天気ですね。')] },
+      ]),
+    ),
+    [cue(110, 120, '今日はいい天気ですね。')],
+  );
+  // Different words inside the overlap are different speech: both stay.
+  assert.deepEqual(
+    plain(
+      mergeChunkCues([
+        { start: 0, end: 116, cues: [cue(113, 114, 'はい。')] },
+        { start: 112, end: 232, cues: [cue(114.5, 115.5, 'そうです。')] },
+      ]),
+    ),
+    [cue(113, 114, 'はい。'), cue(114.5, 115.5, 'そうです。')],
+  );
+  // The same words timed slightly differently, with different punctuation, are kept once.
+  assert.deepEqual(
+    plain(
+      mergeChunkCues([
+        { start: 0, end: 116, cues: [cue(113, 114.5, 'はい、そうです。')] },
+        { start: 112, end: 232, cues: [cue(113.1, 114.6, 'はい そうです')] },
+      ]),
+    ),
+    [cue(113, 114.5, 'はい、そうです。')],
+  );
+  // A later chunk's partial hearing of an earlier, complete sentence is dropped.
+  assert.deepEqual(
+    plain(
+      mergeChunkCues([
+        { start: 0, end: 116, cues: [cue(112.5, 114, '駅まで歩きます。')] },
+        { start: 112, end: 232, cues: [cue(113, 114, '歩きます。')] },
+      ]),
+    ),
+    [cue(112.5, 114, '駅まで歩きます。')],
+  );
 });
 
 test('resume checkpoints require exact prepared chunk bytes and timeline, remain account-key isolated', async () => {

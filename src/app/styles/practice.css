@@ -19,12 +19,6 @@
 .practice-breadcrumb > a:hover {
   color: var(--accent);
 }
-.private-label {
-  margin-left: auto;
-  color: #a5a997;
-  font-size: 10px;
-  font-style: italic;
-}
 .practice-title {
   display: flex;
   justify-content: space-between;
@@ -168,22 +162,6 @@
   white-space: normal;
   word-break: break-all;
   width: 100%;
-}
-.player-settings {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 10px 14px;
-  padding: 15px 0 17px;
-}
-.playback-adjustments {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  flex-wrap: wrap;
-  gap: 8px 12px;
-  margin-left: auto;
 }
 .segmented-control {
   display: flex;
@@ -666,11 +644,6 @@
   font-size: 9px;
   color: #a2ac91;
 }
-.translation-privacy {
-  font-size: 8px;
-  color: #acb39d;
-  margin: 0 0 10px;
-}
 .transcript-card {
   display: flex;
   flex-direction: column;
@@ -871,58 +844,4 @@
   font-size: 12px;
   text-align: center;
   padding: 25px;
-}
-.practice-signoff {
-  padding: 35px 0 32px;
-  display: flex;
-  gap: 15px;
-  align-items: center;
-  justify-content: center;
-  color: #b1b7a2;
-  font-size: 9px;
-}
-.practice-signoff [lang='ja'] {
-  font-size: 10px;
-  letter-spacing: 1.5px;
-}
-.practice-signoff > span + span {
-  border-left: 1px solid #e0e5d5;
-  padding-left: 15px;
-}
-.completion-card {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  border: 1px solid #cbd9ba;
-  background: #f1f6e8;
-  padding: 17px;
-  border-radius: 9px;
-  margin-top: 13px;
-}
-.completion-card > span {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: #e1ebd4;
-  color: #7b995c;
-  flex-shrink: 0;
-}
-.completion-card > div {
-  flex: 1;
-}
-.completion-card strong {
-  font-size: 11px;
-  font-weight: 500;
-}
-.completion-card p {
-  font-size: 9px;
-  color: #919e80;
-  margin-top: 3px;
-}
-.completion-card .text-button {
-  font-size: 9px;
-  color: #86976f;
 }

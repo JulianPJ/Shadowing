@@ -7,10 +7,7 @@ import { emptyReview, applyLocalReview } from '../../src/lib/review/local';
 import { dictionarySource } from '../../src/lib/dictionary/source';
 import type { Lesson } from '../../src/lib/types';
 import { dictionaryCursor, parseDictionaryCursor } from '../../src/lib/dictionary/query';
-import type { Tag, TagOperation } from '../../src/lib/tags/types';
-import { tagName } from '../../src/lib/tags/validation';
 type Remote = {
-  tags: Tag[];
   queries: string[];
   entries: DictionaryEntry[];
   review: ReviewSnapshot;
@@ -35,12 +32,8 @@ export async function connect(context: BrowserContext, plan: AccountUser['plan']
   );
   const remote: Remote = {
     entries: [],
-    tags: [],
     queries: [],
-    review: {
-      ...emptyReview(),
-      decks: [{ id: 'inbox', name: 'Inbox', createdAt: '', updatedAt: '' }],
-    },
+    review: emptyReview(),
     offline: false,
     writes: [],
   };
@@ -99,12 +92,7 @@ export async function connect(context: BrowserContext, plan: AccountUser['plan']
           (!params.has('search') ||
             [e.term, e.reading ?? '', e.translation].some((value) =>
               value.toLocaleLowerCase().includes(params.get('search')!.toLocaleLowerCase()),
-            )) &&
-          (!params.has('deckId') ||
-            remote.review.memberships.some(
-              (m) => m.entryId === e.id && m.deckId === params.get('deckId'),
-            )) &&
-          (!params.has('tagId') || e.tags?.some((t) => t.id === params.get('tagId'))),
+            )),
       );
       entries.sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id));
       if (params.has('ids')) return route.fulfill({ json: { entries } });
@@ -142,39 +130,7 @@ export async function connect(context: BrowserContext, plan: AccountUser['plan']
       updatedAt: now,
     };
     remote.entries.unshift(entry);
-    remote.review.memberships.push({ deckId: 'inbox', entryId: entry.id });
     return route.fulfill({ json: { entry } });
-  });
-  await context.route('**/api/tags', (route) => {
-    if (remote.offline) return route.fulfill({ status: 503, json: { error: 'offline' } });
-    if (route.request().method() === 'POST') {
-      const op = route.request().postDataJSON() as TagOperation,
-        now = new Date().toISOString();
-      if (op.action === 'create' || op.action === 'rename') {
-        const name = tagName(op.name);
-        if (remote.tags.some((t) => t.normalizedName === name.normalizedName && t.id !== op.id))
-          return route.fulfill({
-            status: 409,
-            json: { error: 'A tag with this name already exists.' },
-          });
-        const old = remote.tags.find((t) => t.id === op.id);
-        if (old) Object.assign(old, name, { updatedAt: now });
-        else remote.tags.push({ id: op.id, ...name, createdAt: now, updatedAt: now });
-      } else if (op.action === 'delete') {
-        remote.tags = remote.tags.filter((t) => t.id !== op.id);
-        for (const e of remote.entries) {
-          e.tags = e.tags?.filter((t) => t.id !== op.id);
-          e.updatedAt = now;
-        }
-      } else {
-        for (const entry of remote.entries.filter((e) => op.entryIds.includes(e.id))) {
-          entry.tags = entry.tags?.filter((t) => t.id !== op.tagId) ?? [];
-          if (!op.remove) entry.tags.push(remote.tags.find((t) => t.id === op.tagId)!);
-          entry.updatedAt = now;
-        }
-      }
-    }
-    return route.fulfill({ json: { tags: remote.tags } });
   });
   return remote;
 }
@@ -199,7 +155,6 @@ export async function seed(remote: Remote, count: number) {
     remote.review = applyLocalReview(remote.review, {
       action: 'enroll',
       entryIds: [entry.id],
-      deckId: 'inbox',
       enrolledAt: now,
     });
   }

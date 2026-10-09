@@ -5,10 +5,7 @@ import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
 import type { D1Database } from '../src/lib/d1';
 import { createD1DictionaryRepository } from '../src/lib/dictionary/repository';
 import { createD1ReviewRepository } from '../src/lib/review/repository';
-import { createD1TagRepository, TagConflict } from '../src/lib/tags/repository';
 import { handleDictionaryRequest } from '../src/lib/dictionary/server';
-import { handleTagRequest } from '../src/lib/tags/server';
-import { tagName, validateTagOperation } from '../src/lib/tags/validation';
 import { dictionaryCursor } from '../src/lib/dictionary/query';
 import { vocabularyRows, vocabularyCsv, vocabularyTsv } from '../src/lib/export/vocabulary';
 const mf = new Miniflare(
@@ -21,8 +18,7 @@ const mf = new Miniflare(
 );
 let db: D1Database,
   dictionary: ReturnType<typeof createD1DictionaryRepository>,
-  review: ReturnType<typeof createD1ReviewRepository>,
-  tags: ReturnType<typeof createD1TagRepository>;
+  review: ReturnType<typeof createD1ReviewRepository>;
 const date = '2026-10-01T00:00:00.000Z';
 before(async () => {
   db = await mf.getD1Database('HIBIKI_DB');
@@ -72,13 +68,18 @@ before(async () => {
       .map((s) => db.prepare(s)),
   );
   review = createD1ReviewRepository(db);
-  await review.apply('scale', { action: 'deck', id: 'old-deck', name: 'Existing' });
-  await review.apply('scale', {
-    action: 'enroll',
-    entryIds: ['word-0001'],
-    deckId: 'old-deck',
-    enrolledAt: date,
-  });
+  // A legacy deck membership from before decks were removed stays harmlessly in place.
+  await db.batch([
+    db
+      .prepare(
+        "INSERT INTO user_decks(user_id,id,name,created_at,updated_at) VALUES ('scale','old-deck','Existing',?,?)",
+      )
+      .bind(date, date),
+    db.prepare(
+      "INSERT INTO user_deck_entries(user_id,deck_id,entry_id) VALUES ('scale','old-deck','word-0001')",
+    ),
+  ]);
+  await review.apply('scale', { action: 'enroll', entryIds: ['word-0001'], enrolledAt: date });
   const old = await review.snapshot('scale');
   await db.batch(
     (await readFile('migrations/0008_tags_dictionary_pagination.sql', 'utf8'))
@@ -93,7 +94,6 @@ before(async () => {
     { ...old, historySince: undefined, historyWindowStart: undefined },
   );
   dictionary = createD1DictionaryRepository(db);
-  tags = createD1TagRepository(db);
 });
 after(() => mf.dispose());
 const get = (query: string, user = 'scale') =>
@@ -103,14 +103,10 @@ const get = (query: string, user = 'scale') =>
     true,
     dictionary,
   );
-test('real D1 upgrades populated dictionary/deck/review and preserves foreign keys', async () => {
+test('real D1 upgrades populated dictionary and review data and preserves foreign keys', async () => {
   assert.equal((await dictionary.list('scale')).length, 650);
   assert.equal((await review.snapshot('scale')).cards[0].entryId, 'word-0001');
   assert.deepEqual((await db.prepare('PRAGMA foreign_key_check').all()).results, []);
-  const fks = await db
-    .prepare('PRAGMA foreign_key_list(user_dictionary_tags)')
-    .all<{ from: string; to: string }>();
-  assert.equal(fks.results.filter((f) => f.from === 'user_id').length, 2);
 });
 test('cursor pages are stable with duplicate timestamps and reach beyond 500 without duplicates', async () => {
   const first = await dictionary.page('scale', { limit: 100 });
@@ -178,218 +174,30 @@ test('targeted old entries hydrate review and exact lesson revision without full
     0,
   );
 });
-test('entire and filtered exports include old entries, context, decks and tags; TSV protects formulas', async () => {
-  await tags.apply('scale', { action: 'create', id: 'export-tag', name: '旅行' });
-  await tags.apply('scale', {
-    action: 'membership',
-    tagId: 'export-tag',
-    entryIds: ['word-0001'],
-    remove: false,
-  });
+test('entire exports include old entries and context; TSV protects formulas', async () => {
   const entries = await dictionary.list('scale'),
-    snapshot = await review.snapshot('scale'),
-    rows = vocabularyRows(entries, snapshot);
+    rows = vocabularyRows(entries);
   assert.equal(rows.length, 649);
   const old = rows.find((r) => r.term === '語1')!;
-  assert.equal(old.tags, '旅行');
-  assert.equal(old.decks, 'Existing');
   assert.equal(old.sourceSentence, '日本語');
+  assert.deepEqual(Object.keys(old).includes('decks'), false);
   assert.ok(vocabularyCsv(rows).includes('"語1"'));
-  assert.equal(
-    (await dictionary.page('scale', { tagId: 'export-tag', deckId: 'old-deck', term: '語1' }))
-      .entries.length,
-    1,
-  );
-  assert.equal(
-    (await dictionary.page('scale', { tagId: 'export-tag', deckId: 'inbox' })).entries.length,
-    0,
-  );
+  assert.equal((await dictionary.page('scale', { term: '語1' })).entries.length, 1);
   const tsv = vocabularyTsv([{ ...old, translation: ' =SUM(1)\tbad\nline' }]);
   assert.ok(tsv.includes("' =SUM(1) bad line"));
   assert.equal(tsv.split('\n').length, 3);
 });
-test('tag normalization preserves Japanese display names and rejects bad input', () => {
-  assert.deepEqual(tagName('  Ｔｒａｖｅｌ　 plans '), {
-    name: 'Travel plans',
-    normalizedName: 'travel plans',
-  });
-  assert.equal(tagName('旅行').name, '旅行');
-  for (const name of ['', ' '.repeat(3), 'x'.repeat(65), 12, 'hi\u0000'])
-    assert.throws(() => tagName(name));
-  assert.throws(() =>
-    validateTagOperation({
-      action: 'membership',
-      tagId: 't',
-      entryIds: Array(51).fill('e'),
-      remove: false,
-    }),
-  );
-});
-test('tags create, normalize uniqueness, rename, and isolate ownership', async () => {
-  await tags.apply('scale', { action: 'create', id: 'travel', name: 'Travel' });
-  await assert.rejects(
-    tags.apply('scale', { action: 'create', id: 'duplicate', name: ' travel ' }),
-    TagConflict,
-  );
-  await tags.apply('other', { action: 'create', id: 'travel', name: 'Travel' });
-  await tags.apply('scale', { action: 'rename', id: 'travel', name: '旅行計画' });
-  assert.equal((await tags.list('scale')).find((t) => t.id === 'travel')?.name, '旅行計画');
-  assert.equal((await tags.list('other'))[0].name, 'Travel');
-  await assert.rejects(
-    tags.apply('other', {
-      action: 'membership',
-      tagId: 'travel',
-      entryIds: ['word-0001'],
-      remove: false,
-    }),
-  );
-  await assert.rejects(
-    tags.apply('scale', {
-      action: 'membership',
-      tagId: 'unknown',
-      entryIds: ['word-0001'],
-      remove: false,
-    }),
-  );
-});
-test('multiple tags, bulk membership, removal and deletion preserve vocabulary and review', async () => {
-  await tags.apply('scale', {
-    action: 'membership',
-    tagId: 'travel',
-    entryIds: ['word-0001', 'word-0002'],
-    remove: false,
-  });
-  assert.equal((await dictionary.byIds('scale', ['word-0001']))[0].tags?.length, 2);
-  assert.equal((await dictionary.page('scale', { tagId: 'travel' })).entries.length, 2);
-  await tags.apply('scale', {
-    action: 'membership',
-    tagId: 'travel',
-    entryIds: ['word-0002'],
-    remove: true,
-  });
-  await tags.apply('scale', { action: 'delete', id: 'travel' });
-  assert.equal((await dictionary.byIds('scale', ['word-0001']))[0].tags?.length, 1);
-  assert.equal((await review.snapshot('scale')).cards.length, 1);
-  await tags.apply('scale', {
-    action: 'membership',
-    tagId: 'export-tag',
-    entryIds: ['word-0003'],
-    remove: false,
-  });
-  await dictionary.remove('scale', 'word-0003');
+
+test('deleting a word removes its card and any legacy deck membership', async () => {
+  await dictionary.remove('scale', 'word-0001');
+  assert.equal((await review.snapshot('scale')).cards.length, 0);
   assert.equal(
     (
       await db
-        .prepare("SELECT count(*) AS n FROM user_dictionary_tags WHERE entry_id='word-0003'")
+        .prepare("SELECT count(*) AS n FROM user_deck_entries WHERE entry_id='word-0001'")
         .first<{ n: number }>()
     )?.n,
     0,
-  );
-});
-test('tag entry/account limits are atomic and duplicate membership is idempotent at the limit', async () => {
-  for (let i = 0; i < 11; i++)
-    await tags.apply('scale', { action: 'create', id: 'limit-' + i, name: 'Limit ' + i });
-  for (let i = 0; i < 10; i++)
-    await tags.apply('scale', {
-      action: 'membership',
-      tagId: 'limit-' + i,
-      entryIds: ['word-0004'],
-      remove: false,
-    });
-  await tags.apply('scale', {
-    action: 'membership',
-    tagId: 'limit-0',
-    entryIds: ['word-0004'],
-    remove: false,
-  });
-  await assert.rejects(
-    tags.apply('scale', {
-      action: 'membership',
-      tagId: 'limit-10',
-      entryIds: ['word-0005', 'word-0004'],
-      remove: false,
-    }),
-    TagConflict,
-  );
-  assert.equal((await dictionary.byIds('scale', ['word-0005']))[0].tags?.length, 0);
-  for (let i = 1; i < 100; i++)
-    await tags.apply('other', { action: 'create', id: 't-' + i, name: 'Tag ' + i });
-  await assert.rejects(
-    tags.apply('other', { action: 'create', id: 'excess', name: 'Excess' }),
-    TagConflict,
-  );
-  assert.equal((await tags.list('other')).length, 100);
-  assert.deepEqual((await db.prepare('PRAGMA foreign_key_check').all()).results, []);
-});
-test('tag API bounds, verification, ownership and private caching', async () => {
-  const post = (value: unknown) =>
-    new Request('https://example.com/api/tags', { method: 'POST', body: JSON.stringify(value) });
-  assert.equal(
-    (
-      await handleTagRequest(
-        post({ action: 'create', id: 'new', name: 'Food' }),
-        'scale',
-        false,
-        tags,
-      )
-    ).status,
-    403,
-  );
-  assert.equal((await handleTagRequest(post(null), 'scale', true, tags)).status, 400);
-  assert.equal(
-    (
-      await handleTagRequest(
-        post({ action: 'membership', tagId: 'export-tag', entryIds: ['word-0001'], remove: false }),
-        'other',
-        true,
-        tags,
-      )
-    ).status,
-    409,
-  );
-  assert.equal(
-    (
-      await handleTagRequest(
-        post({ action: 'create', id: 'x', name: 'x'.repeat(13000) }),
-        'scale',
-        true,
-        tags,
-      )
-    ).status,
-    413,
-  );
-  assert.equal(
-    (
-      await handleTagRequest(new Request('https://example.com/api/tags'), 'scale', true, tags)
-    ).headers.get('cache-control'),
-    'no-store',
-  );
-});
-
-test('maximum bulk tag batch adds and removes 50 memberships within D1 parameter limits', async () => {
-  const entryIds = Array.from({ length: 50 }, (_, i) => 'word-' + String(i + 50).padStart(4, '0'));
-  await tags.apply('scale', { action: 'membership', tagId: 'export-tag', entryIds, remove: false });
-  for (const entry of await dictionary.byIds('scale', entryIds))
-    assert.ok(entry.tags?.some((tag) => tag.id === 'export-tag'));
-  await tags.apply('scale', { action: 'membership', tagId: 'export-tag', entryIds, remove: true });
-  for (const entry of await dictionary.byIds('scale', entryIds))
-    assert.equal(entry.tags?.length, 0);
-});
-
-test('composite foreign keys reject forged ownership even when bypassing repositories', async () => {
-  await assert.rejects(
-    db
-      .prepare(
-        "INSERT INTO user_dictionary_tags(user_id,tag_id,entry_id) VALUES ('other','travel','word-0001')",
-      )
-      .run(),
-  );
-  await assert.rejects(
-    db
-      .prepare(
-        "INSERT INTO user_dictionary_tags(user_id,tag_id,entry_id) VALUES ('scale','t-1','word-0001')",
-      )
-      .run(),
   );
   assert.deepEqual((await db.prepare('PRAGMA foreign_key_check').all()).results, []);
 });

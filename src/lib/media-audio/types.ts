@@ -1,7 +1,9 @@
 export const AUDIO_SAMPLE_RATE = 16000;
-export const AUDIO_CHUNK_SECONDS = 120;
-// Adjacent windows preserve every utterance without text-based boundary deletion or extra inference.
-export const AUDIO_OVERLAP_SECONDS = 0;
+// Each window re-hears the last few seconds of the previous one, so an utterance cut at a chunk
+// boundary is transcribed whole by the next chunk (see mergeChunkCues). Windows stay at most
+// 120 s, within the bounded WAV and server limits.
+export const AUDIO_CHUNK_SECONDS = 116;
+export const AUDIO_OVERLAP_SECONDS = 4;
 export const MAX_TRANSCRIPTION_SECONDS = 4 * 60 * 60;
 export const MEDIA_AUDIO_WORKER_URL = '/furigana/v1/media-audio-worker.js';
 

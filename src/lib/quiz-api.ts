@@ -1,6 +1,8 @@
 import { readBoundedJson } from './http-json';
-import { validateQuizLesson, QuizValidationError } from './quiz';
-import { generateLessonQuiz, QuizProviderError } from './providers/quiz';
+import { validateQuizLesson } from './transcript';
+import { QuizValidationError } from './transcript-validation';
+import { generateLessonQuiz } from './providers/quiz/generation';
+import { QuizProviderError } from './providers/quiz/errors';
 import type { QuizGenerationProvider } from './types';
 import { requestEnvelope } from './content-request';
 import { QUIZ_GENERATOR_VERSION } from './generated-artifacts';

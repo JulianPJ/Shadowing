@@ -1,6 +1,5 @@
 import type { DictionaryEntry, DictionaryQuery } from './types';
 import { readStorage, writeStorage } from '../storage/browser';
-import { cachedReview } from '../review/client';
 import { normalizeDictionaryTerm } from './validation';
 export const DICTIONARY_CACHE_MAX = 700;
 export const DICTIONARY_CACHE_BYTES = 3_000_000;
@@ -87,7 +86,6 @@ export function cacheDictionary(entries: DictionaryEntry[], startedAt: number, p
   return entries.map((e) => next.records[e.id]?.entry).filter((e): e is DictionaryEntry => !!e);
 }
 export function cachedDictionaryQuery(query: DictionaryQuery) {
-  const review = cachedReview();
   return Object.values(cachedDictionary().records)
     .map((r) => r.entry)
     .filter(
@@ -98,10 +96,7 @@ export function cachedDictionaryQuery(query: DictionaryQuery) {
         (!query.search ||
           [e.term, e.reading ?? '', e.translation].some((value) =>
             normalizeDictionaryTerm(value).includes(normalizeDictionaryTerm(query.search!)),
-          )) &&
-        (!query.deckId ||
-          review.memberships.some((m) => m.entryId === e.id && m.deckId === query.deckId)) &&
-        (!query.tagId || e.tags?.some((t) => t.id === query.tagId)),
+          )),
     )
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id));
 }

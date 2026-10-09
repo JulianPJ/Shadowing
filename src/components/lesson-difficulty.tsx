@@ -5,8 +5,9 @@ import {
   validateDifficultyAnalysis,
   validateDifficultyLesson,
 } from '@/lib/difficulty';
-import { object, transcriptRevision } from '@/lib/quiz';
-import { loadDifficulty, saveDifficulty } from '@/lib/storage';
+import { object } from '@/lib/transcript-validation';
+import { transcriptRevision } from '@/lib/transcript';
+import { loadDifficulty, saveDifficulty } from '@/lib/storage/learning';
 import type { ContentDifficultyAnalysis, Lesson } from '@/lib/types';
 import { postContentRequest } from '@/lib/content-request';
 

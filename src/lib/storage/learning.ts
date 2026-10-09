@@ -1,15 +1,16 @@
 import type { ContentDifficultyAnalysis, LessonQuiz, QuizAttempt, QuizLesson } from '../types';
 import { validateDifficultyAnalysis } from '../difficulty';
 import { transcriptRevision } from '../transcript';
-import { validateAttempt, validateQuiz } from '../quiz';
+import { validateAttempt } from '../quiz/attempts';
+import { validateQuiz } from '../quiz/document';
 import {
   ARCHIVE_LIMIT,
   HISTORY_BYTE_LIMIT,
   compactDifficulty,
-  compactHistory,
   emptyHistory,
-  validateHistory,
-} from '../learner-progress';
+} from '../learner/constants';
+import { compactHistory } from '../learner/retention';
+import { validateHistory } from '../learner/validation';
 import type { LearnerHistory } from '../learner-types';
 import { reportStorageFailure, readStorage, writeStorage, storageAccount } from './browser';
 export function writeLearnerHistory(history: LearnerHistory, protectedId?: string) {

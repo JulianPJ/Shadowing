@@ -1,5 +1,4 @@
 import type { DictionaryEntry } from '../dictionary/types';
-import type { ReviewSnapshot } from '../review/types';
 import { externalReplay } from '../dictionary/replay';
 export type VocabularyExportRow = {
   term: string;
@@ -11,13 +10,19 @@ export type VocabularyExportRow = {
   sourceUrl: string;
   start: number;
   end: number;
-  decks: string;
-  tags: string;
 };
-export function vocabularyRows(
-  entries: DictionaryEntry[],
-  review: ReviewSnapshot,
-): VocabularyExportRow[] {
+const columns: (keyof VocabularyExportRow)[] = [
+  'term',
+  'reading',
+  'translation',
+  'sourceSentence',
+  'sourceTranslation',
+  'lessonTitle',
+  'sourceUrl',
+  'start',
+  'end',
+];
+export function vocabularyRows(entries: DictionaryEntry[]): VocabularyExportRow[] {
   return entries.map((e) => ({
     term: e.term,
     reading: e.reading ?? '',
@@ -28,12 +33,6 @@ export function vocabularyRows(
     sourceUrl: externalReplay(e) ?? '',
     start: e.source.start,
     end: e.source.end,
-    tags: e.tags?.map((t) => t.name).join('; ') ?? '',
-    decks: review.memberships
-      .filter((m) => m.entryId === e.id)
-      .map((m) => review.decks.find((d) => d.id === m.deckId)?.name ?? '')
-      .filter(Boolean)
-      .join('; '),
   }));
 }
 function cell(value: string | number) {
@@ -43,21 +42,8 @@ function cell(value: string | number) {
   return '"' + text.replaceAll('"', '""') + '"';
 }
 export function vocabularyCsv(rows: VocabularyExportRow[]) {
-  const columns: (keyof VocabularyExportRow)[] = [
-    'term',
-    'reading',
-    'translation',
-    'sourceSentence',
-    'sourceTranslation',
-    'lessonTitle',
-    'sourceUrl',
-    'start',
-    'end',
-    'decks',
-    'tags',
-  ];
   return (
-    '\uFEFF' +
+    '﻿' +
     [
       columns.map(cell).join(','),
       ...rows.map((r) => columns.map((k) => cell(r[k])).join(',')),
@@ -68,19 +54,6 @@ export function vocabularyCsv(rows: VocabularyExportRow[]) {
 
 /** Anki-compatible plain TSV: one record per line, formula protection preserved. */
 export function vocabularyTsv(rows: VocabularyExportRow[]) {
-  const columns: (keyof VocabularyExportRow)[] = [
-    'term',
-    'reading',
-    'translation',
-    'sourceSentence',
-    'sourceTranslation',
-    'lessonTitle',
-    'sourceUrl',
-    'start',
-    'end',
-    'decks',
-    'tags',
-  ];
   const safe = (value: string | number) => {
     let text = String(value).replaceAll('\t', ' ').replaceAll('\r', ' ').replaceAll('\n', ' ');
     if (/^[\s\u0000-\u001f]*[=+@-]/.test(text)) text = "'" + text;

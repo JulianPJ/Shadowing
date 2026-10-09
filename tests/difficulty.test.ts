@@ -10,8 +10,8 @@ import {
   validateDifficultyAnalysis,
   validateDifficultyLesson,
 } from '../src/lib/difficulty';
-import { transcriptKey } from '../src/lib/quiz';
-import { loadDifficulty, saveDifficulty } from '../src/lib/storage';
+import { transcriptKey } from '../src/lib/transcript';
+import { loadDifficulty, saveDifficulty } from '../src/lib/storage/learning';
 import {
   createWorkersAiDifficultyProvider,
   generateLessonDifficulty,

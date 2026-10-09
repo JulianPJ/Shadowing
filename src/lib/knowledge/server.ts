@@ -12,8 +12,9 @@ export async function handleKnowledgeRequest(
   try {
     if (request.method === 'GET') {
       const params = new URL(request.url).searchParams;
-      if ([...params.keys()].some((key) => key !== 'cursor')) throw new Error('Invalid query');
-      return respond(await repository.page(userId, params.get('cursor')));
+      if ([...params.keys()].some((key) => key !== 'cursor' && key !== 'since'))
+        throw new Error('Invalid query');
+      return respond(await repository.page(userId, params.get('cursor'), params.get('since')));
     }
     if (request.method !== 'POST') return respond({ error: 'Method not supported' }, 405);
     if (!verified) return respond({ error: 'Verify your email before syncing word states.' }, 403);
@@ -27,8 +28,7 @@ export async function handleKnowledgeRequest(
       )
     )
       throw new Error('Invalid update time');
-    await repository.apply(userId, records);
-    return respond({ ok: true });
+    return respond({ ok: true, records: await repository.apply(userId, records) });
   } catch (error) {
     if (error instanceof BodyLimitError)
       return respond({ error: 'Word state batch too large' }, 413);

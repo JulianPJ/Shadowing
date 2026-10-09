@@ -7,7 +7,7 @@ import { authClient } from '@/lib/auth/client';
 import { authPath, safeReturnPath } from '@/lib/auth/return-path';
 import { refreshAccount } from '@/lib/sync/client';
 import { useAccount } from './account';
-import { StandaloneNavigation } from './chrome';
+import { TaskReturn } from './chrome';
 export function AuthForm({ screen = 'sign-in' }: { screen?: 'sign-in' | 'register' | 'reset' }) {
   const router = useRouter(),
     account = useAccount();
@@ -96,7 +96,7 @@ export function AuthForm({ screen = 'sign-in' }: { screen?: 'sign-in' | 'registe
         : 'Welcome back';
   return (
     <>
-      <StandaloneNavigation />
+      <TaskReturn />
       <main className="account-screen">
         <h1>{title}</h1>
         <p className="muted">

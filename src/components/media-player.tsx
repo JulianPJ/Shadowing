@@ -1,10 +1,11 @@
 'use client';
-import { forwardRef } from 'react';
+import { forwardRef, type ReactNode } from 'react';
 import type { Lesson } from '@/lib/types';
 import { lessonMedia } from '@/lib/media';
 import { YouTubeMedia } from './media-youtube';
 import { VimeoMedia } from './media-vimeo';
 import { HtmlMedia } from './media-html';
+import { PageMedia } from './media-page';
 
 export interface MediaHandle {
   play(): Promise<void>;
@@ -22,12 +23,17 @@ export type MediaPlayerProps = {
   onPlaying: (playing: boolean) => void;
   onEnded: () => void;
   onError: (message: string) => void;
+  /** Rendered over the picture, e.g. Studio subtitles. */
+  overlay?: ReactNode;
+  /** The current line; a page video shows it over the original player. */
+  caption?: string;
 };
 export const MediaPlayer = forwardRef<MediaHandle, MediaPlayerProps>(
   function MediaPlayer(props, ref) {
     const source = lessonMedia(props.lesson);
     if (source.type === 'youtube') return <YouTubeMedia ref={ref} {...props} />;
     if (source.type === 'vimeo') return <VimeoMedia ref={ref} {...props} />;
+    if (source.type === 'page') return <PageMedia ref={ref} {...props} />;
     return (
       <HtmlMedia
         key={

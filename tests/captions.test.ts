@@ -12,7 +12,8 @@ import {
   readProviderBody,
   withTranscriptionFallback,
 } from '../src/lib/providers/youtube-captions';
-import type { TranscriptionProvider } from '../src/lib/types';
+import type { Lesson, TranscriptionProvider } from '../src/lib/types';
+import { transcriptLabel, whisperUpgradePath } from '../src/lib/caption-labels';
 
 const cue = { start: 1, end: 3, text: 'こんにちは。' };
 const id = 'IJ6R4u05ppw';
@@ -245,4 +246,86 @@ test('bounds upstream payloads and cancels oversized streams', async () => {
   });
   await assert.rejects(readProviderBody(new Response(stream), 50, 'watch', 'provider'));
   assert.equal(cancelled, true);
+});
+
+test('human Japanese captions are preferred over speech recognition, which is labelled', async () => {
+  const requested: string[] = [];
+  const fakeFetch = (tracks: object[]): typeof fetch => {
+    let calls = 0;
+    return async (url) => {
+      calls++;
+      if (calls === 1) return new Response('"INNERTUBE_API_KEY":"test-key"');
+      if (calls === 2)
+        return Response.json({
+          playabilityStatus: { status: 'OK' },
+          captions: { playerCaptionsTracklistRenderer: { captionTracks: tracks } },
+          videoDetails: { title: 'Lesson', author: 'Author' },
+        });
+      requested.push(String(url));
+      return new Response('<transcript><text start="1" dur="2">こんにちは。</text></transcript>');
+    };
+  };
+  const asr = {
+    languageCode: 'ja',
+    kind: 'asr',
+    baseUrl: 'https://www.youtube.com/api/timedtext?asr',
+  };
+  const human = { languageCode: 'ja', baseUrl: 'https://www.youtube.com/api/timedtext?human' };
+  const both = await createDirectYoutubeCaptions(fakeFetch([asr, human])).transcribe(id);
+  assert.equal(both.provider, 'youtube-transcript-plus');
+  assert.match(requested.at(-1)!, /human/);
+  const onlyAsr = await createDirectYoutubeCaptions(fakeFetch([asr])).transcribe(id);
+  assert.equal(onlyAsr.provider, 'youtube-transcript-plus (auto-generated)');
+  assert.match(requested.at(-1)!, /asr/);
+
+  const relayed = await createCaptionRelay('https://captions.example', 'secret', async () =>
+    Response.json({ videoId: id, cues: [cue], provider: onlyAsr.provider }),
+  ).transcribe(id);
+  assert.equal(relayed.provider, 'YouTube captions via relay (auto-generated)');
+});
+
+test('learners see where a transcript came from in plain words', () => {
+  const lesson = (transcript: Partial<Lesson['transcript']> & object, source = 'youtube') =>
+    ({ source, transcriptSource: transcript.provenance, transcript }) as unknown as Lesson;
+  assert.equal(
+    transcriptLabel(lesson({ type: 'provider-captions', provenance: 'youtube-transcript-plus' })),
+    'YouTube captions',
+  );
+  assert.match(
+    transcriptLabel(
+      lesson({
+        type: 'provider-captions',
+        provenance: 'YouTube captions via relay (auto-generated)',
+      }),
+    ),
+    /auto-generated/,
+  );
+  assert.equal(
+    transcriptLabel(lesson({ type: 'user-upload', provenance: 'demo.srt' })),
+    'Your subtitles',
+  );
+  assert.equal(
+    transcriptLabel(lesson({ type: 'generated', provenance: 'Whisper' })),
+    'AI subtitles',
+  );
+  assert.match(transcriptLabel(lesson({}, 'demo')), /Studio sample/);
+});
+
+test('only YouTube lessons on auto-generated captions offer a Whisper upgrade', () => {
+  const lesson = (provenance: string, source = 'youtube', videoId = 'IJ6R4u05ppw') =>
+    ({
+      source,
+      videoId,
+      transcriptSource: provenance,
+      transcript: { type: 'provider-captions', provenance },
+    }) as unknown as Lesson;
+  const path = whisperUpgradePath(lesson('YouTube captions via relay (auto-generated)'));
+  assert.ok(path);
+  const url = new URL(path, 'https://hibiki.example');
+  assert.equal(url.pathname, '/');
+  assert.equal(url.searchParams.get('video'), 'https://www.youtube.com/watch?v=IJ6R4u05ppw');
+  assert.equal(url.searchParams.get('subtitles'), 'generate');
+  assert.equal(whisperUpgradePath(lesson('youtube-transcript-plus')), null);
+  assert.equal(whisperUpgradePath(lesson('x (auto-generated)', 'upload')), null);
+  assert.equal(whisperUpgradePath(lesson('x (auto-generated)', 'youtube', '')), null);
 });

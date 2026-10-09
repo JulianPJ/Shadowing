@@ -78,6 +78,49 @@ test('generic homepage and existing YouTube preparation/playback work through mo
   await page.getByRole('button', { name: 'Replay R' }).click();
   await expect(page.getByTestId('playback-state')).toContainText('LISTEN CLOSELY');
 });
+test('auto-generated YouTube captions are labelled and hand the link to Whisper import', async ({
+  page,
+}) => {
+  await mockProAccount(page);
+  await page.goto('/');
+  await mockYouTube(page);
+  await page.route('**/api/prepare', (route) =>
+    route.fulfill({
+      contentType: 'application/x-ndjson',
+      body:
+        JSON.stringify({
+          lesson: {
+            ...demo,
+            id: `youtube-${id}`,
+            videoId: id,
+            source: 'youtube',
+            mediaUrl: undefined,
+            mediaSource: resolvedYoutube.media,
+            transcriptSource: 'production-relay (auto-generated)',
+            transcript: {
+              schemaVersion: 1,
+              type: 'provider-captions',
+              language: 'ja',
+              provenance: 'production-relay (auto-generated)',
+              normalizationVersion: 1,
+              segmentationVersion: 1,
+            },
+          },
+        }) + '\n',
+    }),
+  );
+  await startLink(page, videoUrl);
+  await expect(page.getByRole('button', { name: 'Listen', exact: true })).toBeEnabled();
+  await expect(page.getByText('YouTube auto-generated captions', { exact: false })).toBeVisible();
+  await page.getByRole('link', { name: 'Improve with Whisper', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Your next listening session.' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('textbox', { name: 'Video link' })).toHaveValue(videoUrl);
+  await expect(
+    dialog.getByRole('button', { name: 'Auto-generate subtitles', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true');
+  await expect(dialog.getByLabel('Audio or video for subtitle generation')).toBeAttached();
+});
 test('no-captions → own transcript retains link, identity, title and author without a second preparation request', async ({
   page,
 }) => {
@@ -255,144 +298,6 @@ test('manual video-link import accepts timed TXT and rejects untimed text withou
     .setInputFiles({ name: 'lesson.txt', mimeType: 'text/plain', buffer: Buffer.from(transcript) });
   await page.getByRole('button', { name: 'Start practicing' }).click();
   await expect(page.getByRole('button', { name: 'Listen', exact: true })).toBeEnabled();
-});
-test('public page discovery extracts media and metadata inertly, exposes the link, and never executes page scripts or iframes', async ({
-  page,
-}) => {
-  await page.goto('/');
-  const mediaBytes = fs.readFileSync('public/demo.mp4');
-  await page.route('https://media.example.test/clip.mp4*', (route) =>
-    route.fulfill({ contentType: 'video/mp4', body: mediaBytes }),
-  );
-  await page.route('https://page.example.test/watch', (route) =>
-    route.fulfill({
-      contentType: 'text/html',
-      headers: { 'Access-Control-Allow-Origin': '*' },
-      body: '<title>Extracted Japanese video</title><meta name="author" content="Creator"><video><source src="https://media.example.test/clip.mp4?token=secret" type="video/mp4"></video><script>window.pwned=true</script><iframe src="https://forbidden.example.test"></iframe>',
-    }),
-  );
-  let forbidden = 0;
-  page.on('request', (request) => {
-    if (request.url().includes('forbidden.example')) forbidden++;
-  });
-  await startLink(page, 'https://page.example.test/watch');
-  await expect(page.getByRole('dialog')).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Open extracted media' })).toHaveAttribute(
-    'href',
-    'https://media.example.test/clip.mp4?token=secret',
-  );
-  expect(
-    await page.evaluate(() => (window as unknown as { pwned?: boolean }).pwned),
-  ).toBeUndefined();
-  expect(forbidden).toBe(0);
-  await page.getByRole('button', { name: 'Upload own subtitles', exact: true }).click();
-  await page.getByLabel('Paste timestamped transcript').fill(transcript);
-  await page.getByRole('button', { name: 'Start practicing' }).click();
-  await expect(page.getByRole('heading', { name: 'Extracted Japanese video' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Listen', exact: true })).toBeEnabled();
-  const lesson = await page.evaluate(
-    () => JSON.parse(localStorage.getItem('hibiki:v1:history')!)[0].lesson,
-  );
-  expect(lesson.mediaSource.discoveredFrom).toBe('https://page.example.test/watch');
-  expect(lesson.id).not.toContain('secret');
-});
-test('metadata discovery supports OpenGraph and JSON-LD, and inaccessible/iframe-only pages remain unsupported', async ({
-  page,
-}) => {
-  await page.goto('/');
-  for (const [name, html] of [
-    ['og', '<meta property="og:video" content="https://media.example.test/a.mp4">'],
-    [
-      'json',
-      '<script type="application/ld+json">{"@type":"VideoObject","contentUrl":"https://media.example.test/b.webm"}</script>',
-    ],
-    [
-      'typed',
-      '<video><source src="https://media.example.test/play?id=7" type="video/mp4"></video>',
-    ],
-  ]) {
-    await page.route(`https://page.example.test/${name}`, (route) =>
-      route.fulfill({
-        contentType: 'text/html',
-        headers: { 'Access-Control-Allow-Origin': '*' },
-        body: html,
-      }),
-    );
-    await startLink(page, `https://page.example.test/${name}`);
-    await expect(page.getByRole('dialog')).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Open extracted media' })).toBeVisible();
-    await page.getByRole('button', { name: 'Close import', exact: true }).click();
-  }
-  for (const html of [
-    '<iframe src="https://thirdparty.test/player"></iframe>',
-    '<video src="javascript:alert(1)"></video>',
-    '<video src="https://127.0.0.1/a.mp4"></video>',
-  ]) {
-    await page.route('https://page.example.test/unsupported', (route) =>
-      route.fulfill({
-        contentType: 'text/html',
-        headers: { 'Access-Control-Allow-Origin': '*' },
-        body: html,
-      }),
-    );
-    await startLink(page, 'https://page.example.test/unsupported');
-    await expect(page.locator('.error-message[role="alert"]')).toContainText(
-      'does not expose a supported player',
-    );
-    await page.unroute('https://page.example.test/unsupported');
-  }
-  await page.route('https://page.example.test/blocked', (route) => route.abort('blockedbyclient'));
-  await startLink(page, 'https://page.example.test/blocked');
-  await expect(page.locator('.error-message[role="alert"]')).toContainText(
-    'direct audio/video link',
-  );
-});
-test('discovery bounds HTML, rejects redirects without following them, and recognizes extensionless direct media by MIME', async ({
-  page,
-}) => {
-  await page.goto('/');
-  await page.route('https://page.example.test/large', (route) =>
-    route.fulfill({
-      contentType: 'text/html',
-      headers: { 'Access-Control-Allow-Origin': '*' },
-      body: ' '.repeat(1_000_001),
-    }),
-  );
-  await startLink(page, 'https://page.example.test/large');
-  await expect(page.locator('.error-message[role="alert"]')).toContainText(
-    'does not expose a supported player',
-  );
-  let followed = 0;
-  await page.route('https://page.example.test/redirect', (route) =>
-    route.fulfill({
-      status: 302,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        Location: 'https://protected.example.test/page',
-      },
-    }),
-  );
-  await page.route('https://protected.example.test/page', (route) => {
-    followed++;
-    return route.abort();
-  });
-  await startLink(page, 'https://page.example.test/redirect');
-  await expect(page.locator('.error-message[role="alert"]')).toContainText(
-    'does not expose a supported player',
-  );
-  expect(followed).toBe(0);
-  await page.route('https://media.example.test/play?id=7', (route) =>
-    route.fulfill({
-      contentType: 'video/mp4',
-      headers: { 'Access-Control-Allow-Origin': '*' },
-      body: fs.readFileSync('public/demo.mp4'),
-    }),
-  );
-  await startLink(page, 'https://media.example.test/play?id=7');
-  await expect(page.getByRole('dialog')).toBeVisible();
-  await expect(page.getByLabel('Video link', { exact: true })).toHaveValue(
-    'https://media.example.test/play?id=7',
-  );
 });
 test('expanded local media selection reports browser decoding errors cleanly', async ({ page }) => {
   await page.goto('/');

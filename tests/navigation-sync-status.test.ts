@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { authPath, safeReturnPath } from '../src/lib/auth/return-path';
 import {
-  aggregateSync,
   channelStatus,
   reportChannel,
+  sessionExpired,
   setChannelOwner,
   syncFailure,
 } from '../src/lib/sync/channel-status';
@@ -14,6 +14,7 @@ test('auth returns preserve supported learning destinations and reject external 
     '/practice/demo?section=segment-2&lookup=%E8%A9%B1%E3%81%9B%E3%81%BE%E3%81%99';
   assert.equal(safeReturnPath(destination), destination);
   assert.equal(safeReturnPath('/dictionary?view=decks'), '/dictionary?view=decks');
+  assert.equal(safeReturnPath('/profile'), '/profile');
   assert.equal(
     authPath('/sign-in', destination),
     `/sign-in?returnTo=${encodeURIComponent(destination)}`,
@@ -33,41 +34,30 @@ test('auth returns preserve supported learning destinations and reject external 
     assert.equal(safeReturnPath(value), '/account', value);
 });
 
-test('account sync is complete only when learner, review and knowledge have all succeeded', () => {
+test('sync stays silent unless a signed-in account must sign in again', () => {
   setChannelOwner('learner');
-  const date = '2026-10-07T10:00:00.000Z';
-  reportChannel('learner', 'learner', { state: 'saved', lastSync: date });
-  assert.equal(aggregateSync(channelStatus()).state, 'pending');
-  reportChannel('learner', 'review', { state: 'saved', lastSync: date });
-  reportChannel('learner', 'knowledge', { state: 'saved', lastSync: date });
-  reportChannel('learner', 'discovery', { state: 'saved', lastSync: date });
-  assert.equal(aggregateSync(channelStatus()).state, 'saved');
-  reportChannel('learner', 'review', { state: 'saved', pending: 1 });
-  assert.equal(aggregateSync(channelStatus()).state, 'pending');
-  reportChannel('learner', 'review', { state: 'syncing', pending: 1 });
-  assert.equal(aggregateSync(channelStatus()).state, 'syncing');
-  reportChannel('learner', 'knowledge', { state: 'error', message: 'Word sync unavailable' });
-  assert.equal(aggregateSync(channelStatus()).state, 'error');
-  assert.equal(aggregateSync(channelStatus()).message, 'Word sync unavailable');
+  for (const state of ['syncing', 'pending', 'error', 'offline', 'conflict'] as const) {
+    reportChannel('learner', 'review', { state });
+    assert.equal(sessionExpired(channelStatus()), false, state);
+  }
+  reportChannel('learner', 'knowledge', syncFailure({ status: 401 }, true));
+  assert.equal(sessionExpired(channelStatus()), true);
+  reportChannel('learner', 'knowledge', { state: 'saved', message: '' });
+  assert.equal(sessionExpired(channelStatus()), false);
   setChannelOwner(null);
 });
 
-test('last complete sync uses the oldest channel confirmation and account changes discard old status', () => {
+test('account changes discard the previous account status', () => {
   setChannelOwner('one');
-  for (const [channel, date] of [
-    ['learner', '2026-10-07T12:00:00.000Z'],
-    ['review', '2026-10-07T11:00:00.000Z'],
-    ['knowledge', '2026-10-07T10:00:00.000Z'],
-    ['discovery', '2026-10-07T10:30:00.000Z'],
-  ] as const)
-    reportChannel('one', channel, { state: 'saved', lastSync: date });
-  assert.equal(aggregateSync(channelStatus()).lastSync, '2026-10-07T10:00:00.000Z');
+  reportChannel('one', 'learner', { state: 'auth' });
+  assert.equal(sessionExpired(channelStatus()), true);
   setChannelOwner('two');
-  reportChannel('one', 'learner', { state: 'error', pending: 2 });
+  reportChannel('one', 'learner', { state: 'auth' });
   assert.equal(channelStatus().learner.state, 'idle');
-  assert.equal(aggregateSync(channelStatus()).lastSync, null);
+  assert.equal(sessionExpired(channelStatus()), false);
   setChannelOwner(null);
-  assert.equal(aggregateSync(channelStatus()).state, 'local');
+  reportChannel('two', 'learner', { state: 'auth' });
+  assert.equal(sessionExpired(channelStatus()), false);
 });
 
 test('sync distinguishes server failures, disconnection, expired sessions and review conflicts', () => {

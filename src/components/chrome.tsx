@@ -9,78 +9,85 @@ import {
   Headphones,
   Mic,
   Repeat2,
-  Keyboard,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { AccountEntry } from './account';
-import { ThemeToggle } from './theme-toggle';
-import { ReviewLink } from './review-link';
-import { useTaskReturn } from './task-return';
 import { usePathname } from 'next/navigation';
+import { ThemeToggle } from './theme-toggle';
+import { useAccount } from './account';
+import { useReview } from './use-review';
+import { dueReviews } from '@/lib/review-scheduler';
+import { authPath } from '@/lib/auth/return-path';
+import { useTaskReturn } from './task-return';
 
-export function Header({ onHelp, player = false }: { onHelp: () => void; player?: boolean }) {
-  const pathname = usePathname();
+/** Three sections: Home (practice, Discover, Library), Vocabulary and Profile. */
+const sections = [
+  { label: 'Home', href: '/', paths: ['/', '/discover', '/library', '/prepare'] },
+  { label: 'Vocabulary', href: '/review', paths: ['/review', '/words', '/dictionary'] },
+  { label: 'Profile', href: '/profile', paths: ['/profile', '/progress', '/account'] },
+] as const;
+
+function DueCount() {
+  const account = useAccount();
+  const { data } = useReview();
+  const count = account.user ? dueReviews(data.cards, new Date().toISOString()).length : 0;
+  return count ? (
+    <span className="nav-badge" aria-label={`${count} due`}>
+      {count}
+    </span>
+  ) : null;
+}
+
+/** Rendered once by the root layout so navigation keeps its state across routes. */
+export function Header() {
+  const pathname = usePathname() ?? '/';
+  const account = useAccount();
+  const { destination } = useTaskReturn();
   const [menuOpen, setMenuOpen] = useState(false);
   const menu = useRef<HTMLDialogElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
-  useTaskReturn();
   useEffect(() => {
     if (menuOpen) menu.current?.showModal();
     else menu.current?.close();
   }, [menuOpen]);
+  useEffect(() => {
+    // Client navigation closes the mobile menu.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMenuOpen(false);
+  }, [pathname]);
   function closeMenu() {
     setMenuOpen(false);
     menu.current?.close();
     trigger.current?.focus();
   }
-  function navigation(mobile = false) {
-    return (
-      <>
-        {process.env.NEXT_PUBLIC_DISCOVER_ENABLED !== 'false' ? (
-          <Link
-            className="nav-link"
-            href="/discover"
-            aria-current={pathname === '/discover' ? 'page' : undefined}
-          >
-            Discover
-          </Link>
-        ) : null}
-        <Link className="nav-link" href="/library">
-          Library
-        </Link>
-        <Link className="nav-link" href="/dictionary">
-          Vocabulary
-        </Link>
-        <ReviewLink />
-        <Link className="nav-link" href="/progress">
-          Progress
-        </Link>
-        <AccountEntry drawer={!mobile} />
-        <button
+  const links = (
+    <>
+      {sections.map((section) => (
+        <Link
+          key={section.href}
           className="nav-link"
-          onClick={() => {
-            closeMenu();
-            onHelp();
-          }}
+          href={section.href}
+          aria-current={
+            (section.paths as readonly string[]).some(
+              (path) => pathname === path || (path !== '/' && pathname.startsWith(`${path}/`)),
+            )
+              ? 'page'
+              : undefined
+          }
         >
-          {player ? (
-            <>
-              <Keyboard size={16} /> Shortcuts
-            </>
-          ) : (
-            'How it works'
-          )}
-        </button>
-        <ThemeToggle />
-        <Link className="nav-demo" href={player ? '/' : '/practice/demo'}>
-          {player ? 'New practice' : 'Try a practice'}
-          <ArrowUpRight size={15} />
+          {section.label}
+          {section.label === 'Vocabulary' ? <DueCount /> : null}
         </Link>
-      </>
-    );
-  }
+      ))}
+      {account.loaded && !account.user ? (
+        <Link className="nav-link" href={authPath('/sign-in', destination)}>
+          Sign in
+        </Link>
+      ) : null}
+      <ThemeToggle />
+    </>
+  );
   return (
-    <header className={`site-header ${player ? 'practice-header' : ''}`}>
+    <header className="site-header">
       <div className="header-inner">
         <Link className="brand" href="/" aria-label="Hibiki home">
           <span className="brand-mark">
@@ -94,7 +101,7 @@ export function Header({ onHelp, player = false }: { onHelp: () => void; player?
           </span>
         </Link>
         <nav className="desktop-navigation" aria-label="Main navigation">
-          {navigation()}
+          {links}
         </nav>
         <button
           ref={trigger}
@@ -129,52 +136,45 @@ export function Header({ onHelp, player = false }: { onHelp: () => void; player?
             if ((event.target as Element).closest('a')) closeMenu();
           }}
         >
-          {navigation(true)}
+          {links}
         </nav>
       </dialog>
     </header>
   );
 }
-export function StandaloneNavigation({
-  vocabularyView,
+
+/** Sub-navigation inside a section, e.g. Discover/Library or Review/Words. */
+export function SectionTabs({
+  label,
+  tabs,
+  active,
 }: {
-  vocabularyView?: 'saved' | 'decks' | 'review' | 'knowledge';
+  label: string;
+  tabs: readonly (readonly [key: string, title: React.ReactNode, href: string])[];
+  active: string;
 }) {
-  const [help, setHelp] = useState(false);
-  const { practice } = useTaskReturn();
   return (
-    <>
-      <Header onHelp={() => setHelp(true)} />
-      <div className="standalone-navigation">
-        <Link className="task-return" href={practice}>
-          <ArrowLeft size={18} />
-          {practice.startsWith('/practice/') ? 'Back to practice' : 'Home'}
+    <nav className="section-tabs" aria-label={label}>
+      {tabs.map(([key, title, href]) => (
+        <Link key={key} href={href} aria-current={key === active ? 'page' : undefined}>
+          {title}
         </Link>
-        {vocabularyView ? (
-          <nav className="vocabulary-navigation" aria-label="Vocabulary views">
-            {(
-              [
-                ['saved', 'Saved words', '/dictionary'],
-                ['decks', 'Decks', '/dictionary?view=decks'],
-                ['review', 'Review', '/review'],
-                ['knowledge', 'Word knowledge', '/words'],
-              ] as const
-            ).map(([view, label, href]) => (
-              <Link
-                key={view}
-                href={href}
-                aria-current={view === vocabularyView ? 'page' : undefined}
-              >
-                {label}
-              </Link>
-            ))}
-          </nav>
-        ) : null}
-      </div>
-      <HelpDialog open={help} onClose={() => setHelp(false)} />
-    </>
+      ))}
+    </nav>
   );
 }
+
+/** Returns to the paused lesson after a detour into Vocabulary or Profile. */
+export function TaskReturn() {
+  const { practice } = useTaskReturn();
+  return practice.startsWith('/practice/') ? (
+    <Link className="task-return" href={practice}>
+      <ArrowLeft size={18} />
+      Back to practice
+    </Link>
+  ) : null;
+}
+
 export function Footer() {
   return (
     <footer className="site-footer">
@@ -183,6 +183,17 @@ export function Footer() {
     </footer>
   );
 }
+
+const shortcuts = [
+  ['Space', 'Play / pause'],
+  ['R', 'Replay section'],
+  ['Enter', 'Continue'],
+  ['← / →', 'Previous / next'],
+  ['T', 'Translation'],
+  ['M', 'Record / stop'],
+  ['P', 'Play your recording'],
+] as const;
+
 export function HelpDialog({
   open,
   onClose,
@@ -234,20 +245,20 @@ export function HelpDialog({
         </div>
       </div>
       {player ? (
-        <div className="shortcut-grid">
-          {[
-            ['Space', 'Play / pause'],
-            ['R', 'Replay section'],
-            ['Enter', 'Continue'],
-            ['← / →', 'Previous / next'],
-            ['T', 'Translation'],
-          ].map(([key, label]) => (
-            <div key={key}>
-              <kbd>{key}</kbd>
-              <span>{label}</span>
-            </div>
-          ))}
-        </div>
+        <>
+          <div className="shortcut-grid">
+            {shortcuts.map(([key, label]) => (
+              <div key={key}>
+                <kbd>{key}</kbd>
+                <span>{label}</span>
+              </div>
+            ))}
+          </div>
+          <p className="small muted">
+            Revealing a translation sends that Japanese section and its neighbours to the
+            translation service. Recordings never leave your device unless you ask for analysis.
+          </p>
+        </>
       ) : (
         <p className="small muted">
           Start with the built-in sample, paste a YouTube link, or import your own media and

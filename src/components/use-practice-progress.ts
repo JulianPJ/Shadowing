@@ -8,23 +8,19 @@ const subscribeAccount = (callback: () => void) => {
 };
 import type { Lesson, Segment } from '@/lib/types';
 import type { PracticeSession } from '@/lib/learner-types';
+import { RESUME_WINDOW_MS, lessonIdentity } from '@/lib/learner/constants';
 import {
-  RESUME_WINDOW_MS,
   createSession,
-  lessonIdentity,
   recordSignal,
   resumableSession,
   type PracticeSignal,
-} from '@/lib/learner-progress';
-import {
-  loadLearnerHistory,
-  migrateLearnerHistory,
-  savePracticeSession,
-} from '@/lib/learner-storage';
-import { transcriptKey } from '@/lib/quiz';
+} from '@/lib/learner/sessions';
+import { loadLearnerHistory, savePracticeSession } from '@/lib/learner/persistence';
+import { migrateLearnerHistory } from '@/lib/learner/migration';
+import { transcriptKey } from '@/lib/transcript';
 import { PlaybackActivity, PracticeClock } from '@/lib/practice-clock';
 import { PracticeCheckpoint } from '@/lib/practice-checkpoint';
-import { progressStorageFailed } from '@/lib/storage';
+import { progressStorageFailed } from '@/lib/storage/browser';
 
 type Controller = {
   signal: (segment: Segment, signal: PracticeSignal) => void;

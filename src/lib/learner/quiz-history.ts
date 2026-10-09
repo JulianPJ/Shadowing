@@ -1,6 +1,6 @@
 import { object } from '../transcript-validation';
-import { QUESTION_KINDS } from '../quiz';
-import { readStorage } from '../storage';
+import { QUESTION_KINDS } from '../quiz/questions';
+import { readStorage } from '../storage/browser';
 import type { QuizAttempt, QuizAnswerResult } from '../types';
 // Existing quiz history is the sole source. Validate portable attempts even when
 // the old lesson/quiz revision is no longer present; never duplicate their content.

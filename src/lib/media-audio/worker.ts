@@ -13,7 +13,6 @@ import {
   StreamTarget,
   WavOutputFormat,
   type InputAudioTrack,
-  type EncodedPacket,
 } from 'mediabunny';
 import {
   AUDIO_SAMPLE_RATE,
@@ -34,7 +33,6 @@ let track: InputAudioTrack | undefined;
 let windows: ReturnType<typeof audioChunkWindows> = [];
 let next = 0;
 let running = false;
-let lastCopiedPacket: EncodedPacket | undefined;
 let copyAudio = false;
 
 async function initialize(file: File, range?: { start: number; end: number }) {
@@ -71,7 +69,6 @@ async function initialize(file: File, range?: { start: number; end: number }) {
     windows = [{ index: 0, start: range.start, end: Math.min(range.end, end) }];
   } else windows = audioChunkWindows(start, end);
   next = 0;
-  lastCopiedPacket = undefined;
   scope.postMessage({
     type: 'ready',
     info: {
@@ -231,14 +228,12 @@ async function extract() {
 async function copyAac(window: { index: number; start: number; end: number }) {
   if (!track) throw new Error('Choose the media file again to prepare its audio.');
   const sink = new EncodedPacketSink(track);
-  let packet = lastCopiedPacket
-    ? await sink.getNextPacket(lastCopiedPacket)
-    : ((await sink.getPacket(window.start)) ?? (await sink.getFirstPacket()));
+  // Windows overlap, so each copy starts from the packet covering its own window start.
+  let packet = (await sink.getPacket(window.start)) ?? (await sink.getFirstPacket());
   while (packet && packet.timestamp < 0) packet = await sink.getNextPacket(packet);
   if (!packet) throw new Error('This audio track contains no readable packets.');
   const start = packet.timestamp;
   let end = start;
-  let finalPacket: EncodedPacket | undefined;
   let payloadBytes = 0;
   const target = new BufferTarget();
   const output = new Output({ format: new Mp4OutputFormat({ fastStart: 'in-memory' }), target });
@@ -262,21 +257,16 @@ async function copyAac(window: { index: number; start: number; end: number }) {
         decoderConfig: config,
       });
       end = packet.timestamp + packet.duration;
-      finalPacket = packet;
       packet = await sink.getNextPacket(packet);
     }
     source.close();
     await output.finalize();
-    if (!target.buffer || target.buffer.byteLength > 9 * 1024 * 1024 || end - start > 121)
+    if (!target.buffer || target.buffer.byteLength > 9 * 1024 * 1024 || end - start > 122)
       throw new Error(
         'This audio track exceeds the bounded preparation limit. Add subtitles manually.',
       );
     canonicalizeAudioMp4(target.buffer);
     next++;
-    // A chunk boundary is an AAC packet boundary. Do not duplicate a partially covered packet
-    // if the following chunk later needs the PCM compatibility path.
-    if (windows[next] && end < windows[next].end) windows[next].start = end;
-    lastCopiedPacket = finalPacket;
     scope.postMessage(
       {
         type: 'chunk',

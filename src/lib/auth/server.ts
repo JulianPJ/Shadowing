@@ -11,18 +11,6 @@ export type AuthEnvironment = {
   AUTH_EMAIL_FROM?: string;
 };
 export type AuthMail = { to: string; subject: string; text: string };
-export function authEnvironment(): AuthEnvironment {
-  return Object.fromEntries(
-    [
-      'AUTH_SECRET',
-      'AUTH_BASE_URL',
-      'GOOGLE_CLIENT_ID',
-      'GOOGLE_CLIENT_SECRET',
-      'RESEND_API_KEY',
-      'AUTH_EMAIL_FROM',
-    ].map((key) => [key, process.env[key]]),
-  );
-}
 
 export function createAuth(
   database: NonNullable<BetterAuthOptions['database']>,

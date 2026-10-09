@@ -6,7 +6,6 @@ import {
   validateDictionaryIds,
   validateDictionaryQuery,
 } from './query';
-import type { Tag } from '../tags/types';
 
 export interface DictionaryStatement {
   bind(...values: (string | number | null)[]): DictionaryStatement;
@@ -74,28 +73,6 @@ source_sentence_translation,lesson_id,segment_id,lesson_title,lesson_author,medi
 media_url,media_content_key,transcript_key,section_start,section_end,created_at,updated_at`;
 
 export function createD1DictionaryRepository(db: DictionaryDatabase): DictionaryRepository {
-  async function hydrate(userId: string, entries: DictionaryEntry[]) {
-    for (let i = 0; i < entries.length; i += 50) {
-      const part = entries.slice(i, i + 50);
-      const rows = await db
-        .prepare(
-          `SELECT m.entry_id AS entryId,t.id,t.name,t.normalized_name AS normalizedName,t.created_at AS createdAt,t.updated_at AS updatedAt FROM user_dictionary_tags m JOIN user_tags t ON t.user_id=m.user_id AND t.id=m.tag_id WHERE m.user_id=? AND m.entry_id IN (${part.map(() => '?').join(',')}) ORDER BY t.normalized_name,t.id`,
-        )
-        .bind(userId, ...part.map((e) => e.id))
-        .all<Tag & { entryId: string }>();
-      for (const e of part)
-        e.tags = rows.results
-          .filter((r) => r.entryId === e.id)
-          .map(({ id, name, normalizedName, createdAt, updatedAt }) => ({
-            id,
-            name,
-            normalizedName,
-            createdAt,
-            updatedAt,
-          }));
-    }
-    return entries;
-  }
   const repository: DictionaryRepository = {
     async page(userId, input) {
       const query = validateDictionaryQuery(input);
@@ -117,14 +94,6 @@ export function createD1DictionaryRepository(db: DictionaryDatabase): Dictionary
         );
         values.push(pattern, pattern, pattern);
       }
-      for (const [table, field, value] of [
-        ['user_deck_entries', 'deck_id', query.deckId],
-        ['user_dictionary_tags', 'tag_id', query.tagId],
-      ] as const)
-        if (value) {
-          conditions.push(`id IN (SELECT entry_id FROM ${table} WHERE user_id=? AND ${field}=?)`);
-          values.push(userId, value);
-        }
       if (query.cursor) {
         const cursor = parseDictionaryCursor(query.cursor);
         conditions.push('(created_at,id)<(?,?)');
@@ -136,7 +105,7 @@ export function createD1DictionaryRepository(db: DictionaryDatabase): Dictionary
         )
         .bind(...values, query.limit + 1)
         .all<DictionaryRow>();
-      const entries = await hydrate(userId, rows.results.slice(0, query.limit).map(entry));
+      const entries = rows.results.slice(0, query.limit).map(entry);
       const last = entries.at(-1);
       return {
         entries,
@@ -154,7 +123,7 @@ export function createD1DictionaryRepository(db: DictionaryDatabase): Dictionary
         )
         .bind(userId, ...ids)
         .all<DictionaryRow>();
-      return hydrate(userId, rows.results.map(entry));
+      return rows.results.map(entry);
     },
     async list(userId) {
       // Compatibility facade for explicit full traversal. UI consumers use bounded queries.
@@ -220,19 +189,7 @@ export function createD1DictionaryRepository(db: DictionaryDatabase): Dictionary
         .bind(userId, normalized, s.lessonId, s.segmentId)
         .first<DictionaryRow>();
       if (!row) throw new Error('Dictionary write unavailable');
-      await db
-        .prepare(
-          `INSERT OR IGNORE INTO user_decks(user_id,id,name,created_at,updated_at) VALUES (?,'inbox','Inbox',?,?)`,
-        )
-        .bind(userId, now, now)
-        .run();
-      await db
-        .prepare(
-          `INSERT OR IGNORE INTO user_deck_entries(user_id,deck_id,entry_id) VALUES (?,'inbox',?)`,
-        )
-        .bind(userId, row.id)
-        .run();
-      return (await hydrate(userId, [entry(row)]))[0];
+      return entry(row);
     },
     async remove(userId, id) {
       await db

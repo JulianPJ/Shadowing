@@ -1,7 +1,8 @@
 import { installMemoryStorage } from './helpers/memory-storage';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { loadPreferences, writeStorage } from '../src/lib/storage';
+import { loadPreferences } from '../src/lib/storage/preferences';
+import { writeStorage } from '../src/lib/storage/browser';
 
 const values = new Map<string, string>();
 installMemoryStorage(values);
@@ -13,6 +14,7 @@ test('display preferences default off and old saved mode/speed survive', () => {
     translation: false,
     studioMode: false,
     furigana: false,
+    subtitleOverlay: false,
     playbackOffsetMs: 0,
   });
   writeStorage('preferences', { mode: 'continuous', speed: 0.75, translation: true });
@@ -22,6 +24,7 @@ test('display preferences default off and old saved mode/speed survive', () => {
     translation: false,
     studioMode: false,
     furigana: false,
+    subtitleOverlay: false,
     playbackOffsetMs: 0,
   });
 });
@@ -32,6 +35,7 @@ test('display and playback offset preferences persist using the existing version
     translation: false,
     studioMode: true,
     furigana: true,
+    subtitleOverlay: true,
     playbackOffsetMs: 350,
   } as const;
   writeStorage('preferences', prefs);
@@ -53,6 +57,7 @@ test('corrupt or malformed preferences use strict safe defaults', () => {
       translation: false,
       studioMode: false,
       furigana: false,
+      subtitleOverlay: false,
       playbackOffsetMs: 0,
     });
   }

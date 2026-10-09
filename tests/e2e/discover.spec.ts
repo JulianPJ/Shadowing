@@ -50,9 +50,6 @@ test.beforeEach(async ({ page }) => {
   await page.route('**/api/account/me', (route) =>
     route.fulfill({ json: { user: null, googleEnabled: false, emailEnabled: false } }),
   );
-  await page.route('**/api/discovery', (route) =>
-    route.fulfill({ json: { lessons: [], difficulties: [] } }),
-  );
   await catalog(page);
 });
 test('feed browses all six bands, filters, persists search and never prepares on scroll', async ({
@@ -70,7 +67,7 @@ test('feed browses all six bands, filters, persists search and never prepares on
   });
   await page.goto('/discover');
   await expect(
-    page.getByRole('heading', { name: 'Find something worth listening to.' }),
+    page.getByRole('heading', { name: 'Find something worth listening to' }),
   ).toBeVisible();
   await expect(page.locator('.discover-card')).not.toHaveCount(0);
   for (const [, label] of BANDS)
@@ -447,14 +444,14 @@ test('a full account queue preserves device-only media and reveals retained acco
   await expect(page.locator('.library-queue li')).toHaveCount(40);
   await expect(page.locator('.library-queue')).toContainText('Device-only Vimeo');
   await expect(
-    page.getByRole('status').filter({ hasText: 'beyond this device’s 40-link view' }),
-  ).toContainText('1 account save');
+    page.getByRole('status').filter({ hasText: 'beyond this device’s 40-link list' }),
+  ).toContainText('1 more saved video');
   await page
     .getByRole('button', { name: 'Remove Device-only Vimeo from queue', exact: true })
     .click();
   await expect(page.locator('.library-queue li')).toHaveCount(40);
   await expect(page.locator('.library-queue')).toContainText('Account save 39');
   await expect(
-    page.getByRole('status').filter({ hasText: 'beyond this device’s 40-link view' }),
+    page.getByRole('status').filter({ hasText: 'beyond this device’s 40-link list' }),
   ).toHaveCount(0);
 });

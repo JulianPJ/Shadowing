@@ -1,12 +1,8 @@
 import demo from '../../../data/demo.json';
 import demoQuiz from '../../../data/demo-quiz.json';
-import {
-  createGeneratedQuiz,
-  createQuiz,
-  object,
-  QuizValidationError,
-  transcriptRevision,
-} from '../../quiz';
+import { createGeneratedQuiz, createQuiz } from '../../quiz/document';
+import { object, QuizValidationError } from '../../transcript-validation';
+import { transcriptRevision } from '../../transcript';
 import type { LessonQuiz, QuizGenerationProvider, QuizLesson } from '../../types';
 import { MIN_QUIZ_JAPANESE_CHARS } from './prompts';
 import { quizJapaneseCharacterCount } from './selection';

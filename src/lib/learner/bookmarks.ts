@@ -1,8 +1,8 @@
 import demo from '@/data/demo.json';
 import { transcriptKey, validateQuizLesson } from '../transcript';
 import { object } from '../transcript-validation';
-import { readStorage } from '../storage';
-import { lessonIdentity } from '../learner-progress';
+import { readStorage } from '../storage/browser';
+import { lessonIdentity } from './constants';
 import type { BookmarkSnapshot, LearnerHistory, LessonIdentity } from '../learner-types';
 import type { Lesson } from '../types';
 export function availableLesson(id: string): Lesson | null {
@@ -15,7 +15,7 @@ export function availableLesson(id: string): Lesson | null {
       typeof r.title !== 'string' ||
       !r.title.trim() ||
       typeof r.author !== 'string' ||
-      !['demo', 'youtube', 'vimeo', 'direct', 'upload'].includes(r.source as string)
+      !['demo', 'youtube', 'vimeo', 'direct', 'upload', 'page'].includes(r.source as string)
     )
       return null;
     return { ...r, ...normalized } as Lesson;

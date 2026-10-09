@@ -118,9 +118,12 @@
   overflow: hidden;
   min-height: 296px;
 }
+/* The zoom hides the poster's own footer line; anchoring left keeps its lettering whole. */
 .demo-art img {
   object-fit: cover;
+  object-position: left center;
   transform: scale(1.19);
+  transform-origin: left center;
 }
 .demo-art-play {
   position: absolute;
@@ -204,15 +207,6 @@
 .demo-button:hover {
   background: #e5eadc;
 }
-.demo-note {
-  display: block;
-  font-size: 9px;
-  color: #979d8b;
-  margin-top: 9px;
-}
-.rhythm-section {
-  padding: 51px 0 40px;
-}
 .section-heading {
   display: flex;
   align-items: center;
@@ -221,68 +215,6 @@
 }
 .section-heading .small {
   font-size: 10px;
-}
-.rhythm-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  margin-top: 25px;
-}
-.rhythm-grid > div {
-  position: relative;
-  padding: 0 38px;
-}
-.rhythm-grid > div:first-child {
-  padding-left: 0;
-}
-.rhythm-grid > div:last-child {
-  padding-right: 0;
-}
-.rhythm-grid > div + div {
-  border-left: 1px solid var(--line);
-}
-.step-icon {
-  display: inline-flex;
-  width: 45px;
-  height: 45px;
-  background: #eeeee4;
-  align-items: center;
-  justify-content: center;
-  border-radius: 13px;
-  color: #828970;
-}
-.step-number {
-  float: right;
-  color: #caccc0;
-  font-family: Georgia, serif;
-  font-size: 21px;
-}
-.rhythm-grid h3 {
-  font-size: 15px;
-  font-weight: 500;
-  margin: 15px 0 7px;
-  letter-spacing: -0.3px;
-}
-.rhythm-grid p {
-  color: #969a8b;
-  font-size: 11px;
-  line-height: 1.9;
-  max-width: 285px;
-}
-.home-signoff {
-  text-align: center;
-  padding: 30px 0 50px;
-  border-top: 1px solid var(--line);
-  color: #919580;
-}
-.home-signoff span {
-  font-size: 16px;
-  letter-spacing: 4px;
-}
-.home-signoff p {
-  font-size: 10px;
-  margin-top: 9px;
-  color: #a1a592;
-  letter-spacing: 0.3px;
 }
 .recent-section {
   padding: 34px 0 0;
@@ -310,17 +242,6 @@
 }
 .recent-card:hover {
   border-color: #c3cbba;
-}
-.recent-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--green-pale);
-  color: var(--green);
-  width: 38px;
-  height: 38px;
-  border-radius: 9px;
-  flex-shrink: 0;
 }
 .recent-card div {
   min-width: 0;

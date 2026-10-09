@@ -2,8 +2,11 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { ArrowRight, Check, LoaderCircle, RotateCcw } from 'lucide-react';
 import type { Lesson, LessonQuiz, QuizAttempt, QuizEvidence } from '@/lib/types';
-import { newAttempt, object, updateAttempt, validateQuiz, validateQuizLesson } from '@/lib/quiz';
-import { loadQuiz, loadQuizAttempt, saveQuiz, saveQuizAttempt } from '@/lib/storage';
+import { newAttempt, updateAttempt } from '@/lib/quiz/attempts';
+import { object } from '@/lib/transcript-validation';
+import { validateQuiz } from '@/lib/quiz/document';
+import { validateQuizLesson } from '@/lib/transcript';
+import { loadQuiz, loadQuizAttempt, saveQuiz, saveQuizAttempt } from '@/lib/storage/learning';
 import { timestamp } from '@/lib/youtube';
 import { JapaneseText } from './japanese-text';
 import { postContentRequest } from '@/lib/content-request';

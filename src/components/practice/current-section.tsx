@@ -17,6 +17,7 @@ import type { Lesson, Mode, PlaybackState, Segment } from '@/lib/types';
 import { timestamp } from '@/lib/youtube';
 import { JapaneseText } from '../japanese-text';
 import { DictionarySavePanel } from '../dictionary-save';
+import { useElapsed, type ElapsedStore } from './elapsed-store';
 type CurrentSectionProps = {
   recording: boolean;
   status: PlaybackState;
@@ -33,7 +34,7 @@ type CurrentSectionProps = {
   translationProvider: string;
   translationError: string;
   setTranslationError: (message: string) => void;
-  percent: number;
+  elapsed: ElapsedStore;
   ready: boolean;
   index: number;
   navigate: (index: number, play?: boolean) => void;
@@ -60,7 +61,7 @@ export function CurrentSection({
   translationProvider,
   translationError,
   setTranslationError,
-  percent,
+  elapsed,
   ready,
   index,
   navigate,
@@ -182,9 +183,7 @@ export function CurrentSection({
           </button>
         </p>
       ) : null}
-      <div className="section-track" aria-label="Section playback progress">
-        <span style={{ width: `${percent}%` }} />
-      </div>
+      <SectionTrack elapsed={elapsed} start={segment.start} end={segment.end} />
       <div className="practice-controls">
         <button
           className="icon-button previous-button"
@@ -276,5 +275,24 @@ export function CurrentSection({
         </p>
       ) : null}
     </section>
+  );
+}
+
+/** Subscribes to playback time on its own so ticks don't re-render the section card. */
+function SectionTrack({
+  elapsed,
+  start,
+  end,
+}: {
+  elapsed: ElapsedStore;
+  start: number;
+  end: number;
+}) {
+  const time = useElapsed(elapsed);
+  const percent = Math.min(100, Math.max(0, ((time - start) / (end - start)) * 100));
+  return (
+    <div className="section-track" aria-label="Section playback progress">
+      <span style={{ width: `${percent}%` }} />
+    </div>
   );
 }

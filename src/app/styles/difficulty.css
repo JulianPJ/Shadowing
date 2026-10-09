@@ -44,31 +44,6 @@
   min-height: 44px;
   margin: 8px 0;
 }
-.difficulty-details {
-  border-top: 1px solid var(--line);
-  padding-top: 14px;
-}
-.difficulty-details h3 {
-  font-size: 14px;
-  font-weight: 500;
-  margin: 0 0 7px;
-}
-.difficulty-details p {
-  margin: 7px 0;
-}
-.difficulty-dimension {
-  margin-top: 18px;
-}
-.difficulty-dimension ul {
-  margin: 10px 0;
-  padding-left: 18px;
-}
-.difficulty-dimension li {
-  margin: 10px 0;
-}
-.difficulty-dimension q {
-  font-size: 14px;
-}
 @media (max-width: 700px) {
   .difficulty-card {
     padding: 18px;

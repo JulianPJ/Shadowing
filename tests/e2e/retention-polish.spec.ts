@@ -3,7 +3,8 @@ import { readFile } from 'node:fs/promises';
 import demo from '../../src/data/demo.json' with { type: 'json' };
 import questions from '../../src/data/demo-quiz.json' with { type: 'json' };
 import { connect, seed } from '../helpers/retention-account';
-import { createQuiz, newAttempt, updateAttempt } from '../../src/lib/quiz';
+import { createQuiz } from '../../src/lib/quiz/document';
+import { newAttempt, updateAttempt } from '../../src/lib/quiz/attempts';
 import { transcriptRevision } from '../../src/lib/transcript';
 import type { Lesson } from '../../src/lib/types';
 import authored from '../../src/data/demo-difficulty.json' with { type: 'json' };
@@ -161,43 +162,6 @@ test('completion combines cached match, completed quiz and explainable revisit l
   await expect(recap.locator('.completion-revisit li')).toHaveCount(2);
   expect(inference).toEqual([]);
 });
-test('tags are optional metadata: create Japanese, bulk tag, combine deck/tag filters, rename/delete without schedule loss', async ({
-  page,
-  context,
-}) => {
-  const remote = await connect(context);
-  await seed(remote, 2);
-  await page.goto('/dictionary');
-  await expect(page.locator('.dictionary-entry')).toHaveCount(2);
-  await page.getByText('Tags · describe your words', { exact: true }).click();
-  await page.getByLabel('Tag name').fill('旅行');
-  await page.getByRole('button', { name: 'Create tag', exact: true }).click();
-  await expect.poll(() => remote.tags.length).toBe(1);
-  await page
-    .getByRole('combobox', { name: 'Manage tag', exact: true })
-    .selectOption({ label: '旅行' });
-  await page.getByLabel('Select 朝', { exact: true }).check();
-  await page.getByRole('button', { name: 'Tag selected entries' }).click();
-  await expect(page.getByRole('button', { name: 'Remove tag 旅行 from 朝' })).toBeVisible();
-  await page.getByLabel('Filter by tag').selectOption({ label: '旅行' });
-  await page.getByLabel('Filter by deck').selectOption('inbox');
-  await expect(page.locator('.dictionary-entry')).toHaveCount(1);
-  await expect(page.getByLabel('Select 朝', { exact: true })).not.toBeChecked();
-  await page.getByText('Export saved words', { exact: true }).click();
-  const download = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Export filtered TSV' }).click();
-  const tsv = await readFile((await (await download).path())!, 'utf8');
-  expect(tsv).toContain('旅行');
-  expect(tsv).toContain('Inbox');
-  await page.getByLabel('Tag name').fill('旅');
-  await page.getByRole('button', { name: 'Rename tag' }).click();
-  await expect.poll(() => remote.tags[0].name).toBe('旅');
-  page.once('dialog', (dialog) => dialog.accept());
-  await page.getByRole('button', { name: 'Delete tag', exact: true }).click();
-  await expect.poll(() => remote.tags.length).toBe(0);
-  expect(remote.entries).toHaveLength(2);
-  expect(remote.review.cards).toHaveLength(2);
-});
 test('cursor UI and complete export reach old vocabulary; targeted review remains offline after unrelated pages', async ({
   page,
   context,
@@ -209,7 +173,6 @@ test('cursor UI and complete export reach old vocabulary; targeted review remain
   old.term = '古い語';
   old.createdAt = '2026-01-01T00:00:00.000Z';
   remote.review.cards[0].entryId = old.id;
-  remote.review.memberships[0].entryId = old.id;
   for (let i = 1; i <= 805; i++)
     remote.entries.push({
       ...old,
@@ -224,13 +187,13 @@ test('cursor UI and complete export reach old vocabulary; targeted review remain
   await page.goto('/dictionary');
   await expect(page.locator('.dictionary-entry')).toHaveCount(100);
   for (let i = 0; i < 8; i++) {
-    await page.getByRole('button', { name: 'Load more saved words', exact: true }).click();
+    await page.getByRole('button', { name: 'Load more words', exact: true }).click();
     await expect(page.locator('.dictionary-entry')).toHaveCount(Math.min(806, (i + 2) * 100));
   }
   await expect(page.getByRole('heading', { name: '古い語', exact: true })).toBeVisible();
-  await page.getByText('Export saved words', { exact: true }).click();
+  await page.getByText('Export words', { exact: true }).click();
   const download = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Export entire dictionary CSV' }).click();
+  await page.getByRole('button', { name: 'Export CSV' }).click();
   const csv = await readFile((await (await download).path())!, 'utf8');
   expect(csv).toContain('古い語');
   expect(csv).toContain('語805');
@@ -264,10 +227,10 @@ test('review keeps the full due queue and bounds each targeted hydration request
   await page.reload();
   await expect(page.getByRole('heading', { name: '25 due now' })).toBeVisible();
   await page.getByRole('button', { name: 'Start review' }).click();
-  await expect(page.getByText(/0 ratings · 25 due now/)).toBeVisible();
+  await expect(page.getByText(/0 reviewed · 25 left/)).toBeVisible();
 });
 
-test('account switching clears dictionary selections and tag forms while retaining isolated caches', async ({
+test('account switching clears word search while retaining isolated caches', async ({
   page,
   context,
 }) => {
@@ -275,13 +238,9 @@ test('account switching clears dictionary selections and tag forms while retaini
   await seed(remote, 1);
   await page.goto('/dictionary');
   await expect(page.locator('.dictionary-entry')).toHaveCount(1);
-  await page.getByLabel('Select 朝', { exact: true }).check();
-  await page.getByText('Tags · describe your words', { exact: true }).click();
-  await page.getByLabel('Tag name').fill('秘密のタグ');
+  await page.getByLabel('Search your words').fill('秘密');
   remote.entries = [];
-  remote.tags = [];
   remote.review.cards = [];
-  remote.review.memberships = [];
   await context.route('**/api/account/me', (route) =>
     route.fulfill({
       json: {
@@ -304,9 +263,8 @@ test('account switching clears dictionary selections and tag forms while retaini
     )
     .toBe('another-learner');
   await expect(page.locator('.dictionary-entry')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Export selected CSV' })).toHaveCount(0);
-  await page.getByText('Tags · describe your words', { exact: true }).click();
-  await expect(page.getByLabel('Tag name')).toHaveValue('');
+  await expect(page.getByLabel('Search your words')).toHaveValue('');
+  await expect(page.getByRole('heading', { name: 'No saved words yet.' })).toBeVisible();
   const records = await page.evaluate(() => ({
     previous: Object.keys(
       JSON.parse(

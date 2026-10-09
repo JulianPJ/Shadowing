@@ -1,5 +1,6 @@
 import demo from '@/data/demo.json' with { type: 'json' };
-import { createQuiz, scoreQuiz, validateAttempt } from '../quiz';
+import { createQuiz } from '../quiz/document';
+import { scoreQuiz, validateAttempt } from '../quiz/attempts';
 import demoQuiz from '@/data/demo-quiz.json' with { type: 'json' };
 import {
   createD1GeneratedArtifactRepository,
@@ -11,7 +12,7 @@ import {
 } from '../linked-transcripts';
 import { segmentTranscript } from '../segmentation';
 import { transcriptKey, validateQuizLesson } from '../transcript';
-import { validateQuiz } from '../quiz';
+import { validateQuiz } from '../quiz/document';
 import type { D1Database } from '../d1';
 import type { LessonQuiz, QuizLesson } from '../types';
 import type { SyncedAttempt } from './types';

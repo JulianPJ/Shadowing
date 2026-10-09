@@ -22,7 +22,7 @@ Focused unit checks:
 node --import tsx --test tests/audio-diagnostics*.test.ts
 ```
 
-They cover silence, quiet signals, steady/background signals, clicks, phrase pauses, opposite-phase stereo, clipping, malformed samples, duration/channel bounds, bounded output, selected-speed timing, decoder/worker failure and cancellation before/after worker creation. Native browser tests exercise explicit local-only processing, recording replacement, replay, deletion, unsupported decoding, delayed native decode cancellation and microphone cleanup on a later account interruption. Existing scored-recorder browser contracts remain required on both production runtimes.
+They cover silence, quiet signals, steady/background signals, clicks, phrase pauses, opposite-phase stereo, clipping, malformed samples, duration/channel bounds, bounded output, selected-speed timing, decoder/worker failure and cancellation before/after worker creation. Native browser tests exercise explicit local-only processing, recording replacement, replay, deletion, unsupported decoding, delayed native decode cancellation and microphone cleanup on a later account interruption. Existing scored-recorder browser contracts remain required.
 
 Reproduce the isolated numeric workload:
 

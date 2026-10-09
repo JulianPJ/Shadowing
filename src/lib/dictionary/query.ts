@@ -44,9 +44,6 @@ export function validateDictionaryQuery(
   if (!Number.isInteger(limit) || limit < 1 || limit > DICTIONARY_PAGE_MAX)
     throw new DictionaryValidationError('Invalid dictionary page size');
   if (query.cursor !== undefined && query.cursor !== null) parseDictionaryCursor(query.cursor);
-  for (const id of [query.deckId, query.tagId])
-    if (id !== undefined && !dictionaryId(id))
-      throw new DictionaryValidationError('Invalid dictionary filter');
   if (query.lessonId !== undefined && (!query.lessonId.trim() || query.lessonId.length > 500))
     throw new DictionaryValidationError('Invalid lesson identity');
   if (
@@ -74,24 +71,14 @@ export function dictionaryQueryParams(query: DictionaryQuery) {
 export function readDictionaryQuery(params: URLSearchParams) {
   for (const key of params.keys())
     if (
-      ![
-        'limit',
-        'cursor',
-        'term',
-        'search',
-        'deckId',
-        'tagId',
-        'lessonId',
-        'transcriptKey',
-        'ids',
-      ].includes(key) ||
+      !['limit', 'cursor', 'term', 'search', 'lessonId', 'transcriptKey', 'ids'].includes(key) ||
       params.getAll(key).length !== 1
     )
       throw new DictionaryValidationError('Invalid dictionary query');
   return validateDictionaryQuery({
     ...(params.has('limit') ? { limit: Number(params.get('limit')) } : {}),
     ...Object.fromEntries(
-      ['cursor', 'term', 'search', 'deckId', 'tagId', 'lessonId', 'transcriptKey']
+      ['cursor', 'term', 'search', 'lessonId', 'transcriptKey']
         .filter((k) => params.has(k))
         .map((k) => [k, params.get(k)]),
     ),

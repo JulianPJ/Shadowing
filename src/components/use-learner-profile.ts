@@ -1,13 +1,11 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { aggregateProfile, identityKey } from '@/lib/learner-progress';
-import {
-  availableLesson,
-  currentBookmarks,
-  loadQuizHistory,
-  migrateLearnerHistory,
-} from '@/lib/learner-storage';
-import { progressStorageFailed } from '@/lib/storage';
+import { aggregateProfile } from '@/lib/learner/profile';
+import { identityKey } from '@/lib/learner/constants';
+import { availableLesson, currentBookmarks } from '@/lib/learner/bookmarks';
+import { loadQuizHistory } from '@/lib/learner/quiz-history';
+import { migrateLearnerHistory } from '@/lib/learner/migration';
+import { progressStorageFailed } from '@/lib/storage/browser';
 import type { LearnerProfile } from '@/lib/learner-types';
 import { accountBookmarks } from '@/lib/sync/client';
 import { transcriptKey } from '@/lib/transcript';

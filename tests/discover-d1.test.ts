@@ -506,7 +506,7 @@ test('actual auth routing cannot read another account by supplying a stale owner
   // Direct test cookie uses the framework signature, matching production session lookup.
   const signature = createHmac('sha256', env.AUTH_SECRET).update(sessionToken).digest('base64');
   const cookie = `__Secure-better-auth.session_token=${encodeURIComponent(`${sessionToken}.${signature}`)}`;
-  const handler = accountHandler(auth, createD1UserProgressRepository(db), env, db);
+  const handler = accountHandler({ auth, progress: createD1UserProgressRepository(db), env, db });
   const response = await handler(
     new Request('https://hibiki.example/api/watch-later', {
       headers: { Cookie: cookie, 'X-Hibiki-Account': 'two' },

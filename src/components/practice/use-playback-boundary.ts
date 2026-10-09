@@ -19,7 +19,7 @@ type BoundaryOptions = {
   replayRange: QuizEvidence | null;
   media: RefObject<MediaHandle | null>;
   seeking: RefObject<{ target: number; deadline: number } | null>;
-  setElapsed: Dispatch<SetStateAction<number>>;
+  setElapsed: (time: number) => void;
   setStatus: Dispatch<SetStateAction<PlaybackState>>;
   setPracticeCount: Dispatch<SetStateAction<number>>;
   setIndex: Dispatch<SetStateAction<number>>;

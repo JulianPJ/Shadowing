@@ -1,4 +1,4 @@
-import { WordBrowser } from '@/components/word-browser';
+import { VocabularyWords } from '@/components/vocabulary-words';
 export default function WordsPage() {
-  return <WordBrowser />;
+  return <VocabularyWords />;
 }

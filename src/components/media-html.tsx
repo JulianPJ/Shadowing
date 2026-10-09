@@ -5,7 +5,7 @@ import { lessonMedia } from '@/lib/media';
 import type { MediaHandle, MediaPlayerProps } from './media-player';
 
 export const HtmlMedia = forwardRef<MediaHandle, MediaPlayerProps>(function HtmlMedia(
-  { lesson, speed, initialTime, onReady, onPlaying, onEnded, onError },
+  { lesson, speed, initialTime, onReady, onPlaying, onEnded, onError, overlay },
   ref,
 ) {
   const video = useRef<HTMLVideoElement>(null);
@@ -111,6 +111,7 @@ export const HtmlMedia = forwardRef<MediaHandle, MediaPlayerProps>(function Html
           Open extracted media <ExternalLink size={14} />
         </a>
       ) : null}
+      {overlay}
     </div>
   );
 });

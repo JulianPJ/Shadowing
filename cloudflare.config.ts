@@ -27,6 +27,11 @@ export const worker = defineWorker({
       namespace: '19002',
       simple: { limit: 90, period: 60 },
     }),
+    // Public, unauthenticated routes that spend provider quota (translation, caption relay).
+    PUBLIC_API_RATE_LIMIT: bindings.rateLimit({
+      namespace: '19003',
+      simple: { limit: 60, period: 60 },
+    }),
     YOUTUBE_DATA_API_KEY: bindings.secret(),
     // Better Auth must have one canonical production origin for trusted callbacks and secure cookies.
     AUTH_BASE_URL: bindings.text('https://shadowing.julianpopovskijones.workers.dev'),

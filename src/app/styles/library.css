@@ -9,18 +9,6 @@
   font-weight: 500;
   letter-spacing: -1px;
 }
-.library-intro {
-  max-width: 680px;
-  color: var(--muted);
-  margin-bottom: 22px;
-}
-.library-utilities {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 20px;
-  margin-bottom: 28px;
-}
 .library-panel {
   border: 1px solid var(--line);
   background: var(--paper);
@@ -81,8 +69,7 @@
   font-weight: 600;
 }
 .library-lesson-title,
-.library-queue strong,
-.recommendation-card h3 {
+.library-queue strong {
   overflow-wrap: anywhere;
 }
 .library-queue span {
@@ -133,66 +120,6 @@
 .queue-current-link {
   margin: 12px 0 4px;
 }
-.content-fit {
-  display: inline-flex;
-  padding: 3px 9px;
-  border-radius: 20px;
-  background: var(--green-pale);
-  color: var(--green);
-  font-size: 11px;
-  font-weight: 600;
-}
-.fit-hard {
-  background: var(--pale);
-  color: var(--accent);
-}
-.fit-not-enough-evidence {
-  background: var(--bg);
-  color: var(--muted);
-}
-.library-fit-line {
-  margin-top: 8px;
-  font-size: 12px;
-}
-.recommendation-grid,
-.starter-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-  margin-top: 20px;
-}
-.recommendation-card,
-.starter-card {
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 19px;
-  min-width: 0;
-}
-.recommendation-card h3 {
-  font-size: 17px;
-  margin: 12px 0 6px;
-}
-.recommendation-reason {
-  font-size: 12px;
-  margin: 12px 0 17px;
-  color: var(--muted);
-}
-.starter-heading {
-  margin: 26px 0 7px;
-  font-size: 16px;
-  font-weight: 500;
-}
-.starter-card > strong,
-.starter-card > span {
-  display: block;
-  margin-bottom: 8px;
-}
-.starter-card > div {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  margin-top: 15px;
-}
 .weekly-report .section-heading {
   flex-wrap: wrap;
   gap: 15px;
@@ -203,7 +130,7 @@
 }
 .weekly-metrics {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 20px;
   margin: 23px 0;
 }
@@ -222,17 +149,6 @@
   margin-top: 5px;
   font-size: 11px;
   color: var(--muted);
-}
-.weekly-evidence {
-  margin-top: 18px;
-}
-.weekly-evidence summary {
-  cursor: pointer;
-  color: var(--green);
-  font-size: 12px;
-}
-.weekly-evidence p {
-  padding-top: 10px;
 }
 .daily-goal {
   display: flex;
@@ -308,10 +224,6 @@
   }
   .library-panel {
     padding: 20px 16px;
-  }
-  .recommendation-grid,
-  .starter-grid {
-    grid-template-columns: 1fr;
   }
   .weekly-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));

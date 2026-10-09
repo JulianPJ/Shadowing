@@ -1,33 +1,68 @@
 # Browser analysis and larger media imports
 
-Hibiki keeps native media playback and the current Next.js/vinext/Cloudflare architecture. Local media can be up to 1 GiB. Automatic Japanese subtitles prepare only audio in a lazy browser worker; the original file remains the player's source. No video-hosting service, storage bucket, new Cloudflare binding, WASI runtime or cross-origin isolation header is introduced.
+Local media can be up to 1 GiB and plays natively from the original file. Whisper subtitles prepare only the audio, in a lazy browser worker. The setup adds no video hosting, storage bucket, new Cloudflare binding, WASI runtime or cross-origin isolation header.
 
 ## Japanese analysis
 
-Readings and morphology share one versioned, bounded canonical-text analysis cache. Furigana, dictionary lookup, Shadowing normalization, topic vocabulary and word coverage reuse those tokens. Background transcript work uses bounded batches with separate sentence inputs and opportunities for interactive work between batches. Cancellation suppresses stale consumers without destroying shared canonical results. Existing public reading/morphology interfaces and token-derived behavior remain compatible.
+Readings and morphology share one versioned, bounded analysis cache keyed by canonical text. Furigana, dictionary lookup, Shadowing normalisation, topic vocabulary and word coverage all reuse its tokens.
 
-Kuromoji/IPADIC remains the engine. The isolated Lindera 6.2.0 experiment found no warm median/p95 speedup and three output differences in a 22-sentence sample. A default engine replacement is gated on browser memory/cold-start benefit and semantic parity; this change does not ship an unverified engine or add Rust compilation to deployment.
+- Background transcript work runs in bounded batches, leaving room for interactive work in between.
+- Cancellation stops stale consumers without discarding shared results.
 
-## Audio-only subtitle generation
+Kuromoji/IPADIC is the engine. A Lindera 6.2.0 experiment showed no warm speedup and three output differences in 22 sentences. Replacing the engine is gated on a measured memory or cold-start benefit plus output parity.
 
-The browser reads source media through Mediabunny's bounded Blob source. Compatible AAC tracks are copied into audio-only MP4 parts without decoding or re-encoding, including on browsers without WebCodecs audio decoding. Other supported browser codecs decode only the audio track into mono 16 kHz PCM WAV, approximately 1.92 MB per minute. Video frames are not decoded for transcription. Roughly two-minute parts stay under the existing 32 MiB request bound; copied AAC payloads have an additional 8 MiB preparation bound. Input audio is bounded to four hours. A high-bitrate video can therefore exceed the previous transcription-file limit without increasing the inference request size.
+## Whisper subtitles from a file
 
-Keep original presentation timestamps and track start offsets when producing adjacent audio parts. Decoded WAV preserves internal gaps; compressed stream copy rejects discontinuous packet timelines. Convert returned cue times onto the original media timeline; repeated speech must not be removed merely because the text is the same. Parts do not overlap, avoiding duplicate recognition and repeated billable audio. The merged cues go through existing transcript validation and shadowing segmentation.
+The worker (`src/lib/media-audio/worker.ts`) reads the file through Mediabunny's bounded Blob source.
 
-Browser/codec capability failures explain how to use manual subtitles or extracted audio. The pipeline must not silently send the original video as a fallback. Native playback and extraction have separate codec capabilities: readable audio does not guarantee the video codec will play. YouTube/Vimeo remain embedded players; automatic generation for a link requires a matching user-selected file.
+**Preparing audio**
 
-The client queue is sequential and cancellable. Each provider request has a bounded timeout rather than one five-minute limit on the entire import. Completed parts have bounded account-scoped session checkpoints, verified against source identity and exact audio bytes before reuse; only subtitle results and fingerprints are stored, not recordings or the video. A refresh requires reattaching the file. Network timeouts are not automatically replayed as they may already have incurred a billable call. Rate-limit responses receive bounded delayed retry. Cloudflare reuses the existing rate-limit binding on this route, with the existing Pro gate, body bound and additional prepared-PCM validation.
+- Compatible AAC tracks are copied into audio-only MP4 parts without re-encoding.
+- Other codecs decode only the audio, into mono 16 kHz WAV (about 1.92 MB per minute). Unusual AAC timelines also fall back to WAV.
+- Video frames are never decoded.
+- Audio is limited to four hours. The original video is never sent as a fallback.
 
-Audio extraction reduces upload bytes and request memory, not audio-duration-based Whisper charges. Manual retry may add billable audio. No silence removal, model replacement or hosted-job infrastructure is introduced. The optional local Whisper route keeps its existing contract and limits.
+**Windows and merging**
+
+- Windows are 116 seconds long and overlap by 4 seconds (`audioChunkWindows`), so a sentence cut at one edge is heard whole in the next window.
+- Each window keeps its place on the original media timeline, and returned cue times are mapped back onto it (`mapChunkCues`).
+- `mergeChunkCues` deduplicates overlapping cues only when their **text** confirms it, using containment, near-identical text or a suffix–prefix splice.
+- Repeated speech outside the overlap is never removed just because the words match.
+- The merged cues go through the normal transcript validation and segmentation.
+
+**Queue and retries**
+
+- The queue is sequential and cancellable, with a timeout per request.
+- Completed windows are checkpointed per account and session, and reused only when the source identity and exact audio bytes match. Only subtitle results and fingerprints are stored.
+- After a refresh, the learner reattaches the file to resume.
+- Timeouts are not replayed automatically, because the call may already have been billed. A 429 gets a bounded delayed retry.
+
+**Server side.** `/api/transcribe` applies the Pro gate, the inference rate limit, the body bound and prepared-audio validation. The overlap adds about 3% more billable audio.
+
+**Failures.** When the browser lacks a codec, the error explains how to use manual subtitles or extracted audio.
+
+Page videos played through [Hibiki Bridge](browser-extension.md) use the same windows and merge. The audio is captured while the page's video plays.
 
 ## Local recording checks
 
-An explicit local action inspects a short microphone recording without an inference request. Native decoding prepares bounded 16 kHz PCM for a background numeric worker. Recording limits remain approximately one minute and 8 MiB; recordings are never stored by this feature. Cancellation, new recordings, navigation and account changes discard stale work. Native A/B replay and microphone cleanup retain their existing lifecycle.
+An explicit local action inspects a short microphone recording, with no inference request.
 
-Feedback describes estimated sound activity, pauses, low level and clipping. Accessible demo/local audio can also supply bounded source excerpts for descriptive active-duration and pause comparisons at the selected playback speed. Noise, music and microphone processing can affect these measurements; they are not authoritative speech or pronunciation judgments. Score weights, versions, timing normalization, historical trends and the existing Pro AI analysis remain unchanged. Reference-based rhythm scores, pitch/prosody and composite scores require separate calibration; embedded players do not expose reference PCM.
+- Native decoding prepares bounded 16 kHz PCM for a background worker.
+- Recordings are limited to about one minute and 8 MiB, and this feature never stores them.
+- New recordings, navigation and account changes discard stale work.
+
+Feedback describes sound activity, pauses, low level and clipping. For demo and local audio it can also compare active duration and pauses with the source at the selected speed. These are descriptive measures, not pronunciation judgements. Embedded players expose no reference PCM.
 
 ## Build and checks
 
-The existing `furigana:prepare` asset hook compiles the lazy browser workers and retains Mediabunny's MPL-2.0 license alongside the existing IPADIC/library notices. Media/DSP workers are not imported by the application server or Cloudflare server bundle. Use the same npm install, dev, build and deploy commands as before.
+`furigana:prepare`, run before `dev` and `build`, compiles the lazy workers into `public/furigana/v1/` and keeps Mediabunny's MPL-2.0 licence with the other notices. The media and DSP workers are never imported by the server bundle.
 
-Verification covers canonical token parity, deduplicated/bounded scheduling, independent cancellation, actual browser audio extraction, large sparse video input, original-source playback, chunk timelines, checkpoint isolation, rate limits, cancellation, malformed/missing codecs and synthetic plus native-recording diagnostics. Run typecheck, lint, formatting, unit tests, both builds, local D1 verification and Playwright against both production runtimes. Real-provider transcript quality, phone memory/thermal limits and future WASM engine adoption remain separate measured gates; deterministic provider fixtures do not establish those results.
+Tests cover:
+
+- token parity, scheduling and cancellation;
+- audio extraction, large sparse input and window timelines;
+- the overlap merge (`tests/media-audio.test.ts`);
+- checkpoint isolation, rate limits and malformed codecs;
+- recording diagnostics.
+
+Real-provider transcript quality and phone memory and thermal limits need measurement on real devices.

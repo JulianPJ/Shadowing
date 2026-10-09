@@ -1,85 +1,106 @@
-# Video links and independent transcripts
+# Media sources and transcripts
 
-The primary entry point accepts YouTube (watch, shortlink, Shorts, live-recording and embed URLs), Vimeo (video, player, channel, group and unlisted links), and direct HTTP(S) audio/video files. Live streams without finite, seekable duration are unsuitable for section/evidence replay. Remote bytes play in the browser; the Worker never proxies them.
+**Supported links.** The home entry point accepts:
 
-YouTube automatic Japanese captions still use the existing production relay/direct chain. A genuine `no-japanese-captions` result opens **Video link + transcript**, retaining the original link, normalized source, identity, title and author. Network errors, relay outages, bot blocking and unavailable/private videos stay separate errors with manual transcript recovery. Vimeo/direct media currently have no automatic caption integration and immediately offer the transcript dialog.
+- **YouTube:** watch, shortlink, Shorts, live-recording and embed URLs;
+- **Vimeo:** video, player, channel, group and unlisted links;
+- **direct links** to HTTP(S) audio or video files.
 
-## Public media discovery
+Remote bytes play in the browser; the Worker never proxies them. Live streams without a finite, seekable duration cannot support section replay.
 
-For an otherwise unsupported page link, the browser attempts a credential-free CORS fetch with an 8-second timeout, a 1 MB HTML bound and redirects disabled. It examines `<video>`/`<audio>` sources, OpenGraph video metadata and VideoObject/AudioObject JSON-LD `contentUrl` in an unattached, inert HTML template. Relative media sources resolve against the page URL. Extensionless media can be recognized through a browser-playable MIME type. Extracted media is exposed through **Open extracted media** and uses the HTML media adapter.
+**Getting subtitles for a link**
 
-The app does not execute the page, follow arbitrary iframe URLs, inspect player scripts or intercept protected streams. CORS denial, authentication, redirects, DRM, expired signed URLs, referrer/embedding restrictions, unsupported codecs and pages without public media metadata can prevent this path. A page allowing iframe embedding alone does not provide Hibiki's required playback controls. Discovery rejects local-network/IP page and extracted-media targets. No server-side scraping endpoint or third-party-media re-hosting exists. Browser requests necessarily contact the submitted public host; URLs are never written to application diagnostic logs.
+- **YouTube** captions come through the production relay, with a direct fallback. When there are genuinely no Japanese captions (`no-japanese-captions`), **Video link + transcript** opens with the link, title and author kept.
+- **Errors stay separate.** Network errors, relay outages, bot blocking and private videos each get their own message, with manual subtitles as the recovery.
+- **Vimeo and direct links** have no caption integration and go straight to the subtitle dialog.
+
+**Videos on other sites** play through the [Hibiki Bridge](browser-extension.md) extension; Hibiki never scrapes or re-hosts them.
 
 ## Versioned contracts
 
-The exact contracts are in [types.ts](../src/lib/types.ts):
+[types.ts](../src/lib/types.ts) holds the exact types:
 
 ```ts
-type LinkedMediaSource = {
-  schemaVersion: 1;
-  canonicalUrl: string;
-  contentKey: string;
-} & (
+type LinkedMediaSource = { schemaVersion: 1; canonicalUrl: string; contentKey: string } & (
   | { type: 'youtube'; provider: 'youtube'; videoId: string }
   | { type: 'vimeo'; provider: 'vimeo'; videoId: string }
-  | { type: 'direct'; discoveredFrom?: string }
+  | { type: 'direct'; discoveredFrom?: string } // discoveredFrom: legacy lessons only
 );
-
-type MediaSource = LinkedMediaSource
+type PageMediaSource = { schemaVersion: 1; type: 'page'; canonicalUrl: string; pageKey: string };
+type MediaSource =
+  | LinkedMediaSource
+  | PageMediaSource
   | { schemaVersion: 1; type: 'local'; fileName: string }
   | { schemaVersion: 1; type: 'demo' };
-
-type TranscriptSource = {
-  schemaVersion: 1;
-  type: 'provider-captions' | 'user-upload' | 'user-paste' | 'generated' | 'authored';
-  language: 'ja';
-  provenance: string;
-  provider?: string;
-  transcriptHash?: string;
-  normalizationVersion: 1;
-  segmentationVersion: 1;
-};
 ```
 
-`Lesson.mediaSource` and `Lesson.transcript` are additive versioned fields. The legacy `source`, YouTube-only `videoId`, and human-readable `transcriptSource` label remain for saved learning artifacts. Practice operates through `MediaHandle` (`play`, `pause`, `seek`, `time`, `setSpeed`, `isPlaying`) and ready/playing/ended/error callbacks. YouTube, Vimeo and HTML implementations are isolated from Practice. Vimeo commands are serialized, real current time is polled without extrapolation, and creator-disabled speed changes receive an explicit status message. Other embed providers remain unsupported until both a resolver and a complete control adapter exist.
+`TranscriptSource` records how the subtitles were obtained (`provider-captions`, `user-upload`, `user-paste`, `generated` or `authored`), plus provenance, hash and normalisation and segmentation versions.
 
-Linked content keys are `youtube:<id>`, `vimeo:<id>`, and `direct:<SHA-256(canonicalUrl)>`. Canonical direct URLs retain all query parameters and remove fragments; scheme/host/default ports use URL normalization. Vimeo access hashes stay in the playback URL and never appear in IDs. Direct signed queries are needed for playback and browser-local persistence, but never appear in readable generated IDs/logs. Signed URL renewal can change direct identity because there is no reliable provider identity for arbitrary files.
+**Players.** Practice drives every player through `MediaHandle` (`play`, `pause`, `seek`, `time`, `setSpeed`, `isPlaying`) plus ready, playing, ended and error callbacks. Each adapter is isolated from Practice:
 
-Transcript SHA-256 hashes cover validated normalized cues, independently of title, media identity, lesson/quiz/difficulty/user IDs. Existing learning artifact fingerprints remain unchanged. Future artifacts may key on contentKey + transcriptHash + artifact type + generator/schema version.
+| Adapter | Behaviour |
+| --- | --- |
+| YouTube | Embedded player |
+| Vimeo | Commands run in order; time is polled, never extrapolated; creator-disabled speed changes get a status message |
+| HTML | Native `<audio>`/`<video>` |
+| Page | `media-page.tsx`; commands go through the extension, and time is estimated between video events |
+
+Another embed provider needs both a resolver and a complete control adapter.
+
+**Identity**
+
+- Linked content keys are `youtube:<id>`, `vimeo:<id>` and `direct:<SHA-256(canonicalUrl)>`.
+- Canonical direct URLs keep their query and drop the fragment.
+- Vimeo access hashes and direct signed queries stay in the playback URL and never appear in IDs or logs.
+- A renewed signed URL can change a direct identity.
+- Page lessons use `pageKey` (`page:<SHA-256(url)>`) and never enter the shared content cache.
+
+**Transcript hashes.** SHA-256 hashes cover the normalised cues only, independent of title, media and user.
 
 ## Migration and privacy
 
-Saved legacy lessons are migrated on read/save without changing lesson IDs or segment IDs/timings. YouTube source identity is inferred from the validated existing video ID; demo/local contracts are inferred from source and file name. Legacy transcript provenance is preserved and acquisition type is inferred conservatively. Missing legacy cue hashes are left optional because only segmented text survives; they are not falsely presented as original cue hashes. Unknown source versions fail safely. History is migrated for display. Existing quizzes, difficulty records, attempts and learner history retain their own identities.
+**Saved legacy lessons** migrate on read and save. Lesson IDs, segment IDs and timings are unchanged; unknown source versions fail safely.
 
-Local media has no globally reusable content key. It remains browser-local, session-bound via object URLs and needs reattachment after a full refresh. Transcript imports are private/browser-local; adding a public video link does not publish the uploaded transcript. The existing explicitly configured local Whisper flow is the only import path that sends selected local media to a transcription service.
+**Local media**
 
-## Transcript and file support
+- Local media has no shared content key and plays from an object URL. After a refresh, the learner reattaches the file.
+- Imported transcripts stay private and in the browser. Adding a public link does not publish them.
+- Only Whisper subtitles (Pro) send audio from a file or page, and only audio windows ([details](browser-media-analysis.md)).
 
-SRT, WebVTT, JSON, ASS and SSA share Cue validation. ASS/SSA read `[Events]` Dialogue rows with declared Format columns (or standard positions), centisecond timestamps, commas in text, override-tag removal, drawing suppression and `\N`/`\n`/`\h` normalization. Malformed structures/timestamps/tags receive errors. TXT is only a container for the same timestamped syntax; untimed prose is rejected. Subtitle files remain limited to 2 MB, 15,000 cues and 24-hour timestamps.
+## Subtitle and file support
 
-Local audio/video selection uses media MIME categories plus common extension hints, including MP4/M4V, WebM, MOV, MP3/M4A/AAC, WAV, OGG/OGA/OGV and FLAC. The 250 MB bound remains. The browser decides decoding support and supplies a clean playback error; no transcoding or universal codec support is promised.
+**Subtitle files**
 
-## Hosted transcript storage and future generation
+- SRT, WebVTT, JSON, ASS and SSA share one cue validator.
+- ASS and SSA read `[Events]` Dialogue rows using the declared Format columns. Override tags and drawings are removed, and `\N`, `\n` and `\h` are normalised.
+- TXT must use the same timestamped syntax; untimed prose is rejected.
+- Limits are 2 MB, 15,000 cues and 24-hour timestamps.
 
-[linked-transcripts.ts](../src/lib/linked-transcripts.ts) defines `LinkedTranscriptRepository.lookup({ contentKey, language })` / `save(StoredTranscript)`, a native D1 production implementation, and a no-op ordinary Next development fallback. `StoredTranscript` carries schema/content/media/language/source identity, normalized cues, transcript hash, timestamp, explicit visibility and optional generator/model/owner metadata. A real repository must enforce visibility/access policy; user-supplied transcripts must stay private by default. D1 stores provider captions with system visibility and trusted derived quiz/difficulty artifacts. Stored media identity excludes playback URLs, Vimeo hashes and signed queries. See [storage and migration workflow](storage.md).
+**Media files**
 
-`GeneratedTranscriptProvider.transcribe(LinkedMediaSource, AbortSignal)` is a contract only; there is no working remote AI transcription path, audio download or Generate subtitles button.
+- Local media is accepted by MIME type plus common extensions (MP4/M4V, WebM, MOV, MP3/M4A/AAC, WAV, OGG/OGA/OGV, FLAC), up to 1 GiB.
+- The browser decides what it can decode; there is no transcoding.
+
+## Hosted transcripts
+
+[linked-transcripts.ts](../src/lib/linked-transcripts.ts) defines `LinkedTranscriptRepository`, with a native D1 implementation.
+
+- D1 stores provider captions with system visibility, plus trusted quiz and difficulty artifacts derived from them.
+- User-supplied, Whisper-generated and page transcripts stay in the browser.
+- Stored media identity excludes playback URLs, Vimeo hashes and signed queries.
+- See [storage](storage.md).
 
 ```text
 resolve linked media identity
-  → D1 shared transcript repository (no-op in ordinary Next development)
-  → provider Japanese captions (YouTube only today)
-  → unavailable: offer a user transcript now
-  → FUTURE: generate through an approved audio-access path
-  → validate/normalize
-  → persist by contentKey + language + transcriptHash + provenance/visibility
-  → reuse subject to access policy
+  → D1 shared transcript (YouTube provider captions)
+  → provider Japanese captions (YouTube only)
+  → unavailable: the learner's subtitles, or Whisper from a local file or page (Pro)
+  → validate, normalise, segment
 ```
-
-The current non-YouTube browser path enters user import immediately; provider acquisition for these sources remains future work. The production preparation API can reuse an eligible stored linked transcript at the repository boundary. Hosted shared content storage is implemented. Accounts, hosted learner persistence and AI subtitle generation remain unimplemented.
 
 ## Verification
 
-[media.test.ts](../tests/media.test.ts) covers provider URLs, unsafe input, content identities, ASS/SSA/SRT/VTT/JSON, transcript metadata, migration, size bounds, no-caption versus infrastructure failures and ordered Vimeo controls. [media.spec.ts](../tests/e2e/media.spec.ts) covers the generic homepage, YouTube preparation, no-caption continuation, direct media with ASS/SSA on mobile, timestamped TXT, inert public-source/metadata extraction and the real Vimeo SDK through a mocked iframe message boundary. Deterministic tests require no live provider calls.
-
-Verified: 94 unit tests; all 35 Playwright tests on Next.js production and built Cloudflare/local workerd; typecheck, lint, Next build and vinext/Cloudflare build. Lint retains four pre-existing unused-code warnings. Local Worker verification uses an ignored, isolated Wrangler configuration with the built bundle/assets and production compatibility flags, omitting remote inference and secrets. Production now also binds HIBIKI_DB; see storage verification for the subsequent persistence phase.
+- [media.test.ts](../tests/media.test.ts) covers provider URLs, unsafe input, content identities, every subtitle format, migration, size bounds, no-caption versus infrastructure failures and ordered Vimeo controls.
+- [media.spec.ts](../tests/e2e/media.spec.ts) covers YouTube preparation, no-caption continuation, direct media with ASS/SSA on mobile, timestamped TXT and the real Vimeo SDK behind a mocked iframe boundary.
+- Page media is covered by `tests/extension.test.ts` and `tests/e2e/extension.spec.ts`.
+- No test calls a live provider.

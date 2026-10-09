@@ -66,7 +66,7 @@ const errors: Record<number, string> = {
 };
 
 export const YouTubeMedia = forwardRef<MediaHandle, MediaPlayerProps>(function YouTubeMedia(
-  { lesson, speed, initialTime, onReady, onPlaying, onEnded, onError },
+  { lesson, speed, initialTime, onReady, onPlaying, onEnded, onError, overlay },
   ref,
 ) {
   const host = useRef<HTMLDivElement>(null);
@@ -213,6 +213,7 @@ export const YouTubeMedia = forwardRef<MediaHandle, MediaPlayerProps>(function Y
           </div>
         </div>
       ) : null}
+      {overlay}
     </div>
   );
 });

@@ -1,67 +1,52 @@
 import { test, expect } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
 import { connect, seed } from '../helpers/retention-account';
 
 for (const width of [320, 390, 768]) {
-  test(`vocabulary ${width}px: select in all words, assign an empty deck, tag and move without resetting reviews`, async ({
+  test(`vocabulary ${width}px: filters and known/learning actions preserve saved context`, async ({
     page,
     context,
   }) => {
     const remote = await connect(context);
     await seed(remote, 2);
     await page.setViewportSize({ width, height: 844 });
-    await page.goto('/dictionary?view=decks');
-    await page.getByLabel('New deck').fill('Travel');
-    await page.getByRole('button', { name: 'Create deck', exact: true }).click();
-    const deck = page.getByRole('article', { name: 'Travel deck' });
-    await expect(deck).toContainText('This deck is empty');
-    await expect(deck.getByRole('link', { name: 'Study · 0 ready' })).toBeVisible();
-    const deckId = remote.review.decks.find((value) => value.name === 'Travel')!.id;
-    await page.goto('/dictionary');
-    await page.getByLabel('Select 朝', { exact: true }).check();
-    await page.getByLabel('Destination deck').selectOption(deckId);
-    await page.getByRole('button', { name: 'Add selected to deck', exact: true }).click();
-    await expect
-      .poll(() =>
-        remote.review.memberships.some(
-          (member) => member.entryId === 'word-0' && member.deckId === deckId,
-        ),
-      )
-      .toBe(true);
-    await page.getByLabel('Add tag to selected words').fill('旅行');
-    await page.getByRole('button', { name: 'Create and apply tag', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Remove tag 旅行 from 朝' })).toBeVisible();
-    await page.getByRole('button', { name: 'Move selected to deck', exact: true }).click();
-    await expect
-      .poll(() =>
-        remote.review.memberships
-          .filter((member) => member.entryId === 'word-0')
-          .map((member) => member.deckId),
-      )
-      .toEqual([deckId]);
-    expect(remote.review.cards).toHaveLength(2);
-    expect(remote.review.cards.every((card) => card.revision === 0)).toBe(true);
-    await page.getByLabel('Filter by deck').selectOption(deckId);
+    await page.goto('/words');
+    await expect(page.getByRole('heading', { name: 'Vocabulary', exact: true })).toBeVisible();
+    const filters = page.getByRole('group', { name: 'Filter words' });
+    await filters.getByRole('button', { name: 'Learning', exact: true }).click();
+    await expect(page.locator('.dictionary-entry')).toHaveCount(2);
+    const first = page
+      .locator('.dictionary-entry')
+      .filter({ has: page.getByRole('heading', { name: '朝', exact: true }) });
+    await first.getByRole('button', { name: 'Mark known', exact: true }).click();
     await expect(page.locator('.dictionary-entry')).toHaveCount(1);
-    await expect(
-      page.getByRole('button', { name: 'Add selected to review', exact: true }),
-    ).toBeDisabled();
+    await filters.getByRole('button', { name: 'Known', exact: true }).click();
+    await expect(first).toBeVisible();
+    await expect
+      .poll(() => remote.review.cards.find((c) => c.entryId === 'word-0')?.status)
+      .toBe('suspended');
+    expect(remote.entries).toHaveLength(2);
+    await first.getByRole('button', { name: 'Learn again', exact: true }).click();
+    await filters.getByRole('button', { name: 'Learning', exact: true }).click();
+    await expect(page.locator('.dictionary-entry')).toHaveCount(2);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     );
-    await page.goto('/dictionary?view=decks');
-    await expect(deck.getByRole('link', { name: 'Study · 1 ready' })).toBeVisible();
-    await deck.getByText('Manage deck', { exact: true }).click();
-    await deck.getByLabel('Deck name').fill('Holiday');
-    await deck.getByRole('button', { name: 'Rename deck', exact: true }).click();
-    await expect(page.getByRole('article', { name: 'Holiday deck' })).toBeVisible();
-    expect(remote.review.cards).toHaveLength(2);
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
-      true,
-    );
+    await page.getByText('Export words', { exact: true }).click();
+    const download = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Export CSV', exact: true }).click();
+    const csv = await readFile((await (await download).path())!, 'utf8');
+    expect(csv).toContain('朝');
+    expect(csv).toContain(remote.entries[0].sourceSentence);
+    const ankiDownload = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Export TSV (Anki)', exact: true }).click();
+    const tsv = await readFile((await (await ankiDownload).path())!, 'utf8');
+    expect(tsv).toContain('朝');
+    expect(tsv).toContain('\t');
   });
 }
 
-test('saved-word search, empty deck and no cached results have targeted recovery and revision-aware context', async ({
+test('saved-word search and empty results have recovery and revision-aware context', async ({
   page,
   context,
 }) => {
@@ -69,49 +54,47 @@ test('saved-word search, empty deck and no cached results have targeted recovery
   await seed(remote, 2);
   remote.entries[0].reading = 'あさ';
   await page.goto('/dictionary');
-  await page.getByLabel('Search saved words').fill('あさ');
+  await page.getByLabel('Search your words').fill('あさ');
   await page.getByRole('button', { name: 'Search', exact: true }).click();
   await expect(page.locator('.dictionary-entry')).toHaveCount(1);
   await expect(page.getByRole('link', { name: 'Open section', exact: true })).toHaveAttribute(
     'href',
     /&transcript=[a-f0-9]{64}$/,
   );
-  await page.getByLabel('Search saved words').fill('absent');
+  await page.getByLabel('Search your words').fill('absent');
   await page.getByRole('button', { name: 'Search', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'No words match these filters.' })).toBeVisible();
-  await page.getByRole('button', { name: 'Show all saved words' }).click();
+  await expect(page.getByRole('heading', { name: 'No words match.' })).toBeVisible();
+  await page.getByRole('button', { name: 'Show all words' }).click();
   await expect(page.locator('.dictionary-entry')).toHaveCount(2);
   page.once('dialog', (dialog) => dialog.dismiss());
-  await page
-    .locator('.dictionary-entry')
-    .first()
-    .getByRole('button', { name: 'Delete saved word' })
-    .click();
+  await page.getByRole('button', { name: 'Delete 朝', exact: true }).click();
   expect(remote.entries).toHaveLength(2);
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.getByRole('button', { name: 'Delete 朝', exact: true }).click();
+  await expect(page.locator('.dictionary-entry')).toHaveCount(1);
+  expect(remote.entries).toHaveLength(1);
 });
 
-test('word knowledge is distinct from cards, lookup does not filter the list, and changing filters clears selections', async ({
-  page,
-}) => {
+test('other marked words remain editable without a saved review card', async ({ page }) => {
   await page.route('**/api/account/me', (route) =>
     route.fulfill({ json: { user: null, googleEnabled: false, emailEnabled: false } }),
   );
+  await page.addInitScript(() => {
+    if (localStorage.getItem('hibiki:v1:knowledge:records')) return;
+    localStorage.setItem(
+      'hibiki:v1:knowledge:records',
+      JSON.stringify([
+        { lemma: '食べる', reading: 'たべる', state: 'known', updatedAt: new Date().toISOString() },
+      ]),
+    );
+  });
   await page.goto('/words');
-  await expect(page.getByRole('heading', { name: 'Word knowledge', exact: true })).toBeVisible();
-  await expect(page.locator('.knowledge-definitions')).toContainText(
-    'Excluded from vocabulary coverage; kept in your list.',
-  );
-  await page.getByLabel('Find Japanese words').fill('食べました');
-  await page.getByRole('button', { name: 'Look up a word', exact: true }).click();
-  const lookup = page.getByRole('region', { name: 'Japanese dictionary lookup' });
-  await lookup.getByRole('button', { name: 'Known', exact: true }).click();
-  await expect(page.getByLabel('State of 食べる')).toHaveValue('known');
-  await page.getByRole('checkbox', { name: 'Select 食べる', exact: true }).check();
-  await expect(page.getByRole('button', { name: 'Mark selected Learning' })).toBeEnabled();
-  await page.getByLabel('Filter your words').fill('食');
-  await expect(page.getByRole('button', { name: 'Mark selected Learning' })).toBeDisabled();
-  await page.getByLabel('Filter word state').selectOption('ignored');
-  await expect(page.getByRole('heading', { name: 'No words match these filters.' })).toBeVisible();
-  await page.getByRole('button', { name: 'Clear word filters' }).click();
-  await expect(page.getByLabel('State of 食べる')).toHaveValue('known');
+  await expect(page.getByRole('heading', { name: 'Other words you’ve marked' })).toBeVisible();
+  await page.getByLabel('Status for 食べる').selectOption('learning');
+  await page.reload();
+  await expect(page.getByLabel('Status for 食べる')).toHaveValue('learning');
+  await page.getByLabel('Status for 食べる').selectOption('ignored');
+  await expect(page.getByLabel('Status for 食べる')).toHaveValue('ignored');
+  await page.getByLabel('Status for 食べる').selectOption('unknown');
+  await expect(page.getByLabel('Status for 食べる')).toHaveCount(0);
 });

@@ -1,18 +1,12 @@
 # Shared content storage
 
-Phase A.2: additive `0008_tags_dictionary_pagination.sql` creates account-owned descriptive tags/memberships and indexes for actual cursor and lesson/revision queries. Both ownership foreign keys cascade memberships while preserving dictionary/review state when a tag is deleted. Migration 0007 is unchanged. The recent dictionary index now includes `id DESC` to support stable duplicate-timestamp ordering; the lesson index includes owner, lesson, transcript revision and cursor tuple. Existing normalized-term and deck membership indexes are reused.
-
-Dictionary retrieval is bounded at 100 entries/page or 50 exact IDs/request. Tags accompany only those entries; `/api/tags` lists at most the enforced 100 account tags. The existing `dictionary:entries` account key migrates in place to a version-2 ID map, merging newest records, fencing local deletion races and prioritizing explicitly hydrated offline review material. Bounds are 700 records/3 MB of UTF-8 record data, with up to 200 recent review records prioritized within that budget. Partial cached pages never represent a complete remote dictionary; offline UI identifies cached material and full export requires successful server traversal. `dictionary:tags` is account-scoped management metadata. See [complete query/cache/export contracts](retention-implementation.md).
-
-Retention update: `0007_retention.sql` adds `user_decks`, `user_deck_entries` and `user_review_states`. Composite owner/entry and owner/deck foreign keys prevent cross-account references; vocabulary and account deletion cascade, while deck deletion preserves vocabulary and review state. Existing vocabulary backfills into Inbox with no automatic review enrollment. Browser `dictionary:entries` and `review:*` keys use the existing account namespace. Review state and its outbox contain entry references and scheduling/collection metadata, without transcript/media duplication. See [retention](retention-implementation.md).
-
 Cloudflare D1 is Hibiki's primary production application database, including the shared content cache and authenticated accounts/learner state. It uses native `env.HIBIKI_DB`, injected by `cloudflare-worker.js`; request handlers never use D1 REST or database tokens. `cloudflare.config.ts` uses the installed `cf/config` API: `bindings.d1({ name, id })`.
 
 Production database: `hibiki`, ID `cf88fe7d-16bb-4f58-8839-2b27718a7847`, account `faa2e940eaa3b7c4077ed18f34b4e653`, binding `HIBIKI_DB` on Worker `shadowing`.
 
 ## Cache hierarchy and trust
 
-Preparation resolves linked identity, reads D1, acquires provider captions on a miss, validates/normalizes/hashes cues, saves them best-effort, then returns segmented practice. Ordinary Next development uses a no-op repository. Vimeo/direct provider caption acquisition and hosted AI subtitle generation are still unimplemented.
+Preparation resolves linked identity, reads D1, acquires provider captions on a miss, validates/normalizes/hashes cues, saves them best-effort, then returns segmented practice. Vimeo and direct links have no provider caption acquisition. Whisper subtitles go back to the browser and are never written to the shared cache.
 
 Quiz and difficulty retain browser `loadQuiz`/`saveQuiz` and `loadDifficulty`/`saveDifficulty` as L1. On a browser miss, the API accepts `{ lesson, content?: { contentKey } }`; old bare lesson requests remain supported and bypass shared caching. The server loads and validates a system/shared hosted transcript, resegments it with current rules, and requires its normalized segment SHA-256 fingerprint to equal the request. A client provenance claim, title, video ID or content key alone grants no shared access. Local and user-import browser requests omit `content`.
 
@@ -51,27 +45,27 @@ Create the database once, apply committed migrations, then deploy the bound Work
 npm run db:migrate:local
 npm run db:migrations:local
 npm test
-npm run build:vinext
+npm run build
 npm run test:d1:runtime
 
 # Production: authenticated cf CLI, same connected account
 npm run db:migrate:production
 npm run db:migrations:production
-npx cf deploy --prebuilt
+npm run deploy   # applies migrations, then deploys the prebuilt Worker
 ```
 
-`db:migrations:*` lists **pending** migrations; an empty list means current. Applying normally twice is safe. Local migration commands use `.cloudflare/state`, never production. `npm run deploy:vinext` gates deployment on a successful production migration.
+`db:migrations:*` lists **pending** migrations; an empty list means current. Applying normally twice is safe. Local migration commands use `.cloudflare/state`, never production. `npm run deploy` gates deployment on a successful production migration.
 
-CI runs `npm run test:d1:migrations` against real persisted local workerd/D1 at `.cloudflare/migration-verification`. It atomically applies each committed migration with its ledger row, verifies the full ledger, composite tag ownership FKs and an empty `foreign_key_check`, and explicitly disposes Miniflare. This avoids the installed beta `cf` CLI's Linux process-lifetime hang after successful local migration output. The manual local CLI commands and production migration/deployment gate remain unchanged; the populated 0007 → 0008 upgrade is additionally covered by the real D1 integration fixture.
+CI runs `npm run test:d1:migrations` against real persisted local workerd/D1 at `.cloudflare/migration-verification`. It atomically applies each committed migration with its ledger row, verifies the full ledger and an empty `foreign_key_check`, and explicitly disposes Miniflare. This avoids the installed beta `cf` CLI's Linux process-lifetime hang after successful local migration output. The manual local CLI commands and production migration/deployment gate remain unchanged; the populated 0007 → 0008 upgrade is additionally covered by the real D1 integration fixture.
 
-The connected Cloudflare build trigger uses `npm run deploy:vinext`, which expands to `npm run db:migrate:production && cf deploy --prebuilt` (build remains `npm run build:vinext`). The build token needs D1 migration permissions; a failure stops deployment. Do not assume deployment alone applies SQL. For manual API-based operations, apply the same committed statements and ledger atomically, then verify the ledger before deployment.
+The connected Cloudflare build trigger runs `npm run build`, then `npm run deploy` (`npm run db:migrate:production && cf deploy --prebuilt`). The build token needs D1 migration permissions; a failure stops deployment. Do not assume deployment alone applies SQL. For manual API-based operations, apply the same committed statements and ledger atomically, then verify the ledger before deployment.
 
 `npm test` exercises real local D1/workerd repositories with deterministic fixtures, privacy, corruption, indexed access, uniqueness, forging, version misses and outage fallback. `npm run test:d1:runtime` loads the actual built production Worker with local D1, mocked caption egress and a mocked Workers AI RPC binding. Preparing/quiz/difficulty twice proves each provider is called once; second calls throw if mistakenly invoked. CI does not contact live providers. Production smoke uses real public captions and limited inference, verifies durable row counts and repeated cache headers without dumping content.
 
-## Future application data
+## Account data and caches
 
-Later phases can add users/authentication identities, sessions, subscriptions/entitlements, lesson progress, practice sessions, quiz attempts, saved vocabulary, pronunciation results and preferences. Application-owned records should reference a stable internal Hibiki user ID. Evaluate a then-current D1-compatible auth layer (for example Better Auth), supporting email, Google sign-in and account linking, and let it own its framework-specific auth tables. Accounts and learner tables are now added through `0002_auth.sql` and `0003_user_sync.sql`; see [accounts and sync](accounts-and-sync.md). There is no bespoke password system or anonymous fake user ID.
+Accounts and learner tables are described in [accounts and sync](accounts-and-sync.md), and vocabulary storage in [vocabulary](vocabulary.md). Application rows reference the Better Auth user ID; there is no bespoke password system or fake anonymous user. Payment processors stay authoritative for subscriptions; D1 may hold entitlement metadata, never card details.
 
-Payment processors remain authoritative for subscriptions; D1 can hold entitlement metadata, never card details. The transcript contract leaves room for owner-specific private storage and future authenticated retrieval, but this repository does not upload it.
+The browser keeps an account-scoped saved-word cache: at most 700 records and 3 MB of record data, with up to 200 recent review records prioritised. A cached page never stands in for the full remote list, and a full export always reads from the server.
 
-Concurrent cache misses can both infer before saving; uniqueness prevents duplicate logical rows. Future single-flight could use a Durable Object coordinator keyed by contentKey + transcriptKey + artifactType to share one inference among waiters. No such coordinator, additional storage service, billing, vocabulary saving, pronunciation persistence, remote media downloads or AI subtitle generation is implemented in this phase. Accounts and eligible learner sync are implemented separately as documented above.
+Concurrent cache misses can both run inference before saving; uniqueness prevents duplicate rows. A Durable Object keyed by contentKey + transcriptKey + artifactType could share one inference among waiters if that cost matters.

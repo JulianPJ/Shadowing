@@ -17,6 +17,10 @@ export type VoiceRecorderHandle = {
   prepare: () => Promise<boolean>;
   recordFor: (seconds: number) => Promise<boolean>;
   cancel: () => void;
+  /** Keyboard record/stop, matching the record button. */
+  toggle: () => void;
+  /** Play the current attempt from the start, if there is one. */
+  playAttempt: () => void;
 };
 export type VoiceRecorderReference = {
   recording: Blob;
@@ -147,7 +151,23 @@ export function VoiceRecorder({
       });
     },
     cancel,
+    toggle() {
+      if (recording) stopManually();
+      else if (enabled && !requesting && !analyzing) void start();
+    },
+    playAttempt() {
+      if (!recorded || !audio.current) return;
+      audio.current.currentTime = 0;
+      void audio.current.play().catch(() => {});
+    },
   }));
+
+  function stopManually() {
+    const instance = recorder.current;
+    if (instance?.state === 'recording') instance.stop();
+    onManualStop?.();
+    if (instance) manuallyStopped.current = { recorder: instance, request: requestId.current };
+  }
 
   useEffect(() => {
     callback.current = onRecording;
@@ -373,14 +393,10 @@ export function VoiceRecorder({
           <button
             className={`button record-button ${recording ? 'recording' : ''}`}
             disabled={(!enabled && !recording) || requesting || analyzing}
+            aria-keyshortcuts="M"
             onClick={() => {
-              if (recording) {
-                const instance = recorder.current;
-                if (instance?.state === 'recording') instance.stop();
-                onManualStop?.();
-                if (instance)
-                  manuallyStopped.current = { recorder: instance, request: requestId.current };
-              } else void start();
+              if (recording) stopManually();
+              else void start();
             }}
           >
             {recording ? (
@@ -403,8 +419,8 @@ export function VoiceRecorder({
         </div>
         <p className="recording-retention">
           {recorded
-            ? 'This recording will be cleared when you leave this section.'
-            : 'Recording is optional. Audio stays here until you change sections.'}
+            ? 'Press P to hear it. Cleared when you leave this section.'
+            : 'Press M to record. Your audio stays in this browser.'}
         </p>
 
         {requesting ? (
@@ -619,10 +635,6 @@ export function VoiceRecorder({
           {error}
         </p>
       ) : null}
-      <span className="recording-privacy">
-        Recordings stay in this browser unless you explicitly choose Analyse attempt, and are
-        cleared when you change sections.
-      </span>
     </div>
   );
 }

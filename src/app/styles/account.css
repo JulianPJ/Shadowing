@@ -67,14 +67,6 @@
   flex-wrap: wrap;
   gap: 10px;
 }
-.sync-dot {
-  display: inline-block;
-  width: 7px;
-  height: 7px;
-  margin-left: 5px;
-  border-radius: 50%;
-  background: #a87835;
-}
 @media (max-width: 650px) {
   .site-header {
     height: auto;
@@ -88,9 +80,6 @@
   }
   .header-inner .brand {
     flex-shrink: 0;
-  }
-  .account-entry {
-    font-size: 0.75rem;
   }
   .site-header nav {
     gap: 8px;
@@ -110,16 +99,14 @@
   gap: 20px;
   flex-wrap: nowrap;
 }
-.site-header .nav-link,
-.site-header .nav-demo {
+.site-header .nav-link {
   font-size: 13px;
   min-height: 44px;
 }
 .navigation-toggle {
   display: none;
 }
-.navigation-dialog,
-.account-drawer {
+.navigation-dialog {
   color: var(--ink);
   background: var(--paper);
   border: 1px solid var(--line);
@@ -129,8 +116,7 @@
   padding: 24px;
   overflow-y: auto;
 }
-.navigation-dialog::backdrop,
-.account-drawer::backdrop {
+.navigation-dialog::backdrop {
   background: #17231cb3;
 }
 .navigation-heading {
@@ -149,8 +135,7 @@
   justify-content: stretch;
   align-items: stretch;
 }
-.site-header .navigation-dialog .nav-link,
-.site-header .navigation-dialog .nav-demo {
+.site-header .navigation-dialog .nav-link {
   padding: 10px 12px;
   font-size: 16px;
   min-height: 44px;
@@ -160,14 +145,9 @@
   width: 44px;
   height: 44px;
 }
-.navigation-heading .icon-button,
-.account-drawer .dialog-close {
+.navigation-heading .icon-button {
   width: 44px;
   height: 44px;
-}
-.standalone-navigation {
-  width: min(1128px, calc(100% - 40px));
-  margin: 24px auto 0;
 }
 .task-return {
   display: inline-flex;
@@ -177,63 +157,11 @@
   font-size: 14px;
   font-weight: 600;
 }
-.vocabulary-navigation {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 16px 0;
-  border-bottom: 1px solid var(--line);
-}
-.vocabulary-navigation a {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 44px;
-  padding: 10px 14px;
-  border: 1px solid transparent;
-  border-radius: 9px;
-  font-size: 14px;
-}
-.vocabulary-navigation a[aria-current='page'] {
-  background: var(--green-pale);
-  border-color: var(--green);
-  color: var(--green);
-  font-weight: 600;
-}
-.vocabulary-navigation a:hover {
-  border-color: var(--line);
-}
 .account-screen {
   margin-top: 24px;
 }
 .account-email {
   overflow-wrap: anywhere;
-}
-.account-drawer {
-  position: fixed;
-  margin: 16px 16px 16px auto;
-  min-height: min(520px, calc(100dvh - 32px));
-}
-.account-drawer h2 {
-  font-size: 23px;
-  margin: 4px 44px 16px 0;
-}
-.account-drawer p {
-  margin: 14px 0;
-  line-height: 1.65;
-}
-.account-sync {
-  padding: 16px;
-  margin: 24px 0;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-}
-.account-sync h2 {
-  font-size: 17px;
-  margin: 0 0 12px;
-}
-.account-sync .button {
-  margin: 8px 8px 0 0;
 }
 .plan-comparison {
   margin: 32px 0;
@@ -306,15 +234,5 @@
 @media (max-width: 390px) {
   .account-screen {
     padding: 20px;
-  }
-  .standalone-navigation {
-    width: calc(100% - 32px);
-  }
-  .vocabulary-navigation {
-    gap: 4px;
-  }
-  .vocabulary-navigation a {
-    flex: 1 0 calc(50% - 4px);
-    padding: 10px 8px;
   }
 }

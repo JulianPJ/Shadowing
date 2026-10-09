@@ -19,11 +19,11 @@ jobs:
   e2e:
     name: Playwright E2E
     runs-on: ubuntu-latest
-    # Both production runtimes run the full media/browser and native D1 checks.
-    timeout-minutes: 35
+    # The canonical Cloudflare Worker is the only runtime: build it once and test it in local workerd.
+    timeout-minutes: 25
     env:
       CI: true
-      PLAYWRIGHT_BASE_URL: http://localhost:3000
+      PLAYWRIGHT_BASE_URL: http://localhost:3001
 
     steps:
       - name: Check out repository
@@ -53,44 +53,20 @@ jobs:
       - name: Run unit and integration tests
         run: npm test
 
-      - name: Build application
-        run: npm run build
-
-      - name: Start application
-        run: |
-          mkdir -p artifacts
-          npm start > artifacts/next-server.log 2>&1 &
-          echo $! > artifacts/next-server.pid
-
-      - name: Wait for application
-        shell: bash
-        run: |
-          for attempt in {1..90}; do
-            if curl --fail --silent --show-error http://localhost:3000/ > /dev/null; then
-              exit 0
-            fi
-            sleep 1
-          done
-          echo "Application did not become ready in time."
-          cat artifacts/next-server.log || true
-          exit 1
-
-      - name: Run Playwright tests
-        run: npm run test:e2e
-
       - name: Apply local D1 migrations
         timeout-minutes: 2
         run: npm run test:d1:migrations
 
-      - name: Build canonical Worker
-        run: npm run build:vinext
+      - name: Build Worker
+        run: npm run build
 
       - name: Verify built Worker and D1
         run: npm run test:d1:runtime
 
       - name: Start isolated built Worker
         run: |
-          npm run start:vinext:test > artifacts/worker-server.log 2>&1 &
+          mkdir -p artifacts
+          npm run start:test > artifacts/worker-server.log 2>&1 &
           echo $! > artifacts/worker-server.pid
 
       - name: Wait for built Worker
@@ -106,8 +82,6 @@ jobs:
           exit 1
 
       - name: Run Playwright against built Worker
-        env:
-          PLAYWRIGHT_BASE_URL: http://localhost:3001
         run: npm run test:e2e
 
       - name: Upload Playwright artifacts

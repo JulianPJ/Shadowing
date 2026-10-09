@@ -1,83 +1,72 @@
 # Code navigation
 
-Hibiki runs on Cloudflare Workers via vinext. Standard Next.js is also supported for local development and verification. Read `PROJECT_CONTEXT.md` for product decisions and the installed Next.js documentation before changing framework code.
+Hibiki is one Cloudflare Worker built with vinext (Next.js App Router on Vite). `vite dev` runs the Worker with its bindings, so development, preview, CI and production share a runtime. Read `PROJECT_CONTEXT.md` for product decisions, and the installed Next.js documentation before changing framework code.
+
+## Where things live
 
 | Concern | Implementation |
 | --- | --- |
+| Header, section tabs, help, task return | `src/components/chrome.tsx`, `src/components/task-return.ts` |
+| Home: start a lesson, continue, Discover / Library tabs | `src/components/home.tsx`, `src/components/discover/`, `src/components/my-library.tsx`, `src/components/library-preview.tsx` |
+| Vocabulary: Daily Review and Words | `src/components/daily-review.tsx`, `src/components/vocabulary-words.tsx`, `src/components/vocabulary-header.tsx` |
+| Profile: progress, weekly report, account settings | `src/components/learner-progress.tsx`, `src/components/weekly-report.tsx`, `src/components/account.tsx` |
 | Practice hydration / missing lesson | `src/components/practice.tsx` |
-| Player state, navigation, recording / quiz coordination | `src/components/practice/study-player.tsx` |
-| Current section and playback buttons | `src/components/practice/current-section.tsx` |
-| Transcript filtering and automatic scrolling | `src/components/practice/transcript-panel.tsx` |
+| Player state, navigation, recording and quiz coordination | `src/components/practice/study-player.tsx` |
+| Practice toolbar and advanced settings | `src/components/practice/practice-settings.tsx`, `src/lib/drill-presets.ts` |
+| Current section, transcript, elapsed-time store | `src/components/practice/current-section.tsx`, `transcript-panel.tsx`, `elapsed-store.ts` |
 | Playback boundaries, seek tolerance, evidence replay | `src/components/practice/use-playback-boundary.ts`, `src/lib/section-lookup.ts` |
-| Translation request, cancellation, reveal and browser cache | `src/components/practice/use-section-translation.ts` |
+| Media adapters (YouTube, Vimeo, HTML media, web pages via Hibiki Bridge) | `src/components/media-player.tsx`, `media-youtube.tsx`, `media-vimeo.tsx`, `media-html.tsx`, `media-page.tsx` |
+| Hibiki Bridge extension and its app-side protocol | `extension/`, `src/lib/extension/` ([details](browser-extension.md)) |
+| Media identity, link resolution, lesson migration | `src/lib/media.ts`, `src/lib/import-lesson.ts` |
+| Caption retrieval, ASR detection and labels | `src/lib/providers/youtube-captions.ts`, `src/lib/caption-labels.ts` |
+| Whisper subtitles: audio windows, overlap merge, upload | `src/lib/media-audio/`, `src/lib/transcription-client.ts`, `src/lib/providers/ai-transcription.ts` |
+| Translation request, cancellation and browser cache | `src/components/practice/use-section-translation.ts`, `src/lib/translation-api.ts` |
 | Practice clock and checkpoints | `src/components/use-practice-progress.ts`, `src/lib/practice-clock.ts`, `src/lib/practice-checkpoint.ts` |
-| Progress page loading and cross-tab refresh | `src/components/use-learner-profile.ts` |
-| Learner validation, sessions, retention, aggregation, migration | `src/lib/learner/` |
-| Browser persistence, lessons, preferences, learning records | `src/lib/storage/` |
-| Framework-owned authentication, cookie sessions and local Next adapter | `src/lib/auth/` |
-| Account sync contract, validation, merge, D1 repository and browser hydration | `src/lib/sync/` |
-| Dictionary identity/context and safe replay links | `src/lib/dictionary/` |
-| Dictionary cursor/filter and exact-ID queries, account-scoped record cache | `src/lib/dictionary/query.ts`, `repository.ts`, `cache.ts`, `client.ts` |
-| Descriptive tags, ownership, limits and connected edits | `src/lib/tags/`, `src/components/tag-controls.tsx` |
-| Composed completion recap and explainable revisit evidence | `src/components/lesson-completion-summary.tsx`, `src/lib/lesson-completion.ts` |
-| Licensed lexical assets, lookup and contextual lemma resolution | `scripts/prepare-lexicon.mjs`, `src/lib/lexicon/`, `src/components/lexicon-definitions.tsx` |
-| Shared Japanese morphology, Furigana views and prioritized bounded worker batches | `src/lib/japanese-analysis.ts`, `japanese-analysis-protocol.ts`, `japanese-analysis-worker.ts`, `furigana-client.ts`, `furigana-worker.ts` |
-| Local-first word knowledge, D1 ownership, vocabulary coverage and Word Browser | `src/lib/knowledge/`, `src/components/use-word-knowledge.ts`, `src/components/lesson-vocabulary.tsx`, `src/components/word-browser.tsx` |
-| Explicit presets, local recording automation and bounded Match trends | `src/lib/drill-presets.ts`, `src/lib/shadowing-session.ts`, `src/components/voice-recorder.tsx` |
-| My Library/queue, trusted public discovery and personal next lessons | `src/lib/library/`, `src/lib/discovery-api.ts`, `src/components/my-library.tsx` |
-| Discover catalogue, scheduled YouTube metadata, ranking and account queue/feedback | `src/lib/discover/`, `src/components/discover/`, `src/app/discover/` |
-| Explicit URL hand-off into existing preparation | `src/app/prepare/`, `src/lib/prepare-client.ts`, `src/components/home.tsx` |
-| Weekly evidence, self-rated review history and local daily goal | `src/lib/reports/weekly.ts`, `src/lib/review/history.ts`, `src/components/weekly-report.tsx` |
-| Collections and entry memberships | `src/lib/decks/`, `src/lib/review/repository.ts` |
-| Pure scheduling, local review outbox and authenticated D1 review | `src/lib/review-scheduler.ts`, `src/lib/review/` |
-| Exportable vocabulary rows and spreadsheet-safe CSV | `src/lib/export/vocabulary.ts` |
-| Optional account UI and first-login import prompt | `src/components/account.tsx`, `src/components/auth-form.tsx` |
-| Transcript validation and identity | `src/lib/transcript.ts`, `src/lib/transcript-validation.ts`, `src/lib/hash.ts` |
-| Quiz questions, documents and attempts | `src/lib/quiz/` |
-| Quiz configuration, prompts, selection and provider adapters | `src/lib/providers/quiz/` |
-| Request envelope / browser POST transport | `src/lib/content-request.ts` |
-| Trusted transcript matching and shared artifact cache | `src/lib/shared-content.ts` |
-| Bounded streamed bodies | `src/lib/http-body.ts` |
-| Ordered global styles | `src/app/globals.css`, `src/app/styles/` |
-| Cloudflare runtime routing and inferred binding types | `cloudflare-worker.js`, `cloudflare.config.ts` |
+| Learner validation, sessions, aggregation, migration | `src/lib/learner/` |
+| Browser persistence: lessons (history stores references), preferences | `src/lib/storage/` |
+| Authentication (Better Auth on D1) | `src/lib/auth/` |
+| Learner sync contract, validation, merge, D1 repository, hydration | `src/lib/sync/` |
+| Shared sync engine for review, word states and Watch Later | `src/lib/sync/channel.ts`, `src/lib/sync/channel-status.ts` |
+| One word status: saving, Known, grading side effects | `src/lib/vocabulary.ts` ([details](vocabulary.md)) |
+| Saved words, context and replay links | `src/lib/dictionary/` |
+| Review scheduling, local outbox, D1 review, study limits | `src/lib/review-scheduler.ts`, `src/lib/review/` |
+| Word states, incremental sync, lesson vocabulary coverage | `src/lib/knowledge/`, `src/components/use-word-knowledge.ts`, `src/components/lesson-vocabulary.tsx` |
+| Lexical assets, lookup and contextual lemma resolution | `scripts/prepare-lexicon.mjs`, `src/lib/lexicon/`, `src/components/lexicon-definitions.tsx` |
+| Japanese morphology and Furigana workers | `src/lib/japanese-analysis*.ts`, `src/lib/furigana-*.ts` |
+| Discover catalogue, ranking, Watch Later sync | `src/lib/discover/` ([details](discover.md)) |
+| Completion recap and revisit evidence | `src/components/lesson-completion-summary.tsx`, `src/lib/lesson-completion.ts` |
+| Quiz documents, attempts, prompts and providers | `src/lib/quiz/`, `src/lib/providers/quiz/` |
+| Worker runtime: bindings, rate limits, account route wiring | `src/lib/server/runtime.ts`, `src/lib/server/rate-limit.ts`, `src/types/cloudflare-env.d.ts` |
+| Worker entry: demo asset, Discover flag, scheduled refresh | `cloudflare-worker.js`, `cloudflare.config.ts` |
+| Styles (imported in order; `shell.css` last) | `src/app/globals.css`, `src/app/styles/` |
 
-`storage.ts`, `learner-progress.ts`, `learner-storage.ts`, `quiz.ts` and `providers/quiz.ts` retain their existing exports as compatibility facades. Internal modules should import the specific module they need, especially for transcript utilities that are also used outside quizzes. Avoid importing server providers into client components.
+Import the module you need directly; there are no compatibility facades. Keep server providers out of client components.
 
-## Behaviour to preserve
+## Contracts to preserve
 
-Discover contracts, account merge/retention rules, quota/freshness bounds and release flags are documented in [Discover](discover.md). Metadata reads and saves never acquire captions or infer difficulty. `/api/discovery` remains the existing trusted prepared-lesson endpoint; `/api/discover` is the separate catalogue feed.
-
-The UX contracts and audit coverage are documented in [UX core loops](ux-core-loops.md). Canonical lexical spans live in `japanese-lexical-spans.ts`; safe task return paths in `auth/return-path.ts`; paused browser-session playback return in `practice-return.ts`; local study days in `study-day.ts`; aggregate sync status in `sync/channel-status.ts`. Review limits are plain validated preference data in `review/limits.ts`, with device-only today extensions in `review/study-settings.ts`. Accepted recent rating history belongs to the account-owned review repository, never deck/tag schedules.
-
-- Keep the same mounted media player when changing display preferences. Browser recordings, local object URLs and the media adapter belong to the active practice tree.
-- Preserve playback tolerances and automatic pause timing. `section-lookup.ts` reproduces the original predicate, including gaps and legacy ordering.
-- Manual Continue and timed/hands-free continuation resume the media clock through subtitle gaps. The next shadowing section is armed during the gap without reselecting the preceding section. Transcript clicks, previous/next and replay still seek to authored speech starts; subtitle timing is never stretched. Continuous playback runs to the media's actual end, including footage after the last subtitle. Finish practice remains an explicit shadowing completion action.
-- Keep the `hibiki:v1:` keys and existing JSON formats. Lesson history and quiz attempts retain all existing compatibility rules; unchanged lesson payloads skip redundant writes. Failed writes still retain visit data in memory and show the existing warning.
-- Transcript hashes include section IDs, timing and trimmed Japanese text; media URLs are excluded. Model selection thresholds, prompts, inference options and evidence validation are unchanged.
-- Styles are imported in their original cascade order. Later responsive and display rules intentionally override earlier rules. Do not merge distant duplicate selectors without checking intervening declarations.
-- Preserve vinext's response-stage exports in the Worker wrapper, Cloudflare bindings, provider fallback and D1 fail-open behaviour.
+- **API routes** read bindings from `cloudflare:workers` through `src/lib/server/runtime.ts` and must export `dynamic = 'force-dynamic'`; otherwise vinext routes GET responses through its shared response cache.
+- **Paid and public endpoints are rate limited** with a constant route name per handler (never the request path). Workers AI routes (transcribe, difficulty, quiz, shadowing) fail closed; caption preparation and translation fail open.
+- **Sync is silent.** The only visible sync state is "Your session expired". Channels never sync for signed-out or unverified accounts. Routine triggers (focus, reconnect, a slow poll) reuse a sync from the last five minutes unless local changes are pending.
+- **Word-state pulls are incremental** (`synced_at` watermark plus a 60-second overlap). Uploads return the stored value for each lemma so a device that lost last-writer-wins adopts the winner.
+- **Media playback**: keep the same mounted media player when display preferences change; recordings, object URLs and the adapter belong to the active practice tree. `section-lookup.ts` reproduces the original boundary predicate, including gaps. Subtitle timing is never stretched.
+- **Storage**: keep the `hibiki:v1:` keys. `history` holds `{ lesson: { id }, index, updatedAt }` references (legacy embedded lessons migrate on the next save); section moves write only `position:{id}`. Writes skip unchanged values and notify `hibiki:local-write` once per real change.
+- **Transcript identity**: hashes include section IDs, timing and trimmed Japanese; media URLs are excluded.
+- **Web-page lessons** (`source: 'page'`) carry a `pageKey`, never a shared `contentKey`, sync with `mediaAvailable: false`, and save words with media type `local`.
+- **D1** binds at most 100 parameters per statement; split `IN (…)` lists accordingly.
+- **Styles**: later files intentionally override earlier ones. Check intervening declarations before merging duplicate selectors.
 
 ## Verification
 
-Use Node 24, as declared in `package.json`. Install dependencies with `npm ci`; on Windows PowerShell use `npm.cmd` / `npx.cmd` if script execution policy blocks the `.ps1` shims.
+Use Node 24 (`package.json`) and `npm ci`. On Windows PowerShell, use `npm.cmd` / `npx.cmd` if script policy blocks the shims.
 
 | Change | Checks |
 | --- | --- |
-| General code | `npm run typecheck`, `npm run lint`, `npm test`, `npm run format:check` |
-| Playback or persistence | Existing browser tests plus `tests/refactoring.test.ts` |
-| Next.js integration | `npm run build`; start with `npm start`, then `npm run test:e2e` |
-| Canonical Cloudflare runtime | `npm run build:vinext`, `npm run test:d1:runtime`; browser tests against local preview |
-| Local D1 migration ledger / ownership | `npm run test:d1:migrations`; real persisted D1 with explicit runtime disposal |
-| Caption relay | Included in `typecheck`; `npm run build:caption-relay` for bundling |
+| Any code | `npm run typecheck`, `npm run lint`, `npm test`, `npm run format:check` |
+| Worker, routes, D1 | `npm run build`, then `npm run test:d1:runtime`; `npm run test:d1:migrations` for migrations |
+| UI and playback | `npm run build`, `npm run start:test` (port 3001), then `npm run test:e2e` |
+| Hibiki Bridge | `tests/extension.test.ts`; `tests/e2e/extension.spec.ts` loads the unpacked extension into Chromium |
+| Caption relay | included in `typecheck`; `npm run build:caption-relay` |
 
-Browser tests use `PLAYWRIGHT_BASE_URL` (default `http://localhost:3000`). Set `PLAYWRIGHT_CHROME_PATH` to an installed Chrome executable when Playwright's bundled browser is unavailable. D1 unit and built-runtime tests use local storage and mocked providers, without contacting live AI/caption services.
+Always build with `npm run build`: its prebuild step regenerates the Furigana and media-audio worker bundles in `public/furigana/` that a bare `vite build` leaves stale.
 
-`npm run start:vinext:test` serves the built Worker at port 3001 with remote bindings and persistent state disabled. Run the full browser suite with `PLAYWRIGHT_BASE_URL=http://localhost:3001`. CI now verifies both production runtimes, local migrations and the built native Worker/D1 boundary on the same PR head. Focused retention checks: `tests/retention-scale.test.ts` (650 real D1 entries and populated upgrade), `tests/dictionary-cache.test.ts`, `tests/lesson-completion.test.ts`, and `tests/e2e/retention-polish.spec.ts` (806-word browser export/offline hydration).
-
-Interactive dictionary consumers must use `page()` or `byIds()`. Full traversal is an explicit export/compatibility operation, never the Daily Review join or lesson recap default. Cache and query contracts live in [retention](retention-implementation.md). Scheduling remains in `review/`; tags never own or copy schedules. The completion component composes domain outputs without adding player state or AI generation effects.
-
-`npm run format` provides reproducible formatting. Generated assets, build output, lockfiles and authored demo data are excluded. Formatting increases physical line counts; evaluate simplification by ownership and duplicated logic rather than line count alone.
-
-The refactor was verified on 2026-10-04 with 123 passing unit tests (including Node 24), 42 passing browser tests on each runtime, both app builds, the relay build, and the built Worker/D1 integration check. The original CSS and all compatibility-facade exports were compared directly against the pre-refactor revision. Browser/provider boundaries use deterministic mocks or authored demo data; these checks do not exercise live AI or caption services.
-
-Lesson-history normalization and a new incremental quiz-attempt format remain separate migration work. This refactor retains the existing stored formats and all attempt records, and reduces redundant lesson writes without migrating browser data.
+Browser tests read `PLAYWRIGHT_BASE_URL` (default `http://localhost:3001`) and `PLAYWRIGHT_CHROME_PATH`. They use mocked providers and the authored demo; they never contact live AI or caption services. Recording tests need a working fake microphone and `MediaRecorder`; on some Windows setups they fail before recording starts.

@@ -29,7 +29,6 @@ export type DictionaryEntry = DictionarySaveInput & {
   normalizedTerm: string;
   createdAt: string;
   updatedAt: string;
-  tags?: import('../tags/types').Tag[];
 };
 
 export type DictionaryQuery = {
@@ -38,8 +37,6 @@ export type DictionaryQuery = {
   term?: string;
   /** Bounded partial search across Japanese term, reading and chosen meaning. */
   search?: string;
-  deckId?: string;
-  tagId?: string;
   lessonId?: string;
   transcriptKey?: string;
 };

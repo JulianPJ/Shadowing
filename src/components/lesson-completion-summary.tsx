@@ -8,8 +8,8 @@ import type {
   ShadowingScoreSession,
   ShadowingSessionSummary,
 } from '@/lib/shadowing-session';
-import { loadQuiz, loadQuizAttempt } from '@/lib/storage';
-import { validateQuizLesson } from '@/lib/quiz';
+import { loadQuiz, loadQuizAttempt } from '@/lib/storage/learning';
+import { validateQuizLesson } from '@/lib/transcript';
 import { completionRevisitSections } from '@/lib/lesson-completion';
 import { dueReviews } from '@/lib/review-scheduler';
 import { useReview } from './use-review';

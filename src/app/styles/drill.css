@@ -1,39 +1,3 @@
-.drill-settings {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: end;
-  gap: 10px 14px;
-  margin: 10px 0 14px;
-  padding: 12px 14px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--paper);
-}
-.drill-settings label {
-  display: grid;
-  gap: 5px;
-  color: var(--muted);
-  font-size: 10px;
-}
-.drill-settings select,
-.drill-settings input {
-  max-width: 100%;
-  min-height: 34px;
-  padding: 5px 7px;
-  color: var(--ink);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--paper);
-  font: inherit;
-  font-size: 11px;
-}
-.drill-settings input {
-  width: 80px;
-}
-.drill-settings p {
-  flex-basis: 100%;
-  margin: 0;
-}
 .shadowing-diagnostics,
 .shadowing-trend {
   margin-top: 12px;
@@ -85,12 +49,4 @@
   padding: 8px 18px;
   color: var(--green);
   background: var(--green-pale);
-}
-@media (max-width: 600px) {
-  .drill-settings label:first-child {
-    flex-basis: 100%;
-  }
-  .drill-settings select {
-    width: 100%;
-  }
 }

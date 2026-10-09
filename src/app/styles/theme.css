@@ -57,10 +57,8 @@
 }
 :root[data-theme='dark'] .hero-description,
 :root[data-theme='dark'] .demo-copy p,
-:root[data-theme='dark'] .rhythm-grid p,
 :root[data-theme='dark'] .input-meta,
-:root[data-theme='dark'] .input-meta .text-button,
-:root[data-theme='dark'] .demo-note {
+:root[data-theme='dark'] .input-meta .text-button {
   color: var(--muted);
 }
 :root[data-theme='dark'] .start-card,
@@ -93,17 +91,6 @@
 }
 :root[data-theme='dark'] .demo-button:hover {
   background: #273026;
-}
-:root[data-theme='dark'] .step-icon {
-  background: #20251f;
-  color: #a7b39c;
-}
-:root[data-theme='dark'] .step-number {
-  color: #656d64;
-}
-:root[data-theme='dark'] .home-signoff,
-:root[data-theme='dark'] .home-signoff p {
-  color: #8f988c;
 }
 :root[data-theme='dark'] .recent-card:hover {
   border-color: #576254;
@@ -143,7 +130,6 @@
 }
 :root[data-theme='dark'] .practice-breadcrumb,
 :root[data-theme='dark'] .practice-breadcrumb > a,
-:root[data-theme='dark'] .private-label,
 :root[data-theme='dark'] .practice-title p,
 :root[data-theme='dark'] .practice-progress > span:first-child > span {
   color: var(--muted);
@@ -212,8 +198,7 @@
 :root[data-theme='dark'] .recording-hint,
 :root[data-theme='dark'] .recording-privacy,
 :root[data-theme='dark'] .player-footnote,
-:root[data-theme='dark'] .player-footnote .text-button,
-:root[data-theme='dark'] .translation-privacy {
+:root[data-theme='dark'] .player-footnote .text-button {
   color: var(--muted);
 }
 :root[data-theme='dark'] .translation-button > span,
@@ -286,8 +271,7 @@
 :root[data-theme='dark'] .row-number,
 :root[data-theme='dark'] .row-time,
 :root[data-theme='dark'] .transcript-bottom,
-:root[data-theme='dark'] .transcript-empty,
-:root[data-theme='dark'] .practice-signoff {
+:root[data-theme='dark'] .transcript-empty {
   color: var(--muted);
 }
 :root[data-theme='dark'] .transcript-search {
@@ -320,21 +304,8 @@
 :root[data-theme='dark'] .past .row-content > [lang='ja'] {
   color: #8f9c8b;
 }
-:root[data-theme='dark'] .transcript-bottom,
-:root[data-theme='dark'] .practice-signoff > span + span {
+:root[data-theme='dark'] .transcript-bottom {
   border-color: var(--line);
-}
-:root[data-theme='dark'] .completion-card {
-  border-color: #455740;
-  background: #202a21;
-}
-:root[data-theme='dark'] .completion-card > span {
-  background: #2b392a;
-  color: #b2ce9f;
-}
-:root[data-theme='dark'] .completion-card p,
-:root[data-theme='dark'] .completion-card .text-button {
-  color: #a6b69d;
 }
 :root[data-theme='dark'] .quiz-feedback blockquote {
   border-color: #536650;

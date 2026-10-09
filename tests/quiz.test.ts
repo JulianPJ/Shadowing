@@ -3,42 +3,34 @@ import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import demo from '../src/data/demo.json';
 import demoQuiz from '../src/data/demo-quiz.json';
-import {
-  createQuiz,
-  mapEvidence,
-  newAttempt,
-  scoreQuiz,
-  transcriptKey,
-  updateAttempt,
-  validateAttempt,
-  validateQuestions,
-  validateQuiz,
-  validateQuizLesson,
-} from '../src/lib/quiz';
+import { createQuiz, validateQuiz } from '../src/lib/quiz/document';
+import { mapEvidence, validateQuestions } from '../src/lib/quiz/questions';
+import { newAttempt, scoreQuiz, updateAttempt, validateAttempt } from '../src/lib/quiz/attempts';
+import { transcriptKey, validateQuizLesson } from '../src/lib/transcript';
 import {
   completeLesson,
   lessonCompleted,
   loadQuiz,
   loadQuizAttempt,
-  readStorage,
   saveQuiz,
   saveQuizAttempt,
-  writeStorage,
-} from '../src/lib/storage';
+} from '../src/lib/storage/learning';
+import { readStorage, writeStorage } from '../src/lib/storage/browser';
 import {
   buildQuizWindows,
-  chatCompletionQuizProvider,
-  createWorkersAiQuizProvider,
-  DIRECT_QWEN_MAX_JAPANESE_CHARS,
-  generateLessonQuiz,
-  MIN_QUIZ_JAPANESE_CHARS,
   quizGenerationRoute,
   quizJapaneseCharacterCount,
-  QuizProviderError,
-  readBoundedJson,
+} from '../src/lib/providers/quiz/selection';
+import { chatCompletionQuizProvider, readBoundedJson } from '../src/lib/providers/quiz/chat';
+import { createWorkersAiQuizProvider } from '../src/lib/providers/quiz/workers';
+import {
+  DIRECT_QWEN_MAX_JAPANESE_CHARS,
+  MIN_QUIZ_JAPANESE_CHARS,
   WORKERS_AI_MODEL,
   WORKERS_AI_QUIZ_SELECTOR_MODEL,
-} from '../src/lib/providers/quiz';
+} from '../src/lib/providers/quiz/prompts';
+import { generateLessonQuiz } from '../src/lib/providers/quiz/generation';
+import { QuizProviderError } from '../src/lib/providers/quiz/errors';
 import { handleQuizRequest } from '../src/lib/quiz-api';
 import type { QuizGenerationProvider } from '../src/lib/types';
 

@@ -1,4 +1,3 @@
-import type { Deck, DeckMembership } from '../decks/types';
 import type { ReviewEvent } from './history';
 export type ReviewGrade = 'again' | 'hard' | 'good' | 'easy';
 export type ReviewState = {
@@ -16,9 +15,8 @@ export type ReviewState = {
   createdAt: string;
   updatedAt: string;
 };
+/** One review schedule per saved word. A suspended card is a word marked Known. */
 export type ReviewSnapshot = {
-  decks: Deck[];
-  memberships: DeckMembership[];
   cards: ReviewState[];
   /** Accepted account ratings in the bounded authoritative window, when supplied by the server. */
   history?: ReviewEvent[];
@@ -28,10 +26,7 @@ export type ReviewSnapshot = {
   historyWindowStart?: string;
 };
 export type ReviewOperation =
-  | { action: 'deck'; id: string; name: string }
-  | { action: 'delete-deck'; deckId: string }
-  | { action: 'membership'; deckId: string; entryIds: string[]; remove: boolean }
-  | { action: 'enroll'; entryIds: string[]; deckId: string; enrolledAt: string }
+  | { action: 'enroll'; entryIds: string[]; enrolledAt: string }
   | { action: 'suspend'; entryId: string; revision: number; operationId: string }
   | {
       action: 'undo';
@@ -50,6 +45,12 @@ export type ReviewOperation =
       reviewedAt: string;
       operationId: string;
     };
+export const REVIEW_ACTIONS: readonly ReviewOperation['action'][] = [
+  'enroll',
+  'suspend',
+  'undo',
+  'grade',
+];
 export interface ReviewRepository {
   snapshot(userId: string): Promise<ReviewSnapshot>;
   apply(userId: string, operation: ReviewOperation): Promise<void>;

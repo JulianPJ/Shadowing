@@ -169,7 +169,7 @@ test('cancelled chunk queue resumes only complete audio chunks after refresh and
       );
       return key ? JSON.parse(localStorage.getItem(key)!).segments : [];
     });
-    expect(cues.some((cue: { start: number }) => cue.start >= 119)).toBe(true);
+    expect(cues.some((cue: { start: number }) => cue.start >= 112)).toBe(true);
   } finally {
     release?.();
     fs.rmSync(directory, { recursive: true, force: true });
@@ -181,7 +181,7 @@ test('silent audio chunk does not abort later speech and keeps original timestam
 }) => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'hibiki-silent-media-'));
   const fixture = path.join(directory, 'silence-then-japanese.wav');
-  fs.writeFileSync(fixture, wave(132, 121));
+  fs.writeFileSync(fixture, wave(132, 113));
   let calls = 0;
   try {
     await mockProAccount(page);
@@ -214,7 +214,7 @@ test('silent audio chunk does not abort later speech and keeps original timestam
       );
       return key ? JSON.parse(localStorage.getItem(key)!).segments[0].start : -1;
     });
-    expect(start).toBe(121);
+    expect(start).toBe(113);
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
   }
@@ -290,7 +290,7 @@ test('AAC stream copy resumes beyond two minutes without WebCodecs and uploads n
         : [];
     });
     expect(starts[0]).toBeCloseTo(1, 2);
-    expect(starts[1]).toBeCloseTo(121, 1);
+    expect(starts[1]).toBeCloseTo(113, 1);
   } finally {
     release?.();
     fs.rmSync(directory, { recursive: true, force: true });
@@ -313,7 +313,7 @@ test('AAC final packet covers a tiny trailing window without an empty or repeate
     '-i',
     'sine=frequency=400:sample_rate=44100',
     '-t',
-    '120.0003',
+    '116.0003',
     '-c:a',
     'aac',
     '-b:a',

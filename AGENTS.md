@@ -18,4 +18,4 @@ It is the persistent source of truth for the product purpose, current implementa
 
 ## Code navigation and checks
 
-Read [docs/architecture.md](docs/architecture.md) for module ownership, compatibility boundaries and focused verification commands. Keep the public library facades compatible; change the underlying domain module when working on a specific concern.
+Read [docs/architecture.md](docs/architecture.md) for module ownership, compatibility boundaries and focused verification commands. Import and change the specific domain module for the concern you are working on; there are no compatibility facades.

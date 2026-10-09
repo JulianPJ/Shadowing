@@ -1,5 +1,5 @@
 'use client';
-import { resolveMediaLink } from './media-discovery';
+import { resolveMediaUrl } from './media';
 import { needsUserTranscript } from './linked-transcripts';
 import type { Lesson, ResolvedMedia } from './types';
 type Preparation = { resolved: ResolvedMedia; lesson?: Lesson; needsTranscript?: string };
@@ -9,7 +9,7 @@ export async function prepareLinkedVideo(
   signal: AbortSignal,
   onProgress: (stage: string, message: string, resolved?: ResolvedMedia) => void,
 ): Promise<Preparation> {
-  let resolved = await resolveMediaLink(url, signal);
+  let resolved = await resolveMediaUrl(url);
   if (signal.aborted) throw new DOMException('Cancelled', 'AbortError');
   onProgress('identify', 'Finding your video…', resolved);
   if (resolved.media.type !== 'youtube')

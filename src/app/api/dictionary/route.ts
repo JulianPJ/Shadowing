@@ -1,1 +1,4 @@
-export { localAccountHandler as GET, localAccountHandler as POST } from '@/lib/auth/local-handler';
+export { accountRoute as GET, accountRoute as POST } from '@/lib/server/runtime';
+
+// API responses are per-request and never enter the framework response cache.
+export const dynamic = 'force-dynamic';

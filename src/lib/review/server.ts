@@ -2,6 +2,12 @@ import { BodyLimitError, readBoundedText } from '../http-body';
 import { ReviewConflict } from './repository';
 import type { ReviewRepository } from './types';
 import { validateReviewOperation } from './validation';
+
+/**
+ * Deck operations from tabs still running a bundle from before decks were removed. Acknowledging
+ * them as no-ops keeps those tabs' outboxes draining; they read empty deck lists below.
+ */
+const RETIRED_ACTIONS = new Set(['deck', 'delete-deck', 'membership']);
 export async function handleReviewRequest(
   request: Request,
   userId: string,
@@ -11,10 +17,14 @@ export async function handleReviewRequest(
   const respond = (body: unknown, status = 200) =>
     Response.json(body, { status, headers: { 'Cache-Control': 'no-store', Vary: 'Cookie' } });
   try {
-    if (request.method === 'GET') return respond(await repository.snapshot(userId));
+    if (request.method === 'GET')
+      return respond({ ...(await repository.snapshot(userId)), decks: [], memberships: [] });
     if (request.method !== 'POST') return respond({ error: 'Method not supported' }, 405);
     if (!verified) return respond({ error: 'Verify your email before reviewing.' }, 403);
-    const op = validateReviewOperation(JSON.parse(await readBoundedText(request, 16000)));
+    const body = JSON.parse(await readBoundedText(request, 16000));
+    if (RETIRED_ACTIONS.has((body as { action?: unknown } | null)?.action as string))
+      return respond({ ok: true });
+    const op = validateReviewOperation(body);
     await repository.apply(userId, op);
     return respond({ ok: true });
   } catch (error) {

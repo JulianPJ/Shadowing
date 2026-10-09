@@ -1,0 +1,321 @@
+/* Site sections, section tabs and the simplified vocabulary, profile and player controls. */
+
+.nav-badge {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: #fff9f4;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
+}
+.nav-link[aria-current='page'] {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* Tabs within a section: Home (Discover / Library) and Vocabulary (Review / Words). */
+.section-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 28px 0 22px;
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+}
+.section-tabs a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 16px;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.section-tabs a:hover {
+  color: var(--ink);
+}
+.section-tabs a[aria-current='page'] {
+  border-bottom-color: var(--accent);
+  color: var(--ink);
+}
+
+.task-return {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* Player: preset and speed stay visible; everything else is under Advanced settings. */
+.practice-settings-stack {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+.practice-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 10px 16px;
+}
+.practice-toolbar label,
+.drill-advanced-fields label {
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.practice-toolbar select,
+.drill-advanced-fields :is(select, input) {
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink);
+}
+.drill-advanced summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+.drill-advanced-fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px 16px;
+  padding: 12px 0 4px;
+}
+.drill-advanced-fields label {
+  flex: 1 1 140px;
+}
+.drill-advanced-fields .offset-control {
+  flex-basis: 100%;
+}
+
+/* Lookup panel: one primary action with status choices beside it. */
+.word-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 6px;
+}
+.word-actions .button[aria-pressed='true'] {
+  border-color: var(--green);
+  background: var(--green-pale);
+  color: var(--green);
+}
+.word-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--pale);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+}
+.word-status.in-review {
+  background: var(--green-pale);
+  color: var(--green);
+}
+.dictionary-edit {
+  margin-top: 8px;
+}
+.dictionary-edit summary {
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+/* Vocabulary → Words */
+.saved-words-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.saved-words-filters form {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+}
+.saved-words-filters label {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.saved-words-filters input {
+  min-height: 40px;
+  min-width: min(280px, 60vw);
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink);
+}
+.dictionary-entry-term .word-status {
+  margin-left: auto;
+}
+.marked-words {
+  margin-top: 40px;
+}
+.marked-word-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+  padding: 0;
+  list-style: none;
+}
+.marked-word-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+}
+.marked-word-list li > span:first-child {
+  font-family: var(--jp);
+  font-size: 15px;
+}
+.marked-word-list label {
+  margin-left: auto;
+}
+.marked-word-list select {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 12px;
+}
+.recap-words {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  padding: 0;
+  list-style: none;
+}
+
+/* Profile */
+.progress-details summary {
+  font-weight: 600;
+  cursor: pointer;
+}
+.account-settings {
+  margin-top: 40px;
+  padding-top: 28px;
+  border-top: 1px solid var(--line);
+}
+.account-settings .account-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 20px;
+}
+.account-verify {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin: 16px 0;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.account-verify p {
+  margin: 0;
+}
+
+@media (max-width: 700px) {
+  .section-tabs {
+    margin: 20px 0 16px;
+  }
+  .saved-words-filters form {
+    flex: 1 1 100%;
+  }
+  .saved-words-filters input {
+    min-width: 0;
+    width: 100%;
+  }
+}
+
+/* Home: the start card, Continue row and tabs sit close together for returning learners. */
+.returning-home .hero {
+  padding: 40px 0 0;
+}
+.returning-home .library-preview {
+  margin: 28px 0 0;
+  padding-top: 0;
+}
+.home-main .discover-main {
+  max-width: none;
+  padding: 0 0 48px;
+}
+.home-main .library-main {
+  max-width: none;
+  padding: 0 0 48px;
+}
+.practice-toolbar .speed-control {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* A video playing in another tab through Hibiki Bridge */
+.page-frame {
+  display: grid;
+  place-items: center;
+}
+.page-media {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  max-width: 420px;
+  padding: 24px;
+  color: #f2f2e5;
+  text-align: center;
+}
+.page-media p {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+.page-import-source {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 12px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.page-import-source span {
+  display: grid;
+  gap: 2px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.page-import-source strong {
+  color: var(--ink);
+}

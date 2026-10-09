@@ -1,7 +1,4 @@
 /* Keep the listen / speak controls in view on typical laptop screens. */
-.practice-header {
-  height: 66px;
-}
 .practice-main {
   padding-top: 21px;
 }
@@ -105,22 +102,12 @@
 .demo-copy p {
   color: #737e65;
 }
-.rhythm-grid p {
-  color: #7b856d;
-}
 .input-meta,
 .input-meta .text-button {
   color: #7c856d;
 }
-.demo-note {
-  color: #7f896f;
-}
 .hero-tag {
   color: #6c795f;
-}
-.translation-privacy {
-  color: var(--muted);
-  font-size: 12px;
 }
 .translation-source {
   color: var(--muted);
@@ -150,9 +137,6 @@
   }
 }
 @media (max-width: 700px) {
-  .practice-header {
-    height: 65px;
-  }
   .practice-grid {
     grid-template-columns: 1fr;
   }

@@ -44,11 +44,12 @@ test('mobile menu is complete, restores focus and keeps learning-page return pat
   for (const width of [320, 360, 390]) {
     await page.setViewportSize({ width, height: 844 });
     await page.goto('/practice/demo');
+    await page.goto('/words');
     const trigger = page.getByRole('button', { name: 'Open navigation menu' });
     await trigger.click();
     const menu = page.getByRole('dialog', { name: 'Navigate Hibiki' });
     await expect(menu).toBeVisible();
-    for (const name of ['Library', 'Vocabulary', 'Review', 'Progress', 'Sign in'])
+    for (const name of ['Home', 'Vocabulary', 'Profile', 'Sign in'])
       await expect(menu.getByRole('link', { name, exact: true })).toBeVisible();
     await expect(trigger).toHaveAttribute('aria-expanded', 'true');
     await page.keyboard.press('Escape');
@@ -59,14 +60,14 @@ test('mobile menu is complete, restores focus and keeps learning-page return pat
       'href',
       '/practice/demo',
     );
-    const views = page.getByRole('navigation', { name: 'Vocabulary views' });
-    await expect(views.getByRole('link', { name: 'Saved words', exact: true })).toHaveAttribute(
+    const views = page.getByRole('navigation', { name: 'Vocabulary' });
+    await expect(views.getByRole('link', { name: 'Words', exact: true })).toHaveAttribute(
       'aria-current',
       'page',
     );
-    await expect(views.getByRole('link', { name: 'Word knowledge', exact: true })).toHaveAttribute(
+    await expect(views.getByRole('link', { name: 'Review', exact: true })).toHaveAttribute(
       'href',
-      '/words',
+      '/review',
     );
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
@@ -106,44 +107,28 @@ test('email sign-in returns to the chosen word and section, with password visibi
   expect(callback).toBe('/account');
 });
 
-test('account drawer returns focus to practice and describes plans without a checkout promise', async ({
+test('three desktop sections and profile aliases keep account and plan information accessible', async ({
   context,
   page,
 }) => {
   await services(context, { user });
-  await page.goto('/practice/demo');
-  const entry = page.getByRole('link', { name: 'Account', exact: true });
-  await entry.click();
-  const drawer = page.getByRole('dialog', { name: 'Your account' });
-  await expect(drawer).toBeVisible();
-  await expect(drawer.getByRole('heading', { name: 'Automatic sync' })).toBeVisible();
-  await expect(drawer.getByText('Your progress is synced.', { exact: true })).toBeVisible();
-  await expect(drawer.getByText(/Email and password/)).toBeVisible();
-  await page.keyboard.press('Escape');
-  await expect(entry).toBeFocused();
-  await expect(page.getByTestId('current-japanese')).toHaveText(demo.segments[0].japanese);
-  await page.goto('/account#plans');
-  await expect(page.getByRole('heading', { name: 'Free and Pro' })).toBeVisible();
-  await expect(page.getByText(/Online subscriptions are not available yet/)).toBeVisible();
-});
-
-test('account never claims all data synced when word or review channels fail and offers accurate recovery', async ({
-  context,
-  page,
-}) => {
-  const state = { user, knowledgeError: 503, reviewError: 0 };
-  await services(context, state);
-  await page.goto('/account');
-  const sync = page.getByRole('region', { name: 'Automatic sync' });
-  await expect(sync.getByRole('status')).toContainText('The sync service is unavailable');
-  await expect(page.getByText('Your progress is synced.', { exact: true })).toHaveCount(0);
-  await expect(sync.getByRole('status')).not.toContainText('reconnect');
-  state.knowledgeError = 0;
-  state.reviewError = 401;
-  await sync.getByRole('button', { name: 'Sync now' }).click();
-  await expect(sync.getByRole('link', { name: 'Sign in again' })).toBeVisible();
-  state.reviewError = 0;
-  await sync.getByRole('button', { name: 'Sync now' }).click();
-  await expect(sync.getByText('Your progress is synced.', { exact: true })).toBeVisible();
-  await expect(sync.getByText(/Last synced/)).toBeVisible();
+  await page.goto('/');
+  const nav = page.getByRole('navigation', { name: 'Main navigation' });
+  await expect(nav.getByRole('link')).toHaveCount(3);
+  for (const [name, href] of [
+    ['Home', '/'],
+    ['Vocabulary', '/review'],
+    ['Profile', '/profile'],
+  ])
+    await expect(nav.getByRole('link', { name, exact: true })).toHaveAttribute('href', href);
+  await nav.getByRole('link', { name: 'Profile', exact: true }).click();
+  for (const route of ['/profile', '/account', '/progress']) {
+    await page.goto(route);
+    await expect(page.getByRole('heading', { name: 'Your progress', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Account', exact: true })).toBeVisible();
+    await expect(page.getByText(user.email, { exact: true })).toBeVisible();
+    await expect(page.getByText(/Email and password/)).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Free and Pro' })).toBeVisible();
+    await expect(page.getByText(/Online subscriptions are not available yet/)).toBeVisible();
+  }
 });

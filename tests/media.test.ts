@@ -17,8 +17,9 @@ import {
   transcriptHash,
 } from '../src/lib/linked-transcripts';
 import { CaptionError } from '../src/lib/providers/errors';
-import { loadLesson, saveLesson } from '../src/lib/storage';
-import { lessonIdentity, validateIdentity } from '../src/lib/learner-progress';
+import { loadLesson, saveLesson } from '../src/lib/storage/lessons';
+import { lessonIdentity } from '../src/lib/learner/constants';
+import { validateIdentity } from '../src/lib/learner/validation';
 import { VimeoControls, type VimeoControlApi } from '../src/lib/vimeo-controls';
 import type { Lesson, TranscriptionProvider } from '../src/lib/types';
 

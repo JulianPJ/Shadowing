@@ -63,7 +63,7 @@ export function validateIdentity(v: unknown): LessonIdentity {
     'duration',
     'segmentCount',
   ]);
-  if (!['demo', 'youtube', 'vimeo', 'direct', 'upload'].includes(r.source as string))
+  if (!['demo', 'youtube', 'vimeo', 'direct', 'upload', 'page'].includes(r.source as string))
     throw new Error('Invalid source');
   if (typeof r.author !== 'string' || r.author.length > 300) throw new Error('Invalid author');
   const duration = count(r.duration),

@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Hibiki Bridge</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Hibiki Bridge</h1>
+      <p id="status" role="status">Looking for videos on this page…</p>
+      <ul id="videos" aria-label="Videos on this page"></ul>
+      <button id="allow" type="button" hidden>Allow embedded players</button>
+      <details>
+        <summary>Settings</summary>
+        <label for="origin">Hibiki address</label>
+        <input id="origin" type="url" spellcheck="false" />
+        <p class="hint">The Hibiki site, or http://localhost:&lt;port&gt; for development.</p>
+      </details>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

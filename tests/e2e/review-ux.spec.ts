@@ -4,52 +4,6 @@ import demo from '../../src/data/demo.json' with { type: 'json' };
 import { dictionarySource } from '../../src/lib/dictionary/source';
 import type { Lesson } from '../../src/lib/types';
 
-test('exhausted and overlapping deck limits leave eligible words in the combined study queue', async ({
-  page,
-  context,
-}) => {
-  const remote = await connect(context);
-  await seed(remote, 4);
-  remote.review.decks.push(
-    ...['travel', 'blocked'].map((id) => ({ id, name: id, createdAt: '', updatedAt: '' })),
-  );
-  remote.review.memberships.push(
-    { entryId: 'word-0', deckId: 'blocked' },
-    { entryId: 'word-0', deckId: 'travel' },
-    { entryId: 'word-1', deckId: 'travel' },
-    { entryId: 'word-2', deckId: 'travel' },
-  );
-  await context.addInitScript(() =>
-    localStorage.setItem(
-      'hibiki:v1:account:retention-free:preferences',
-      JSON.stringify({
-        mode: 'shadowing',
-        speed: 1,
-        reviewLimits: {
-          defaults: { new: 3, review: null },
-          decks: { travel: { new: 2, review: null }, blocked: { new: 0, review: null } },
-        },
-      }),
-    ),
-  );
-  await page.goto('/review');
-  await page.getByRole('button', { name: 'Start review', exact: true }).click();
-  for (const entry of remote.entries.slice(1)) {
-    await expect(page.locator('.review-card h2')).toHaveText(entry.term);
-    await page.getByRole('button', { name: /Show answer/ }).click();
-    await page.getByRole('button', { name: /^Easy/ }).click();
-  }
-  await expect(page.getByRole('heading', { name: 'Caught up for now' })).toBeVisible();
-  await expect
-    .poll(() =>
-      remote.writes
-        .filter((op) => op.action === 'grade')
-        .map((op) => ('entryId' in op ? op.entryId : '')),
-    )
-    .toEqual(['word-1', 'word-2', 'word-3']);
-  expect(remote.review.cards.find((card) => card.entryId === 'word-0')?.revision).toBe(0);
-});
-
 test('all 25 due cards can be finished; optional limits keep the remaining backlog visible', async ({
   page,
   context,
@@ -60,8 +14,8 @@ test('all 25 due cards can be finished; optional limits keep the remaining backl
   await page.setViewportSize({ width: 320, height: 740 });
   await page.goto('/review');
   await expect(page.getByRole('heading', { name: '25 due now' })).toBeVisible();
-  await page.getByText('Daily limits', { exact: true }).click();
-  await page.getByLabel('Daily new card limit').fill('20');
+  await page.getByText('Review settings', { exact: true }).click();
+  await page.getByLabel('New words per day').fill('20');
   await page.getByRole('button', { name: 'Start review', exact: true }).click();
   for (let i = 0; i < 20; i++) {
     await page.getByRole('button', { name: /Show answer/ }).waitFor();
@@ -71,12 +25,13 @@ test('all 25 due cards can be finished; optional limits keep the remaining backl
     await page.keyboard.press('4');
   }
   await expect(page.getByRole('heading', { name: 'Caught up for now' })).toBeVisible();
-  await expect(
-    page.getByText('5 cards remain due beyond your daily limits. Today’s backlog is still saved.'),
-  ).toBeVisible();
+  await page.getByRole('button', { name: 'Done', exact: true }).click();
+  await expect(page.getByText('5 more cards are due beyond your daily limit.')).toBeVisible();
   await page.reload();
-  await expect(page.getByRole('heading', { name: 'Caught up for now' })).toBeVisible();
-  await page.getByRole('button', { name: 'Study all due today', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '0 due now' })).toBeVisible();
+  await page.getByText('Review settings', { exact: true }).click();
+  await page.getByLabel('New words per day').fill('');
+  await page.getByRole('button', { name: 'Start review', exact: true }).click();
   for (let i = 0; i < 5; i++) {
     await page.getByRole('button', { name: /Show answer/ }).waitFor();
     await page.locator('.review-card h2').focus();
@@ -84,7 +39,7 @@ test('all 25 due cards can be finished; optional limits keep the remaining backl
     await expect(page.getByRole('button', { name: /^Easy/ })).toBeVisible();
     await page.keyboard.press('4');
   }
-  await expect(page.getByRole('heading', { name: 'Today’s due queue is complete' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Today’s review is complete' })).toBeVisible();
   await expect.poll(() => remote.review.cards.every((card) => card.revision === 1)).toBe(true);
   expect(remote.writes.filter((op) => op.action === 'grade')).toHaveLength(25);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -117,7 +72,7 @@ test('Again returns automatically with actual intervals; later-today study accel
   await page.getByRole('button', { name: 'Study remaining today now', exact: true }).click();
   await page.getByRole('button', { name: /Show answer/ }).click();
   await page.getByRole('button', { name: /^Good · 1d/ }).click();
-  await expect(page.getByRole('heading', { name: 'Today’s due queue is complete' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Today’s review is complete' })).toBeVisible();
   await expect.poll(() => remote.review.cards[0].revision).toBe(3);
   expect(remote.review.cards[0].status).toBe('review');
   expect(remote.review.cards[0].intervalDays).toBe(1);
@@ -130,8 +85,8 @@ test('offline undo restores the card and a corrected grade syncs in revision ord
   const remote = await connect(context);
   await seed(remote, 1);
   await page.goto('/review');
-  await page.getByText('Daily limits', { exact: true }).click();
-  await page.getByLabel('Daily new card limit').fill('1');
+  await page.getByText('Review settings', { exact: true }).click();
+  await page.getByLabel('New words per day').fill('1');
   await page.getByRole('button', { name: 'Start review', exact: true }).click();
   remote.offline = true;
   await page.getByRole('button', { name: /Show answer/ }).click();
@@ -162,19 +117,19 @@ test('reading and bounded inline context preserve the answer and session', async
   remote.entries[0].reading = 'あさ';
   remote.entries[0].source = await dictionarySource(demo as Lesson, demo.segments[1]);
   remote.entries[0].sourceSentence = demo.segments[1].japanese;
-  await page.goto('/review?deck=inbox');
+  await page.goto('/review');
   await page.getByRole('button', { name: 'Start review', exact: true }).click();
-  await expect(page.locator('.review-card button')).toHaveCount(2);
+  await expect(page.locator('.review-card button')).toHaveCount(3);
   await expect(page.locator('.review-card a')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Play this section', exact: true })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Pause study', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
   await expect(page.getByText('あさ', { exact: true })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Show furigana', exact: true }).click();
+  await page.getByRole('button', { name: 'Show reading', exact: true }).click();
   await expect(page.getByText('あさ', { exact: true })).toBeVisible();
   expect(remote.writes).toHaveLength(0);
   await page.getByRole('button', { name: /Show answer/ }).click();
   await expect(page.getByRole('link', { name: 'Open full lesson ↗', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Pause study', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Play this section', exact: true }).click();
   await page.getByRole('button', { name: 'Play section', exact: true }).click();
   const video = page.locator('.review-context video');
@@ -193,7 +148,7 @@ test('reading and bounded inline context preserve the answer and session', async
   expect(await video.evaluate((node) => (node as HTMLVideoElement).currentTime)).toBeLessThan(
     end + 0.4,
   );
-  await page.getByRole('button', { name: 'Minimise context', exact: true }).click();
+  await page.getByRole('button', { name: 'Hide context player', exact: true }).click();
   await expect(page.locator('.review-context video')).toHaveCount(0);
   await expect(page.getByText('Meaning 0', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: /^Good/ })).toBeVisible();
@@ -214,8 +169,8 @@ test('cold material hydration shows loading and input-focused shortcuts leave st
     await route.fallback();
   });
   await page.goto('/review');
-  await page.getByText('Daily limits', { exact: true }).click();
-  await page.getByLabel('Daily new card limit').focus();
+  await page.getByText('Review settings', { exact: true }).click();
+  await page.getByLabel('New words per day').focus();
   await page.keyboard.press('Space');
   expect(remote.writes).toHaveLength(0);
   await page.getByRole('button', { name: 'Start review', exact: true }).click();
@@ -295,8 +250,8 @@ test('a second device applies shared daily counts from accepted grades', async (
   await seed(remote, 2);
   const learner = await first.newPage();
   await learner.goto('/review');
-  await learner.getByText('Daily limits', { exact: true }).click();
-  await learner.getByLabel('Daily new card limit').fill('1');
+  await learner.getByText('Review settings', { exact: true }).click();
+  await learner.getByLabel('New words per day').fill('1');
   await learner.getByRole('button', { name: 'Start review', exact: true }).click();
   await learner.getByRole('button', { name: /Show answer/ }).click();
   await learner.getByRole('button', { name: /^Easy/ }).click();
@@ -306,7 +261,7 @@ test('a second device applies shared daily counts from accepted grades', async (
   await second.addInitScript(() =>
     localStorage.setItem(
       'hibiki:v1:account:retention-free:review:study-settings',
-      JSON.stringify({ defaults: { new: 1, review: null }, decks: {}, extensions: {} }),
+      JSON.stringify({ defaults: { new: 1, review: null }, extensions: {} }),
     ),
   );
   await second.route('**/api/review', (route) => route.fulfill({ json: remote.review }));
@@ -318,7 +273,7 @@ test('a second device applies shared daily counts from accepted grades', async (
     await other.goto('/review');
     await expect(other.getByRole('heading', { name: '0 due now' })).toBeVisible();
     await expect(other.getByRole('button', { name: 'Start review', exact: true })).toBeDisabled();
-    await expect(other.getByText(/1 more card is due beyond your daily limits/)).toBeVisible();
+    await expect(other.getByText(/1 more card is due beyond your daily limit/)).toBeVisible();
   } finally {
     await first.close();
     await second.close();
@@ -338,22 +293,22 @@ test('daily limits accept custom values, zero for either card type and no limit,
   remote.review.cards[0].intervalDays = 2;
   await page.setViewportSize({ width: 320, height: 740 });
   await page.goto('/review');
-  await page.getByText('Daily limits', { exact: true }).click();
-  const newLimit = page.getByLabel('Daily new card limit', { exact: true });
-  const reviewLimit = page.getByLabel('Daily review card limit', { exact: true });
+  await page.getByText('Review settings', { exact: true }).click();
+  const newLimit = page.getByLabel('New words per day', { exact: true });
+  const reviewLimit = page.getByLabel('Reviews per day', { exact: true });
   await newLimit.fill('17');
   await reviewLimit.fill('23');
   await page.reload();
-  await page.getByText('Daily limits', { exact: true }).click();
+  await page.getByText('Review settings', { exact: true }).click();
   await expect(newLimit).toHaveValue('17');
   await expect(reviewLimit).toHaveValue('23');
   await newLimit.fill('0');
   await page.getByRole('button', { name: 'Start review', exact: true }).click();
   await expect(page.locator('.review-card h2')).toHaveText(remote.entries[0].term);
   await page.getByRole('button', { name: /Show answer/ }).click();
-  await page.getByRole('button', { name: 'Pause study', exact: true }).click();
-  await page.getByText('Daily limits', { exact: true }).click();
-  await page.getByRole('button', { name: 'No limit for new cards', exact: true }).click();
+  await page.getByRole('button', { name: 'Pause', exact: true }).click();
+  await page.getByText('Review settings', { exact: true }).click();
+  await newLimit.fill('');
   await expect(newLimit).toHaveValue('');
   await reviewLimit.fill('0');
   await page.getByRole('button', { name: 'Start review', exact: true }).click();
@@ -361,15 +316,15 @@ test('daily limits accept custom values, zero for either card type and no limit,
   await page.getByRole('button', { name: /Show answer/ }).click();
   await page.getByRole('button', { name: /^Easy/ }).click();
   await expect(page.locator('.review-card h2')).toHaveText(remote.entries[2].term);
-  await expect(page.locator('.review-card button')).toHaveCount(2);
+  await expect(page.locator('.review-card button')).toHaveCount(3);
   await expect(page.getByRole('button', { name: 'Undo last rating', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: /Show answer/ }).click();
   await expect(page.getByRole('button', { name: 'Undo last rating', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Pause study', exact: true }).click();
-  await page.getByText('Daily limits', { exact: true }).click();
+  await page.getByRole('button', { name: 'Pause', exact: true }).click();
+  await page.getByText('Review settings', { exact: true }).click();
   await reviewLimit.fill('');
   await page.reload();
-  await page.getByText('Daily limits', { exact: true }).click();
+  await page.getByText('Review settings', { exact: true }).click();
   await expect(newLimit).toHaveValue('');
   await expect(reviewLimit).toHaveValue('');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

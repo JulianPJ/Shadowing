@@ -1,21 +1,44 @@
 import { transcriptHash } from './linked-transcripts';
 import { segmentTranscript } from './segmentation';
-import type { Cue, Lesson, ResolvedMedia, TranscriptSource } from './types';
+import type { Cue, Lesson, PageMediaSource, ResolvedMedia, TranscriptSource } from './types';
 
 export async function createImportedLesson(input: {
   resolved?: ResolvedMedia;
+  /** A video on another web page, played through Hibiki Bridge. */
+  page?: { media: PageMediaSource; title?: string };
   fileName?: string;
   mediaUrl?: string;
   cues: Cue[];
   transcriptType: TranscriptSource['type'];
   provenance: string;
 }): Promise<Lesson> {
-  const { resolved, fileName, mediaUrl, cues, provenance, transcriptType } = input;
-  if (!resolved && !fileName) throw new Error('Choose your media first.');
+  const { resolved, page, fileName, mediaUrl, cues, provenance, transcriptType } = input;
+  if (!resolved && !page && !fileName) throw new Error('Choose your media first.');
   const media = resolved?.media;
   const segments = segmentTranscript(cues);
   if (!segments.length)
     throw new Error('No usable spoken sections were found. Check the transcript timings.');
+  const transcript: TranscriptSource = {
+    schemaVersion: 1,
+    type: transcriptType,
+    language: 'ja',
+    provenance,
+    ...(transcriptType === 'generated' ? { provider: provenance } : {}),
+    transcriptHash: await transcriptHash(cues),
+    normalizationVersion: 1,
+    segmentationVersion: 1,
+  };
+  if (page)
+    return {
+      id: `page-${page.media.pageKey.slice(5)}`,
+      title: page.title || new URL(page.media.canonicalUrl).hostname,
+      author: `${new URL(page.media.canonicalUrl).hostname} · web page`,
+      source: 'page',
+      mediaSource: page.media,
+      segments,
+      transcriptSource: provenance,
+      transcript,
+    };
   const lesson: Lesson = {
     id: media
       ? media.type === 'direct'
@@ -35,16 +58,7 @@ export async function createImportedLesson(input: {
     mediaSource: media || { schemaVersion: 1, type: 'local', fileName: fileName! },
     segments,
     transcriptSource: provenance,
-    transcript: {
-      schemaVersion: 1,
-      type: transcriptType,
-      language: 'ja',
-      provenance,
-      ...(transcriptType === 'generated' ? { provider: provenance } : {}),
-      transcriptHash: await transcriptHash(cues),
-      normalizationVersion: 1,
-      segmentationVersion: 1,
-    },
+    transcript,
   };
   return lesson;
 }

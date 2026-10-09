@@ -75,7 +75,6 @@ async function seed(page: Page) {
     { first: lesson, second: nextLesson },
   );
 }
-
 test('full Japanese lexicon loads real readings, senses and deinflection without translation requests', async ({
   page,
 }) => {
@@ -90,23 +89,32 @@ test('full Japanese lexicon loads real readings, senses and deinflection without
   expect(manifest.entryCount).toBeGreaterThan(210000);
   expect(manifest.sourceSha256).toBe(source.sha256);
   expect(manifest.largestShardBytes).toBeLessThan(500000);
-  await page.goto('/words');
-  await page.getByLabel('Find Japanese words').fill('食べました');
-  await page.getByRole('button', { name: 'Look up a word' }).click();
-  const lookup = page.getByRole('region', { name: 'Japanese dictionary lookup' });
-  await expect(lookup.locator('.lexicon-term strong').first()).toHaveText('食べる');
+  await page.addInitScript(
+    (value) => localStorage.setItem('hibiki:v1:lesson:adaptive-lexicon', JSON.stringify(value)),
+    {
+      ...lesson,
+      id: 'adaptive-lexicon',
+      segments: [
+        { ...lesson.segments[0], japanese: '食べました。' },
+        { ...lesson.segments[1], japanese: '斟酌します。' },
+      ],
+    },
+  );
+  await page.goto('/practice/adaptive-lexicon');
+  await page.locator('#current-japanese .lookup-token').first().click();
+  const lookup = page.getByRole('complementary', { name: 'Save vocabulary' });
+  await expect(lookup).toContainText('食べる');
   await expect(lookup).toContainText('たべる');
   await expect(lookup).toContainText('to eat');
   await expect(lookup).toContainText('Ichidan verb');
   await expect(lookup).toContainText('CC BY-SA 4.0');
   await lookup.getByRole('button', { name: 'Known', exact: true }).click();
-  await page.getByLabel('Find Japanese words').fill('');
-  await expect(page.getByLabel('State of 食べる')).toHaveValue('known');
+  await page.goto('/words');
+  await expect(page.getByLabel('Status for 食べる')).toHaveValue('known');
   await page.reload();
-  await expect(page.getByLabel('State of 食べる')).toHaveValue('known');
-  await page.getByLabel('Find Japanese words').fill('斟酌');
-  await page.getByRole('button', { name: 'Look up a word' }).click();
-  await expect(lookup.locator('.lexicon-term strong').first()).toHaveText('斟酌');
+  await expect(page.getByLabel('Status for 食べる')).toHaveValue('known');
+  await page.goto('/practice/adaptive-lexicon?section=cat-sleeps');
+  await page.locator('#current-japanese .lookup-token').first().click();
   await expect(lookup).toContainText('しんしゃく');
   expect(translationRequests).toBe(0);
 });
@@ -148,10 +156,10 @@ test('word states highlight across lessons and update coverage, bulk status and 
   await page.locator('#current-japanese [data-lemma="猫"]').click();
   const panel = page.getByRole('complementary', { name: 'Save vocabulary' });
   await expect(panel).toContainText('cat');
-  await panel.getByRole('button', { name: 'Learning', exact: true }).click();
+  await panel.getByRole('button', { name: 'Known', exact: true }).click();
   await expect(page.locator('#current-japanese [data-lemma="猫"]')).toHaveAttribute(
     'data-word-state',
-    'learning',
+    'known',
   );
   await expect(page.locator('.transcript-row')).toHaveCount(0);
   await page.getByRole('button', { name: 'Show full transcript' }).click();
@@ -159,14 +167,13 @@ test('word states highlight across lessons and update coverage, bulk status and 
   await page.goto('/practice/adaptive-two');
   await expect(page.locator('#current-japanese [data-lemma="猫"]')).toHaveAttribute(
     'data-word-state',
-    'learning',
+    'known',
   );
   await page.goto('/words');
-  await page.getByRole('button', { name: 'Find words in recent lessons' }).click();
-  await expect(page.getByLabel('State of 猫')).toHaveValue('learning');
-  await page.getByRole('checkbox', { name: 'Select 猫', exact: true }).check();
-  await page.getByRole('button', { name: 'Mark selected Known' }).click();
-  await expect(page.getByLabel('State of 猫')).toHaveValue('known');
+  await expect(page.getByLabel('Status for 猫')).toHaveValue('known');
+  await page.getByLabel('Status for 猫').selectOption('learning');
+  await expect(page.getByLabel('Status for 猫')).toHaveValue('learning');
+  await page.getByLabel('Status for 猫').selectOption('known');
   await page.goto('/practice/adaptive-one');
   await expect(coverage).toContainText('100% marked Known');
   await expect(coverage.locator('.good-line')).toHaveCount(0);
@@ -174,27 +181,6 @@ test('word states highlight across lessons and update coverage, bulk status and 
     'data-word-state',
     'known',
   );
-});
-
-test('Word Browser source links reject a replacement transcript revision', async ({ page }) => {
-  await seed(page);
-  await page.goto('/words');
-  await page.getByRole('button', { name: 'Find words in recent lessons' }).click();
-  const row = page
-    .getByRole('row')
-    .filter({ has: page.getByRole('checkbox', { name: 'Select 猫', exact: true }) });
-  const href = await row.getByRole('link', { name: 'Open section' }).getAttribute('href');
-  expect(href).toMatch(/^\/practice\/adaptive-one\?section=cat-eats&transcript=[a-f0-9]{64}$/);
-  await page.evaluate(() => {
-    const replacement = JSON.parse(localStorage.getItem('hibiki:v1:lesson:adaptive-one')!);
-    replacement.segments[0].japanese = '猫は犬と走る。';
-    localStorage.setItem('hibiki:v1:lesson:adaptive-one', JSON.stringify(replacement));
-  });
-  await page.goto(href!);
-  await expect(
-    page.getByRole('heading', { name: 'This saved context has changed.' }),
-  ).toBeVisible();
-  await expect(page.locator('video')).toHaveCount(0);
 });
 
 test('Free account knowledge survives offline edits and replays its durable outbox', async ({
@@ -213,22 +199,35 @@ test('Free account knowledge survives offline edits and replays its durable outb
     }
     return route.fulfill({ json: { records: [...remote.values()], nextCursor: null } });
   });
-  await page.goto('/words');
-  await expect(page.getByRole('main').getByRole('link', { name: 'Saved words' })).toBeVisible();
-  await page.getByLabel('Find Japanese words').fill('朝');
-  await page.getByRole('button', { name: 'Look up a word' }).click();
-  const lookup = page.getByRole('region', { name: 'Japanese dictionary lookup' });
-  await expect(lookup).toContainText('morning');
+  await page.goto('/practice/demo');
+  await page.locator('#current-japanese [data-lookup="今日"]').click();
+  const lookup = page.getByRole('complementary', { name: 'Save vocabulary' });
+  await expect(lookup).toContainText('today');
   await lookup.getByRole('button', { name: 'Known', exact: true }).click();
-  await expect(
-    page.getByText('1 word state changes saved locally · waiting to sync'),
-  ).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          JSON.parse(
+            localStorage.getItem('hibiki:v1:account:retention-free:knowledge:outbox') ?? '[]',
+          ).length,
+      ),
+    )
+    .toBe(1);
+  await page.goto('/words');
   await page.reload();
-  await expect(page.getByLabel('State of 朝')).toHaveValue('known');
+  await expect(page.getByLabel('Status for 今日')).toHaveValue('known');
   offline = false;
   await page.evaluate(() => window.dispatchEvent(new Event('online')));
-  await expect.poll(() => remote.get('朝')?.state).toBe('known');
-  await expect(page.getByText('1 word state changes saved locally · waiting to sync')).toHaveCount(
-    0,
-  );
+  await expect.poll(() => remote.get('今日')?.state).toBe('known');
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          JSON.parse(
+            localStorage.getItem('hibiki:v1:account:retention-free:knowledge:outbox') ?? '[]',
+          ).length,
+      ),
+    )
+    .toBe(0);
 });

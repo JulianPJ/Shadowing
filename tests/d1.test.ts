@@ -17,12 +17,12 @@ import {
 import { resolveMediaUrl } from '../src/lib/media';
 import { createPrepareHandler } from '../src/lib/prepare';
 import { segmentTranscript } from '../src/lib/segmentation';
-import { createQuiz, transcriptKey, validateQuizLesson } from '../src/lib/quiz';
+import { createQuiz } from '../src/lib/quiz/document';
+import { transcriptKey, validateQuizLesson } from '../src/lib/transcript';
 import { createDifficultyAnalysis } from '../src/lib/difficulty';
 import { handleQuizRequest } from '../src/lib/quiz-api';
 import { handleDifficultyRequest } from '../src/lib/difficulty-api';
 import { contentRequest } from '../src/lib/content-request';
-import { handleDiscoveryRequest } from '../src/lib/discovery-api';
 import type { ArtifactType } from '../src/lib/generated-artifacts';
 import type { Cue, Lesson, QuizLesson } from '../src/lib/types';
 import type { SharedContentDependencies } from '../src/lib/shared-content';
@@ -118,78 +118,6 @@ const request = (input = lesson, key: string | null = contentKey) =>
     method: 'POST',
     body: JSON.stringify({ lesson: input, ...(key ? { content: { contentKey: key } } : {}) }),
   });
-
-test('public discovery validates captions and matching difficulty, excludes private and corrupted content', async () => {
-  await storage.transcripts!.save(record);
-  const difficulty = await createDifficultyAnalysis(semantic, lesson);
-  await storage.artifacts!.save(
-    {
-      contentKey,
-      transcriptKey: await transcriptKey(lesson),
-      sourceTranscriptHash: record.transcriptHash,
-      artifactType: 'difficulty',
-      schemaVersion: 1,
-      generatorVersion: DIFFICULTY_GENERATOR_VERSION,
-      payload: difficulty,
-      payloadId: difficulty.id,
-      createdAt: difficulty.generatedAt,
-    },
-    lesson,
-  );
-  const metadata = async () =>
-    Response.json({ title: 'Real public lesson', author_name: 'Japanese teacher' });
-  const response = await handleDiscoveryRequest(
-    new Request('https://example.com/api/discovery'),
-    db,
-    metadata,
-  );
-  const snapshot = await response.json();
-  assert.equal(snapshot.lessons.length, 1);
-  assert.equal(snapshot.lessons[0].title, 'Real public lesson');
-  assert.deepEqual(
-    snapshot.lessons[0].segments,
-    JSON.parse(JSON.stringify(segmentTranscript(cues))),
-  );
-  assert.equal(snapshot.difficulties.length, 1);
-  const unavailableMetadata = await handleDiscoveryRequest(
-    new Request('https://example.com/api/discovery'),
-    db,
-    async () => new Response(null, { status: 404 }),
-  );
-  assert.deepEqual(await unavailableMetadata.json(), { lessons: [], difficulties: [] });
-  await db
-    .prepare("UPDATE linked_transcripts SET visibility='private', owner_user_id='someone'")
-    .run();
-  const privateResult = await handleDiscoveryRequest(
-    new Request('https://example.com/api/discovery'),
-    db,
-    metadata,
-  );
-  assert.deepEqual((await privateResult.json()).lessons, []);
-  await db
-    .prepare(
-      "UPDATE linked_transcripts SET visibility='system', owner_user_id=NULL, cues_json='[]'",
-    )
-    .run();
-  const invalidResult = await handleDiscoveryRequest(
-    new Request('https://example.com/api/discovery'),
-    db,
-    metadata,
-  );
-  assert.deepEqual((await invalidResult.json()).lessons, []);
-});
-
-test('public discovery is optional, GET-only and does not require learner authentication', async () => {
-  const request = new Request('https://example.com/api/discovery');
-  assert.deepEqual(await (await handleDiscoveryRequest(request)).json(), {
-    lessons: [],
-    difficulties: [],
-  });
-  assert.equal(
-    (await handleDiscoveryRequest(new Request(request, { method: 'POST' }))).status,
-    405,
-  );
-});
 
 test('D1 transcript miss/provider/save/hit bypasses captions on second prepare', async () => {
   let calls = 0;

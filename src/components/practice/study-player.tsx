@@ -3,24 +3,28 @@ import { CurrentSection } from './current-section';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, ArrowRight, Languages, Keyboard, Upload, PanelTop } from 'lucide-react';
-import type { Lesson, Mode, PlaybackState, QuizEvidence } from '@/lib/types';
 import {
-  writeStorage,
-  saveLesson,
-  completeLesson,
-  lessonCompleted,
-  loadFavorites,
-  loadPreferences,
-  PLAYBACK_OFFSET_MIN_MS,
-  PLAYBACK_OFFSET_MAX_MS,
-  PLAYBACK_OFFSET_STEP_MS,
-  type Preferences,
-} from '@/lib/storage';
+  ArrowLeft,
+  ArrowRight,
+  Captions,
+  Languages,
+  Keyboard,
+  Upload,
+  PanelTop,
+} from 'lucide-react';
+import type { Lesson, Mode, PlaybackState, QuizEvidence } from '@/lib/types';
+import { writeStorage } from '@/lib/storage/browser';
+import { saveLesson, saveLessonPosition } from '@/lib/storage/lessons';
+import { completeLesson, lessonCompleted } from '@/lib/storage/learning';
+import { loadFavorites, loadPreferences, type Preferences } from '@/lib/storage/preferences';
+import { createElapsedStore } from './elapsed-store';
+import { transcriptLabel, whisperUpgradePath } from '@/lib/caption-labels';
+import { PracticeSettings } from './practice-settings';
 import { lessonMedia, sourceLabel, MEDIA_ACCEPT, validateMediaFile } from '@/lib/media';
 import { localMediaFile, localMediaUrl } from '@/lib/local-media-file';
 import { timestamp } from '@/lib/youtube';
 import { MediaPlayer, type MediaHandle } from '../media-player';
+import { JapaneseText } from '../japanese-text';
 import { VoiceRecorder, type VoiceRecorderHandle } from '../voice-recorder';
 import { loadDrillSettings, practicePreset, type PracticePreset } from '@/lib/drill-presets';
 import { LessonCompletionSummary } from '../lesson-completion-summary';
@@ -60,8 +64,10 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
   const [returnPosition] = useState(() => loadPracticeReturn(session.lesson));
   const openingIndex = returnPosition?.index ?? session.index;
   const [index, setIndex] = useState(openingIndex);
-  const [mode, setMode] = useState<Mode>(session.preferences.mode);
   const [drill, setDrill] = useState(() => loadDrillSettings(session.preferences.mode));
+  // The preset is the single source of truth; normalizeDrillSettings keeps it consistent with
+  // the synced preference mode.
+  const mode: Mode = drill.preset === 'continuous' ? 'continuous' : 'shadowing';
   const [drillRunning, setDrillRunning] = useState(false);
   const [drillPreparing, setDrillPreparing] = useState(false);
   const recorder = useRef<VoiceRecorderHandle>(null);
@@ -83,14 +89,17 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
   const [playbackOffsetMs, setPlaybackOffsetMs] = useState(session.preferences.playbackOffsetMs);
   const [studioMode, setStudioMode] = useState(session.preferences.studioMode);
   const [furigana, setFurigana] = useState(session.preferences.furigana);
+  const [subtitleOverlay, setSubtitleOverlay] = useState(session.preferences.subtitleOverlay);
   const [status, setStatus] = useState<PlaybackState>(returnPosition ? 'paused' : 'ready');
   const [ready, setReady] = useState(false);
   const [recording, setRecording] = useState(false);
   const [playbackError, setPlaybackError] = useState('');
-  const [elapsed, setElapsed] = useState(
-    returnPosition
-      ? Math.max(0, returnPosition.mediaTime - session.preferences.playbackOffsetMs / 1000)
-      : lesson.segments[openingIndex].start,
+  const [elapsed] = useState(() =>
+    createElapsedStore(
+      returnPosition
+        ? Math.max(0, returnPosition.mediaTime - session.preferences.playbackOffsetMs / 1000)
+        : session.lesson.segments[openingIndex].start,
+    ),
   );
   const [shadowingScores, setShadowingScores] = useState(() =>
     loadShadowingSession(session.lesson.id, shadowingRevision),
@@ -103,6 +112,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
 
   const [favorites, setFavorites] = useState<string[]>(() => loadFavorites(lesson));
   const [recommendedSegmentIds, setRecommendedSegmentIds] = useState<Set<string> | null>(null);
+  const clearRecommendations = useCallback(() => setRecommendedSegmentIds(null), []);
   const filterRecommendations = useCallback((ids: string[] | null) => {
     setRecommendedSegmentIds((current) => {
       if (ids === null) return null;
@@ -178,14 +188,6 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
   const isFavorite = favorites.includes(segment.id);
 
   const duration = lesson.segments.at(-1)!.end;
-  const percent = Math.min(
-    100,
-    Math.max(0, ((elapsed - segment.start) / (segment.end - segment.start)) * 100),
-  );
-  const presetDefaults = practicePreset(drill.preset);
-  const customized = (['repeats', 'pause', 'reveal', 'responseSeconds'] as const).some(
-    (key) => drill[key] !== presetDefaults[key],
-  );
   const stateLabel = recording
     ? 'RECORDING'
     : {
@@ -198,12 +200,12 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
   useEffect(() => {
     const hydrate = () => {
       const prefs = loadPreferences();
-      setMode(prefs.mode);
       setDrill(loadDrillSettings(prefs.mode));
       setSpeed(prefs.speed);
       setPlaybackOffsetMs(prefs.playbackOffsetMs);
       setStudioMode(prefs.studioMode);
       setFurigana(prefs.furigana);
+      setSubtitleOverlay(prefs.subtitleOverlay);
       setFavorites(loadFavorites(lesson));
       setCompleted(lessonCompleted(lesson));
     };
@@ -230,9 +232,17 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
   useEffect(() => {
     if (returnPosition) clearPracticeReturn();
   }, [returnPosition]);
+  const indexRef = useRef(index);
   useEffect(() => {
-    saveLesson(lesson, index);
-  }, [lesson, index]);
+    indexRef.current = index;
+  }, [index]);
+  // Opening (or reattaching) a lesson records it once; section changes only move the position.
+  useEffect(() => {
+    saveLesson(lesson, indexRef.current);
+  }, [lesson]);
+  useEffect(() => {
+    saveLessonPosition(lesson.id, index);
+  }, [lesson.id, index]);
   useEffect(() => {
     writeStorage('preferences', {
       ...loadPreferences(),
@@ -242,8 +252,9 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
       translation: false,
       studioMode,
       furigana,
+      subtitleOverlay,
     });
-  }, [mode, speed, playbackOffsetMs, studioMode, furigana]);
+  }, [mode, speed, playbackOffsetMs, studioMode, furigana, subtitleOverlay]);
   useEffect(() => {
     writeStorage('drill:settings', drill);
   }, [drill]);
@@ -274,7 +285,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
         rememberPracticeReturn(
           lesson,
           index,
-          media.current?.time() ?? elapsed + playbackOffsetMs / 1000,
+          media.current?.time() ?? elapsed.get() + playbackOffsetMs / 1000,
         );
     };
     const leave = (event: MouseEvent) => {
@@ -374,7 +385,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
         seeking.current = { target: mediaTarget, deadline: Date.now() + 4000 };
       }
       setIndex(next);
-      setElapsed(resume ? readPlaybackTime() : target.start);
+      elapsed.set(resume ? readPlaybackTime() : target.start);
       setStatus(play ? 'listening' : 'ready');
       if (!evidenceReplay) setFinished(false);
       setPlaybackError('');
@@ -386,6 +397,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
         });
     },
     [
+      elapsed,
       lesson.segments,
       index,
       resetTranslation,
@@ -506,7 +518,6 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
   function selectPreset(preset: PracticePreset) {
     stopAutomation();
     setDrill(practicePreset(preset));
-    setMode(preset === 'continuous' ? 'continuous' : 'shadowing');
     resetTranslation();
   }
 
@@ -535,7 +546,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
     replayRange,
     media,
     seeking,
-    setElapsed,
+    setElapsed: elapsed.set,
     setStatus,
     setPracticeCount,
     setIndex,
@@ -594,11 +605,20 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
         ([' ', 'Enter'].includes(event.key) && element.closest('button,a,[role="button"]')) ||
         document.querySelector('dialog[open]') ||
         !ready ||
-        recording ||
         quizOpen
       )
         return;
+      // Recording stays reachable mid-take so the learner can stop without the mouse.
+      if (event.key === 'm' || event.key === 'M') {
+        event.preventDefault();
+        recorder.current?.toggle();
+        return;
+      }
+      if (recording) return;
       const actions: Record<string, () => void> = {
+        '?': onHelp,
+        p: () => recorder.current?.playAttempt(),
+        P: () => recorder.current?.playAttempt(),
         ' ': togglePlayback,
         r: replaySection,
         R: replaySection,
@@ -626,6 +646,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
     revealTranslation,
     quizOpen,
     replaySection,
+    onHelp,
   ]);
 
   const onPlaying = useCallback((playing: boolean) => {
@@ -643,7 +664,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
     }
     if (mode === 'shadowing' && readPlaybackTime() < segment.end - 0.08) return;
     setStatus(mode === 'shadowing' ? 'your-turn' : 'complete');
-    setElapsed(duration);
+    elapsed.set(duration);
     if (mode === 'shadowing') onSectionEnd();
     if (mode === 'continuous') {
       setFinished(true);
@@ -653,6 +674,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
       recordCompletion();
     }
   }, [
+    elapsed,
     mode,
     duration,
     lesson,
@@ -812,20 +834,12 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
         <span>/</span>
         <span>{sourceLabel(lesson)}</span>
         <span className="studio-lesson-identity">{lesson.title}</span>
-        {studioMode ? (
-          <nav className="studio-navigation" aria-label="Studio navigation">
-            <Link href="/library">Library</Link>
-            <Link href="/dictionary">Vocabulary</Link>
-            <Link href="/progress">Progress</Link>
-            <Link href="/account">Account</Link>
+        <div className="practice-view-controls" aria-label="Practice display">
+          {studioMode ? (
             <button className="button" onClick={() => setStudioMode(false)}>
               Exit Studio
             </button>
-          </nav>
-        ) : (
-          <span className="private-label">One sentence at a time.</span>
-        )}
-        <div className="practice-view-controls" aria-label="Practice display">
+          ) : null}
           <button
             className="button"
             aria-pressed={studioMode}
@@ -834,6 +848,16 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
             <PanelTop size={16} />
             Studio Mode
           </button>
+          {studioMode ? (
+            <button
+              className="button"
+              aria-pressed={subtitleOverlay}
+              onClick={() => setSubtitleOverlay((value) => !value)}
+            >
+              <Captions size={16} />
+              Subtitles on video
+            </button>
+          ) : null}
           <button
             className="button"
             aria-pressed={furigana}
@@ -881,6 +905,15 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
             onPlaying={onPlaying}
             onEnded={onEnded}
             onError={onMediaError}
+            caption={segment.japanese}
+            overlay={
+              studioMode && subtitleOverlay ? (
+                // The current-section card carries the same text for assistive technology.
+                <div className="subtitle-overlay" aria-hidden="true">
+                  <JapaneseText text={segment.japanese} furigana={furigana} />
+                </div>
+              ) : undefined
+            }
           />
           {replayRange ? (
             <div className="evidence-banner" role="status">
@@ -907,213 +940,34 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
               />
             </label>
           ) : null}
-          <div className="practice-settings-stack">
-            <div className="player-settings">
-              <div className="playback-adjustments">
-                <label className="speed-control">
-                  Speed
-                  <select
-                    aria-label="Playback speed"
-                    value={speed}
-                    disabled={recording}
-                    onChange={(event) => {
-                      stopAutomation();
-                      setSpeed(Number(event.target.value));
-                    }}
-                  >
-                    <option value="0.5">0.5×</option>
-                    <option value="0.75">0.75×</option>
-                    <option value="1">1×</option>
-                    <option value="1.25">1.25×</option>
-                  </select>
-                </label>
-                <div
-                  className="offset-control"
-                  role="group"
-                  aria-label="Playback timing offset"
-                  title="Positive shifts section timing later; negative shifts it earlier. Select the value to reset."
-                >
-                  <span>Subtitle sync</span>
-                  <button
-                    type="button"
-                    aria-label="Shift playback timing 50 milliseconds earlier"
-                    disabled={playbackOffsetMs <= PLAYBACK_OFFSET_MIN_MS}
-                    onClick={() => {
-                      stopAutomation();
-                      setPlaybackOffsetMs((value) =>
-                        Math.max(PLAYBACK_OFFSET_MIN_MS, value - PLAYBACK_OFFSET_STEP_MS),
-                      );
-                    }}
-                  >
-                    −
-                  </button>
-                  <button
-                    type="button"
-                    className="offset-value"
-                    aria-label="Reset playback timing offset"
-                    onClick={() => {
-                      stopAutomation();
-                      setPlaybackOffsetMs(0);
-                    }}
-                  >
-                    {playbackOffsetMs > 0 ? '+' : ''}
-                    {playbackOffsetMs} ms
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="Shift playback timing 50 milliseconds later"
-                    disabled={playbackOffsetMs >= PLAYBACK_OFFSET_MAX_MS}
-                    onClick={() => {
-                      stopAutomation();
-                      setPlaybackOffsetMs((value) =>
-                        Math.min(PLAYBACK_OFFSET_MAX_MS, value + PLAYBACK_OFFSET_STEP_MS),
-                      );
-                    }}
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-            </div>
-            <div className="drill-settings" role="group" aria-label="Practice presets">
-              <label>
-                Preset
-                <select
-                  aria-label="Practice preset"
-                  value={drill.preset}
-                  disabled={recording || drillPreparing}
-                  onChange={(event) => selectPreset(event.target.value as PracticePreset)}
-                >
-                  <option value="focus">Focus — listen, pause, repeat</option>
-                  <option value="support">Support — meaning after a pause</option>
-                  <option value="drill">Drill — listen twice, record</option>
-                  <option value="continuous">Continuous — listen through</option>
-                </select>
-              </label>
-              <details className="drill-advanced">
-                <summary>Advanced settings{customized ? ' · Customized' : ''}</summary>
-                <div className="drill-advanced-fields">
-                  <label>
-                    Source repeats
-                    <select
-                      aria-label="Source repeat count"
-                      value={drill.repeats}
-                      disabled={mode === 'continuous' || recording || drillRunning}
-                      onChange={(event) => {
-                        stopAutomation();
-                        setDrill((current) => ({
-                          ...current,
-                          repeats: Number(event.target.value),
-                        }));
-                      }}
-                    >
-                      {[1, 2, 3].map((count) => (
-                        <option key={count} value={count}>
-                          {count}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    Pause
-                    <select
-                      aria-label="Section pause behavior"
-                      value={drill.pause}
-                      disabled={mode === 'continuous' || recording || drillRunning}
-                      onChange={(event) => {
-                        stopAutomation();
-                        setDrill((current) => ({
-                          ...current,
-                          pause: event.target.value as 'manual' | 'timed',
-                        }));
-                      }}
-                    >
-                      <option value="manual">Until I continue</option>
-                      <option value="timed">Timed speaking window</option>
-                    </select>
-                  </label>
-                  <label>
-                    Translation
-                    <select
-                      aria-label="Translation reveal behavior"
-                      value={drill.reveal}
-                      disabled={mode === 'continuous' || recording || drillRunning}
-                      onChange={(event) => {
-                        stopAutomation();
-                        setDrill((current) => ({
-                          ...current,
-                          reveal: event.target.value as 'manual' | 'after-pause',
-                        }));
-                      }}
-                    >
-                      <option value="manual">Reveal on request</option>
-                      <option value="after-pause">Reveal after source repeats</option>
-                    </select>
-                  </label>
-                  {drill.pause === 'timed' || drill.preset === 'drill' ? (
-                    <label>
-                      Speaking window (seconds)
-                      <input
-                        aria-label="Speaking window seconds"
-                        type="number"
-                        min={2}
-                        max={30}
-                        value={drill.responseSeconds}
-                        disabled={recording || drillRunning}
-                        onChange={(event) => {
-                          const seconds = Number(event.target.value);
-                          if (Number.isInteger(seconds) && seconds >= 2 && seconds <= 30) {
-                            stopAutomation();
-                            setDrill((current) => ({ ...current, responseSeconds: seconds }));
-                          }
-                        }}
-                      />
-                    </label>
-                  ) : null}
-                </div>
-              </details>
-              {drill.preset === 'drill' ? (
-                <button
-                  className="button"
-                  disabled={!ready || (!drillRunning && recording)}
-                  onClick={() => {
-                    if (drillRunning || drillPreparing) {
-                      stopAutomation();
-                      media.current?.pause();
-                      setStatus('paused');
-                    } else void startHandsFree();
-                  }}
-                >
-                  {drillPreparing
-                    ? 'Cancel microphone request'
-                    : drillRunning
-                      ? 'Stop hands-free drill'
-                      : 'Start hands-free drill'}
-                </button>
-              ) : null}
-              {mode === 'shadowing' && drill.pause === 'timed' && !drillRunning ? (
-                <button
-                  className="button"
-                  onClick={() => {
-                    stopAutomation();
-                    setDrill((current) => ({ ...current, pause: 'manual' }));
-                    media.current?.pause();
-                    setStatus('paused');
-                  }}
-                >
-                  Stop timed practice
-                </button>
-              ) : null}
-              <p className="small muted">
-                {mode === 'continuous'
-                  ? 'Continuous follows the media without repeats or automatic section pauses.'
-                  : `${drill.repeats} source ${drill.repeats === 1 ? 'play' : 'plays'} → ${drillRunning ? `${drill.responseSeconds} s local recording → next section` : drill.pause === 'timed' ? `${drill.responseSeconds} s to speak → next section` : 'pause until Continue'}.`}
-                {drill.preset === 'drill'
-                  ? ' Hands-free needs your microphone permission; recordings are local and analysis stays explicit.'
-                  : ''}
-              </p>
-            </div>
-          </div>
+          <PracticeSettings
+            mode={mode}
+            drill={drill}
+            setDrill={setDrill}
+            selectPreset={selectPreset}
+            speed={speed}
+            setSpeed={setSpeed}
+            playbackOffsetMs={playbackOffsetMs}
+            setPlaybackOffsetMs={setPlaybackOffsetMs}
+            ready={ready}
+            recording={recording}
+            drillRunning={drillRunning}
+            drillPreparing={drillPreparing}
+            stopAutomation={stopAutomation}
+            onHandsFree={() => {
+              if (drillRunning || drillPreparing) {
+                stopAutomation();
+                media.current?.pause();
+                setStatus('paused');
+              } else void startHandsFree();
+            }}
+            onStopTimed={() => {
+              stopAutomation();
+              setDrill((current) => ({ ...current, pause: 'manual' }));
+              media.current?.pause();
+              setStatus('paused');
+            }}
+          />
           <div className="practice-current-stack">
             <CurrentSection
               lesson={lesson}
@@ -1131,7 +985,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
               translationProvider={translationProvider}
               translationError={translationError}
               setTranslationError={setTranslationError}
-              percent={percent}
+              elapsed={elapsed}
               ready={ready}
               index={index}
               navigate={navigate}
@@ -1249,23 +1103,17 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
             </p>
           ) : null}
           <div className="player-footnote">
-            <span>
-              {lesson.source === 'demo'
-                ? 'Studio sample · Japanese synthetic voice'
-                : lesson.transcriptSource}
-            </span>
+            <span>{transcriptLabel(lesson)}</span>
+            {whisperUpgradePath(lesson) ? (
+              <Link className="text-button" href={whisperUpgradePath(lesson)!}>
+                Improve with Whisper
+              </Link>
+            ) : null}
             <button className="text-button" onClick={onHelp}>
               <Keyboard size={14} />
               Shortcuts
             </button>
           </div>
-          {!segment.translation ? (
-            <p className="translation-privacy">
-              Revealing a translation sends this Japanese section plus up to one neighboring
-              Japanese section on each side for context. It never includes your recordings, quiz
-              results, or learner history.
-            </p>
-          ) : null}
         </div>
         <TranscriptPanel
           hidden={studioMode && secondaryTool !== 'transcript'}
@@ -1279,12 +1127,8 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
           practiceCount={practiceCount}
           navigate={navigate}
           recommendedSegmentIds={recommendedSegmentIds}
-          onClearRecommendations={() => setRecommendedSegmentIds(null)}
+          onClearRecommendations={clearRecommendations}
         />
-      </div>
-      <div className="practice-signoff">
-        <span lang="ja">焦らず、少しずつ。</span>
-        <span>No rush. Just a little closer.</span>
       </div>
     </main>
   );

@@ -88,14 +88,18 @@ async function fixture() {
   });
   return { user, entry };
 }
-test('migration backfills Inbox for existing words without automatic review', async () => {
+test('existing saved words keep no automatic review card after migration', async () => {
   const s = await review.snapshot('old');
-  assert.equal(s.decks[0].id, 'inbox');
-  assert.deepEqual(s.memberships, [{ deckId: 'inbox', entryId: 'existing' }]);
+  assert.deepEqual(Object.keys(s).sort(), [
+    'cards',
+    'history',
+    'historySince',
+    'historyWindowStart',
+  ]);
   assert.equal(s.cards.length, 0);
   assert.deepEqual(s.history, []);
 });
-test('new users get Inbox without entitlement or vocabulary rows', async () => {
+test('new users start with an empty schedule and no vocabulary rows', async () => {
   const user = crypto.randomUUID();
   await db
     .prepare(
@@ -104,18 +108,15 @@ test('new users get Inbox without entitlement or vocabulary rows', async () => {
     .bind(user, 'Learner', `${user}@example.com`)
     .run();
   const s = await review.snapshot(user);
-  assert.equal(s.decks.length, 1);
   assert.equal(s.cards.length, 0);
 });
-test('dictionary save keeps stable IDs and automatically adds Inbox membership', async () => {
+test('dictionary save keeps stable IDs and enrolling creates exactly one card', async () => {
   const { user, entry } = await fixture();
   let s = await review.snapshot(user);
-  assert.equal(s.memberships[0].entryId, entry.id);
   assert.equal(s.cards.length, 0);
   await review.apply(user, {
     action: 'enroll',
     entryIds: [entry.id],
-    deckId: 'inbox',
     enrolledAt: entry.updatedAt,
   });
   const saved = await dictionary.save(user, { ...entry, translation: 'Morning' });
@@ -124,52 +125,11 @@ test('dictionary save keeps stable IDs and automatically adds Inbox membership',
   assert.equal(s.cards[0].entryId, entry.id);
   assert.equal(s.cards.length, 1);
 });
-test('deck creation, multiple membership, removal and deletion preserve words and scheduling', async () => {
-  const { user, entry } = await fixture();
-  const deck = crypto.randomUUID();
-  await review.apply(user, { action: 'deck', id: deck, name: 'Travel' });
-  await review.apply(user, {
-    action: 'membership',
-    deckId: deck,
-    entryIds: [entry.id],
-    remove: false,
-  });
-  await review.apply(user, {
-    action: 'enroll',
-    deckId: deck,
-    entryIds: [entry.id],
-    enrolledAt: entry.updatedAt,
-  });
-  let s = await review.snapshot(user);
-  assert.equal(s.memberships.length, 2);
-  assert.equal(s.cards.length, 1);
-  const createdAt = s.decks.find((value) => value.id === deck)!.createdAt;
-  const beforeRename = structuredClone(s.cards[0]);
-  await review.apply(user, { action: 'deck', id: deck, name: ' Holiday ' });
-  s = await review.snapshot(user);
-  assert.equal(s.decks.find((value) => value.id === deck)!.name, 'Holiday');
-  assert.equal(s.decks.find((value) => value.id === deck)!.createdAt, createdAt);
-  assert.deepEqual(s.cards[0], beforeRename);
-  assert.equal(s.memberships.length, 2);
-  await review.apply(user, {
-    action: 'membership',
-    deckId: deck,
-    entryIds: [entry.id],
-    remove: true,
-  });
-  s = await review.snapshot(user);
-  assert.equal(s.memberships.length, 1);
-  await review.apply(user, { action: 'delete-deck', deckId: deck });
-  assert.equal((await dictionary.list(user)).length, 1);
-  assert.equal((await review.snapshot(user)).cards.length, 1);
-  await assert.rejects(review.apply(user, { action: 'delete-deck', deckId: 'inbox' }));
-});
 test('grades persist all scheduling fields and retries are idempotent; concurrent revisions conflict', async () => {
   const { user, entry } = await fixture();
   await review.apply(user, {
     action: 'enroll',
     entryIds: [entry.id],
-    deckId: 'inbox',
     enrolledAt: entry.updatedAt,
   });
   const op = {
@@ -232,7 +192,6 @@ test('learning and relearning steps round-trip existing D1 columns and match pre
   await review.apply(user, {
     action: 'enroll',
     entryIds: [entry.id],
-    deckId: 'inbox',
     enrolledAt: entry.updatedAt,
   });
   let card = (await review.snapshot(user)).cards[0];
@@ -271,7 +230,6 @@ test('undo restores the last rating with a new revision and lost-response retrie
   await review.apply(user, {
     action: 'enroll',
     entryIds: [entry.id],
-    deckId: 'inbox',
     enrolledAt: entry.updatedAt,
   });
   const previous = (await review.snapshot(user)).cards[0];
@@ -322,7 +280,6 @@ test('undo checks account ownership, target operation, prior identity and monoto
   await review.apply(user, {
     action: 'enroll',
     entryIds: [entry.id],
-    deckId: 'inbox',
     enrolledAt: entry.updatedAt,
   });
   const previous = (await review.snapshot(user)).cards[0];
@@ -365,7 +322,6 @@ test('simultaneous undo and rating accept one revision and never overwrite the w
   await review.apply(user, {
     action: 'enroll',
     entryIds: [entry.id],
-    deckId: 'inbox',
     enrolledAt: entry.updatedAt,
   });
   const previous = (await review.snapshot(user)).cards[0];
@@ -415,7 +371,6 @@ test('suspend and re-enroll preserve history without automatic rescheduling exis
     enroll = {
       action: 'enroll' as const,
       entryIds: [entry.id],
-      deckId: 'inbox',
       enrolledAt: entry.updatedAt,
     };
   await review.apply(user, enroll);
@@ -436,7 +391,6 @@ test('simultaneous grades accept exactly one revision and preserve the winning s
   await review.apply(user, {
     action: 'enroll',
     entryIds: [entry.id],
-    deckId: 'inbox',
     enrolledAt: entry.updatedAt,
   });
   const op = {
@@ -504,7 +458,6 @@ test('schedule and rating history roll back together when recording an event fai
   await review.apply(user, {
     action: 'enroll',
     entryIds: [entry.id],
-    deckId: 'inbox',
     enrolledAt: entry.updatedAt,
   });
   await db
@@ -537,7 +490,6 @@ test('an accepted operation ID cannot be reused for another rating revision', as
   await review.apply(user, {
     action: 'enroll',
     entryIds: [entry.id],
-    deckId: 'inbox',
     enrolledAt: entry.updatedAt,
   });
   const operation = {
@@ -564,7 +516,6 @@ test('accepted ratings survive vocabulary deletion and account deletion cascades
   await review.apply(user, {
     action: 'enroll',
     entryIds: [entry.id],
-    deckId: 'inbox',
     enrolledAt: entry.updatedAt,
   });
   await review.apply(user, {
@@ -591,7 +542,7 @@ test('accepted ratings survive vocabulary deletion and account deletion cascades
     0,
   );
 });
-test('owner isolation and foreign keys reject another account, missing word or missing deck', async () => {
+test('owner isolation and foreign keys reject another account or a missing word', async () => {
   const a = await fixture(),
     b = await fixture();
   await review.snapshot(b.user);
@@ -599,19 +550,19 @@ test('owner isolation and foreign keys reject another account, missing word or m
     review.apply(b.user, {
       action: 'enroll',
       entryIds: [a.entry.id],
-      deckId: 'inbox',
       enrolledAt: a.entry.updatedAt,
     }),
+    ReviewConflict,
   );
   await assert.rejects(
     review.apply(a.user, {
-      action: 'membership',
-      deckId: 'missing',
-      entryIds: [a.entry.id],
-      remove: false,
+      action: 'enroll',
+      entryIds: [a.entry.id, 'missing-word'],
+      enrolledAt: a.entry.updatedAt,
     }),
+    ReviewConflict,
   );
-  await review.apply(b.user, { action: 'delete-deck', deckId: 'another' });
+  assert.deepEqual((await review.snapshot(a.user)).cards, []);
   assert.deepEqual((await review.snapshot(b.user)).cards, []);
   await assert.rejects(
     review.apply(b.user, {
@@ -625,23 +576,20 @@ test('owner isolation and foreign keys reject another account, missing word or m
     ReviewConflict,
   );
 });
-test('deleting vocabulary and accounts cascades; deleting a deck does not own vocabulary', async () => {
+test('deleting vocabulary and accounts cascades review cards', async () => {
   const { user, entry } = await fixture();
   await review.apply(user, {
     action: 'enroll',
     entryIds: [entry.id],
-    deckId: 'inbox',
     enrolledAt: entry.updatedAt,
   });
   await dictionary.remove(user, entry.id);
-  const s = await review.snapshot(user);
-  assert.equal(s.cards.length, 0);
-  assert.equal(s.memberships.length, 0);
+  assert.equal((await review.snapshot(user)).cards.length, 0);
   await db.prepare('DELETE FROM "user" WHERE id=?').bind(user).run();
   assert.equal(
     (
       await db
-        .prepare('SELECT count(*) AS n FROM user_decks WHERE user_id=?')
+        .prepare('SELECT count(*) AS n FROM user_review_states WHERE user_id=?')
         .bind(user)
         .first<{ n: number }>()
     )?.n,
@@ -649,21 +597,32 @@ test('deleting vocabulary and accounts cascades; deleting a deck does not own vo
   );
 });
 test('review API bounds and validates writes, rejects unverified mutations, and uses private cache headers', async () => {
-  const { user } = await fixture();
+  const { user, entry } = await fixture();
   const req = (body: unknown) =>
     new Request('https://example.com/api/review', { method: 'POST', body: JSON.stringify(body) });
-  assert.equal(
-    (await handleReviewRequest(req({ action: 'deck', id: 'd', name: 'Deck' }), user, false, review))
-      .status,
-    403,
-  );
+  const enroll = { action: 'enroll', entryIds: [entry.id], enrolledAt: entry.updatedAt };
+  assert.equal((await handleReviewRequest(req(enroll), user, false, review)).status, 403);
+  // Deck operations from tabs still running an older bundle are acknowledged without effect,
+  // so those tabs' outboxes keep draining instead of retrying a rejected operation forever.
+  for (const body of [
+    { action: 'deck', id: 'd', name: 'Deck' },
+    { action: 'delete-deck', deckId: 'd' },
+    { action: 'membership', deckId: 'inbox', entryIds: [entry.id], remove: false },
+  ])
+    assert.equal((await handleReviewRequest(req(body), user, true, review)).status, 200);
+  assert.equal((await review.snapshot(user)).cards.length, 0);
   for (const body of [
     null,
-    { action: 'delete-deck', deckId: 'inbox' },
-    { action: 'enroll', entryIds: ['word'], deckId: 'inbox', enrolledAt: 'bad' },
+    { action: 'enroll', entryIds: ['word'], enrolledAt: 'bad' },
     { action: 'grade', entryId: 'word', revision: -1, grade: 'good' },
   ])
     assert.equal((await handleReviewRequest(req(body), user, true, review)).status, 400);
+  // An enroll queued offline before decks were removed still applies; its deck is ignored.
+  assert.equal(
+    (await handleReviewRequest(req({ ...enroll, deckId: 'inbox' }), user, true, review)).status,
+    200,
+  );
+  assert.equal((await review.snapshot(user)).cards.length, 1);
   const response = await handleReviewRequest(
     new Request('https://example.com/api/review'),
     user,
@@ -672,15 +631,60 @@ test('review API bounds and validates writes, rejects unverified mutations, and 
   );
   assert.equal(response.status, 200);
   assert.equal(response.headers.get('Cache-Control'), 'no-store');
+  // Older bundles read deck lists from the snapshot; they stay present and empty.
+  const snapshot = await response.json();
+  assert.deepEqual([snapshot.decks, snapshot.memberships], [[], []]);
+  assert.equal(snapshot.cards.length, 1);
   assert.equal(
-    (
-      await handleReviewRequest(
-        req({ action: 'deck', id: 'd', name: 'x'.repeat(17000) }),
-        user,
-        true,
-        review,
-      )
-    ).status,
+    (await handleReviewRequest(req({ ...enroll, padding: 'x'.repeat(17000) }), user, true, review))
+      .status,
     413,
   );
+});
+
+test('enrolling a full 100-word batch stays within the D1 bound-parameter limit', async () => {
+  const { user, entry } = await fixture();
+  const ids = [entry.id];
+  for (let n = 1; n < 100; n++)
+    ids.push(
+      (
+        await dictionary.save(user, {
+          schemaVersion: 1,
+          term: `語${n}`,
+          reading: null,
+          translation: 'word',
+          sourceSentence: demo.segments[0].japanese,
+          sourceSentenceTranslation: demo.segments[0].translation,
+          source: await dictionarySource(demo as Lesson, demo.segments[0]),
+        })
+      ).id,
+    );
+  // Production D1 rejects statements with more than 100 bound values; local SQLite does not.
+  const guarded = new Proxy(db, {
+    get(target, property) {
+      if (property === 'prepare')
+        return (sql: string) => {
+          const statement = target.prepare(sql);
+          return new Proxy(statement, {
+            get(inner, key) {
+              if (key === 'bind')
+                return (...values: unknown[]) => {
+                  assert.ok(values.length <= 100, `${values.length} bound values: ${sql}`);
+                  return inner.bind(...values);
+                };
+              const value = Reflect.get(inner, key);
+              return typeof value === 'function' ? value.bind(inner) : value;
+            },
+          });
+        };
+      const value = Reflect.get(target, property);
+      return typeof value === 'function' ? value.bind(target) : value;
+    },
+  });
+  await createD1ReviewRepository(guarded).apply(user, {
+    action: 'enroll',
+    entryIds: ids,
+    enrolledAt: entry.updatedAt,
+  });
+  assert.equal((await review.snapshot(user)).cards.length, 100);
 });

@@ -2,8 +2,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react';
 import { ArrowRight, RefreshCw, Compass, LoaderCircle } from 'lucide-react';
-import { Header, Footer, HelpDialog } from '../chrome';
-import { useLibrary } from '../use-library';
+import type { useLibrary } from '../use-library';
 import { useLearnerProfile } from '../use-learner-profile';
 import { useAccount } from '../account';
 import {
@@ -31,8 +30,9 @@ import { DiscoverFilters } from './filters';
 import { DiscoverPreferences } from './preferences';
 import { VideoCard } from './video-card';
 import { localVocabularyFit } from '@/lib/discover/vocabulary';
-export function Discover() {
-  const { state: library, ready: libraryReady } = useLibrary(),
+/** Home → Discover. Browsing and saving never acquire captions or run AI. */
+export function DiscoverFeed({ library: shared }: { library: ReturnType<typeof useLibrary> }) {
+  const { state: library, ready: libraryReady } = shared,
     { profile } = useLearnerProfile(),
     account = useAccount();
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS),
@@ -45,7 +45,6 @@ export function Discover() {
     [notice, setNotice] = useState(''),
     [noticeError, setNoticeError] = useState(false);
   const [edit, setEdit] = useState(false),
-    [help, setHelp] = useState(false),
     [revision, setRevision] = useState(0),
     [undo, setUndo] = useState<(() => void) | null>(null);
   const generation = useRef(0),
@@ -58,7 +57,8 @@ export function Discover() {
     setPreferences(prefs);
     try {
       const params = new URLSearchParams(window.location.search);
-      const restored = params.size
+      // Other query parameters (such as a prefilled ?video= link) are not feed filters.
+      const restored = [...params.keys()].some((key) => key in DEFAULT_FILTERS)
         ? normalizeFilters(params)
         : normalizeFilters(
             readStorage('discover:filters', {
@@ -222,7 +222,7 @@ export function Discover() {
     setFilters(next);
     writeStorage('discover:filters', next);
     const query = filtersQuery(next);
-    window.history.pushState(null, '', `/discover${query ? '?' + query : ''}`);
+    window.history.pushState(null, '', `${window.location.pathname}${query ? '?' + query : ''}`);
   }
   function save(video: Card) {
     setNoticeError(false);
@@ -293,26 +293,18 @@ export function Discover() {
   );
   return (
     <>
-      <Header onHelp={() => setHelp(true)} />
-      <main className="discover-main">
-        <div className="discover-intro">
-          <h1>Find something worth listening to.</h1>
-          <p>Japanese that fits your curiosity, your pace and your practice.</p>
-        </div>
+      <section className="discover-main" aria-label="Discover">
         <section className="discover-personal" aria-label="Your discovery level">
           <div>
             <span className="eyebrow">
               {preferences.preferredBand ? 'YOUR PREFERRED CONTENT LEVEL' : 'SUGGESTED FOR YOU'}
             </span>
-            <h2>Find your next Japanese moment</h2>
+            <h2>Find something worth listening to</h2>
             <p>
               {bandLabel
-                ? `${preferences.preferredBand ? 'Your starting point' : 'Based on your practice, we suggest'}: ${bandLabel}. Want a challenge? Choose a chip below.`
-                : 'Follow your interests, or choose a level to find your starting point.'}
+                ? `${preferences.preferredBand ? 'Your starting point' : 'Suggested from your practice'}: ${bandLabel}.`
+                : 'Follow your interests, or choose a level to start from.'}
             </p>
-            <span className="small muted">
-              Content estimates guide exploration; they don’t measure your proficiency.
-            </span>
           </div>
           <div className="discover-personal-actions">
             <span className="discover-level-display">{bandLabel ?? 'Your own pace'}</span>
@@ -332,11 +324,6 @@ export function Discover() {
           </button>
         </div>
         <DiscoverFilters key={filters.q} value={filters} onChange={change} />
-        <p className="discover-privacy small muted">
-          Recommendations use your Hibiki practice and choices. Signed-in discovery activity helps
-          improve suggestions, and Watch Later syncs across devices. Anonymous browsing and saves
-          stay here. <Link href="/library">Open Watch Later →</Link>
-        </p>
         {notice ? (
           <div className="discover-notice" role={noticeError ? 'alert' : 'status'}>
             {notice}
@@ -472,9 +459,7 @@ export function Discover() {
             }}
           />
         ) : null}
-      </main>
-      <Footer />
-      <HelpDialog open={help} onClose={() => setHelp(false)} />
+      </section>
     </>
   );
 }

@@ -148,99 +148,11 @@
 .good-line small {
   color: var(--muted);
 }
-.word-browser-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: end;
-  gap: 15px;
-  margin: 22px 0;
-  padding: 18px;
-  border: 1px solid var(--line);
-  border-radius: 9px;
-}
-.word-browser-toolbar form {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: end;
-  gap: 8px;
-}
-.word-browser-toolbar label {
-  display: grid;
-  gap: 7px;
-  font-size: 12px;
-}
-.word-browser-toolbar input,
-.word-browser-toolbar select,
-.word-browser-table select {
-  padding: 7px 10px;
-  border: 1px solid var(--line);
-  border-radius: 5px;
-  background: var(--paper);
-  color: var(--ink);
-  font: inherit;
-  font-size: 13px;
-}
-.word-browser-toolbar > p {
-  flex-basis: 100%;
-  margin: 0;
-}
-.word-browser-bulk,
-.word-browser-pagination {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-  margin: 18px 0;
-  font-size: 12px;
-}
-.word-browser-bulk > span {
-  margin-right: 10px;
-}
-.word-browser-select {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  font-size: 12px;
-  margin: 12px 0;
-}
-.word-browser-table {
-  overflow-x: auto;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-}
-.word-browser-table table {
-  width: 100%;
-  border-collapse: collapse;
-  min-width: 570px;
-  text-align: left;
-  font-size: 12px;
-}
-.word-browser-table td,
-.word-browser-table th {
-  padding: 12px;
-  border-bottom: 1px solid var(--line);
-}
-.word-browser-table td small {
-  display: block;
-  margin-top: 4px;
-  color: var(--muted);
-}
-.word-browser-lookup {
-  padding: 18px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-}
 @media (max-width: 600px) {
   .lesson-vocabulary {
     padding: 15px;
   }
   .vocabulary-heading {
     align-items: flex-start;
-  }
-  .word-browser-toolbar form {
-    width: 100%;
-  }
-  .word-browser-toolbar input {
-    max-width: 100%;
   }
 }

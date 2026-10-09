@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "Hibiki Bridge",
+  "version": "0.1.0",
+  "description": "Shadow Japanese with videos on other sites: Hibiki plays the page's own video, with its subtitles or Whisper subtitles.",
+  "minimum_chrome_version": "116",
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Practise this video in Hibiki"
+  },
+  "background": { "service_worker": "background.js", "type": "module" },
+  "permissions": ["activeTab", "scripting", "storage"],
+  "optional_host_permissions": ["<all_urls>"],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://shadowing.julianpopovskijones.workers.dev/*",
+        "http://localhost/*",
+        "http://127.0.0.1/*"
+      ],
+      "js": ["bridge.js"],
+      "run_at": "document_start"
+    }
+  ]
+}

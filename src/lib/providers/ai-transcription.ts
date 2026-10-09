@@ -27,7 +27,8 @@ export function createWorkersAiTranscriptionProvider(
           task: 'transcribe',
           language: 'ja',
           vad_filter: true,
-          condition_on_previous_text: true,
+          // Conditioning on earlier output is the main cause of Whisper repetition loops.
+          condition_on_previous_text: false,
         },
         signal,
       );

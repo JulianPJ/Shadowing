@@ -1,28 +1,26 @@
 'use client';
 import Link from 'next/link';
-import { X } from 'lucide-react';
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { authClient } from '@/lib/auth/client';
 import { authPath } from '@/lib/auth/return-path';
-import { refreshReview, startReviewSync } from '@/lib/review/client';
-import { syncWordKnowledge, startKnowledgeSync } from '@/lib/knowledge/client';
-import { syncDiscover, startDiscoverSync } from '@/lib/discover/client';
+import { reviewSync } from '@/lib/review/client';
+import { knowledgeSync } from '@/lib/knowledge/client';
+import { discoverSync, startDiscoverEvents } from '@/lib/discover/client';
+import { startChannels } from '@/lib/sync/channel';
 import {
   chooseImport,
   refreshAccount,
   startSync,
   subscribeSync,
-  synchronize,
   syncStatus,
 } from '@/lib/sync/client';
 import type { SyncStatus } from '@/lib/sync/client';
 import {
-  aggregateSync,
   channelStatus,
   initialChannels,
+  sessionExpired,
   subscribeChannels,
 } from '@/lib/sync/channel-status';
-import { StandaloneNavigation } from './chrome';
 import { useTaskReturn } from './task-return';
 const initial: SyncStatus = {
   user: null,
@@ -37,27 +35,42 @@ const initial: SyncStatus = {
 export function useAccount() {
   return useSyncExternalStore(subscribeSync, syncStatus, () => initial);
 }
-export function useAggregateSync() {
-  const channels = useSyncExternalStore(subscribeChannels, channelStatus, () => initialChannels);
-  return { ...aggregateSync(channels), channels };
+function useSessionExpired() {
+  return sessionExpired(
+    useSyncExternalStore(subscribeChannels, channelStatus, () => initialChannels),
+  );
 }
-async function retrySync() {
-  await Promise.allSettled([synchronize(), refreshReview(), syncWordKnowledge(), syncDiscover()]);
-}
+
+/**
+ * Starts background sync and asks once before importing anonymous device progress.
+ * Sync is otherwise silent: the only visible state is an expired session that needs sign-in.
+ */
 export function AccountBridge() {
   const account = useAccount();
+  const expired = useSessionExpired();
+  const { destination } = useTaskReturn();
   const [busy, setBusy] = useState(false);
   useEffect(() => startSync(), []);
-  useEffect(() => startReviewSync(), []);
-  useEffect(() => startKnowledgeSync(), []);
-  useEffect(() => startDiscoverSync(), []);
+  useEffect(() => startChannels([reviewSync, knowledgeSync, discoverSync]), []);
+  useEffect(() => startDiscoverEvents(), []);
+  if (account.user && expired)
+    return (
+      <aside className="account-import" aria-label="Session expired" role="status">
+        <strong>Your session expired.</strong>
+        <p>Your practice is saved on this device. Sign in again to keep it in sync.</p>
+        <div>
+          <Link className="button primary" href={authPath('/sign-in', destination)}>
+            Sign in again
+          </Link>
+        </div>
+      </aside>
+    );
   return account.importPending ? (
     <aside className="account-import" aria-label="Import device progress">
       <strong>Add this device’s Hibiki progress to your account?</strong>
       <p>
-        Include preferences, practice history, quiz answers, bookmarks and word knowledge states.
-        Media, recordings, transcript text and playback links stay on this device. Either choice
-        keeps your anonymous history on this device.
+        Includes your practice history, quiz answers, bookmarks and word states. Media, recordings
+        and transcripts stay on this device either way.
       </p>
       <div>
         {[
@@ -85,61 +98,7 @@ export function AccountBridge() {
     </aside>
   ) : null;
 }
-export function AccountEntry({ drawer = true }: { drawer?: boolean }) {
-  const account = useAccount();
-  const sync = useAggregateSync();
-  const { destination } = useTaskReturn();
-  const [open, setOpen] = useState(false);
-  const dialog = useRef<HTMLDialogElement>(null);
-  const trigger = useRef<HTMLAnchorElement>(null);
-  useEffect(() => {
-    if (open) dialog.current?.showModal();
-    else dialog.current?.close();
-  }, [open]);
-  function close() {
-    setOpen(false);
-    dialog.current?.close();
-    trigger.current?.focus();
-  }
-  return (
-    <>
-      <Link
-        ref={trigger}
-        className="nav-link account-entry"
-        href={account.user ? '/account' : authPath('/sign-in', destination)}
-        onClick={(event) => {
-          if (drawer && account.user && !event.metaKey && !event.ctrlKey && !event.shiftKey) {
-            event.preventDefault();
-            setOpen(true);
-          }
-        }}
-      >
-        {account.user ? 'Account' : 'Sign in'}
-        {account.user &&
-        ['offline', 'error', 'auth', 'conflict', 'pending'].includes(sync.state) ? (
-          <span className="sync-dot" aria-label="Account sync needs attention" />
-        ) : null}
-      </Link>
-      <dialog
-        ref={dialog}
-        className="account-drawer"
-        aria-label="Your account"
-        onCancel={close}
-        onClick={(event) => {
-          if (event.target === event.currentTarget) close();
-        }}
-      >
-        <button className="icon-button dialog-close" aria-label="Close account" onClick={close}>
-          <X size={20} />
-        </button>
-        {open ? <AccountDetails compact /> : null}
-        <Link className="button full-width" href="/account" onClick={close}>
-          Account settings and plans
-        </Link>
-      </dialog>
-    </>
-  );
-}
+
 export function PlanComparison() {
   return (
     <section className="plan-comparison" id="plans" aria-labelledby="plan-comparison-title">
@@ -148,15 +107,15 @@ export function PlanComparison() {
         <div>
           <dt>Hibiki Free</dt>
           <dd>
-            Shadowing, replay and local recording; dictionary lookup and word knowledge. A Free
-            account adds saved words, decks, review and eligible progress sync.
+            Shadowing, recording, dictionary lookup, saved words and review, with progress synced to
+            your account.
           </dd>
         </div>
         <div>
           <dt>Hibiki Pro</dt>
           <dd>
-            Everything in Free, plus generated comprehension checks, topic vocabulary, automatic
-            subtitles for your own media and Shadowing Match analysis.
+            Everything in Free, plus comprehension checks, topic vocabulary, automatic subtitles and
+            Shadowing Match analysis.
           </dd>
         </div>
       </dl>
@@ -167,9 +126,10 @@ export function PlanComparison() {
     </section>
   );
 }
-function AccountDetails({ compact = false }: { compact?: boolean }) {
+
+/** Sign-in, plan and sign-in methods. Rendered at the bottom of the Profile page. */
+export function AccountSettings() {
   const account = useAccount();
-  const sync = useAggregateSync();
   const { destination } = useTaskReturn();
   const [methods, setMethods] = useState<string[] | null>(null);
   const [message, setMessage] = useState('');
@@ -202,59 +162,60 @@ function AccountDetails({ compact = false }: { compact?: boolean }) {
       setBusy(false);
     }
   }
-  if (!account.loaded) return <p role="status">Checking your account…</p>;
+  if (!account.loaded)
+    return (
+      <section className="account-settings" aria-labelledby="account-title">
+        <h2 id="account-title">Account</h2>
+        <p role="status">Checking your account…</p>
+      </section>
+    );
   if (!account.user)
     return (
-      <>
-        <p>Sign in to save words and keep eligible practice progress across devices.</p>
+      <section className="account-settings" aria-labelledby="account-title">
+        <h2 id="account-title">Account</h2>
+        <p>Sign in to save words and keep your progress across devices.</p>
         <Link className="button primary" href={authPath('/sign-in', destination)}>
-          Continue to sign in
+          Sign in
         </Link>
         {account.error ? (
           <p role="status">
             Account services are temporarily unavailable. You can keep practising.
           </p>
         ) : null}
-      </>
+        <PlanComparison />
+      </section>
     );
   return (
-    <>
-      {compact ? <h2>Your account</h2> : null}
+    <section className="account-settings" aria-labelledby="account-title">
+      <h2 id="account-title">Account</h2>
       <p className="account-email">{account.user.email}</p>
       <span className={`account-plan ${account.user.plan === 'pro' ? 'pro' : ''}`}>
         {account.user.plan === 'pro' ? 'Hibiki Pro' : 'Hibiki Free'}
       </span>
-      <section className="account-sync" aria-label="Automatic sync">
-        <h2>Automatic sync</h2>
-        <p role="status">{sync.message}</p>
-        {sync.pending ? (
-          <p className="small muted">
-            {sync.pending} pending {sync.pending === 1 ? 'change' : 'changes'}
-          </p>
-        ) : null}
-        {sync.lastSync ? (
-          <p className="small muted">Last synced {new Date(sync.lastSync).toLocaleString()}</p>
-        ) : null}
-        {sync.state === 'auth' ? (
-          <Link className="button primary" href={authPath('/sign-in', destination)}>
-            Sign in again
-          </Link>
-        ) : null}
-        {sync.state === 'conflict' ? (
-          <Link className="button" href="/review">
-            Check review changes
-          </Link>
-        ) : null}
-        <button
-          className="button"
-          disabled={busy || sync.state === 'syncing'}
-          onClick={() => void action(retrySync)}
-        >
-          {busy ? 'Retrying…' : 'Sync now'}
-        </button>
-      </section>
+      {!account.user.emailVerified ? (
+        <div className="account-verify" role="status">
+          <p>Verify your email to save words and sync across devices.</p>
+          {account.emailEnabled ? (
+            <button
+              className="button"
+              disabled={busy}
+              onClick={() =>
+                void action(async () => {
+                  const result = await authClient.sendVerificationEmail({
+                    email: account.user!.email,
+                    callbackURL: '/profile',
+                  });
+                  setMessage(result.error?.message ?? 'Check your inbox for a verification link.');
+                })
+              }
+            >
+              Resend verification email
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       <p className="muted">
-        Connected sign-in methods:{' '}
+        Sign-in methods:{' '}
         {methods === null
           ? 'Loading…'
           : methods.length
@@ -270,7 +231,7 @@ function AccountDetails({ compact = false }: { compact?: boolean }) {
             : 'Could not load sign-in methods.'}
       </p>
       <div className="account-actions">
-        {!compact && account.googleEnabled && methods && !methods.includes('google') ? (
+        {account.googleEnabled && methods && !methods.includes('google') ? (
           <button
             className="button"
             disabled={busy}
@@ -278,7 +239,7 @@ function AccountDetails({ compact = false }: { compact?: boolean }) {
               void action(async () => {
                 const result = await authClient.linkSocial({
                   provider: 'google',
-                  callbackURL: '/account',
+                  callbackURL: '/profile',
                 });
                 if (result.error) setMessage(result.error.message ?? 'Could not link Google.');
               })
@@ -287,17 +248,11 @@ function AccountDetails({ compact = false }: { compact?: boolean }) {
             Connect Google
           </button>
         ) : null}
-        {!compact && account.emailEnabled && methods && !methods.includes('credential') ? (
+        {account.emailEnabled && methods && !methods.includes('credential') ? (
           <Link className="button" href={authPath('/reset-password', destination)}>
             Add email sign-in
           </Link>
         ) : null}
-        <Link className="button" href="/progress">
-          View progress
-        </Link>
-        <Link className="button" href="/dictionary">
-          Saved words
-        </Link>
         <button
           className="button"
           disabled={busy}
@@ -313,22 +268,7 @@ function AccountDetails({ compact = false }: { compact?: boolean }) {
         </button>
       </div>
       {message ? <p role="alert">{message}</p> : null}
-      {!compact ? <PlanComparison /> : null}
-    </>
-  );
-}
-export function AccountPage() {
-  return (
-    <>
-      <StandaloneNavigation />
-      <main className="account-screen">
-        <h1>Your account</h1>
-        <AccountDetails />
-        <p className="small muted">
-          Recordings and private transcripts stay on your device. Saving vocabulary sends only your
-          selected words and sentence context to your account.
-        </p>
-      </main>
-    </>
+      <PlanComparison />
+    </section>
   );
 }

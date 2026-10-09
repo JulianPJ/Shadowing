@@ -1,13 +1,11 @@
 'use client';
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { ArrowRight, Target } from 'lucide-react';
+import { Target } from 'lucide-react';
 import { readStorage, writeStorage } from '@/lib/storage/browser';
 import { loadLearnerHistory } from '@/lib/learner/persistence';
 import { loadKnowledge } from '@/lib/knowledge/client';
 import { cachedDictionary } from '@/lib/dictionary/cache';
 import { reviewHistory } from '@/lib/review/history';
-import { pendingReview } from '@/lib/review/client';
 import { loadAllShadowingSessions } from '@/lib/shadowing-session';
 import { studyTimeZone } from '@/lib/study-day';
 import {
@@ -21,14 +19,10 @@ export function WeeklyReport() {
   const [report, setReport] = useState<Report | null>(null);
   const [goal, setGoal] = useState<Goal>({ version: 1, minutes: null });
   const [minutes, setMinutes] = useState('5');
-  const [pending, setPending] = useState(0);
   const [notice, setNotice] = useState('');
-  const [timeZone, setTimeZone] = useState('');
   const [editingGoal, setEditingGoal] = useState(false);
   useEffect(() => {
     const refresh = () => {
-      const zone = studyTimeZone();
-      setTimeZone(zone);
       setReport(
         weeklyReport(
           {
@@ -41,11 +35,10 @@ export function WeeklyReport() {
             ),
           },
           new Date().toISOString(),
-          zone,
+          studyTimeZone(),
         ),
       );
       setGoal(validateGoal(readStorage('goal:daily', null)));
-      setPending(pendingReview().filter((op) => op.action === 'grade').length);
     };
     refresh();
     const events = [
@@ -54,7 +47,6 @@ export function WeeklyReport() {
       'hibiki:dictionary-change',
       'hibiki:review-change',
       'hibiki:account-change',
-      'hibiki:local-write',
       'storage',
     ];
     for (const event of events) window.addEventListener(event, refresh);
@@ -70,31 +62,16 @@ export function WeeklyReport() {
     setGoal(next);
     setEditingGoal(false);
     setNotice(
-      saved
-        ? value === null
-          ? 'Daily goal turned off.'
-          : 'Your daily goal is saved on this device.'
-        : 'Your goal is available for this visit; browser storage is unavailable.',
+      saved ? '' : 'Your goal is available for this visit; browser storage is unavailable.',
     );
   }
   return (
     <section className="progress-panel weekly-report" aria-labelledby="weekly-report-title">
-      <div className="section-heading">
-        <div>
-          <span className="eyebrow">A CALM LOOK BACK</span>
-          <h2 id="weekly-report-title">Your week in Japanese</h2>
-        </div>
-        <Link className="text-button" href="/library">
-          Choose your next lesson <ArrowRight size={14} />
-        </Link>
-      </div>
+      <h2 id="weekly-report-title">This week</h2>
       {!report ? (
-        <p role="status">Opening your weekly report…</p>
+        <p role="status">Opening your week…</p>
       ) : (
         <>
-          <p className="small muted">
-            {report.from} – {report.to} · last seven days · {timeZone} · day starts at midnight
-          </p>
           <dl className="weekly-metrics">
             <div>
               <dt>Minutes practised</dt>
@@ -105,71 +82,23 @@ export function WeeklyReport() {
               <dd>{report.sectionsPractised}</dd>
             </div>
             <div>
-              <dt>Cached saved words</dt>
-              <dd>{report.savedTerms}</dd>
-            </div>
-            <div>
-              <dt>Marked Known this week</dt>
+              <dt>Words known</dt>
               <dd>{report.markedKnown}</dd>
             </div>
             <div>
-              <dt>Self-rated recall</dt>
-              <dd>{report.reviewRecall === null ? 'No answers yet' : `${report.reviewRecall}%`}</dd>
-              <span>
-                {report.reviewRemembered} Good/Easy of {report.reviewAnswers} self-rated answers
-              </span>
-            </div>
-            <div>
-              <dt>Speech recognition match</dt>
-              <dd>
-                {report.averageMatch === null ? 'No recorded matches' : `${report.averageMatch}%`}
-              </dd>
-              <span>{report.shadowingAttempts} analyzed attempts</span>
+              <dt>Review recall</dt>
+              <dd>{report.reviewRecall === null ? '—' : `${report.reviewRecall}%`}</dd>
+              {report.reviewAnswers ? (
+                <span>
+                  {report.reviewRemembered} of {report.reviewAnswers} remembered
+                </span>
+              ) : null}
             </div>
           </dl>
-          {report.legacyUtcSeconds > 0 && (
-            <p className="small muted">
-              Includes {Math.round(report.legacyUtcSeconds / 60)} minutes of earlier UTC-day
-              records. They remain in your history; the daily goal uses exact local-day samples.
-            </p>
-          )}
-          <p className="small muted">
-            Practised content:{' '}
-            {report.contentLevels.length
-              ? report.contentLevels.join(', ')
-              : 'No analyzed content in this period'}
-            . {report.recordingAttempts} recording attempts in recent sessions.
-          </p>
-          {pending ? (
-            <p className="small muted">
-              {pending} review {pending === 1 ? 'answer is' : 'answers are'} waiting to sync; your
-              self-ratings are included.
-            </p>
-          ) : null}
-          <details className="weekly-evidence">
-            <summary>How this report is counted</summary>
-            <p className="small muted">
-              Minutes use recorded active time, including retained daily totals. Sections count
-              distinct sections explicitly replayed or recorded in sessions started and updated
-              during these seven days; archived section totals have no reliable weekly date and are
-              excluded. Saved terms reflect the bounded device dictionary cache, which may be a
-              partial account view. Marked Known counts your current Known states updated this week,
-              not a proven memory gain. Review recall is your chosen Good/Easy answers, not a
-              retention prediction; Hard and Again are excluded from the remembered count. Match
-              describes recognizer text and recording pace, not a pronunciation grade. Review and
-              Match histories begin when these features are used; older evidence is never invented.
-            </p>
-          </details>
           <div className="daily-goal">
-            <div>
-              <h3>
-                <Target size={18} /> A little daily goal
-              </h3>
-              <p className="small muted">
-                Optional, local to this device. A fresh invitation each day; no streaks or
-                penalties.
-              </p>
-            </div>
+            <h3>
+              <Target size={18} /> Daily goal
+            </h3>
             {goal.minutes === null || editingGoal ? (
               <form
                 onSubmit={(event) => {
@@ -180,11 +109,11 @@ export function WeeklyReport() {
                 <label>
                   Minutes per day
                   <select value={minutes} onChange={(e) => setMinutes(e.target.value)}>
-                    <option value="3">3 minutes</option>
-                    <option value="5">5 minutes</option>
-                    <option value="10">10 minutes</option>
-                    <option value="15">15 minutes</option>
-                    <option value="20">20 minutes</option>
+                    {[3, 5, 10, 15, 20].map((value) => (
+                      <option key={value} value={value}>
+                        {value} minutes
+                      </option>
+                    ))}
                   </select>
                 </label>
                 <button className="button" type="submit">
@@ -206,9 +135,6 @@ export function WeeklyReport() {
                     ? 'You made room for Japanese today.'
                     : 'Any amount of practice is a useful step.'}
                 </p>
-                <button className="text-button" onClick={() => saveGoal(null)}>
-                  Turn off daily goal
-                </button>
                 <button
                   className="text-button"
                   onClick={() => {
@@ -217,6 +143,9 @@ export function WeeklyReport() {
                   }}
                 >
                   Edit daily goal
+                </button>
+                <button className="text-button" onClick={() => saveGoal(null)}>
+                  Turn off daily goal
                 </button>
               </div>
             )}

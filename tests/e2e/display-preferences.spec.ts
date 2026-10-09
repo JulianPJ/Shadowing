@@ -1,7 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
 import demo from '../../src/data/demo.json' with { type: 'json' };
 import questions from '../../src/data/demo-quiz.json' with { type: 'json' };
-import { createQuiz, transcriptRevision } from '../../src/lib/quiz';
+import authoredDifficulty from '../../src/data/demo-difficulty.json' with { type: 'json' };
+import { createDifficultyAnalysis } from '../../src/lib/difficulty';
+import { createQuiz } from '../../src/lib/quiz/document';
+import { transcriptRevision } from '../../src/lib/transcript';
 import type { Lesson } from '../../src/lib/types';
 import { mockProAccount, proStorageKey } from '../helpers/pro-account';
 
@@ -38,6 +41,7 @@ test('display defaults, lazy assets, Studio playback continuity, navigation and 
   await expect(furigana(page)).toHaveAttribute('aria-pressed', 'false');
   await expect(page.locator('ruby')).toHaveCount(0);
   await expect(page.getByRole('combobox', { name: 'Playback speed' })).toHaveValue('0.75');
+  await page.getByText('Advanced settings', { exact: true }).click();
   const offset = page.getByRole('button', { name: 'Reset playback timing offset' });
   await expect(offset).toHaveText('0 ms');
   for (let i = 0; i < 7; i++)
@@ -99,13 +103,13 @@ test('display defaults, lazy assets, Studio playback continuity, navigation and 
     'true',
   );
   await studio(page).click();
-  // Desktop Studio Mode hides the global header; its breadcrumb remains available.
   await page.getByRole('link', { name: 'Your practice', exact: true }).click();
   await page.goto('/practice/demo');
   await expect(studio(page)).toHaveAttribute('aria-pressed', 'true');
   await page.reload();
   await expect(studio(page)).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('combobox', { name: 'Playback speed' })).toHaveValue('0.75');
+  await page.getByText('Advanced settings', { exact: true }).click();
   await expect(page.getByRole('button', { name: 'Reset playback timing offset' })).toHaveText(
     '+350 ms',
   );
@@ -158,6 +162,8 @@ test('Studio and Furigana preserve quiz answers, difficulty, identity and bounde
 }) => {
   await mockProAccount(page);
   const quiz = await createQuiz(questions, demo as Lesson);
+  const analysis = await createDifficultyAnalysis(authoredDifficulty, demo as Lesson);
+  await page.route('**/api/difficulty', (route) => route.fulfill({ json: { analysis } }));
   let calls = 0;
   await page.route('**/api/quiz', (route) => {
     calls++;
@@ -329,8 +335,12 @@ test('Studio desktop/mobile/tablet, long ruby text, translations and screenshots
   await expect(page.locator('#current-japanese ruby')).not.toHaveCount(0);
   for (const width of [1440, 820, 390, 320]) {
     await page.setViewportSize({ width, height: width < 700 ? 844 : 1000 });
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
-      true,
+    const dimensions = await page.evaluate(() => ({
+      page: document.documentElement.scrollWidth,
+      viewport: innerWidth,
+    }));
+    expect(dimensions.page, `Long furigana text at ${width}px`).toBeLessThanOrEqual(
+      dimensions.viewport,
     );
     const rects = await page.locator('#current-japanese').evaluate((element) => ({
       container: element.getBoundingClientRect().toJSON(),
@@ -445,10 +455,7 @@ test('Vocabulary return restores the exact paused position and ignores a changed
   const position = await page
     .locator('video')
     .evaluate((video: HTMLVideoElement) => video.currentTime);
-  await page
-    .getByRole('navigation', { name: 'Main navigation' })
-    .getByRole('link', { name: 'Vocabulary', exact: true })
-    .click();
+  await page.goto('/review');
   await page.getByRole('link', { name: 'Back to practice', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Listen', exact: true })).toBeEnabled();
   const returned = await page
@@ -457,10 +464,7 @@ test('Vocabulary return restores the exact paused position and ignores a changed
   expect(returned.paused).toBe(true);
   expect(Math.abs(returned.time - position)).toBeLessThan(0.1);
   await expect(page.getByTestId('playback-state')).toContainText('TAKE A BREATH');
-  await page
-    .getByRole('navigation', { name: 'Main navigation' })
-    .getByRole('link', { name: 'Vocabulary', exact: true })
-    .click();
+  await page.goto('/review');
   await page.evaluate(() => {
     const saved = JSON.parse(sessionStorage.getItem('hibiki:practice-return')!);
     saved.transcript = 'a replaced transcript';
@@ -472,4 +476,28 @@ test('Vocabulary return restores the exact paused position and ignores a changed
     await page.locator('video').evaluate((video: HTMLVideoElement) => video.currentTime),
   ).toBeLessThan(0.1);
   expect(await page.evaluate(() => sessionStorage.getItem('hibiki:practice-return'))).toBeNull();
+});
+
+test('Studio draws the current line over the video only when asked and remembers the choice', async ({
+  page,
+}) => {
+  await open(page);
+  const toggle = page.getByRole('button', { name: 'Subtitles on video', exact: true });
+  await expect(toggle).toHaveCount(0);
+  await studio(page).click();
+  await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.locator('.subtitle-overlay')).toHaveCount(0);
+  await toggle.click();
+  const overlay = page.locator('.media-frame .subtitle-overlay');
+  await expect(overlay).toHaveText(demo.segments[0].japanese);
+  // The current-section card already exposes this text to assistive technology.
+  await expect(overlay).toHaveAttribute('aria-hidden', 'true');
+  await page.locator('body').click({ position: { x: 3, y: 3 } });
+  await page.keyboard.press('ArrowRight');
+  await expect(overlay).toHaveText(demo.segments[1].japanese);
+  await page.reload();
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  await expect(overlay).toBeVisible();
+  await studio(page).click();
+  await expect(page.locator('.subtitle-overlay')).toHaveCount(0);
 });

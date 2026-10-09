@@ -1,14 +1,17 @@
 'use client';
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useState } from 'react';
 import { useAccount } from './account';
 import { cachedReview, pendingReview, refreshReview } from '@/lib/review/client';
 import { emptyReview } from '@/lib/review/local';
 import type { ReviewSnapshot } from '@/lib/review/types';
 import { readStorage } from '@/lib/storage/browser';
-import { channelStatus, initialChannels, subscribeChannels } from '@/lib/sync/channel-status';
+
+/**
+ * The account review schedule. Edits apply locally first and sync in the background; the only
+ * surfaced problems are a conflicting edit from another device, or no schedule at all.
+ */
 export function useReview() {
   const account = useAccount();
-  const channels = useSyncExternalStore(subscribeChannels, channelStatus, () => initialChannels);
   const [loaded, setLoaded] = useState<{
     owner: string;
     data: ReviewSnapshot;
@@ -23,8 +26,6 @@ export function useReview() {
     let active = true;
     let settled = false;
     const update = () => {
-      if (active && channelStatus().review.state === 'saved' && !pendingReview().length)
-        setError('');
       if (active)
         setLoaded({
           owner,
@@ -44,8 +45,9 @@ export function useReview() {
       .then(() => {
         if (active) setError('');
       })
-      .catch((e) => {
-        if (active) setError((e as Error).message);
+      .catch(() => {
+        if (active && !cachedReview().cards.length)
+          setError('Your review schedule could not load. Check your connection and try again.');
       })
       .finally(() => {
         settled = true;
@@ -61,16 +63,11 @@ export function useReview() {
   return {
     data: owned?.data ?? emptyReview(),
     pending: owned?.pending ?? 0,
-    error: owned
-      ? channels.owner === account.user?.id &&
-        ['offline', 'error', 'auth'].includes(channels.review.state)
-        ? channels.review.message
-        : error
-      : '',
+    error: owned ? error : '',
     conflict: owned?.conflict ?? '',
     loading: !!account.user && !owned?.settled,
     refresh: async () => {
-      await refreshReview();
+      await refreshReview({ force: true });
       setError('');
     },
   };

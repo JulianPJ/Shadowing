@@ -1,30 +1,35 @@
 'use client';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAccount } from './account';
 import { useReview } from './use-review';
-import { StandaloneNavigation } from './chrome';
 import { JapaneseText } from './japanese-text';
+import { VocabularyHeader } from './vocabulary-header';
 import {
   acknowledgeReviewConflict,
   cachedReview,
   changeReview,
   pendingReview,
 } from '@/lib/review/client';
-import { dueReviews, previewReview, reviewIntervalLabel } from '@/lib/review-scheduler';
+import {
+  dueReviews,
+  previewReview,
+  reviewIntervalLabel,
+  scheduleReview,
+} from '@/lib/review-scheduler';
 import { dictionaryByIds } from '@/lib/dictionary/client';
 import { reviewContextHref, externalReplay } from '@/lib/dictionary/replay';
-import { readStorage, writeStorage, storageAccount } from '@/lib/storage/browser';
-import { studyDay, studyTimeZone } from '@/lib/study-day';
+import { readStorage, writeStorage } from '@/lib/storage/browser';
+import { studyDay } from '@/lib/study-day';
 import { reviewHistory } from '@/lib/review/history';
 import {
-  loadStudySettings,
-  saveStudySettings,
-  limitDeckStudyQueue,
-  type StudySettings,
+  limitStudyQueue,
+  loadStudyLimits,
+  saveStudyLimits,
   type StudyLimits,
 } from '@/lib/review/study-settings';
+import { syncStatusAfterGrade } from '@/lib/vocabulary';
 import type { DictionaryEntry } from '@/lib/dictionary/types';
 import type { ReviewGrade, ReviewState } from '@/lib/review/types';
 import { timestamp } from '@/lib/youtube';
@@ -34,7 +39,6 @@ const ContextPlayer = dynamic(
 );
 type StudySession = {
   owner: string;
-  deck: string;
   ahead: boolean;
   answered: number;
   skipped: string[];
@@ -42,17 +46,10 @@ type StudySession = {
   startedAt: string;
   lastRating?: { previous: ReviewState; operationId: string };
 };
-function eligible(
-  cards: ReviewState[],
-  memberships: { entryId: string; deckId: string }[],
-  deck: string,
-) {
-  return cards.filter(
-    (c) =>
-      c.status !== 'suspended' &&
-      (deck === 'all' || memberships.some((m) => m.entryId === c.entryId && m.deckId === deck)),
-  );
-}
+const GRADES = ['again', 'hard', 'good', 'easy'] as const;
+// Learning steps are minutes apart, so a coarse clock keeps the queue current cheaply.
+const CLOCK_MS = 5000;
+
 function laterToday(cards: ReviewState[], at: string) {
   return cards
     .filter(
@@ -86,38 +83,31 @@ export function DailyReview() {
   const [readingsDefault, setReadingsDefault] = useState(false);
   const [contextOpen, setContextOpen] = useState(false);
   const [error, setError] = useState('');
-  const [deck, setDeck] = useState('all');
   const [clock, setClock] = useState(() => Date.now());
   const [retry, setRetry] = useState(0);
-  const [settings, setSettings] = useState<StudySettings>({
-    defaults: { new: null, review: null },
-    decks: {},
-    extensions: {},
-  });
+  const [limits, setLimits] = useState<StudyLimits>({ new: null, review: null });
   const heading = useRef<HTMLHeadingElement>(null);
   const gradeLock = useRef('');
   const owner = account.user?.id;
   const activeSession = session?.owner === owner ? session : null;
-  const selectedDeck = activeSession?.deck ?? deck;
   const now = new Date(clock).toISOString();
-  const cards = eligible(review.data.cards, review.data.memberships, selectedDeck);
-  const allDueCards = dueReviews(cards, now);
-  const configuredLimits = settings.decks[selectedDeck] ?? settings.defaults;
-  // Offline undo is immediate; durable history remains until its guarded operation syncs.
-  const pendingUndos = new Set(
-    pendingReview().flatMap((op) => (op.action === 'undo' ? [op.targetOperationId] : [])),
+  const cards = useMemo(
+    () => review.data.cards.filter((c) => c.status !== 'suspended'),
+    [review.data.cards],
   );
-  const history = reviewHistory().filter((event) => !pendingUndos.has(event.operationId));
-  const limited = limitDeckStudyQueue(
-    cards,
-    review.data.memberships,
-    history,
-    now,
-    settings,
-    selectedDeck,
-  );
+  // Undone ratings stay in durable history until their guarded operation syncs.
+  const history = useMemo(() => {
+    const undone = new Set(
+      pendingReview().flatMap((op) => (op.action === 'undo' ? [op.targetOperationId] : [])),
+    );
+    return reviewHistory().filter((event) => !undone.has(event.operationId));
+    // Both reads change only with the review data the hook already tracks.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [review.data, review.pending]);
+  const allDue = dueReviews(cards, now);
+  const limited = limitStudyQueue(cards, history, now, limits);
   const dueCards = limited.cards;
-  const limitedCount = allDueCards.length - dueCards.length;
+  const limitedCount = allDue.length - dueCards.length;
   const delayed = laterToday(cards, now);
   const remaining = [...dueCards, ...(activeSession?.ahead ? delayed : [])].filter(
     (c) => !activeSession?.skipped.includes(c.entryId),
@@ -143,53 +133,29 @@ export function DailyReview() {
   useEffect(() => {
     if (!owner) return;
     const stored = readStorage<StudySession | null>('review:session', null);
-    const requested = new URLSearchParams(window.location.search).get('deck');
-    if (requested && /^[\w-]{1,100}$/.test(requested)) setDeck(requested);
     if (
       stored?.owner === owner &&
       Array.isArray(stored.skipped) &&
       Number.isInteger(stored.answered) &&
       stored.answered >= 0 &&
-      typeof stored.deck === 'string' &&
       typeof stored.ahead === 'boolean' &&
-      typeof stored.startedAt === 'string' &&
-      (!requested || requested === stored.deck)
-    ) {
+      typeof stored.startedAt === 'string'
+    )
       setSession(stored);
-      setDeck(stored.deck);
-    } else setSession(null);
+    else setSession(null);
     setReadingsDefault(readStorage<boolean>('review:readings-default', false) === true);
-    setSettings(loadStudySettings());
+    setLimits(loadStudyLimits());
   }, [owner]);
   useEffect(() => {
     if (owner && activeSession) writeStorage('review:session', activeSession);
   }, [owner, activeSession]);
   useEffect(() => {
-    const reload = () => {
-      if (owner && owner === storageAccount()) {
-        const next = loadStudySettings();
-        setSettings((current) =>
-          JSON.stringify(current) === JSON.stringify(next) ? current : next,
-        );
-      }
-    };
-    const local = (event: Event) => {
-      if ((event as CustomEvent<{ key: string }>).detail?.key === 'preferences') reload();
-    };
-    const cross = (event: StorageEvent) => {
-      if (event.key?.endsWith(':preferences')) reload();
-    };
+    const reload = () => setLimits(loadStudyLimits());
     window.addEventListener('hibiki:sync-hydrated', reload);
-    window.addEventListener('hibiki:local-write', local);
-    window.addEventListener('storage', cross);
-    return () => {
-      window.removeEventListener('hibiki:sync-hydrated', reload);
-      window.removeEventListener('hibiki:local-write', local);
-      window.removeEventListener('storage', cross);
-    };
-  }, [owner]);
+    return () => window.removeEventListener('hibiki:sync-hydrated', reload);
+  }, []);
   useEffect(() => {
-    const timer = window.setInterval(() => setClock(Date.now()), 1000);
+    const timer = window.setInterval(() => setClock(Date.now()), CLOCK_MS);
     return () => window.clearInterval(timer);
   }, []);
   useEffect(() => {
@@ -238,32 +204,11 @@ export function DailyReview() {
   function begin(ahead = false) {
     if (!owner) return;
     setError('');
-    setSession({
-      owner,
-      deck,
-      ahead,
-      answered: 0,
-      skipped: [],
-      currentId: null,
-      startedAt: now,
-    });
+    setSession({ owner, ahead, answered: 0, skipped: [], currentId: null, startedAt: now });
   }
   function updateLimits(value: StudyLimits) {
-    const updated =
-      selectedDeck === 'all'
-        ? { ...settings, defaults: value }
-        : { ...settings, decks: { ...settings.decks, [selectedDeck]: value } };
-    setSettings(updated);
-    saveStudySettings(updated);
-  }
-  function extendToday() {
-    const updated = {
-      ...settings,
-      extensions: { ...settings.extensions, [selectedDeck]: studyDay(now) },
-    };
-    setSettings(updated);
-    saveStudySettings(updated);
-    if (!activeSession) begin();
+    setLimits(value);
+    saveStudyLimits(value);
   }
   function pause() {
     setContextOpen(false);
@@ -271,20 +216,22 @@ export function DailyReview() {
     if (owner) writeStorage('review:session', null);
   }
   function grade(value: ReviewGrade) {
-    if (!card || !activeSession || !revealed || review.conflict) return;
+    if (!card || !entry || !activeSession || !revealed || review.conflict) return;
     const lock = `${card.entryId}:${card.revision}`;
     if (gradeLock.current === lock) return;
     gradeLock.current = lock;
     try {
       const operationId = crypto.randomUUID();
+      const reviewedAt = new Date(Math.max(Date.now(), Date.parse(card.updatedAt))).toISOString();
       changeReview({
         action: 'grade',
         entryId: card.entryId,
         revision: card.revision,
         grade: value,
-        reviewedAt: new Date(Math.max(clock, Date.parse(card.updatedAt))).toISOString(),
+        reviewedAt,
         operationId,
       });
+      syncStatusAfterGrade(entry, card, scheduleReview(card, value, reviewedAt));
       setSession({
         ...activeSession,
         currentId: null,
@@ -314,7 +261,7 @@ export function DailyReview() {
         operationId: crypto.randomUUID(),
         targetOperationId: previous.operationId,
         previous: previous.previous,
-        undoneAt: new Date(Math.max(clock, Date.parse(current.updatedAt))).toISOString(),
+        undoneAt: new Date(Math.max(Date.now(), Date.parse(current.updatedAt))).toISOString(),
       });
       setSession({
         ...activeSession,
@@ -329,8 +276,9 @@ export function DailyReview() {
       setError((e as Error).message);
     }
   }
+  const keyboard = useRef<(event: KeyboardEvent) => void>(() => {});
   useEffect(() => {
-    function keydown(event: KeyboardEvent) {
+    keyboard.current = (event: KeyboardEvent) => {
       if (
         !activeSession ||
         !entry ||
@@ -349,470 +297,359 @@ export function DailyReview() {
       const index = ['1', '2', '3', '4'].indexOf(event.key);
       if (revealed && index >= 0) {
         event.preventDefault();
-        grade((['again', 'hard', 'good', 'easy'] as const)[index]);
+        grade(GRADES[index]);
       }
-    }
-    window.addEventListener('keydown', keydown);
-    return () => window.removeEventListener('keydown', keydown);
+    };
   });
-  const newCount = dueCards.filter((c) => c.status === 'new').length;
-  const learningCount = dueCards.filter((c) => c.status === 'learning').length;
-  const reviewCount = dueCards.filter((c) => c.status === 'review').length;
+  useEffect(() => {
+    const listener = (event: KeyboardEvent) => keyboard.current(event);
+    window.addEventListener('keydown', listener);
+    return () => window.removeEventListener('keydown', listener);
+  }, []);
+  const counts = {
+    new: dueCards.filter((c) => c.status === 'new').length,
+    learning: dueCards.filter((c) => c.status === 'learning').length,
+    review: dueCards.filter((c) => c.status === 'review').length,
+  };
   const skippedCount = dueCards.filter((c) => activeSession?.skipped.includes(c.entryId)).length;
-  const upcoming = cards
-    .filter((c) => c.status === 'learning' && Date.parse(c.dueAt) > clock)
-    .sort((a, b) => a.dueAt.localeCompare(b.dueAt))[0];
+  const upcoming = delayed[0];
   return (
-    <>
-      <StandaloneNavigation vocabularyView="review" />
-      <main className="dictionary-screen review-screen">
-        <h1>Daily Review</h1>
-        <p>Recall Japanese, then replay the context that made it useful.</p>
-        {!account.user ? (
+    <main className="dictionary-screen review-screen">
+      <VocabularyHeader active="review" />
+      {!account.user ? (
+        <section className="dictionary-empty">
+          <h2>Review the words you save.</h2>
+          <p>Sign in, then add words to review while you practise.</p>
           <Link className="button primary" href="/sign-in?returnTo=%2Freview">
             Sign in to review
           </Link>
-        ) : !account.user.emailVerified ? (
-          <p>Verify your email before reviewing.</p>
-        ) : (
-          <>
-            {!activeSession ? (
-              <section className="dictionary-empty">
-                <label>
-                  Review deck{' '}
-                  <select value={deck} onChange={(e) => setDeck(e.target.value)}>
-                    <option value="all">All decks</option>
-                    {review.data.decks.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                {review.loading && !review.data.cards.length ? (
-                  <p role="status">Opening your review schedule…</p>
-                ) : (
-                  <>
-                    <h2>{dueCards.length} due now</h2>
-                    <p className="review-counts">
-                      {newCount} new · {learningCount} learning · {reviewCount} review
-                    </p>
-                    <p>
-                      Study the full due queue. Learning cards return when ready; there is no
-                      20-word cutoff.
-                    </p>
-                    {delayed.length ? (
-                      <p>
-                        {delayed.length} learning {delayed.length === 1 ? 'card is' : 'cards are'}{' '}
-                        due later today.
-                      </p>
-                    ) : null}
-                    {!cards.length ? (
-                      <p>Save a word with “Save and study”, or add saved words to review.</p>
-                    ) : !dueCards.length && !delayed.length && !limitedCount ? (
-                      <p>
-                        Nothing else is due today. Keep practising; your next scheduled cards stay
-                        saved.
-                      </p>
-                    ) : null}
-                    {limitedCount ? (
-                      <p>
-                        {limitedCount} more {limitedCount === 1 ? 'card is' : 'cards are'} due
-                        beyond your daily limits.{' '}
-                        <button className="text-button" onClick={extendToday}>
-                          Study all due today
-                        </button>
-                      </p>
-                    ) : null}
-                    <div className="review-actions">
-                      <button
-                        className="button primary"
-                        disabled={!dueCards.length || !!review.conflict}
-                        onClick={() => begin()}
-                      >
-                        Start review
-                      </button>
-                      {delayed.length ? (
-                        <button
-                          className="button"
-                          disabled={!!review.conflict}
-                          onClick={() => begin(true)}
-                        >
-                          Study remaining today now
-                        </button>
-                      ) : null}
-                      <Link className="text-button" href="/dictionary?view=decks">
-                        Browse decks
-                      </Link>
-                    </div>
-                    <label className="review-reading-default">
-                      <input
-                        type="checkbox"
-                        checked={readingsDefault}
-                        onChange={(e) => {
-                          setReadingsDefault(e.target.checked);
-                          writeStorage('review:readings-default', e.target.checked);
-                        }}
-                      />
-                      Show term readings by default on this device
-                    </label>
-                    <details className="review-settings">
-                      <summary>Daily limits</summary>
-                      <p>
-                        {selectedDeck === 'all'
-                          ? 'Shared defaults for your decks.'
-                          : 'Overrides for this deck.'}{' '}
-                        Learning retries are always available. Limits and accepted ratings sync with
-                        your account; offline ratings here count immediately. Today-only extensions
-                        stay on this device.
-                      </p>
-                      <p>
-                        Today: {limited.reviewed.new} new · {limited.reviewed.review} review cards.
-                      </p>
-                      <p className="small muted">
-                        Leave a field empty for no limit. Set it to 0 to pause that card type.
-                      </p>
-                      {(['new', 'review'] as const).map((kind) => (
-                        <div className="review-limit-control" key={kind}>
-                          <label>
-                            Daily {kind} card limit
-                            <input
-                              type="number"
-                              min={0}
-                              max={10000}
-                              step={1}
-                              placeholder="No limit"
-                              value={configuredLimits[kind] ?? ''}
-                              onChange={(e) => {
-                                if (e.target.value !== '' && !e.target.validity.valid) return;
-                                updateLimits({
-                                  ...configuredLimits,
-                                  [kind]: e.target.value === '' ? null : Number(e.target.value),
-                                });
-                              }}
-                            />
-                          </label>
-                          <button
-                            className="text-button"
-                            aria-label={`No limit for ${kind} cards`}
-                            disabled={configuredLimits[kind] === null}
-                            onClick={() => updateLimits({ ...configuredLimits, [kind]: null })}
-                          >
-                            No limit
-                          </button>
-                        </div>
-                      ))}
-                      {selectedDeck !== 'all' && settings.decks[selectedDeck] ? (
-                        <button
-                          className="text-button"
-                          onClick={() => {
-                            const updated = { ...settings, decks: { ...settings.decks } };
-                            delete updated.decks[selectedDeck];
-                            setSettings(updated);
-                            saveStudySettings(updated);
-                          }}
-                        >
-                          Use shared defaults
-                        </button>
-                      ) : null}
-                    </details>
-                    <p className="small muted">
-                      Today follows {studyTimeZone()}. “Study remaining today now” brings forward
-                      learning steps only.
-                    </p>
-                  </>
-                )}
-              </section>
-            ) : id && entry && card ? (
-              <article className="dictionary-entry review-card">
-                <div className="review-session-toolbar">
-                  <p role="status">
-                    {activeSession.answered} ratings · {dueCards.length} due now · {delayed.length}{' '}
-                    learning later today
-                  </p>
-                  {revealed ? (
-                    <button className="text-button" onClick={pause}>
-                      Pause study
-                    </button>
-                  ) : null}
-                </div>
-                <h2 lang="ja" tabIndex={-1} ref={heading}>
-                  {entry.term}
-                </h2>
-                {entry.reading ? (
-                  <>
-                    <button
-                      className="text-button"
-                      aria-expanded={reading}
-                      onClick={() => setReading(!reading)}
-                    >
-                      {reading ? 'Hide furigana' : 'Show furigana'}
-                    </button>
-                    {reading ? (
-                      <p lang="ja" className="review-reading">
-                        {entry.reading}
-                      </p>
-                    ) : null}
-                  </>
-                ) : null}
-                {!revealed ? (
-                  <>
-                    <p>Recall the meaning before revealing.</p>
-                    <button className="button primary" onClick={() => setRevealed(true)}>
-                      Show answer <kbd>Space</kbd>
-                    </button>
-                  </>
-                ) : (
-                  <div className="review-answer">
-                    <div className="review-actions">
-                      <button
-                        className="button"
-                        aria-expanded={contextOpen}
-                        onClick={() => setContextOpen(!contextOpen)}
-                      >
-                        {contextOpen ? 'Hide context player' : 'Play this section'}
-                      </button>
-                      <Link
-                        className="text-button"
-                        href={reviewContextHref(entry)}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        Open full lesson ↗
-                      </Link>
-                      {externalReplay(entry) ? (
-                        <a
-                          className="text-button"
-                          href={externalReplay(entry)!}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          Open{' '}
-                          {entry.source.mediaType === 'youtube'
-                            ? 'on YouTube'
-                            : entry.source.mediaType === 'vimeo'
-                              ? 'on Vimeo'
-                              : 'source website'}{' '}
-                          ↗
-                        </a>
-                      ) : null}
-                    </div>
-                    {contextOpen ? (
-                      <ContextPlayer
-                        key={entry.id}
-                        entry={entry}
-                        onClose={() => setContextOpen(false)}
-                      />
-                    ) : null}
-                    <strong>{entry.translation}</strong>
-                    <p lang="ja">
-                      <JapaneseText text={entry.sourceSentence} furigana={sentenceReading} />
-                    </p>
-                    <button
-                      className="text-button"
-                      aria-pressed={sentenceReading}
-                      onClick={() => setSentenceReading(!sentenceReading)}
-                    >
-                      {sentenceReading ? 'Hide sentence readings' : 'Show sentence readings'}
-                    </button>
-                    {entry.sourceSentenceTranslation ? (
-                      <p>{entry.sourceSentenceTranslation}</p>
-                    ) : (
-                      <p className="small muted">Sentence translation has not been saved.</p>
-                    )}
-                    <p className="small muted">
-                      {entry.source.lessonTitle} · {timestamp(entry.source.start)}–
-                      {timestamp(entry.source.end)}
-                    </p>
-                    <div className="review-grades">
-                      {(['again', 'hard', 'good', 'easy'] as const).map((g, i) => {
-                        const preview = previewReview(
-                          card,
-                          g,
-                          new Date(Math.max(clock, Date.parse(card.updatedAt))).toISOString(),
-                        );
-                        return (
-                          <button
-                            className="button"
-                            key={g}
-                            disabled={!!review.conflict}
-                            onClick={() => grade(g)}
-                          >
-                            <span>
-                              {g[0].toUpperCase() + g.slice(1)} · {preview.intervalLabel}
-                            </span>
-                            <kbd>{i + 1}</kbd>
-                          </button>
-                        );
-                      })}
-                    </div>
-                    <p className="small muted">
-                      Again: missed it · Hard: recalled with effort · Good: recalled · Easy:
-                      effortless.
-                    </p>
-                  </div>
-                )}
-              </article>
-            ) : id ? (
-              <section className="dictionary-empty" role="status">
-                <h2>
-                  {materialLoading || review.loading
-                    ? 'Loading this word…'
-                    : 'This word’s material is unavailable here yet.'}
-                </h2>
+        </section>
+      ) : !account.user.emailVerified ? (
+        <p>Verify your email before reviewing.</p>
+      ) : !activeSession ? (
+        <section className="dictionary-empty">
+          {review.loading && !review.data.cards.length ? (
+            <p role="status">Opening your review…</p>
+          ) : (
+            <>
+              <h2>{dueCards.length} due now</h2>
+              <p className="review-counts">
+                {counts.new} new · {counts.learning} learning · {counts.review} review
+              </p>
+              {!cards.length ? (
+                <p>Add a word to review while you practise, and it will appear here.</p>
+              ) : !dueCards.length && !delayed.length ? (
+                <p>Nothing else is due today.</p>
+              ) : null}
+              {delayed.length ? (
                 <p>
-                  Cached words work offline. Your scheduled cards remain saved while material is
-                  loading or unavailable.
+                  {delayed.length} learning {delayed.length === 1 ? 'card is' : 'cards are'} due
+                  later today.
                 </p>
-                {!materialLoading ? (
-                  <div className="review-actions">
-                    <button
-                      className="button"
-                      onClick={() => {
-                        setError('');
-                        setRetry((n) => n + 1);
-                      }}
-                    >
-                      Retry material
-                    </button>
-                    <button
-                      className="text-button"
-                      onClick={() =>
-                        setSession({
-                          ...activeSession,
-                          currentId: null,
-                          skipped: [...activeSession.skipped, id],
-                        })
-                      }
-                    >
-                      Skip for this session
-                    </button>
-                  </div>
-                ) : null}
-                <button className="text-button" onClick={pause}>
-                  Pause study
+              ) : null}
+              {limitedCount ? (
+                <p>
+                  {limitedCount} more {limitedCount === 1 ? 'card is' : 'cards are'} due beyond your
+                  daily limit.
+                </p>
+              ) : null}
+              <div className="review-actions">
+                <button
+                  className="button primary"
+                  disabled={!dueCards.length || !!review.conflict}
+                  onClick={() => begin()}
+                >
+                  Start review
                 </button>
-              </section>
-            ) : (
-              <section className="dictionary-empty" role="status">
-                <h2>
-                  {review.loading
-                    ? 'Opening your schedule…'
-                    : delayed.length || skippedCount || limitedCount
-                      ? 'Caught up for now'
-                      : 'Today’s due queue is complete'}
-                </h2>
-                <p>
-                  {activeSession.answered} ratings saved
-                  {review.pending ? ' on this device, waiting to sync' : ''}.
-                </p>
                 {delayed.length ? (
-                  <p>
-                    {delayed.length} learning{' '}
-                    {delayed.length === 1 ? 'card remains' : 'cards remain'} later today.
-                    {upcoming
-                      ? ` Next in ${reviewIntervalLabel(Math.max(0, Date.parse(upcoming.dueAt) - clock))}.`
-                      : ''}
-                  </p>
-                ) : null}
-                {skippedCount ? (
-                  <p>
-                    {skippedCount} unavailable {skippedCount === 1 ? 'card is' : 'cards are'} still
-                    due. Retry when material is available.
-                  </p>
-                ) : null}
-                {limitedCount ? (
-                  <p>
-                    {limitedCount} cards remain due beyond your daily limits. Today’s backlog is
-                    still saved.
-                  </p>
-                ) : null}
-                <div className="review-actions">
-                  {limitedCount ? (
-                    <button className="button primary" onClick={extendToday}>
-                      Study all due today
-                    </button>
-                  ) : null}
-                  {delayed.length ? (
-                    <button
-                      className="button primary"
-                      disabled={!!review.conflict}
-                      onClick={() => setSession({ ...activeSession, ahead: true, currentId: null })}
-                    >
-                      Study remaining today now
-                    </button>
-                  ) : null}
-                  {skippedCount ? (
-                    <button
-                      className="button"
-                      onClick={() => {
-                        setSession({ ...activeSession, skipped: [], currentId: null });
-                        setRetry((n) => n + 1);
-                      }}
-                    >
-                      Retry skipped words
-                    </button>
-                  ) : null}
-                  <button className="button" onClick={pause}>
-                    Pause study
+                  <button
+                    className="button"
+                    disabled={!!review.conflict}
+                    onClick={() => begin(true)}
+                  >
+                    Study remaining today now
                   </button>
-                  <Link className="text-button" href="/">
-                    Back to practice
-                  </Link>
-                </div>
+                ) : null}
+              </div>
+              <details className="review-settings">
+                <summary>Review settings</summary>
+                {(['new', 'review'] as const).map((kind) => (
+                  <label className="review-limit-control" key={kind}>
+                    {kind === 'new' ? 'New words per day' : 'Reviews per day'}
+                    <input
+                      type="number"
+                      min={0}
+                      max={10000}
+                      step={1}
+                      placeholder="No limit"
+                      value={limits[kind] ?? ''}
+                      onChange={(e) => {
+                        if (e.target.value !== '' && !e.target.validity.valid) return;
+                        updateLimits({
+                          ...limits,
+                          [kind]: e.target.value === '' ? null : Number(e.target.value),
+                        });
+                      }}
+                    />
+                  </label>
+                ))}
                 <p className="small muted">
-                  This screen updates automatically as learning cards become due.
+                  Leave empty for no limit. Today: {limited.reviewed.new} new ·{' '}
+                  {limited.reviewed.review} reviews.
                 </p>
-              </section>
-            )}
-            {activeSession?.lastRating && (!entry || !card || revealed) ? (
-              <button className="button review-undo" disabled={!!review.conflict} onClick={undo}>
-                Undo last rating
+                <label className="review-reading-default">
+                  <input
+                    type="checkbox"
+                    checked={readingsDefault}
+                    onChange={(e) => {
+                      setReadingsDefault(e.target.checked);
+                      writeStorage('review:readings-default', e.target.checked);
+                    }}
+                  />
+                  Show readings by default
+                </label>
+              </details>
+            </>
+          )}
+        </section>
+      ) : id && entry && card ? (
+        <article className="dictionary-entry review-card">
+          <div className="review-session-toolbar">
+            <p role="status">
+              {activeSession.answered} reviewed · {remaining.length} left
+            </p>
+            <button className="text-button" onClick={pause}>
+              Pause
+            </button>
+          </div>
+          <h2 lang="ja" tabIndex={-1} ref={heading}>
+            {entry.term}
+          </h2>
+          {entry.reading ? (
+            <>
+              <button
+                className="text-button"
+                aria-expanded={reading}
+                onClick={() => setReading(!reading)}
+              >
+                {reading ? 'Hide reading' : 'Show reading'}
               </button>
-            ) : null}
-            {review.pending ? (
-              <p role="status">{review.pending} changes saved on this device · waiting to sync</p>
-            ) : null}
-            {review.conflict ? (
-              <section className="review-notice" role="alert">
-                <p>{review.conflict}</p>
-                <p>
-                  Check the restored schedule before continuing. Ratings on the changed card were
-                  not accepted.
+              {reading ? (
+                <p lang="ja" className="review-reading">
+                  {entry.reading}
                 </p>
+              ) : null}
+            </>
+          ) : null}
+          {!revealed ? (
+            <button className="button primary" onClick={() => setRevealed(true)}>
+              Show answer <kbd>Space</kbd>
+            </button>
+          ) : (
+            <div className="review-answer">
+              <strong>{entry.translation}</strong>
+              <p lang="ja">
+                <JapaneseText text={entry.sourceSentence} furigana={sentenceReading} />
+              </p>
+              {entry.sourceSentenceTranslation ? <p>{entry.sourceSentenceTranslation}</p> : null}
+              <div className="review-actions">
                 <button
                   className="button"
-                  onClick={() => {
-                    acknowledgeReviewConflict();
-                    pause();
-                  }}
+                  aria-expanded={contextOpen}
+                  onClick={() => setContextOpen(!contextOpen)}
                 >
-                  Use latest schedule
+                  {contextOpen ? 'Hide context player' : 'Play this section'}
                 </button>
-              </section>
-            ) : null}
-            {error || review.error ? (
-              <div className="review-notice" role="alert">
-                <p>{error || review.error}</p>
                 <button
                   className="text-button"
-                  onClick={() =>
-                    void review
-                      .refresh()
-                      .then(() => {
-                        setError('');
-                        setRetry((n) => n + 1);
-                      })
-                      .catch((e) => setError((e as Error).message))
-                  }
+                  aria-pressed={sentenceReading}
+                  onClick={() => setSentenceReading(!sentenceReading)}
                 >
-                  Retry sync and material
+                  {sentenceReading ? 'Hide sentence readings' : 'Show sentence readings'}
                 </button>
+                <Link
+                  className="text-button"
+                  href={reviewContextHref(entry)}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Open full lesson ↗
+                </Link>
+                {externalReplay(entry) ? (
+                  <a
+                    className="text-button"
+                    href={externalReplay(entry)!}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Open{' '}
+                    {entry.source.mediaType === 'youtube'
+                      ? 'on YouTube'
+                      : entry.source.mediaType === 'vimeo'
+                        ? 'on Vimeo'
+                        : 'source website'}{' '}
+                    ↗
+                  </a>
+                ) : null}
               </div>
+              {contextOpen ? (
+                <ContextPlayer key={entry.id} entry={entry} onClose={() => setContextOpen(false)} />
+              ) : null}
+              <p className="small muted">
+                {entry.source.lessonTitle} · {timestamp(entry.source.start)}–
+                {timestamp(entry.source.end)}
+              </p>
+              <div className="review-grades">
+                {GRADES.map((g, i) => {
+                  const preview = previewReview(
+                    card,
+                    g,
+                    new Date(Math.max(clock, Date.parse(card.updatedAt))).toISOString(),
+                  );
+                  return (
+                    <button
+                      className="button"
+                      key={g}
+                      disabled={!!review.conflict}
+                      onClick={() => grade(g)}
+                    >
+                      <span>
+                        {g[0].toUpperCase() + g.slice(1)} · {preview.intervalLabel}
+                      </span>
+                      <kbd>{i + 1}</kbd>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </article>
+      ) : id ? (
+        <section className="dictionary-empty" role="status">
+          <h2>
+            {materialLoading || review.loading
+              ? 'Loading this word…'
+              : 'This word isn’t available offline yet.'}
+          </h2>
+          {!materialLoading ? (
+            <div className="review-actions">
+              <button
+                className="button"
+                onClick={() => {
+                  setError('');
+                  setRetry((n) => n + 1);
+                }}
+              >
+                Try again
+              </button>
+              <button
+                className="text-button"
+                onClick={() =>
+                  setSession({
+                    ...activeSession,
+                    currentId: null,
+                    skipped: [...activeSession.skipped, id],
+                  })
+                }
+              >
+                Skip for now
+              </button>
+            </div>
+          ) : null}
+          <button className="text-button" onClick={pause}>
+            Pause
+          </button>
+        </section>
+      ) : (
+        <section className="dictionary-empty" role="status">
+          <h2>
+            {review.loading
+              ? 'Opening your review…'
+              : delayed.length || skippedCount || limitedCount
+                ? 'Caught up for now'
+                : 'Today’s review is complete'}
+          </h2>
+          <p>
+            {activeSession.answered} {activeSession.answered === 1 ? 'word' : 'words'} reviewed.
+          </p>
+          {delayed.length ? (
+            <p>
+              {delayed.length} learning {delayed.length === 1 ? 'card returns' : 'cards return'}{' '}
+              later today
+              {upcoming
+                ? ` · next in ${reviewIntervalLabel(Math.max(0, Date.parse(upcoming.dueAt) - clock))}`
+                : ''}
+              .
+            </p>
+          ) : null}
+          <div className="review-actions">
+            {delayed.length ? (
+              <button
+                className="button primary"
+                disabled={!!review.conflict}
+                onClick={() => setSession({ ...activeSession, ahead: true, currentId: null })}
+              >
+                Study remaining today now
+              </button>
             ) : null}
-          </>
-        )}
-      </main>
-    </>
+            {skippedCount ? (
+              <button
+                className="button"
+                onClick={() => {
+                  setSession({ ...activeSession, skipped: [], currentId: null });
+                  setRetry((n) => n + 1);
+                }}
+              >
+                Retry skipped words
+              </button>
+            ) : null}
+            <button className="button" onClick={pause}>
+              Done
+            </button>
+            <Link className="text-button" href="/">
+              Back to practice
+            </Link>
+          </div>
+        </section>
+      )}
+      {activeSession?.lastRating && (!entry || !card || revealed) ? (
+        <button className="button review-undo" disabled={!!review.conflict} onClick={undo}>
+          Undo last rating
+        </button>
+      ) : null}
+      {review.conflict ? (
+        <section className="review-notice" role="alert">
+          <p>{review.conflict}</p>
+          <button
+            className="button"
+            onClick={() => {
+              acknowledgeReviewConflict();
+              pause();
+            }}
+          >
+            Use latest schedule
+          </button>
+        </section>
+      ) : null}
+      {error || review.error ? (
+        <div className="review-notice" role="alert">
+          <p>{error || review.error}</p>
+          <button
+            className="text-button"
+            onClick={() =>
+              void review
+                .refresh()
+                .then(() => {
+                  setError('');
+                  setRetry((n) => n + 1);
+                })
+                .catch((e) => setError((e as Error).message))
+            }
+          >
+            Try again
+          </button>
+        </div>
+      ) : null}
+    </main>
   );
 }

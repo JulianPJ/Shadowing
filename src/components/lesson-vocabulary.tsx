@@ -31,19 +31,16 @@ export function LessonVocabulary({
   return (
     <section className="lesson-vocabulary" aria-label="Personal vocabulary coverage">
       <div className="vocabulary-heading">
-        <div>
-          <span className="eyebrow">ADAPTIVE IMMERSION</span>
-          <h2>Your vocabulary in this lesson</h2>
-        </div>
+        <h2>Your vocabulary in this lesson</h2>
         <Link className="text-button" href="/words">
-          Word knowledge
+          Your words
         </Link>
       </div>
       {!enabled ? (
         <div>
           <p className="small muted">
-            See vocabulary coverage and find short lines with one word to learn. Japanese analysis
-            uses an optional 18 MB local dictionary download once per browser cache.
+            See how much of this lesson you know and find short lines with one new word. The first
+            check downloads an 18 MB dictionary to this browser.
           </p>
           <button className="button small-button" onClick={() => setRequested(true)}>
             Analyse my vocabulary
@@ -69,16 +66,9 @@ export function LessonVocabulary({
           </p>
           {!analysis.complete ? (
             <p className="small muted">
-              {analysis.analyzedSegments} of {analysis.segmentCount} sections analysed. A
-              whole-lesson percentage is withheld when Japanese token boundaries are incomplete.
+              {analysis.analyzedSegments} of {analysis.segmentCount} sections analysed.
             </p>
           ) : null}
-          <p className="small muted">
-            Vocabulary coverage uses your explicit word states. Unmarked words count as Unknown;
-            particles and auxiliary words are excluded, and Ignored words leave the denominator.
-            Repeated words count each time they appear. This is vocabulary coverage based on your
-            marks, rather than a measure of comprehension.
-          </p>
           <div className="vocabulary-counts">
             <span>{analysis.learningTokens} Learning</span>
             <span>{analysis.unknownTokens} Unknown / unmarked</span>
@@ -111,10 +101,6 @@ export function LessonVocabulary({
           ) : null}
           {lines.length ? (
             <>
-              <p className="small muted">
-                Choose a line to replay it in the player, then look up its unfamiliar word.
-                High-value lines practise unfamiliar words that recur in this lesson.
-              </p>
               <ul className="good-lines">
                 {lines.slice(0, 12).map((line) => {
                   const segment = lesson.segments.find((value) => value.id === line.segmentId)!;

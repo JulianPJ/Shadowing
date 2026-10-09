@@ -7,40 +7,32 @@ import difficultyData from '../src/data/demo-difficulty.json';
 import type { Lesson } from '../src/lib/types';
 import { PlaybackActivity, PracticeClock } from '../src/lib/practice-clock';
 import { PracticeCheckpoint } from '../src/lib/practice-checkpoint';
+import { aggregateProfile, contentSummary } from '../src/lib/learner/profile';
+import { compactHistory } from '../src/lib/learner/retention';
 import {
-  aggregateProfile,
-  compactHistory,
-  contentSummary,
   createSession,
+  recordSignal,
+  resumableSession,
+  upsertSession,
+} from '../src/lib/learner/sessions';
+import {
   DETAIL_SESSION_LIMIT,
   emptyHistory,
   lessonIdentity,
-  recordSignal,
   RESUME_WINDOW_MS,
-  resumableSession,
-  upsertSession,
-  validateHistory,
-  validateSession,
-} from '../src/lib/learner-progress';
-import {
-  availableLesson,
-  currentBookmarks,
-  loadLearnerHistory,
-  loadQuizHistory,
-  migrateLearnerHistory,
-  savePracticeSession,
-} from '../src/lib/learner-storage';
-import {
-  completeLesson,
-  loadFavorites,
-  loadTranslationCache,
-  readStorage,
-  saveDifficulty,
-  saveLesson,
-  saveQuizAttempt,
-  writeStorage,
-} from '../src/lib/storage';
-import { createQuiz, newAttempt, transcriptKey, updateAttempt } from '../src/lib/quiz';
+} from '../src/lib/learner/constants';
+import { validateHistory, validateSession } from '../src/lib/learner/validation';
+import { availableLesson, currentBookmarks } from '../src/lib/learner/bookmarks';
+import { loadLearnerHistory, savePracticeSession } from '../src/lib/learner/persistence';
+import { loadQuizHistory } from '../src/lib/learner/quiz-history';
+import { migrateLearnerHistory } from '../src/lib/learner/migration';
+import { completeLesson, saveDifficulty, saveQuizAttempt } from '../src/lib/storage/learning';
+import { loadFavorites, loadTranslationCache } from '../src/lib/storage/preferences';
+import { readStorage, writeStorage } from '../src/lib/storage/browser';
+import { saveLesson } from '../src/lib/storage/lessons';
+import { createQuiz } from '../src/lib/quiz/document';
+import { newAttempt, updateAttempt } from '../src/lib/quiz/attempts';
+import { transcriptKey } from '../src/lib/transcript';
 import { createDifficultyAnalysis } from '../src/lib/difficulty';
 import type { LearnerProfile, PracticeSession } from '../src/lib/learner-types';
 import { setStorageAccount } from '../src/lib/storage/browser';
@@ -227,7 +219,7 @@ test('incremental checkpoint samples every second but writes at 15s boundaries, 
 });
 test('legacy completion without a timestamp preserves completion but invents no date or elapsed time', async () => {
   saveLesson(lesson, 0);
-  const { transcriptRevision } = await import('../src/lib/quiz');
+  const { transcriptRevision } = await import('../src/lib/transcript');
   writeStorage('completion:demo', { transcript: transcriptRevision(lesson) });
   const h = await migrateLearnerHistory();
   assert.equal(h.sessions[0].completed, true);

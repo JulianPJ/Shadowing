@@ -4,6 +4,7 @@
 }
 .practice-view-controls {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-left: auto;
 }
@@ -17,10 +18,6 @@
   background: var(--green-pale);
   border-color: #a9b99e;
   color: var(--green);
-}
-.player-settings {
-  flex-wrap: wrap;
-  gap: 8px;
 }
 .japanese-text {
   overflow-wrap: anywhere;
@@ -86,31 +83,6 @@
   padding: 10px 0;
   font-size: 13px;
   color: var(--ink);
-}
-.drill-advanced-fields {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: end;
-  gap: 12px;
-  padding: 6px 0 12px;
-}
-.drill-advanced-fields label {
-  flex: 1 1 140px;
-}
-.drill-settings label,
-.drill-settings select,
-.drill-settings input {
-  font-size: 13px;
-}
-.drill-settings select,
-.drill-settings input {
-  min-height: 44px;
-}
-.drill-settings > label:first-child {
-  flex: 1 1 230px;
-}
-.drill-settings > label:first-child select {
-  width: 100%;
 }
 .completion-details {
   margin-top: 16px;
@@ -263,19 +235,6 @@ body.studio-active .site-footer {
   color: var(--ink);
   overflow-wrap: anywhere;
 }
-.studio-navigation {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 14px;
-}
-.studio-navigation a {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-  text-decoration: underline;
-  text-underline-offset: 4px;
-}
 .studio-mode .practice-view-controls {
   margin-left: auto;
 }
@@ -304,6 +263,28 @@ body.studio-active .site-footer {
   max-height: calc(100vh - 150px);
   background: #000;
   border-color: var(--line);
+}
+/* Studio subtitles sit above the player's own control bar and never take pointer input. */
+.subtitle-overlay {
+  position: absolute;
+  left: 50%;
+  bottom: max(52px, 9%);
+  z-index: 2;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 90%;
+  padding: 6px 16px;
+  border-radius: 6px;
+  background: rgb(0 0 0 / 0.72);
+  color: #fff;
+  font-size: clamp(18px, 2.3vw, 34px);
+  line-height: 1.55;
+  text-align: center;
+  text-wrap: balance;
+  pointer-events: none;
+}
+.subtitle-overlay rt {
+  color: #e6e6e6;
 }
 .studio-mode .practice-current-stack {
   grid-column: 2;
@@ -349,16 +330,6 @@ body.studio-active .site-footer {
   grid-column: 1 / -1;
   grid-row: 2;
 }
-.studio-mode .player-settings {
-  padding: 0;
-  justify-content: flex-start;
-}
-.studio-mode .playback-adjustments {
-  margin-left: 0;
-}
-.studio-mode .drill-settings {
-  margin-bottom: 0;
-}
 .studio-mode .practice-tool-navigation {
   grid-column: 1 / -1;
   margin: 8px 0 0;
@@ -370,7 +341,6 @@ body.studio-active .site-footer {
 .studio-mode .evidence-banner,
 .studio-mode .reattach,
 .studio-mode .player-footnote,
-.studio-mode .translation-privacy,
 .studio-mode .error-message {
   grid-column: 1 / -1;
 }
@@ -474,13 +444,10 @@ main.practice-main.studio-mode textarea::placeholder {
   border-color: var(--line);
 }
 .studio-mode .dictionary-fields label,
-.studio-mode .dictionary-privacy,
 .studio-mode .dictionary-loading,
-.studio-mode .dictionary-reading,
 .studio-mode .dictionary-context > span,
 .studio-mode .dictionary-signin p,
 .studio-mode .dictionary-lookup-hint,
-.studio-mode .dictionary-lookup-note,
 .studio-mode .section-time,
 .studio-mode .turn-instruction,
 .studio-mode .translation-source,
@@ -499,8 +466,7 @@ main.practice-main.studio-mode textarea::placeholder {
 .studio-mode .transcript-count,
 .studio-mode .speed-control,
 .studio-mode .offset-control,
-.studio-mode .player-footnote,
-.studio-mode .translation-privacy {
+.studio-mode .player-footnote {
   color: var(--muted);
 }
 .studio-mode .dictionary-error,
@@ -533,11 +499,6 @@ main.practice-main.studio-mode textarea::placeholder {
 }
 .studio-mode .section-track {
   background: var(--line);
-}
-.studio-mode .practice-signoff {
-  max-width: 1600px;
-  margin: auto;
-  color: var(--muted);
 }
 
 @media (max-width: 1000px) {
@@ -579,7 +540,6 @@ main.practice-main.studio-mode textarea::placeholder {
     order: 5;
   }
   .studio-mode .player-footnote,
-  .studio-mode .translation-privacy,
   .studio-mode .error-message {
     order: 6;
   }
@@ -601,20 +561,13 @@ main.practice-main.studio-mode textarea::placeholder {
     width: 100%;
   }
   .practice-view-controls .button {
-    flex: 1;
+    flex: 1 1 auto;
   }
   .studio-mode .practice-breadcrumb {
     gap: 8px;
   }
   .studio-mode .studio-lesson-identity {
     flex-basis: 100%;
-  }
-  .studio-navigation {
-    width: 100%;
-    gap: 6px 12px;
-  }
-  .studio-navigation .button {
-    margin-left: auto;
   }
   .practice-tool-navigation .button {
     flex: 1;

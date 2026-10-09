@@ -46,8 +46,8 @@ Typical deployment commands:
 ```sh
 npm run build:caption-relay
 npm run deploy:caption-relay
-npm run build:vinext
-npx @vinext/cloudflare deploy --skip-build
+npm run build
+npm run deploy
 ```
 
 For initial secret installation or token rotation, use the repository's ignored secret-file workflow rather than committing credentials.

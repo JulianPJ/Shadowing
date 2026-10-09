@@ -81,9 +81,6 @@
     gap: 10px;
     padding: 13px 10px;
   }
-  .rhythm-grid > div {
-    padding: 0 27px;
-  }
 }
 @media (max-width: 900px) {
   .hero h1 {
@@ -107,9 +104,6 @@
   }
   .demo-copy p {
     font-size: 11px;
-  }
-  .demo-note {
-    font-size: 8px;
   }
   .lesson-tags {
     gap: 9px;
@@ -204,15 +198,6 @@
   .recent-grid .recent-card:last-child:nth-child(3) {
     display: none;
   }
-  .rhythm-grid > div {
-    padding: 0 20px;
-  }
-  .rhythm-grid p {
-    font-size: 10px;
-  }
-  .rhythm-grid h3 {
-    font-size: 13px;
-  }
   .practice-title h1 {
     font-size: 30px;
   }
@@ -250,9 +235,6 @@
   .nav-link {
     font-size: 10px;
   }
-  .nav-demo {
-    gap: 5px;
-  }
   .home-main,
   .practice-main {
     margin: 0 22px;
@@ -271,9 +253,6 @@
   .hero-description {
     font-size: 12px;
     line-height: 1.9;
-  }
-  .desktop-break {
-    display: none;
   }
   .start-card {
     margin-top: 25px;
@@ -349,63 +328,13 @@
   .lesson-tags span + span {
     padding-left: 12px;
   }
-  .demo-note {
-    font-size: 9px;
-  }
   .demo-button {
     font-size: 12px;
     min-height: 41px;
     margin-top: 20px;
   }
-  .rhythm-section {
-    padding: 35px 0 29px;
-  }
   .section-heading > .small {
     display: none;
-  }
-  .rhythm-grid {
-    grid-template-columns: 1fr;
-    gap: 24px;
-    margin-top: 23px;
-  }
-  .rhythm-grid > div,
-  .rhythm-grid > div:first-child,
-  .rhythm-grid > div:last-child {
-    padding: 0 0 22px 63px;
-    min-height: 66px;
-    border: 0;
-    border-bottom: 1px solid var(--line);
-  }
-  .rhythm-grid > div:last-child {
-    border: 0;
-    padding-bottom: 0;
-  }
-  .rhythm-grid .step-icon {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 43px;
-    height: 43px;
-  }
-  .rhythm-grid .step-number {
-    font-size: 16px;
-    margin-top: -4px;
-  }
-  .rhythm-grid h3 {
-    font-size: 14px;
-    margin: 0 0 5px;
-  }
-  .rhythm-grid p {
-    font-size: 11px;
-    max-width: 95%;
-    line-height: 1.8;
-  }
-  .home-signoff {
-    padding: 28px 0 38px;
-  }
-  .home-signoff span {
-    font-size: 14px;
-    letter-spacing: 2.5px;
   }
   .site-footer {
     font-size: 9px;
@@ -460,9 +389,6 @@
     font-size: 9px;
     gap: 8px;
   }
-  .private-label {
-    display: none;
-  }
   .practice-title {
     margin: 22px 0 23px;
     gap: 15px;
@@ -509,9 +435,6 @@
     line-height: 1.95;
     margin: 20px 0;
     min-height: 80px;
-  }
-  .player-settings {
-    padding: 14px 0 16px;
   }
   .segmented-control button {
     font-size: 10px;
@@ -641,9 +564,6 @@
     font-size: 9px;
     padding: 17px 20px;
   }
-  .practice-signoff {
-    padding: 27px 0;
-  }
   .help-dialog,
   .import-dialog {
     padding: 27px 23px;
@@ -684,13 +604,6 @@
   .media-error .button {
     font-size: 9px;
     padding: 6px 8px;
-  }
-  .completion-card {
-    flex-wrap: wrap;
-  }
-  .completion-card .text-button {
-    margin-left: 44px;
-    font-size: 10px;
   }
   .empty-screen {
     padding: 65px 22px;

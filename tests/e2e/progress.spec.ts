@@ -2,9 +2,11 @@ import { expect, test, type Page } from '@playwright/test';
 import demo from '../../src/data/demo.json' with { type: 'json' };
 import questions from '../../src/data/demo-quiz.json' with { type: 'json' };
 import authoredDifficulty from '../../src/data/demo-difficulty.json' with { type: 'json' };
-import { createQuiz, transcriptKey } from '../../src/lib/quiz';
+import { createQuiz } from '../../src/lib/quiz/document';
+import { transcriptKey } from '../../src/lib/transcript';
 import { createDifficultyAnalysis } from '../../src/lib/difficulty';
-import { createSession, lessonIdentity } from '../../src/lib/learner-progress';
+import { createSession } from '../../src/lib/learner/sessions';
+import { lessonIdentity } from '../../src/lib/learner/constants';
 import type { Lesson } from '../../src/lib/types';
 import { mockProAccount } from '../helpers/pro-account';
 
@@ -18,10 +20,21 @@ async function history(page: Page) {
   );
 }
 async function progress(page: Page) {
-  if (await page.getByRole('button', { name: 'Open navigation menu' }).isVisible())
-    await page.getByRole('button', { name: 'Open navigation menu' }).click();
-  await page.getByRole('link', { name: 'Progress', exact: true }).click();
+  const menu = page.getByRole('button', { name: 'Open navigation menu' });
+  if (await menu.isVisible()) {
+    await menu.click();
+    await page
+      .getByRole('dialog', { name: 'Navigate Hibiki' })
+      .getByRole('link', { name: 'Profile', exact: true })
+      .click();
+  } else
+    await page
+      .getByRole('navigation', { name: 'Main navigation' })
+      .getByRole('link', { name: 'Profile', exact: true })
+      .click();
   await expect(page.getByRole('heading', { name: 'Your progress', exact: true })).toBeVisible();
+  const details = page.getByText('Practice details', { exact: true });
+  if (await details.count()) await details.click();
 }
 
 test('progress observes the latest bookmark state after a burst of writes in another tab', async ({
@@ -91,7 +104,12 @@ test('practice captures deliberate replay, reveal and bookmark, resumes on reloa
   await expect(page.locator('.progress-habits')).toContainText('Saved sections1');
   await expect(page.locator('.attention-reasons').first()).toContainText('Saved section');
   expect(sessions[0].activeSeconds).toBeGreaterThan(0);
-  await page.locator('.progress-list a').first().click();
+  await page
+    .locator('section')
+    .filter({ has: page.getByRole('heading', { name: 'Recent lessons', exact: true }) })
+    .getByRole('link')
+    .first()
+    .click();
   await expect(page.getByTestId('current-japanese')).toHaveText(demo.segments[1].japanese);
   await page.getByTestId('transcript-0').click();
   await page.getByRole('button', { name: 'Unsave this section' }).click();
@@ -160,7 +178,13 @@ test('completion and quiz retakes feed existing comprehension history; evidence 
   await expect(page.locator('.progress-summary')).toContainText('1 completed');
   await expect(page.locator('.progress-summary')).toContainText('9 / 10 correct');
   await expect(page.locator('.progress-habits')).toContainText('Explicit section replays0');
-  await expect(page.locator('.progress-panel')).toContainText(['Quiz evidence replays: 1.']);
+  await expect(
+    page
+      .locator('.progress-habits')
+      .locator('div')
+      .filter({ hasText: 'Quiz evidence replays' })
+      .locator('dd'),
+  ).toHaveText('1');
   await expect(page.locator('.attention-reasons')).toContainText('1 missed question');
 });
 test('later visits create independent sessions and metadata survives missing lesson content', async ({
@@ -241,9 +265,7 @@ test('five practised unique analyzed lessons produce typical content and later a
     { lessons, sessions, analyses },
   );
   await page.goto('/progress');
-  await expect(page.locator('.progress-main')).toContainText(
-    '4 analyzed, practised lessons so far',
-  );
+  await expect(page.locator('.progress-summary')).not.toContainText('Typical content');
   await page.route('**/api/difficulty', (route) =>
     route.fulfill({ json: { analysis: analyses[4] } }),
   );
@@ -251,8 +273,8 @@ test('five practised unique analyzed lessons produce typical content and later a
   await page.getByText('About this lesson’s difficulty', { exact: true }).click();
   await expect(page.locator('.difficulty-summary')).toBeVisible();
   await progress(page);
-  await expect(page.locator('.content-range')).toHaveText(
-    `Typical content: ${analyses[0].overall.jlptMin}–${analyses[0].overall.jlptMax}`,
+  await expect(page.locator('.progress-summary')).toContainText(
+    `${analyses[0].overall.jlptMin}–${analyses[0].overall.jlptMax}`,
   );
 });
 test('checkpointing is incremental, bounded and excludes a quiz/analysis wait', async ({

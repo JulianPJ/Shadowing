@@ -1,14 +1,10 @@
 import { sha256 } from '../hash';
 import { transcriptKey, transcriptRevision } from '../transcript';
 import { object } from '../transcript-validation';
-import { readStorage, writeLearnerHistory, storageKeys, loadDifficulty } from '../storage';
-import {
-  compactDifficulty,
-  createSession,
-  identityKey,
-  lessonIdentity,
-  sectionActivity,
-} from '../learner-progress';
+import { readStorage, storageKeys } from '../storage/browser';
+import { writeLearnerHistory, loadDifficulty } from '../storage/learning';
+import { compactDifficulty, identityKey, lessonIdentity } from './constants';
+import { createSession, sectionActivity } from './sessions';
 import type { LearnerHistory } from '../learner-types';
 import { loadLearnerHistory, savePracticeSession } from './persistence';
 import { loadQuizHistory } from './quiz-history';

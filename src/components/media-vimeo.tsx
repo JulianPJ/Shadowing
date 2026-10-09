@@ -7,7 +7,7 @@ import { VimeoControls } from '@/lib/vimeo-controls';
 import type { MediaHandle, MediaPlayerProps } from './media-player';
 
 export const VimeoMedia = forwardRef<MediaHandle, MediaPlayerProps>(function VimeoMedia(
-  { lesson, initialTime, speed, onReady, onPlaying, onEnded, onError },
+  { lesson, initialTime, speed, onReady, onPlaying, onEnded, onError, overlay },
   ref,
 ) {
   const iframe = useRef<HTMLIFrameElement>(null);
@@ -170,6 +170,7 @@ export const VimeoMedia = forwardRef<MediaHandle, MediaPlayerProps>(function Vim
           current speed.
         </p>
       ) : null}
+      {overlay}
     </div>
   );
 });

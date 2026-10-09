@@ -1,13 +1,7 @@
-import { localRequirePro } from '@/lib/auth/local-handler';
+import { handleShadowingFeedbackRequest } from '@/lib/shadowing-api';
+import { shadowingRoute } from '@/lib/server/runtime';
 
-export async function POST(request: Request) {
-  const denied = await localRequirePro(request);
-  if (denied) return denied;
-  return Response.json(
-    {
-      error:
-        'Shadowing AI analysis is available in the deployed Hibiki app with its Cloudflare Workers AI binding.',
-    },
-    { status: 503, headers: { 'Cache-Control': 'no-store' } },
-  );
-}
+export const POST = shadowingRoute('shadowing-feedback', handleShadowingFeedbackRequest);
+
+// API responses are per-request and never enter the framework response cache.
+export const dynamic = 'force-dynamic';

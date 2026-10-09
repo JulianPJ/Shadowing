@@ -1,7 +1,7 @@
 'use client';
 import { readStorage, writeStorage, storageAccount } from '../storage/browser';
-import { syncStatus, subscribeSync, accountLessons } from '../sync/client';
-import { reportChannel, syncFailure } from '../sync/channel-status';
+import { syncStatus, accountLessons } from '../sync/client';
+import { createSyncChannel } from '../sync/channel';
 import { loadLibrary, saveLibrary } from '../library/client';
 import { normalizeQueueUrl, type QueueItem } from '../library/model';
 import { parseYouTubeUrl } from '../youtube';
@@ -97,7 +97,9 @@ export function queueEdited(previous: QueueItem[], next: QueueItem[]) {
       });
     }
   if (!updates.length) {
-    if (previous.length !== next.length) void syncDiscover();
+    // A freed place can reveal an account save beyond this device's list, which needs a fresh
+    // pull even when nothing is queued.
+    if (previous.length !== next.length) void discoverSync.sync({ force: true }).catch(() => {});
     return;
   }
   writeStorage('library:watch-records', mergeWatchRecords(records, updates));
@@ -195,52 +197,14 @@ const pendingCount = () =>
   Number(readStorage('discover:preferences-pending', false)) +
   readStorage<Feedback[]>('discover:feedback-outbox', []).length;
 function publish(kind: 'queue' | 'preferences' | 'feedback' | 'sync' = 'queue') {
-  const owner = storageAccount();
-  if (owner) reportChannel(owner, 'discovery', { pending: pendingCount() });
   if (typeof window !== 'undefined')
     window.dispatchEvent(new CustomEvent('hibiki:discover-change', { detail: { kind } }));
 }
-let running = false,
-  rerun = false;
-export async function syncDiscover() {
-  const owner = storageAccount(),
-    user = syncStatus().user;
-  if (!owner || user?.id !== owner) return;
-  if (!user.emailVerified) {
-    reportChannel(owner, 'discovery', {
-      state: 'auth',
-      pending: pendingCount(),
-      message: 'Verify your email to sync Watch Later and Discover.',
-    });
-    return;
-  }
-  if (running) {
-    rerun = true;
-    return;
-  }
-  running = true;
-  const current = () => storageAccount() === owner && syncStatus().user?.id === owner;
-  const request = async (path: string, method = 'GET', body?: unknown) => {
-    const response = await fetch(path, {
-      method,
-      credentials: 'same-origin',
-      cache: 'no-store',
-      headers: {
-        'X-Hibiki-Account': owner,
-        ...(body ? { 'Content-Type': 'application/json' } : {}),
-      },
-      body: body ? JSON.stringify(body) : undefined,
-      signal: AbortSignal.timeout(15000),
-    });
-    if (!current()) throw new Error('Account changed');
-    if (!response.ok)
-      throw Object.assign(new Error('Discover sync unavailable'), { status: response.status });
-    const result = await response.json();
-    if (!current()) throw new Error('Account changed');
-    return result;
-  };
-  reportChannel(owner, 'discovery', { state: 'syncing', pending: pendingCount(), message: '' });
-  try {
+type RemoteFeedback = { video_id: string; action: Feedback['action']; created_at: string };
+export const discoverSync = createSyncChannel({
+  channel: 'discovery',
+  pending: pendingCount,
+  async run({ request }) {
     const previousPreferences = JSON.stringify(discoveryPreferences());
     const previousFeedback = JSON.stringify(discoveryFeedback());
     // Migrate only the current account's local queue, once. Anonymous saves require explicit import.
@@ -248,13 +212,11 @@ export async function syncDiscover() {
       queueEdited([], loadLibrary().queue);
       writeStorage('library:watch-initialised', true);
     }
-    const pending = outbox();
     // Replay deletions first so a full remote queue has room for replacement saves.
-    const ordered = [...pending].sort((a, b) => Number(b.removed) - Number(a.removed));
+    const ordered = [...outbox()].sort((a, b) => Number(b.removed) - Number(a.removed));
     for (let offset = 0; offset < ordered.length; offset += 120) {
       const batch = ordered.slice(offset, offset + 120);
-      await request('/api/watch-later', 'POST', { records: batch });
-      if (!current()) return;
+      await request('/api/watch-later', { body: { records: batch } });
       writeStorage(
         'library:watch-outbox',
         outbox().filter(
@@ -262,10 +224,9 @@ export async function syncDiscover() {
         ),
       );
     }
-    const remote = await request('/api/watch-later');
-    if (!current()) return;
+    const remote = await request<{ records: unknown[] }>('/api/watch-later');
     const merged = mergeWatchRecords(
-      remote.records.map((r: unknown) => validateWatchRecord(r)),
+      remote.records.map((r) => validateWatchRecord(r)),
       outbox(),
     );
     writeStorage('library:watch-records', merged);
@@ -282,20 +243,16 @@ export async function syncDiscover() {
     saveLibrary({ ...library, queue: [...other, ...queueFromRecords(merged)].slice(0, 40) }, false);
     if (readStorage('discover:preferences-pending', false)) {
       const sent = discoveryPreferences();
-      await request('/api/discover/preferences', 'PATCH', sent);
-      if (!current()) return;
+      await request('/api/discover/preferences', { method: 'PATCH', body: sent });
       if (JSON.stringify(sent) === JSON.stringify(discoveryPreferences()))
         writeStorage('discover:preferences-pending', false);
     } else {
-      const data = await request('/api/discover/preferences');
-      if (!current()) return;
+      const data = await request<{ preferences: unknown }>('/api/discover/preferences');
       if (!readStorage('discover:preferences-pending', false))
         writeStorage('discover:preferences', validatePreferences(data.preferences));
     }
-    const feedbackPending = readStorage<Feedback[]>('discover:feedback-outbox', []);
-    for (const entry of feedbackPending) {
-      await request('/api/discover/feedback', 'POST', entry);
-      if (!current()) return;
+    for (const entry of readStorage<Feedback[]>('discover:feedback-outbox', [])) {
+      await request('/api/discover/feedback', { body: entry });
       writeStorage(
         'discover:feedback-outbox',
         readStorage<Feedback[]>('discover:feedback-outbox', []).filter(
@@ -303,17 +260,14 @@ export async function syncDiscover() {
         ),
       );
     }
-    const feedback = await request('/api/discover/feedback');
-    if (!current()) return;
+    const feedback = await request<{ feedback: RemoteFeedback[] }>('/api/discover/feedback');
     const mergedFeedback = new Map<string, Feedback>();
     for (const entry of [
-      ...feedback.feedback.map(
-        (f: { video_id: string; action: Feedback['action']; created_at: string }) => ({
-          videoId: f.video_id,
-          action: f.action,
-          createdAt: f.created_at,
-        }),
-      ),
+      ...feedback.feedback.map((f) => ({
+        videoId: f.video_id,
+        action: f.action,
+        createdAt: f.created_at,
+      })),
       ...discoveryFeedback(),
     ]) {
       const previous = mergedFeedback.get(entry.videoId);
@@ -332,34 +286,12 @@ export async function syncDiscover() {
         ? 'sync'
         : 'queue',
     );
-    reportChannel(owner, 'discovery', {
-      state: pendingCount() ? 'pending' : 'saved',
-      pending: pendingCount(),
-      lastSync: new Date().toISOString(),
-      message: '',
-    });
-  } catch (error) {
-    if (current())
-      reportChannel(owner, 'discovery', { ...syncFailure(error), pending: pendingCount() });
-  } finally {
-    running = false;
-    if (rerun) {
-      rerun = false;
-      void syncDiscover();
-    }
-  }
-}
-export function startDiscoverSync() {
-  let identity = '';
-  const change = () => {
-    const next = `${storageAccount()}:${syncStatus().user?.id}:${syncStatus().user?.emailVerified}`;
-    if (next !== identity) {
-      identity = next;
-      void syncDiscover();
-    }
-  };
-  const refresh = () => void syncDiscover();
-  const unsubscribe = subscribeSync(change);
+  },
+});
+/** Pushes Watch Later, preferences and feedback, then pulls them. Failures stay queued. */
+export const syncDiscover = () => discoverSync.sync().catch(() => {});
+/** Records lesson completions for Discover ranking once learner progress has hydrated. */
+export function startDiscoverEvents() {
   const completions = () => {
     const completed = accountLessons()
       .filter((l) => l.completed)
@@ -370,15 +302,7 @@ export function startDiscoverSync() {
     if (completed.length) void recordDiscoveryEvents(completed);
   };
   window.addEventListener('hibiki:sync-hydrated', completions);
-  for (const event of ['online', 'focus', 'hibiki:account-change'])
-    window.addEventListener(event, refresh);
-  change();
-  return () => {
-    unsubscribe();
-    window.removeEventListener('hibiki:sync-hydrated', completions);
-    for (const event of ['online', 'focus', 'hibiki:account-change'])
-      window.removeEventListener(event, refresh);
-  };
+  return () => window.removeEventListener('hibiki:sync-hydrated', completions);
 }
 export function savedVideo(url: string) {
   return loadLibrary().queue.some((q) => q.url === normalizeQueueUrl(url));

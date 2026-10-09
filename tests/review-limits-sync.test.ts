@@ -5,10 +5,10 @@ import { DatabaseSync } from 'node:sqlite';
 import { installMemoryStorage } from './helpers/memory-storage';
 import { readStorage, setStorageAccount, writeStorage } from '../src/lib/storage/browser';
 import { loadPreferences } from '../src/lib/storage/preferences';
-import { loadStudySettings, saveStudySettings } from '../src/lib/review/study-settings';
+import { loadStudyLimits, saveStudyLimits } from '../src/lib/review/study-settings';
 import { normalizeReviewLimits, validateReviewLimits } from '../src/lib/review/limits';
 import { createD1UserProgressRepository } from '../src/lib/sync/repository';
-import { localProgressDatabase } from '../src/lib/sync/local-database';
+import { localProgressDatabase } from './helpers/sqlite-d1';
 import { deviceSnapshot } from '../src/lib/sync/snapshot';
 import { hydrateSync } from '../src/lib/sync/hydrate';
 import { emptySync } from '../src/lib/sync/types';
@@ -17,6 +17,7 @@ import { mergeSync } from '../src/lib/sync/merge';
 
 const date = '2026-10-07T10:00:00.000Z';
 const limits = { defaults: { new: 20, review: 100 }, decks: { travel: { new: 5, review: 25 } } };
+const single = { defaults: limits.defaults, decks: {} };
 
 test('strict synced review limits reject malformed, oversized and extra-field shapes; local fallback is bounded', () => {
   assert.deepEqual(validateReviewLimits(limits), limits);
@@ -54,19 +55,20 @@ test('legacy study settings remain readable and saving limits enters the existin
   installMemoryStorage();
   setStorageAccount(null);
   writeStorage('review:study-settings', { ...limits, extensions: { all: '2026-10-07' } });
-  assert.deepEqual(loadStudySettings(), { ...limits, extensions: { all: '2026-10-07' } });
+  assert.deepEqual(loadStudyLimits(), limits.defaults);
   assert.equal(loadPreferences().reviewLimits, undefined);
-  saveStudySettings(loadStudySettings());
-  assert.deepEqual(loadPreferences().reviewLimits, limits);
+  saveStudyLimits(loadStudyLimits());
+  // Deck overrides are gone; the envelope keeps its shape for older clients.
+  assert.deepEqual(loadPreferences().reviewLimits, single);
   const before = readStorage('preferences', null);
-  saveStudySettings({ ...loadStudySettings(), extensions: { all: '2026-10-08' } });
+  saveStudyLimits(loadStudyLimits());
   assert.deepEqual(readStorage('preferences', null), before);
   const snapshot = await deviceSnapshot();
-  assert.deepEqual(snapshot.preferences?.reviewLimits, limits);
+  assert.deepEqual(snapshot.preferences?.reviewLimits, single);
   assert.equal('extensions' in snapshot.preferences!.reviewLimits!, false);
 });
 
-test('two device snapshots round-trip through the actual SQL preference repository while today extras and timing stay local', async () => {
+test('two device snapshots round-trip daily limits through the actual SQL preference repository while timing stays local', async () => {
   const db = new DatabaseSync(':memory:');
   const previousWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
   Object.defineProperty(globalThis, 'window', { configurable: true, value: new EventTarget() });
@@ -88,28 +90,30 @@ test('two device snapshots round-trip through the actual SQL preference reposito
       deviceB = new Map<string, string>();
     installMemoryStorage(deviceA);
     setStorageAccount('learner');
-    saveStudySettings({ ...limits, extensions: { all: '2026-10-07' } });
+    saveStudyLimits(limits.defaults);
     writeStorage('sync:preferences-date', date);
     const a = validateSync(await deviceSnapshot());
     await repository.push('learner', a);
     const remote = (await repository.bootstrap('learner')).data;
-    assert.deepEqual(remote.preferences?.reviewLimits, limits);
+    assert.deepEqual(remote.preferences?.reviewLimits, single);
     installMemoryStorage(deviceB);
-    writeStorage('preferences', { ...loadPreferences(), playbackOffsetMs: 250 });
-    writeStorage('review:study-settings', { extensions: { travel: '2026-10-08' } });
+    writeStorage('preferences', {
+      ...loadPreferences(),
+      playbackOffsetMs: 250,
+      subtitleOverlay: true,
+    });
     await hydrateSync(remote);
-    assert.deepEqual(loadStudySettings(), { ...limits, extensions: { travel: '2026-10-08' } });
+    assert.deepEqual(loadStudyLimits(), limits.defaults);
     assert.equal(loadPreferences().playbackOffsetMs, 250);
-    const changed = {
-      defaults: { new: 12, review: 80 },
-      decks: { travel: { new: 3, review: 10 } },
-    };
-    saveStudySettings({ ...changed, extensions: { travel: '2026-10-08' } });
+    assert.equal(loadPreferences().subtitleOverlay, true);
+    assert.equal('subtitleOverlay' in validateSync(await deviceSnapshot()).preferences!, false);
+    const changed = { defaults: { new: 12, review: 80 }, decks: {} };
+    saveStudyLimits(changed.defaults);
     writeStorage('sync:preferences-date', '2026-10-07T10:00:01.000Z');
     await repository.push('learner', validateSync(await deviceSnapshot()));
     installMemoryStorage(deviceA);
     await hydrateSync((await repository.bootstrap('learner')).data);
-    assert.deepEqual(loadStudySettings(), { ...changed, extensions: { all: '2026-10-07' } });
+    assert.deepEqual(loadStudyLimits(), changed.defaults);
     const legacy = {
       ...emptySync(),
       preferences: {

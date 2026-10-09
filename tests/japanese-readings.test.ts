@@ -12,7 +12,8 @@ import {
 } from '../src/lib/japanese-readings';
 import { runJapaneseWorkerRequest } from '../src/lib/japanese-analysis-worker';
 import { JapaneseText } from '../src/components/japanese-text';
-import { createQuiz, transcriptKey, transcriptRevision, validateQuiz } from '../src/lib/quiz';
+import { createQuiz, validateQuiz } from '../src/lib/quiz/document';
+import { transcriptKey, transcriptRevision } from '../src/lib/transcript';
 import { transcriptHash } from '../src/lib/linked-transcripts';
 import type { Lesson } from '../src/lib/types';
 import { japaneseLexicalSpans } from '../src/lib/japanese-lexical-spans';

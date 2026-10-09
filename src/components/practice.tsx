@@ -5,9 +5,11 @@ import { ArrowRight, LoaderCircle } from 'lucide-react';
 import demoData from '@/data/demo.json';
 import type { Lesson } from '@/lib/types';
 import { validateCues } from '@/lib/segmentation';
-import { readStorage, loadPreferences, loadLesson, getLiveMedia } from '@/lib/storage';
+import { readStorage } from '@/lib/storage/browser';
+import { loadPreferences } from '@/lib/storage/preferences';
+import { loadLesson, getLiveMedia } from '@/lib/storage/lessons';
 import { lessonMedia, migrateLesson } from '@/lib/media';
-import { Header, Footer, HelpDialog } from './chrome';
+import { HelpDialog } from './chrome';
 import { StudyPlayer, type Session } from './practice/study-player';
 import { restoreAccountLesson, subscribeSync, syncStatus } from '@/lib/sync/client';
 import { transcriptKey } from '@/lib/transcript';
@@ -99,7 +101,6 @@ export function Practice({
   /* eslint-enable react-hooks/set-state-in-effect */
   return (
     <>
-      <Header player onHelp={() => setHelp(true)} />
       {session ? (
         <StudyPlayer key={session.lesson.id} session={session} onHelp={() => setHelp(true)} />
       ) : (
@@ -132,7 +133,6 @@ export function Practice({
           )}
         </main>
       )}
-      <Footer />
       <HelpDialog player open={help} onClose={() => setHelp(false)} />
     </>
   );

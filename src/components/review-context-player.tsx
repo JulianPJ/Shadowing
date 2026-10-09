@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import demoData from '@/data/demo.json';
-import { loadLesson, getLiveMedia } from '@/lib/storage';
+import { loadLesson, getLiveMedia } from '@/lib/storage/lessons';
 import { lessonMedia, migrateLesson } from '@/lib/media';
 import { transcriptKey } from '@/lib/transcript';
 import { restoreAccountLesson } from '@/lib/sync/client';

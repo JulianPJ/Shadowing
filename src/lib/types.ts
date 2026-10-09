@@ -18,8 +18,19 @@ export type LinkedMediaSource = { schemaVersion: 1; canonicalUrl: string; conten
   | { type: 'vimeo'; provider: 'vimeo'; videoId: string }
   | { type: 'direct'; discoveredFrom?: string }
 );
+/**
+ * A video on another web page, played in its own tab through the Hibiki Bridge extension. It has
+ * no shared content identity: the page may need a login, and its media is not Hibiki's to fetch.
+ */
+export type PageMediaSource = {
+  schemaVersion: 1;
+  type: 'page';
+  canonicalUrl: string;
+  pageKey: string;
+};
 export type MediaSource =
   | LinkedMediaSource
+  | PageMediaSource
   | { schemaVersion: 1; type: 'local'; fileName: string }
   | { schemaVersion: 1; type: 'demo' };
 export type TranscriptSource = {
@@ -42,7 +53,7 @@ export type Lesson = {
   id: string;
   title: string;
   author: string;
-  source: 'demo' | 'youtube' | 'vimeo' | 'direct' | 'upload';
+  source: 'demo' | 'youtube' | 'vimeo' | 'direct' | 'upload' | 'page';
   videoId?: string;
   mediaUrl?: string;
   mediaName?: string;

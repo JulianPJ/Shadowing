@@ -74,26 +74,42 @@ export function readStorage<T>(key: string, fallback: T): T {
   }
 }
 
+/** The stored JSON text for a physical key; a missing value reads as `null`. */
+function storedText(key: string) {
+  if (unsaved.has(key)) return JSON.stringify(unsaved.get(key)) ?? 'null';
+  try {
+    return localStorage.getItem(PREFIX + key) || 'null';
+  } catch {
+    // Some storage implementations can accept writes despite failing reads.
+    return 'null';
+  }
+}
+
 function persistStorage(key: string, value: unknown, onlyIfChanged: boolean) {
   const logicalKey = key;
   key = physicalKey(key);
-  const previous = readStorage(logicalKey, null);
-  const changed = JSON.stringify(previous) !== JSON.stringify(value);
+  // Serialize once and compare text; large transcripts and caches are written frequently.
+  const previousText = storedText(key);
+  const serialized = JSON.stringify(value) ?? 'null';
+  const changed = previousText !== serialized;
   const notify = () => {
-    if (changed && typeof window !== 'undefined')
-      window.dispatchEvent(
-        new CustomEvent('hibiki:local-write', { detail: { key: logicalKey, previous, value } }),
-      );
+    if (!changed || typeof window === 'undefined') return;
+    const detail = {
+      key: logicalKey,
+      value,
+      // Only bookmark sync reads the previous value; parse it on demand.
+      get previous(): unknown {
+        try {
+          return JSON.parse(previousText);
+        } catch {
+          return null;
+        }
+      },
+    };
+    window.dispatchEvent(new CustomEvent('hibiki:local-write', { detail }));
   };
   try {
-    const serialized = JSON.stringify(value);
-    if (onlyIfChanged && !unsaved.has(key)) {
-      try {
-        if (localStorage.getItem(PREFIX + key) === serialized) return true;
-      } catch {
-        // Some storage implementations can accept writes despite failing reads.
-      }
-    }
+    if (onlyIfChanged && !unsaved.has(key) && !changed) return true;
     localStorage.setItem(PREFIX + key, serialized);
     unsaved.delete(key);
     notify();

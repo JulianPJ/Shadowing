@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import type { BrowserContext, Page } from '@playwright/test';
 import { emptySync, type AccountUser } from '../../src/lib/sync/types';
 import { mockDiscoverSync } from './discover-account';
 
@@ -12,7 +12,7 @@ export const proTestUser: AccountUser = {
 
 export const proStorageKey = (key: string) => `hibiki:v1:account:${proTestUser.id}:${key}`;
 
-export async function mockProAccount(page: Page) {
+export async function mockProAccount(page: Page | BrowserContext) {
   await mockDiscoverSync(page);
   await page.addInitScript(
     ({ userId }) => {

@@ -10,25 +10,36 @@ import { handleDictionaryRequest } from '../dictionary/server';
 import { freeAccess, type AccessRepository } from '../access';
 import type { ReviewRepository } from '../review/types';
 import { handleReviewRequest } from '../review/server';
-import type { TagRepository } from '../tags/types';
-import { handleTagRequest } from '../tags/server';
 import type { KnowledgeRepository } from '../knowledge/types';
 import { handleKnowledgeRequest } from '../knowledge/server';
 import { handleDiscoverAccountRequest } from '../discover/account-server';
 import type { Database } from '../discover/types';
 
-export function accountHandler(
-  auth: HibikiAuth,
-  repository: UserProgressRepository,
-  env: AuthEnvironment,
-  db?: D1Database,
-  dictionary?: DictionaryRepository,
-  access: AccessRepository = freeAccess,
-  review?: ReviewRepository,
-  tags?: TagRepository,
-  knowledge?: KnowledgeRepository,
-  discoverDb: Database | undefined = db,
-) {
+export type AccountServices = {
+  auth: HibikiAuth;
+  progress: UserProgressRepository;
+  env: AuthEnvironment;
+  /** Shared content database used to restore and verify trusted public lessons. */
+  db?: D1Database;
+  dictionary?: DictionaryRepository;
+  access?: AccessRepository;
+  review?: ReviewRepository;
+  knowledge?: KnowledgeRepository;
+  /** Defaults to `db`. */
+  discoverDb?: Database;
+};
+
+export function accountHandler({
+  auth,
+  progress: repository,
+  env,
+  db,
+  dictionary,
+  access = freeAccess,
+  review,
+  knowledge,
+  discoverDb = db,
+}: AccountServices) {
   return async (request: Request): Promise<Response> => {
     const headers = { 'Cache-Control': 'no-store', Vary: 'Cookie' };
     const respond = (body: unknown, status = 200) => Response.json(body, { status, headers });
@@ -83,10 +94,6 @@ export function accountHandler(
       if (url.pathname === '/api/review') {
         if (!review) return respond({ error: 'Review storage unavailable' }, 503);
         return handleReviewRequest(request, userId, session.user.emailVerified, review);
-      }
-      if (url.pathname === '/api/tags') {
-        if (!tags) return respond({ error: 'Tag storage unavailable' }, 503);
-        return handleTagRequest(request, userId, session.user.emailVerified, tags);
       }
       if (url.pathname === '/api/knowledge') {
         if (!knowledge) return respond({ error: 'Word state storage unavailable' }, 503);

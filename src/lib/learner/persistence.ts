@@ -1,5 +1,8 @@
-import { readStorage, writeLearnerHistory, reportStorageFailure } from '../storage';
-import { emptyHistory, upsertSession, validateHistory, validateSession } from '../learner-progress';
+import { readStorage, reportStorageFailure } from '../storage/browser';
+import { writeLearnerHistory } from '../storage/learning';
+import { emptyHistory } from './constants';
+import { upsertSession } from './sessions';
+import { validateHistory, validateSession } from './validation';
 import type { LearnerHistory, PracticeSession } from '../learner-types';
 export function loadLearnerHistory(): LearnerHistory {
   return validateHistory(readStorage('learner-history', emptyHistory()));

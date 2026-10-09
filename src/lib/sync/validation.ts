@@ -8,9 +8,11 @@ import {
   validateIdentity,
   validateSession,
 } from '../learner/validation';
-import { identityKey, validateHistory } from '../learner-progress';
+import { identityKey } from '../learner/constants';
+import { validateHistory } from '../learner/validation';
 import { validContentKey } from '../linked-transcripts';
-import { QUESTION_KINDS } from '../quiz';
+import { PLAYBACK_SPEEDS } from '../storage/preferences';
+import { QUESTION_KINDS } from '../quiz/questions';
 import { validateReviewLimits } from '../review/limits';
 import {
   emptySync,
@@ -146,7 +148,7 @@ export function validateSync(value: unknown, now = Date.now()): SyncData {
     if (
       p.schemaVersion !== 1 ||
       !['shadowing', 'continuous'].includes(p.mode as string) ||
-      ![0.5, 0.75, 1, 1.25].includes(p.speed as number)
+      !PLAYBACK_SPEEDS.includes(p.speed as number)
     )
       throw new Error('Invalid preferences');
     result.preferences = {
@@ -203,7 +205,7 @@ export function validateSync(value: unknown, now = Date.now()): SyncData {
       position >= lesson.segmentCount
     )
       throw new Error('Invalid media identity');
-    if (['direct', 'upload', 'vimeo'].includes(lesson.source) && l.mediaAvailable !== false)
+    if (['direct', 'upload', 'vimeo', 'page'].includes(lesson.source) && l.mediaAvailable !== false)
       throw new Error('Media requires reattachment');
     const updatedAt = date(l.updatedAt),
       completedAt = l.completedAt === null ? null : date(l.completedAt),

@@ -7,7 +7,7 @@ import { applyLocalReview, emptyReview } from '../src/lib/review/local';
 import type { DictionaryEntry } from '../src/lib/dictionary/types';
 import demo from '../src/data/demo.json';
 import type { Lesson } from '../src/lib/types';
-test('export preserves context, decks, Japanese and CSV escaping while neutralizing formulas', async () => {
+test('export preserves context, Japanese and CSV escaping while neutralizing formulas', async () => {
   const entry: DictionaryEntry = {
     schemaVersion: 1,
     id: 'e',
@@ -21,17 +21,12 @@ test('export preserves context, decks, Japanese and CSV escaping while neutraliz
     createdAt: '2026-01-01',
     updatedAt: '2026-01-01',
   };
-  const rows = vocabularyRows([entry], {
-    decks: [{ id: 'inbox', name: 'Inbox', createdAt: '', updatedAt: '' }],
-    memberships: [{ deckId: 'inbox', entryId: 'e' }],
-    cards: [],
-  });
+  const rows = vocabularyRows([entry]);
   const csv = vocabularyCsv(rows);
   assert.ok(csv.startsWith('\uFEFF'));
   assert.ok(csv.includes('"あさ"'));
   assert.ok(csv.includes('"\'=HYPERLINK(""evil"")"'));
   assert.ok(csv.includes('"朝,""静か""\nです"'));
-  assert.equal(rows[0].decks, 'Inbox');
   assert.equal(rows[0].sourceUrl, '');
   assert.equal(rows[0].start, demo.segments[0].start);
   assert.equal(
@@ -62,7 +57,7 @@ test('export preserves context, decks, Japanese and CSV escaping while neutraliz
 });
 test('optimistic local enrollment and grades use references and preserve repeat enrollments', () => {
   const now = '2026-10-06T00:00:00.000Z';
-  const op = { action: 'enroll' as const, entryIds: ['e'], deckId: 'inbox', enrolledAt: now };
+  const op = { action: 'enroll' as const, entryIds: ['e'], enrolledAt: now };
   let data = applyLocalReview(emptyReview(), op);
   data = applyLocalReview(data, op);
   assert.equal(data.cards.length, 1);

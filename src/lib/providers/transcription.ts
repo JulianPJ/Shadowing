@@ -5,7 +5,6 @@ import {
   createDirectYoutubeCaptions,
   withTranscriptionFallback,
 } from './youtube-captions';
-import { env } from 'node:process';
 
 export function createYoutubeCaptions(url?: string, token?: string): TranscriptionProvider {
   return {
@@ -25,15 +24,6 @@ export function createYoutubeCaptions(url?: string, token?: string): Transcripti
     },
   };
 }
-export const youtubeCaptions: TranscriptionProvider = {
-  name: 'YouTube Japanese captions',
-  transcribe(videoId, signal) {
-    return createYoutubeCaptions(
-      env.YOUTUBE_CAPTION_RELAY_URL,
-      env.YOUTUBE_CAPTION_RELAY_TOKEN,
-    ).transcribe(videoId, signal);
-  },
-};
 export const importedSubtitles: TranscriptionProvider = {
   name: 'Imported subtitles',
   async transcribe(text) {

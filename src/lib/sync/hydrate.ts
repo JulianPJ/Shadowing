@@ -11,15 +11,17 @@ export async function hydrateSync(data: SyncData) {
   const owner = storageAccount();
   if (data.preferences) {
     const { updatedAt, mode, speed, studioMode, furigana, reviewLimits } = data.preferences;
-    // Timing alignment is intentionally device-local: preserve it when account preferences hydrate.
+    // Timing alignment and the subtitle overlay are device-local: keep them when account
+    // preferences hydrate.
     const local = loadPreferences();
-    const { playbackOffsetMs } = local;
+    const { playbackOffsetMs, subtitleOverlay } = local;
     writeStorage('preferences', {
       mode,
       speed,
       studioMode,
       furigana,
       playbackOffsetMs,
+      subtitleOverlay,
       translation: false,
       ...((reviewLimits ?? local.reviewLimits)
         ? { reviewLimits: reviewLimits ?? local.reviewLimits }

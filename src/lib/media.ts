@@ -1,6 +1,12 @@
 import { sha256 } from './hash';
 import { parseYouTubeUrl } from './youtube';
-import type { Lesson, LinkedMediaSource, MediaSource, ResolvedMedia } from './types';
+import type {
+  Lesson,
+  LinkedMediaSource,
+  MediaSource,
+  PageMediaSource,
+  ResolvedMedia,
+} from './types';
 
 export const MEDIA_EXTENSIONS = /\.(mp4|m4v|webm|mov|mp3|m4a|aac|wav|ogg|oga|ogv|flac)$/i;
 export const MEDIA_ACCEPT =
@@ -36,6 +42,16 @@ export async function directMedia(
     canonicalUrl,
     contentKey: `direct:${await sha256(canonicalUrl)}`,
     ...(discoveredFrom ? { discoveredFrom } : {}),
+  };
+}
+/** A video on a web page that Hibiki Bridge plays in the page's own tab. */
+export async function pageMedia(pageUrl: string): Promise<PageMediaSource> {
+  const url = remoteUrl(pageUrl);
+  return {
+    schemaVersion: 1,
+    type: 'page',
+    canonicalUrl: url.href,
+    pageKey: `page:${await sha256(url.href)}`,
   };
 }
 // Pure provider registry: no arbitrary server-side URL fetching. Future providers add a resolver + adapter here.
@@ -123,7 +139,7 @@ export function migrateLesson(lesson: Lesson): Lesson {
   const mediaSource = lessonMedia(lesson);
   if (
     mediaSource.schemaVersion !== 1 ||
-    !['youtube', 'vimeo', 'direct', 'local', 'demo'].includes(mediaSource.type)
+    !['youtube', 'vimeo', 'direct', 'page', 'local', 'demo'].includes(mediaSource.type)
   )
     throw new Error('Unsupported media source version.');
   if ((mediaSource.type === 'local' ? 'upload' : mediaSource.type) !== lesson.source)
@@ -149,6 +165,11 @@ export function migrateLesson(lesson: Lesson): Lesson {
     throw new Error('Invalid saved Vimeo source.');
   if (mediaSource.type === 'direct' && !/^direct:[a-f0-9]{64}$/.test(mediaSource.contentKey))
     throw new Error('Invalid saved direct-media identity.');
+  if (
+    mediaSource.type === 'page' &&
+    (!/^page:[a-f0-9]{64}$/.test(mediaSource.pageKey) || 'contentKey' in mediaSource)
+  )
+    throw new Error('Invalid saved web-page identity.');
   if ((mediaSource.type === 'local' || mediaSource.type === 'demo') && 'contentKey' in mediaSource)
     throw new Error('Local media cannot have a shared content identity.');
   if (
@@ -183,6 +204,7 @@ export function sourceLabel(lesson: Lesson) {
     youtube: 'YouTube',
     vimeo: 'Vimeo',
     direct: 'Direct video',
+    page: 'Web page',
     local: 'Your media',
     demo: 'Studio sample',
   }[lessonMedia(lesson).type];

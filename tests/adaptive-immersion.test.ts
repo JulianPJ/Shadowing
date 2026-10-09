@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
-import { localProgressDatabase } from '../src/lib/sync/local-database';
+import { localProgressDatabase } from './helpers/sqlite-d1';
 import { D1KnowledgeRepository } from '../src/lib/knowledge/repository';
 import { handleKnowledgeRequest } from '../src/lib/knowledge/server';
 import { mergeKnowledge, validateKnowledgeRecord } from '../src/lib/knowledge/validation';
@@ -46,6 +46,7 @@ test('native SQL word knowledge uses account ownership, pagination, stale-write 
       "PRAGMA foreign_keys=ON; CREATE TABLE user (id TEXT PRIMARY KEY); INSERT INTO user VALUES ('a'),('b');",
     );
     db.exec(readFileSync('migrations/0009_word_knowledge.sql', 'utf8'));
+    db.exec(readFileSync('migrations/0013_word_knowledge_synced_at.sql', 'utf8'));
     const repository = new D1KnowledgeRepository(localProgressDatabase(db));
     const records = Array.from({ length: 280 }, (_, index) =>
       record(`日本語${String(index).padStart(3, '0')}`, 'known'),
@@ -72,6 +73,56 @@ test('native SQL word knowledge uses account ownership, pagination, stale-write 
   }
 });
 
+test('incremental word state pulls use server change time, not client clocks', async () => {
+  const db = new DatabaseSync(':memory:');
+  try {
+    db.exec(
+      "PRAGMA foreign_keys=ON; CREATE TABLE user (id TEXT PRIMARY KEY); INSERT INTO user VALUES ('a');",
+    );
+    db.exec(readFileSync('migrations/0009_word_knowledge.sql', 'utf8'));
+    // A row written before the migration has no server change time.
+    db.prepare(
+      "INSERT INTO user_word_knowledge(user_id,lemma,reading,state,updated_at) VALUES ('a','古い',NULL,'known','2026-10-01T00:00:00.000Z')",
+    ).run();
+    db.exec(readFileSync('migrations/0013_word_knowledge_synced_at.sql', 'utf8'));
+    let now = new Date('2026-10-09T10:00:00.000Z');
+    const repository = new D1KnowledgeRepository(localProgressDatabase(db), () => now);
+    await repository.apply('a', [record('日本', 'learning')]);
+    const full = await repository.page('a');
+    assert.deepEqual(full.records.map((r) => r.lemma).sort(), ['古い', '日本'].sort());
+    assert.equal(full.syncedThrough, '2026-10-09T10:00:00.000Z');
+
+    now = new Date('2026-10-09T11:00:00.000Z');
+    // A device with a slow clock still writes a newer server change time.
+    await repository.apply('a', [record('勉強', 'known', '2026-10-01T09:00:00.000Z')]);
+    // The boundary is inclusive, so rows at exactly `since` are re-sent rather than missed.
+    assert.deepEqual(
+      (await repository.page('a', null, full.syncedThrough)).records.map((r) => r.lemma).sort(),
+      ['勉強', '日本'].sort(),
+    );
+    const changed = await repository.page('a', null, '2026-10-09T10:30:00.000Z');
+    assert.deepEqual(
+      changed.records.map((r) => r.lemma),
+      ['勉強'],
+    );
+    assert.equal(changed.syncedThrough, '2026-10-09T11:00:00.000Z');
+    // A stale write that loses last-writer-wins does not mark the row as changed.
+    now = new Date('2026-10-09T12:00:00.000Z');
+    const stored = await repository.apply('a', [
+      record('日本', 'unknown', '2026-10-01T00:00:00.000Z'),
+    ]);
+    // The losing device is told the stored winner instead of a bare acknowledgement.
+    assert.deepEqual(
+      stored.map((r) => [r.lemma, r.state]),
+      [['日本', 'learning']],
+    );
+    assert.deepEqual((await repository.page('a', null, '2026-10-09T11:30:00.000Z')).records, []);
+    await assert.rejects(repository.page('a', null, 'not a date'), /Invalid since/);
+  } finally {
+    db.close();
+  }
+});
+
 test('knowledge endpoint bounds batches and rejects unverified mutation, invalid states and future conflicts', async () => {
   const applied: WordKnowledgeRecord[][] = [];
   const repository = {
@@ -80,6 +131,7 @@ test('knowledge endpoint bounds batches and rejects unverified mutation, invalid
     },
     async apply(_owner: string, records: WordKnowledgeRecord[]) {
       applied.push(records);
+      return records;
     },
   };
   const request = (records: unknown) =>

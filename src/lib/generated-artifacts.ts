@@ -1,7 +1,7 @@
 import { sha256 } from './hash';
 import { type D1Database, storageEvent } from './d1';
 import { validContentKey } from './linked-transcripts';
-import { validateQuiz } from './quiz';
+import { validateQuiz } from './quiz/document';
 import { validateDifficultyAnalysis } from './difficulty';
 import type { ContentDifficultyAnalysis, LessonQuiz, QuizLesson } from './types';
 
