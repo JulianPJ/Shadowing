@@ -431,7 +431,7 @@ test('Studio tool panes keep the player mounted and transcript lookup never seek
   await page.getByTestId('transcript-9').click();
   await expect(page.getByTestId('current-japanese')).toHaveText(demo.segments[9].japanese);
   await expect(page.locator('.transcript-row.past')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Exit Studio', exact: true }).click();
+  await studio(page).click();
   await expect(page.locator('.practice-main')).not.toHaveClass(/studio-mode/);
   await page.setViewportSize({ width: 320, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

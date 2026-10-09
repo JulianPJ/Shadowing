@@ -835,11 +835,6 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
         <span>{sourceLabel(lesson)}</span>
         <span className="studio-lesson-identity">{lesson.title}</span>
         <div className="practice-view-controls" aria-label="Practice display">
-          {studioMode ? (
-            <button className="button" onClick={() => setStudioMode(false)}>
-              Exit Studio
-            </button>
-          ) : null}
           <button
             className="button"
             aria-pressed={studioMode}
