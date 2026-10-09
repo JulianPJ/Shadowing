@@ -8,6 +8,9 @@ export const worker = defineWorker({
   name: 'shadowing',
   // Keep the Cloudflare Dashboard custom domain in source control for strict deploys.
   domains: ['hibikiapp.net'],
+  // Keep legacy shared links and version previews available alongside the custom domain.
+  workersDev: true,
+  previewUrls: true,
   entrypoint: './cloudflare-worker.js',
   compatibilityDate: '2026-10-03',
   // Public routing is required when fetching the relay's workers.dev endpoint.
