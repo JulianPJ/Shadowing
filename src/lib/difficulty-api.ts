@@ -9,6 +9,7 @@ import {
   noSharedContent,
   type SharedContentDependencies,
 } from './shared-content';
+import { InferenceDenied } from './server/rate-limit';
 
 export async function handleDifficultyRequest(
   request: Request,
@@ -54,6 +55,7 @@ export async function handleDifficultyRequest(
       { headers: { ...headers, 'X-Hibiki-Cache': cache } },
     );
   } catch (error) {
+    if (error instanceof InferenceDenied) return error.response;
     const code = error instanceof DifficultyProviderError ? error.code : 'unavailable';
     const stage = error instanceof DifficultyProviderError ? (error.stage ?? 'unknown') : 'unknown';
     const reason = error instanceof DifficultyProviderError ? error.reason : undefined;

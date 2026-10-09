@@ -11,6 +11,7 @@ import {
   noSharedContent,
   type SharedContentDependencies,
 } from './shared-content';
+import { InferenceDenied } from './server/rate-limit';
 
 export async function handleQuizRequest(
   request: Request,
@@ -58,6 +59,7 @@ export async function handleQuizRequest(
     });
     return Response.json({ quiz: payload }, { headers: { ...headers, 'X-Hibiki-Cache': cache } });
   } catch (error) {
+    if (error instanceof InferenceDenied) return error.response;
     const code = error instanceof QuizProviderError ? error.code : 'unavailable';
     const stage = error instanceof QuizProviderError ? (error.stage ?? 'unknown') : 'unknown';
     const reason = error instanceof QuizProviderError ? error.reason : undefined;

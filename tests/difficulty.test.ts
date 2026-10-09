@@ -18,6 +18,7 @@ import {
   WORKERS_AI_DIFFICULTY_MODEL,
 } from '../src/lib/providers/difficulty';
 import { handleDifficultyRequest } from '../src/lib/difficulty-api';
+import { InferenceDenied } from '../src/lib/server/rate-limit';
 import type { DifficultyAnalysisProvider, Segment } from '../src/lib/types';
 
 const lesson = validateDifficultyLesson(demo),
@@ -192,4 +193,30 @@ test('API validates input and semantic failure never blocks the lesson', async (
   const failed = await handleDifficultyRequest(request(custom), bad);
   assert.equal(failed.status, 502);
   assert.equal((await handleDifficultyRequest(request(lesson))).status, 200);
+});
+
+test('the inference limit is spent only when a model call actually runs', async () => {
+  const request = (input: unknown) =>
+    new Request('https://hibiki.test/api/difficulty', {
+      method: 'POST',
+      headers: { origin: 'https://hibiki.test' },
+      body: JSON.stringify(input),
+    });
+  const denied = Response.json({ code: 'rate-limited' }, { status: 429 });
+  let calls = 0;
+  // Stands in for limitedInference(): the provider throws once the route's budget is spent.
+  const exhausted: DifficultyAnalysisProvider = {
+    name: 'exhausted',
+    async analyze() {
+      calls++;
+      throw new InferenceDenied(denied);
+    },
+  };
+  assert.equal((await handleDifficultyRequest(request(lesson), exhausted)).status, 200);
+  assert.equal(calls, 0, 'the authored demo never reaches the provider');
+  assert.equal(
+    await handleDifficultyRequest(request({ ...lesson, id: 'custom' }), exhausted),
+    denied,
+  );
+  assert.equal(calls, 1);
 });

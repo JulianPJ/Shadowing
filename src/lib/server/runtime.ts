@@ -12,7 +12,7 @@ import { createD1LinkedTranscriptRepository, linkedTranscripts } from '../linked
 import { createD1GeneratedArtifactRepository, generatedArtifacts } from '../generated-artifacts';
 import { readCatalog } from '../discover/catalog';
 import { createWorkersAiShadowingProvider } from '../providers/shadowing';
-import { cachedRead, rateLimited, tooManyRequests } from './rate-limit';
+import { InferenceDenied, cachedRead, rateLimited, tooManyRequests } from './rate-limit';
 
 export { env as workerEnv, waitUntil };
 
@@ -58,6 +58,28 @@ export async function inferenceLimit(request: Request, route: InferenceRoute, er
   return (await rateLimited(env.SHADOWING_AI_RATE_LIMIT, request, { failClosed: true, route }))
     ? tooManyRequests(error)
     : null;
+}
+/**
+ * Spends the inference budget only when the provider is actually called: the authored demo and
+ * shared-cache hits never reach it, so browsing analysed lessons cannot exhaust the limit.
+ */
+export function limitedInference<P extends object>(
+  request: Request,
+  route: InferenceRoute,
+  error: string,
+  provider: P,
+): P {
+  return new Proxy(provider, {
+    get(target, key, receiver) {
+      const value: unknown = Reflect.get(target, key, receiver);
+      if (typeof value !== 'function') return value;
+      return async (...args: unknown[]) => {
+        const denied = await inferenceLimit(request, route, error);
+        if (denied) throw new InferenceDenied(denied);
+        return value.apply(target, args);
+      };
+    },
+  });
 }
 
 export async function requireProAccess(request: Request) {

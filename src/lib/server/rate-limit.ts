@@ -22,6 +22,13 @@ export async function rateLimited(
   }
 }
 
+/** Thrown by a rate-limited provider when its budget is spent; the handler returns `response`. */
+export class InferenceDenied extends Error {
+  constructor(readonly response: Response) {
+    super('Inference rate limit reached');
+  }
+}
+
 export function tooManyRequests(error: string) {
   return Response.json(
     { code: 'rate-limited', error },

@@ -45,7 +45,7 @@ Import the module you need directly; there are no compatibility facades. Keep se
 ## Contracts to preserve
 
 - **API routes** read bindings from `cloudflare:workers` through `src/lib/server/runtime.ts` and must export `dynamic = 'force-dynamic'`; otherwise vinext routes GET responses through its shared response cache.
-- **Paid and public endpoints are rate limited** with a constant route name per handler (never the request path). Workers AI routes (transcribe, difficulty, quiz, shadowing) fail closed; caption preparation and translation fail open.
+- **Paid and public endpoints are rate limited** with a constant route name per handler (never the request path). Workers AI routes (transcribe, difficulty, quiz, shadowing) fail closed; caption preparation and translation fail open. Difficulty and quiz wrap their provider with `limitedInference`, so the authored demo and shared-cache hits never spend the budget.
 - **Sync is silent.** The only visible sync state is "Your session expired". Channels never sync for signed-out or unverified accounts. Routine triggers (focus, reconnect, a slow poll) reuse a sync from the last five minutes unless local changes are pending.
 - **Word-state pulls are incremental** (`synced_at` watermark plus a 60-second overlap). Uploads return the stored value for each lemma so a device that lost last-writer-wins adopts the winner.
 - **Media playback**: keep the same mounted media player when display preferences change; recordings, object URLs and the adapter belong to the active practice tree. `section-lookup.ts` reproduces the original boundary predicate, including gaps. Subtitle timing is never stretched.
