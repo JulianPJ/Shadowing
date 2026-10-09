@@ -17,6 +17,15 @@ const worker = {
    */
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    // Keep old shared links usable; auth and account sync require the canonical origin.
+    if (
+      url.hostname === 'shadowing.julianpopovskijones.workers.dev' &&
+      ['GET', 'HEAD'].includes(request.method)
+    ) {
+      url.protocol = 'https:';
+      url.hostname = 'hibikiapp.net';
+      return Response.redirect(url.toString(), 307);
+    }
     if (url.pathname === '/demo.mp4' && ['GET', 'HEAD'].includes(request.method))
       return serveDemoAsset(request, (source) => env.ASSETS.fetch(source));
     if (url.pathname === '/discover' && String(env.DISCOVER_ENABLED) === 'false')

@@ -5,7 +5,7 @@ const allow = document.getElementById('allow');
 const originInput = document.getElementById('origin');
 
 const ALLOWED_ORIGIN =
-  /^(https:\/\/shadowing\.julianpopovskijones\.workers\.dev|http:\/\/(localhost|127\.0\.0\.1)(:\d{1,5})?)$/;
+  /^(https:\/\/hibikiapp\.net|https:\/\/shadowing\.julianpopovskijones\.workers\.dev|http:\/\/(localhost|127\.0\.0\.1)(:\d{1,5})?)$/;
 
 const send = (message) =>
   chrome.runtime.sendMessage({ type: 'popup', ...message }).then((response) => {
@@ -124,7 +124,7 @@ allow.addEventListener('click', async () => {
 });
 
 void chrome.storage.local.get('origin').then(({ origin }) => {
-  originInput.value = origin || 'https://shadowing.julianpopovskijones.workers.dev';
+  originInput.value = origin || 'https://hibikiapp.net';
 });
 originInput.addEventListener('change', async () => {
   const value = originInput.value.trim().replace(/\/+$/, '');

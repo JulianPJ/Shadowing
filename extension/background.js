@@ -1,10 +1,10 @@
 // Hibiki Bridge service worker. It only ever controls tabs the learner connected from the popup,
 // and only Hibiki pages (where bridge.js runs) can send it commands.
 const VERSION = chrome.runtime.getManifest().version;
-const DEFAULT_ORIGIN = 'https://shadowing.julianpopovskijones.workers.dev';
+const DEFAULT_ORIGIN = 'https://hibikiapp.net';
 // bridge.js only runs on these origins (see manifest.json), so Hibiki must be one of them.
 const ALLOWED_ORIGIN =
-  /^(https:\/\/shadowing\.julianpopovskijones\.workers\.dev|http:\/\/(localhost|127\.0\.0\.1)(:\d{1,5})?)$/;
+  /^(https:\/\/hibikiapp\.net|https:\/\/shadowing\.julianpopovskijones\.workers\.dev|http:\/\/(localhost|127\.0\.0\.1)(:\d{1,5})?)$/;
 const bridges = new Set();
 const controllers = new Map();
 
