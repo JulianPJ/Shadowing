@@ -6,6 +6,8 @@ const cache = await createWorkersCacheConfig();
 export const worker = defineWorker({
   ...cache,
   name: 'shadowing',
+  // Keep the Cloudflare Dashboard custom domain in source control for strict deploys.
+  domains: ['hibikiapp.net'],
   entrypoint: './cloudflare-worker.js',
   compatibilityDate: '2026-10-03',
   // Public routing is required when fetching the relay's workers.dev endpoint.
@@ -34,7 +36,7 @@ export const worker = defineWorker({
     }),
     YOUTUBE_DATA_API_KEY: bindings.secret(),
     // Better Auth must have one canonical production origin for trusted callbacks and secure cookies.
-    AUTH_BASE_URL: bindings.text('https://hibikiapp.net'),
+    AUTH_BASE_URL: bindings.text('https://hibikiapp.net/'),
     AUTH_SECRET: bindings.secret(),
     GOOGLE_CLIENT_ID: bindings.secret(),
     GOOGLE_CLIENT_SECRET: bindings.secret(),
