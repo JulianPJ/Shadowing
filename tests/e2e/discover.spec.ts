@@ -223,6 +223,46 @@ test('preferences do not change practice history and feedback has undo', async (
   expect(preferences.discovery.preferredBand).toBe('n4_n3');
   expect(preferences.learning).toBeNull();
 });
+test('easier, my level and challenge shortcuts are exact band filters', async ({ page }) => {
+  await page.goto('/discover');
+  await expect(page.getByRole('group', { name: 'Compared with your level' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Edit level' }).click();
+  await page.getByLabel('Your preferred content level').selectOption('n4_n3');
+  await page.getByRole('button', { name: 'Save preferences' }).click();
+  const shortcuts = page.getByRole('group', { name: 'Compared with your level' });
+  await shortcuts.getByRole('button', { name: 'Challenge · N3–N2', exact: true }).click();
+  await expect(page).toHaveURL(/band=n3_n2/);
+  await expect(page.locator('.discover-card')).toHaveCount(6);
+  for (const band of await page.locator('.discover-band').allInnerTexts())
+    expect(band).toContain('N3–N2');
+  await expect(page.getByRole('button', { name: 'N3–N2', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await shortcuts.getByRole('button', { name: 'Easier · N5–N4', exact: true }).click();
+  await expect(page).toHaveURL(/band=n5_n4/);
+  await expect(shortcuts.getByRole('button', { name: 'My level · N4–N3' })).toHaveAttribute(
+    'aria-pressed',
+    'false',
+  );
+});
+test('a level with no estimated videos explains why and offers honest alternatives', async ({
+  page,
+}) => {
+  // Only video 0 matches this search, and it has no estimated level.
+  await page.goto('/discover?band=n1_plus&q=%E4%BC%9A%E8%A9%B1+0');
+  await expect(
+    page.getByRole('heading', { name: 'No N1+ videos with an estimated level yet.' }),
+  ).toBeVisible();
+  await expect(page.getByText('never filled with guesses', { exact: false })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Try / })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Browse all levels', exact: true }).click();
+  await expect(page.locator('.discover-card')).toHaveCount(1);
+  await expect(page.locator('.discover-band')).toHaveText('Level not yet estimated');
+  // With other estimated videos available, the closest band is offered.
+  await page.goto('/discover?band=n1_plus&duration=5to10');
+  await expect(page.getByRole('button', { name: 'Try N2–N1 (6)', exact: true })).toBeVisible();
+});
 test('pagination keeps lanes and cards deduplicated; back restores filter state', async ({
   page,
 }) => {

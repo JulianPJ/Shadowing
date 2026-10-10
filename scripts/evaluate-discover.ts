@@ -1,5 +1,5 @@
 // Prints the Discover relevance evaluation on the labelled fixtures. No network, no quota.
-import { evaluateDiscover } from '../tests/helpers/discover-evaluation';
+import { evaluateDiscover, evaluatePersonas } from '../tests/helpers/discover-evaluation';
 
 const result = await evaluateDiscover();
 const pct = (n: number) => `${Math.round(n * 100)}%`;
@@ -24,3 +24,11 @@ console.log('Language evidence of accepted videos:', JSON.stringify(result.langu
 console.log('Accepted with captions reported:', result.captionsReportedAccepted);
 console.log('False positives:', result.falsePositives);
 console.log('False negatives:', result.falseNegatives);
+console.log(
+  '\n| Persona | Precision@10 | Verified in top 10 | Within one band | More than one band harder | More than one band easier | Prepared in top 10 | Channels in top 10 | First level match |',
+);
+console.log('| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |');
+for (const row of await evaluatePersonas())
+  console.log(
+    `| ${row.persona} | ${pct(row.p10)} | ${row.verifiedInTop10} | ${row.withinOneBand} | ${row.tooHard} | ${row.tooEasy} | ${row.preparedInTop10} | ${row.channelsInTop10} | ${row.firstLevelMatch || '–'} |`,
+  );

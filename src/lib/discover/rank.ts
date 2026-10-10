@@ -2,6 +2,7 @@ import { sha256 } from '../hash';
 import {
   BANDS,
   TOPICS,
+  type Band,
   type Card,
   type Context,
   type Feed,
@@ -9,38 +10,65 @@ import {
   type Video,
 } from './types';
 import { eligible } from './eligibility';
-const bandIndex = (band: string | null) => BANDS.findIndex((b) => b[0] === band);
+import {
+  bandDistance,
+  bandIndex,
+  explain,
+  learnerProfile,
+  scoreParts,
+  totalScore,
+  type Profile,
+} from './score';
+
+/**
+ * Progression hypothesis for For you: about six comfortable picks to two easier and two stretch
+ * picks in every ten. Slots only reorder verified matches that exist; when a bucket is empty the
+ * next best video takes the slot, so scarce verified levels are never padded with guesses.
+ */
+const PROGRESSION = [
+  'comfort',
+  'comfort',
+  'easier',
+  'comfort',
+  'stretch',
+  'comfort',
+  'comfort',
+  'easier',
+  'comfort',
+  'stretch',
+] as const;
+type Bucket = (typeof PROGRESSION)[number];
+function bucket(video: Video, profile: Profile): Bucket | null {
+  const distance = bandDistance(video, profile);
+  return distance === 0
+    ? 'comfort'
+    : distance === -1
+      ? 'easier'
+      : distance === 1
+        ? 'stretch'
+        : null;
+}
+function blendDifficulty(sorted: Video[], profile: Profile) {
+  const remaining = [...sorted];
+  const result: Video[] = [];
+  for (let slot = 0; remaining.length; slot++) {
+    const want = PROGRESSION[slot % PROGRESSION.length];
+    const index = remaining.findIndex((v) => bucket(v, profile) === want);
+    // An empty bucket yields to the best remaining video of any kind.
+    result.push(remaining.splice(index < 0 ? 0 : index, 1)[0]);
+  }
+  return result;
+}
 export function rankVideos(
   videos: Video[],
   filters: Filters,
   context: Context,
   now: number,
 ): Card[] {
-  const target = bandIndex(context.suggestedBand);
-  const likedTopics = new Set(
-    videos.filter((v) => context.liked.includes(v.videoId)).flatMap((v) => v.topics),
+  const profile = learnerProfile(videos, context);
+  const scores = new Map(
+    videos.map((v) => [v.videoId, totalScore(scoreParts(v, context, profile, now))]),
   );
-  const familiarTopics = new Set(
-    videos
-      .filter((p) => context.completed.includes(p.videoId) || context.saved.includes(p.videoId))
-      .flatMap((p) => p.topics),
-  );
-  const score = (v: Video) => {
-    let value = v.prepared ? 4 : 0;
-    if (target >= 0 && v.band) value += Math.max(0, 20 - 8 * Math.abs(bandIndex(v.band) - target));
-    if (context.preferredTopics.some((t) => v.topics.includes(t))) value += 12;
-    if (v.topics.some((t) => likedTopics.has(t))) value += 8;
-    if (v.topics.some((t) => familiarTopics.has(t))) value += 5;
-    if (context.comfortableSeconds)
-      value += Math.max(0, 5 - Math.abs(v.durationSeconds - context.comfortableSeconds) / 180);
-    if (context.vocabularyFit[v.videoId] !== undefined)
-      value += context.vocabularyFit[v.videoId] / 10;
-    value += Math.max(0, 3 - (now - Date.parse(v.indexedAt)) / 86400000 / 7);
-    if (context.saved.includes(v.videoId)) value -= 15;
-    if (context.completed.includes(v.videoId)) value -= 25;
-    if (context.seen.includes(v.videoId)) value -= 4;
-    return value;
-  };
   const sorted = videos
     .filter((v) => !context.ignored.includes(v.videoId))
     .sort((a, b) => {
@@ -51,13 +79,17 @@ export function rankVideos(
             ? a.durationSeconds - b.durationSeconds
             : filters.sort === 'trending'
               ? (b.popularity ?? -1) - (a.popularity ?? -1)
-              : score(b) - score(a);
+              : scores.get(b.videoId)! - scores.get(a.videoId)!;
       return order || b.indexedAt.localeCompare(a.indexedAt) || a.videoId.localeCompare(b.videoId);
     });
+  const progression =
+    filters.sort === 'recommended' && filters.band === 'for_you' && profile.target >= 0
+      ? blendDifficulty(sorted, profile)
+      : sorted;
   // Interleave overrepresented creators/topics rather than silently discarding the rest.
   const diverse: Video[] =
-    filters.sort === 'newest' || filters.sort === 'shortest' ? [...sorted] : [];
-  const remaining = diverse.length ? [] : [...sorted];
+    filters.sort === 'newest' || filters.sort === 'shortest' ? [...progression] : [];
+  const remaining = diverse.length ? [] : [...progression];
   while (remaining.length) {
     const window = diverse.slice(-5);
     const index = remaining.findIndex(
@@ -68,24 +100,19 @@ export function rankVideos(
     );
     diverse.push(remaining.splice(index < 0 ? 0 : index, 1)[0]);
   }
-  return diverse.map((v) => {
-    const topic = v.topics.find((t) => context.preferredTopics.includes(t) || likedTopics.has(t));
-    const reason =
-      context.vocabularyFit[v.videoId] !== undefined
-        ? `${context.vocabularyFit[v.videoId]}% of content words explicitly marked Known on this device`
-        : topic
-          ? `More ${TOPICS[topic].toLowerCase()} videos`
-          : target >= 0 && v.band && bandIndex(v.band) === target
-            ? 'Close to the content you usually practise'
-            : target >= 0 && v.band && bandIndex(v.band) === target + 1
-              ? 'A little above your usual content band'
-              : v.durationSeconds <= 600
-                ? 'A shorter session'
-                : v.prepared
-                  ? 'Japanese captions already prepared in Hibiki'
-                  : 'A new Japanese listening possibility';
-    return { ...v, reason };
-  });
+  return diverse.map((v) => ({ ...v, reason: explain(v, context, profile) }));
+}
+/** Verified-band availability for the current non-level filters. Public catalogue aggregates only. */
+function coverage(videos: Video[], filters: Filters, region: string, now: number) {
+  const unbanded = videos.filter((v) => eligible(v, { ...filters, band: 'all' }, region, now));
+  const byBand = Object.fromEntries(BANDS.map((b) => [b[0], 0])) as Record<Band, number>;
+  for (const v of unbanded) if (v.band) byBand[v.band]++;
+  return {
+    total: unbanded.length,
+    verified: unbanded.filter((v) => v.band).length,
+    prepared: unbanded.filter((v) => v.prepared).length,
+    byBand,
+  };
 }
 export async function buildFeed(
   videos: Video[],
@@ -102,7 +129,7 @@ export async function buildFeed(
       context,
       region,
       epoch,
-      videos.map((v) => [v.videoId, v.fetchedAt, v.proof, v.popularity]),
+      videos.map((v) => [v.videoId, v.fetchedAt, v.proof, v.popularity, v.qualityScore ?? null]),
     ]),
   );
   let offset = 0;
@@ -158,6 +185,11 @@ export async function buildFeed(
             (v) => target >= 0 && !!v.band && bandIndex(v.band) === target + 1,
           ),
           lane(
+            'ready',
+            'Ready to shadow now',
+            (v) => v.prepared && filters.captions !== 'prepared',
+          ),
+          lane(
             'short',
             '5–10 minutes to yourself',
             (v) => v.durationSeconds >= 300 && v.durationSeconds <= 600,
@@ -185,5 +217,6 @@ export async function buildFeed(
       (latest, v) => (!latest || v.fetchedAt > latest ? v.fetchedAt : latest),
       null,
     ),
+    coverage: coverage(videos, filters, region, now),
   };
 }

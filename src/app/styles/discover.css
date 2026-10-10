@@ -99,6 +99,34 @@
   color: var(--paper);
   font-weight: 600;
 }
+/* Easier / My level / Challenge: shortcuts to exact bands around the learner's level. */
+.discover-level-shortcuts {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.discover-level-shortcuts button {
+  background: transparent;
+  border: 1px dashed var(--line);
+  border-radius: 30px;
+  padding: 6px 14px;
+  min-height: 36px;
+  color: var(--green);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.discover-level-shortcuts button[aria-pressed='true'] {
+  border-style: solid;
+  border-color: var(--green);
+  background: var(--green-pale);
+  font-weight: 600;
+}
+.discover-level-note {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
 .discover-search {
   display: flex;
   align-items: center;

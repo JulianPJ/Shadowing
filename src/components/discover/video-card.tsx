@@ -17,7 +17,7 @@ export function VideoCard({
   onFeedback: (action: 'not_interested' | 'more_like_this') => void;
   onOpen: () => void;
 }) {
-  const label = video.band ? BANDS.find((b) => b[0] === video.band)![1] : 'Level unknown';
+  const label = video.band ? BANDS.find((b) => b[0] === video.band)![1] : 'Level not yet estimated';
   return (
     <article className="discover-card">
       <Link
@@ -59,19 +59,22 @@ export function VideoCard({
               title={
                 video.band
                   ? 'Approximate content difficulty from a validated full Japanese transcript.'
-                  : 'No verified Hibiki difficulty estimate yet.'
+                  : 'Hibiki estimates a level after analysing the full Japanese transcript.'
               }
             >
               {video.band ? '≈ ' : ''}
               {label}
             </span>
             {video.topics[0] ? <span>{TOPICS[video.topics[0]]}</span> : null}
+            {video.audience ? (
+              <span>{video.audience === 'learner' ? 'For learners' : 'Native content'}</span>
+            ) : null}
           </div>
           <p className="discover-reason">{video.reason}</p>
           <p className="discover-captions">
             <Captions size={14} />
             {video.prepared
-              ? 'Japanese captions prepared in Hibiki'
+              ? 'Japanese captions ready in Hibiki'
               : video.preparationStatus === 'needs-captions'
                 ? 'Your own Japanese captions are needed'
                 : video.captionFlag
