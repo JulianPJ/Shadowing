@@ -28,6 +28,8 @@ export const worker = defineWorker({
     }),
     HIBIKI_DB: bindings.d1({ id: 'cf88fe7d-16bb-4f58-8839-2b27718a7847' }),
     DISCOVER_ENABLED: bindings.text('true'),
+    // Explicit opt-in for catalogue caption retrieval and Workers AI spending.
+    DISCOVER_ENRICHMENT_ENABLED: bindings.text('false'),
     DISCOVERY_RATE_LIMIT: bindings.rateLimit({
       namespace: '19002',
       simple: { limit: 90, period: 60 },
