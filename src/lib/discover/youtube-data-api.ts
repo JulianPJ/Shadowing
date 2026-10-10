@@ -94,7 +94,9 @@ export function youtubeDataApi(
       response = await fetchImpl(url, {
         headers: { 'X-Goog-Api-Key': key },
         signal: timeoutSignal,
-        redirect: 'error',
+        // Workers does not support redirect: 'error'. Manual allows us to
+        // reject redirects without forwarding the API key to a new origin.
+        redirect: 'manual',
       });
     } catch (error) {
       console.info(
@@ -102,6 +104,19 @@ export function youtubeDataApi(
           event: 'discover.youtube.network_error',
           endpoint,
           ...youtubeFetchFailureDetails(error, timeoutSignal),
+        }),
+      );
+      throw new YoutubeDataError('unavailable');
+    }
+    // Cloudflare Workers does not support redirect: 'error'. Reject a
+    // manual 3xx (or an opaque redirect) without following its Location header.
+    if (response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400)) {
+      await response.body?.cancel();
+      console.info(
+        JSON.stringify({
+          event: 'discover.youtube.redirect_blocked',
+          endpoint,
+          status: response.status,
         }),
       );
       throw new YoutubeDataError('unavailable');
