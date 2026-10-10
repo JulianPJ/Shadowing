@@ -202,45 +202,36 @@ test('official provider validates public/embed/live/age restrictions and never d
   assert.equal(new URL(endpoints[1]).searchParams.get('part'), 'snippet,contentDetails,status');
   assert.ok(!endpoints.join('').includes('server-only'));
 });
-test('YouTube network diagnostics classify failure without leaking exception details', () => {
+test('YouTube network diagnostics classify failures without exposing credentials', () => {
   const active = new AbortController().signal;
   const secret = 'SENSITIVE_API_KEY_DO_NOT_LOG';
-  assert.deepEqual(youtubeFetchFailureDetails(new TypeError(secret), active), {
+  const network = youtubeFetchFailureDetails(new TypeError(secret), active);
+  assert.deepEqual(network, { failureKind: 'network', errorType: 'TypeError' });
+  const safeCause = new TypeError(secret, { cause: { code: 'ENOTFOUND', message: secret } });
+  const networkCause = youtubeFetchFailureDetails(safeCause, active);
+  assert.deepEqual(networkCause, {
     failureKind: 'network',
     errorType: 'TypeError',
+    causeCode: 'ENOTFOUND',
   });
-  assert.deepEqual(
-    youtubeFetchFailureDetails(
-      new TypeError(secret, { cause: { code: 'ENOTFOUND', message: secret } }),
-      active,
-    ),
-    { failureKind: 'network', errorType: 'TypeError', causeCode: 'ENOTFOUND' },
+  assert.ok(!JSON.stringify(networkCause).includes(secret));
+  const unsafeCause = new TypeError(secret, { cause: { code: secret } });
+  assert.deepEqual(youtubeFetchFailureDetails(unsafeCause, active), network);
+  const aborted = youtubeFetchFailureDetails(
+    new DOMException(secret, 'AbortError'),
+    AbortSignal.abort(),
   );
-  assert.deepEqual(
-    youtubeFetchFailureDetails(
-      new TypeError(secret, { cause: { code: secret } }),
-      active,
-    ),
-    { failureKind: 'network', errorType: 'TypeError' },
+  assert.deepEqual(aborted, { failureKind: 'aborted', errorType: 'AbortError' });
+  const timedOut = youtubeFetchFailureDetails(
+    new TypeError(secret),
+    AbortSignal.abort(new DOMException(secret, 'TimeoutError')),
   );
-  assert.deepEqual(
-    youtubeFetchFailureDetails(
-      new DOMException(secret, 'AbortError'),
-      AbortSignal.abort(),
-    ),
-    { failureKind: 'aborted', errorType: 'AbortError' },
+  assert.deepEqual(timedOut, { failureKind: 'timeout', errorType: 'TypeError' });
+  const thrownTimeout = youtubeFetchFailureDetails(
+    new DOMException(secret, 'TimeoutError'),
+    active,
   );
-  assert.deepEqual(
-    youtubeFetchFailureDetails(
-      new TypeError(secret),
-      AbortSignal.abort(new DOMException(secret, 'TimeoutError')),
-    ),
-    { failureKind: 'timeout', errorType: 'TypeError' },
-  );
-  assert.deepEqual(
-    youtubeFetchFailureDetails(new DOMException(secret, 'TimeoutError'), active),
-    { failureKind: 'timeout', errorType: 'TimeoutError' },
-  );
+  assert.deepEqual(thrownTimeout, { failureKind: 'timeout', errorType: 'TimeoutError' });
   assert.deepEqual(youtubeFetchFailureDetails(secret, active), {
     failureKind: 'network',
     errorType: 'UnknownError',

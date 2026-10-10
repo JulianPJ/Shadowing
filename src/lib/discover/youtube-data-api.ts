@@ -50,8 +50,7 @@ export function youtubeFetchFailureDetails(error: unknown, signal: AbortSignal) 
       ? 'aborted'
       : 'network';
   const cause = error instanceof Error ? error.cause : null;
-  const rawCode =
-    cause && typeof cause === 'object' && 'code' in cause ? cause.code : undefined;
+  const rawCode = cause && typeof cause === 'object' && 'code' in cause ? cause.code : undefined;
   const causeCode =
     typeof rawCode === 'string' && SAFE_FETCH_CAUSE_CODES.has(rawCode) ? rawCode : undefined;
   return { failureKind, errorType, ...(causeCode ? { causeCode } : {}) };
