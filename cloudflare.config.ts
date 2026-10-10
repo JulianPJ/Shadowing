@@ -6,7 +6,7 @@ const cache = await createWorkersCacheConfig();
 export const worker = defineWorker({
   ...cache,
   name: 'shadowing',
-  // Keep the Cloudflare Dashboard custom domain in source control for strict deploys.
+  // Production domain; cf's string domain config does not enable custom-domain previews.
   domains: ['hibikiapp.net'],
   // Keep legacy shared links and version previews available alongside the custom domain.
   workersDev: true,

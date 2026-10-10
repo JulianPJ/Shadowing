@@ -100,6 +100,11 @@ Cloudflare Workers via vinext, configured in `cloudflare.config.ts`:
 | Deploy command | `npm run deploy` (applies D1 migrations, then deploys the prebuilt Worker) |
 | Node.js | 24.x |
 
+Use the pinned `cf` CLI from `npm ci`: beta.14 fixes false custom-domain conflicts during
+strict deployments. `hibikiapp.net` serves production traffic only; keep custom-domain
+previews disabled in the dashboard. `workersDev` and `previewUrls` remain enabled for
+legacy links and workers.dev previews.
+
 The caption relay is a separate Worker plus an outbound Node relay; see [production captions](docs/production-captions.md). Discover needs a server-only YouTube Data API key; see [Discover](docs/discover.md).
 
 ## Limitations
