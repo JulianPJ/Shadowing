@@ -15,6 +15,8 @@ import { handleFeedRequest } from '../src/lib/discover/server';
 import { handleDiscoverAccountRequest } from '../src/lib/discover/account-server';
 import { readWatchLater, writeWatchLater, type WatchRecord } from '../src/lib/discover/watch-later';
 import { discoveryVideo, youtubeMetadata } from './helpers/discover';
+import { catalogueHealth } from '../src/lib/discover/health';
+import { recordPreparationState } from '../src/lib/discover/preparation-state';
 import {
   createD1LinkedTranscriptRepository,
   storedMediaIdentity,
@@ -64,6 +66,8 @@ after(() => mf.dispose());
 beforeEach(async () => {
   for (const table of [
     'discovery_video_state',
+    'discovery_rejections',
+    'discovery_seed_runs',
     'discovery_videos',
     'discovery_feedback',
     'discovery_metric_events',
@@ -78,10 +82,14 @@ beforeEach(async () => {
   ])
     await db.prepare(`DELETE FROM ${table}`).run();
   await db
-    .prepare('UPDATE discovery_seed_queries SET enabled=1,last_run_at=NULL,next_run_at=?')
+    .prepare(
+      'UPDATE discovery_seed_queries SET enabled=(level_target IS NOT NULL),last_run_at=NULL,next_run_at=?,runs=0,returned=0,accepted=0',
+    )
     .bind(new Date(0).toISOString())
     .run();
 });
+// Level-targeted seeds from migration 0014; the original nine are retired.
+const ENABLED_SEEDS = 28;
 const now = () => Date.now();
 const video = (i = 0) =>
   discoveryVideo(i, {
@@ -306,7 +314,7 @@ test('a full refresh day uses nearly 9000 points with paced searches and varied 
   assert.equal(quota?.day, '2026-07-01');
   assert.ok(quota!.units >= 8800 && quota!.units <= DISCOVER_DAILY_BUDGET);
   assert.ok(searches >= 87 && searches <= 89);
-  assert.equal(queries.size, 9);
+  assert.equal(queries.size, ENABLED_SEEDS);
   assert.deepEqual([...orders].sort(), ['date', 'relevance', 'viewCount']);
 });
 test('exhausted quota blocks network calls and resets only at Pacific midnight', async () => {
@@ -599,4 +607,201 @@ test('popularity remains private below ten learners and raw events expire', asyn
       .length,
     0,
   );
+});
+
+const providerSnippet = (
+  title: string,
+  description: string,
+  extra: Record<string, unknown> = {},
+) => ({
+  title,
+  description,
+  channelId: `channel-${title.length}`,
+  channelTitle: 'Channel',
+  publishedAt: '2026-10-01T00:00:00Z',
+  liveBroadcastContent: 'none',
+  thumbnails: { high: { url: 'https://i.ytimg.com/vi/x/hqdefault.jpg' } },
+  ...extra,
+});
+async function trustedTranscript(id: string) {
+  const media = (await resolveMediaUrl(`https://www.youtube.com/watch?v=${id}`)).media;
+  const cues = [{ start: 0, end: 5, text: '今日は日本語で話します。' }];
+  const hash = await transcriptHash(cues);
+  await createD1LinkedTranscriptRepository(db).save({
+    schemaVersion: 1,
+    contentKey: `youtube:${id}`,
+    media: storedMediaIdentity(media),
+    language: 'ja',
+    transcriptHash: hash,
+    cues,
+    source: {
+      schemaVersion: 1,
+      type: 'provider-captions',
+      language: 'ja',
+      provenance: 'test',
+      provider: 'test',
+      transcriptHash: hash,
+      normalizationVersion: 1,
+      segmentationVersion: 1,
+    },
+    visibility: 'system',
+    createdAt: new Date().toISOString(),
+  });
+}
+test('acquisition keeps spoken Japanese, records rejection reasons and seed yield, never assigns a band', async () => {
+  const ids = ['jpgood00000', 'english0000', 'korean00000', 'signlang000'];
+  const metadata = [
+    youtubeMetadata('jpgood00000', {
+      snippet: providerSnippet('【雑談ラジオ】最近ハマっていること', '二人で話す雑談ラジオです。', {
+        defaultAudioLanguage: 'ja',
+        categoryId: '22',
+      }),
+    }),
+    youtubeMetadata('english0000', {
+      snippet: providerSnippet(
+        'ゆっくり簡単英会話フレーズ（日本語音声付）',
+        '英語を3回読み上げます。聞き流しもできます。',
+      ),
+    }),
+    youtubeMetadata('korean00000', {
+      snippet: providerSnippet('【日本語字幕】爆笑シーン', '日本語字幕をつけました', {
+        defaultAudioLanguage: 'ko',
+      }),
+    }),
+    youtubeMetadata('signlang000', {
+      snippet: providerSnippet('【手話】自己紹介', '手話で自己紹介'),
+    }),
+  ];
+  const fetchImpl: typeof fetch = async (input) => {
+    const url = new URL(String(input));
+    if (url.pathname.endsWith('/search'))
+      return Response.json({ items: ids.map((videoId) => ({ id: { videoId } })) });
+    const requested = url.searchParams.get('id')!.split(',');
+    return Response.json({ items: metadata.filter((m) => requested.includes(m.id)) });
+  };
+  const time = Date.parse(`${youtubeQuotaWindow(now()).day}T20:00:00Z`);
+  await refreshCatalog(db, 'key', fetchImpl, time);
+  const catalogue = await readCatalog(db, time);
+  assert.deepEqual(
+    catalogue.map((v) => v.videoId),
+    ['jpgood00000'],
+  );
+  const [card] = catalogue;
+  // Search intent and quality evidence are recorded, but only a validated analysis sets a band.
+  assert.equal(card.band, null);
+  assert.equal(card.proof, null);
+  assert.equal(card.languageEvidence, 'reported-japanese-audio');
+  assert.equal(card.audience, 'native');
+  assert.equal(new Set(card.levelTargets).size, 2);
+  assert.ok(card.qualityScore! >= 55);
+  assert.ok(card.topics.includes('vlogs'));
+  assert.deepEqual(
+    (await db.prepare('SELECT video_id,reason FROM discovery_rejections ORDER BY video_id').all())
+      .results,
+    [
+      { video_id: 'english0000', reason: 'foreign-language-audio' },
+      { video_id: 'korean00000', reason: 'reported-other-audio' },
+      { video_id: 'signlang000', reason: 'sign-language' },
+    ],
+  );
+  // The second search skips IDs rejected by the first instead of requesting them again.
+  assert.deepEqual(
+    (
+      await db
+        .prepare(
+          'SELECT returned,accepted,rejected,reasons_json FROM discovery_seed_runs ORDER BY id',
+        )
+        .all()
+    ).results,
+    [
+      {
+        returned: 4,
+        accepted: 1,
+        rejected: 3,
+        reasons_json: '{"foreign-language-audio":1,"reported-other-audio":1,"sign-language":1}',
+      },
+      { returned: 4, accepted: 1, rejected: 0, reasons_json: '{"previously-rejected":3}' },
+    ],
+  );
+  const health = await catalogueHealth(db, time, youtubeQuotaWindow(time).day);
+  assert.equal(health.total, 1);
+  assert.equal(health.reportedJapaneseAudio, 1);
+  assert.equal(health.rejections24h['sign-language'], 1);
+  assert.equal(health.quotaUnitsToday, 202);
+  assert.equal(health.acceptedLast24h, 2);
+  assert.equal(Object.keys(health.levelTargets).length, 2);
+});
+test('re-assessment removes unsuitable stored videos without provider calls', async () => {
+  await saveVideos(db, [
+    { ...video(0), title: '【ゆっくり解説】日本語の起源', description: 'ゆっくり解説です' },
+    { ...video(1), title: '今日のできごとを話します', description: '日常の雑談です。' },
+  ]);
+  await refreshCatalog(db, undefined, async () => {
+    throw new Error('Re-assessment must not fetch');
+  });
+  const rows = await readCatalog(db);
+  assert.deepEqual(
+    rows.map((v) => v.videoId),
+    [video(1).videoId],
+  );
+  assert.ok(rows[0].qualityScore! >= 55);
+  assert.equal(rows[0].languageEvidence, 'japanese-metadata');
+  assert.equal(
+    (
+      await db
+        .prepare('SELECT reason FROM discovery_rejections WHERE video_id=?')
+        .bind(video(0).videoId)
+        .first<{ reason: string }>()
+    )?.reason,
+    'low-score',
+  );
+});
+test('videos prepared from trusted captions are backfilled once with one metadata unit', async () => {
+  await trustedTranscript('prepared001');
+  await trustedTranscript('gone0000000');
+  const requested: string[] = [];
+  const fetchImpl: typeof fetch = async (input) => {
+    const url = new URL(String(input));
+    if (url.pathname.endsWith('/search')) return Response.json({ items: [] });
+    requested.push(url.searchParams.get('id')!);
+    return Response.json({ items: [youtubeMetadata('prepared001')] });
+  };
+  const time = Date.parse(`${youtubeQuotaWindow(now()).day}T20:00:00Z`);
+  await refreshCatalog(db, 'key', fetchImpl, time);
+  await refreshCatalog(db, 'key', fetchImpl, time + 15 * 60000);
+  assert.deepEqual(requested, ['gone0000000,prepared001']);
+  const [card] = await readCatalog(db, time);
+  assert.equal(card.videoId, 'prepared001');
+  assert.equal(card.prepared, true);
+  assert.equal(card.languageEvidence, 'japanese-transcript');
+  assert.equal(card.band, null);
+  assert.equal(
+    (
+      await db
+        .prepare("SELECT reason FROM discovery_rejections WHERE video_id='gone0000000'")
+        .first<{ reason: string }>()
+    )?.reason,
+    'unavailable',
+  );
+});
+test('a successful preparation queues the video for analysis verification at the next run', async () => {
+  await saveVideos(db, [video(0), video(1)]);
+  for (const v of [video(0), video(1)])
+    await db
+      .prepare('INSERT INTO discovery_video_state(video_id,last_catalog_check_at) VALUES(?,?)')
+      .bind(v.videoId, new Date().toISOString())
+      .run();
+  await recordPreparationState(db, video(0).videoId, null);
+  await recordPreparationState(db, video(1).videoId, 'no-japanese-captions');
+  const rows = (
+    await db
+      .prepare(
+        'SELECT video_id,preparation_status,last_catalog_check_at FROM discovery_video_state ORDER BY video_id',
+      )
+      .all<{ video_id: string; preparation_status: string; last_catalog_check_at: string | null }>()
+  ).results;
+  assert.equal(rows[0].preparation_status, 'prepared');
+  assert.equal(rows[0].last_catalog_check_at, null);
+  assert.equal(rows[1].preparation_status, 'needs-captions');
+  assert.notEqual(rows[1].last_catalog_check_at, null);
 });

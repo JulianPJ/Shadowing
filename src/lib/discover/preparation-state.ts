@@ -12,7 +12,8 @@ export async function recordPreparationState(db: Database, videoId: string, code
       `INSERT INTO discovery_video_state(video_id,preparation_status,last_prepared_at,last_failure_code,cooldown_until)
     SELECT video_id,?,?,?,? FROM discovery_videos WHERE video_id=?
     ON CONFLICT(video_id) DO UPDATE SET preparation_status=excluded.preparation_status,last_prepared_at=excluded.last_prepared_at,
-      last_failure_code=excluded.last_failure_code,cooldown_until=excluded.cooldown_until`,
+      last_failure_code=excluded.last_failure_code,cooldown_until=excluded.cooldown_until,
+      last_catalog_check_at=CASE WHEN excluded.preparation_status='prepared' THEN NULL ELSE discovery_video_state.last_catalog_check_at END`,
     )
     .bind(status, code === null ? time : null, code, cooldown, videoId)
     .run();

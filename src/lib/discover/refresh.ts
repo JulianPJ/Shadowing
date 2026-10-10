@@ -9,8 +9,24 @@ import { segmentTranscript } from '../segmentation';
 import { transcriptKey } from '../transcript';
 import { validateDifficultyAnalysis } from '../difficulty';
 import { TOPICS, type Topic } from './types';
-import { saveVideos } from './catalog';
 import { youtubeDataApi, YoutubeDataError } from './youtube-data-api';
+import {
+  LEVEL_TARGETS,
+  chooseSeeds,
+  seedCooldown,
+  seedOrder,
+  type Coverage,
+  type LevelTarget,
+  type Seed,
+} from './acquisition';
+import {
+  REJECTION_DAYS,
+  ingestVideos,
+  preparedBackfillIds,
+  reassessCatalogue,
+  recentlyRejected,
+} from './ingest';
+import { catalogueHealth } from './health';
 
 // Conservative internal weights: a search costs 100 points, a metadata batch costs one.
 // This also keeps searches below Google's separate default 100-search/day allowance.
@@ -101,6 +117,62 @@ export async function verifyAnalyses(db: D1Database, now = Date.now()) {
       .run();
   }
 }
+// Seeds whose schedule lies beyond the longest adaptive cooldown are treated as legacy and due.
+const MAX_COOLDOWN = 13 * 3600000;
+async function dueSeeds(db: D1Database, now: number): Promise<Seed[]> {
+  const rows = await db
+    .prepare(
+      `SELECT id,topic,query,level_target,orientation,runs,returned,accepted,last_run_at FROM discovery_seed_queries
+      WHERE enabled=1 AND (next_run_at<=? OR next_run_at>?)`,
+    )
+    .bind(new Date(now).toISOString(), new Date(now + MAX_COOLDOWN).toISOString())
+    .all<{
+      id: string;
+      topic: string;
+      query: string;
+      level_target: string | null;
+      orientation: string | null;
+      runs: number;
+      returned: number;
+      accepted: number;
+      last_run_at: string | null;
+    }>();
+  return rows.results
+    .filter((r) => r.topic in TOPICS)
+    .map((r) => ({
+      id: r.id,
+      topic: r.topic as Topic,
+      query: r.query,
+      levelTarget: (LEVEL_TARGETS as readonly string[]).includes(r.level_target ?? '')
+        ? (r.level_target as LevelTarget)
+        : null,
+      orientation: r.orientation === 'learner' || r.orientation === 'native' ? r.orientation : null,
+      runs: r.runs,
+      returned: r.returned,
+      accepted: r.accepted,
+      lastRunAt: r.last_run_at,
+    }));
+}
+async function catalogueCoverage(db: D1Database): Promise<Coverage> {
+  const [total, levels, topics] = await Promise.all([
+    db.prepare('SELECT COUNT(*) AS n FROM discovery_videos').first<{ n: number }>(),
+    db
+      .prepare(
+        'SELECT j.value AS key, COUNT(*) AS n FROM discovery_videos v, json_each(v.level_targets_json) j GROUP BY j.value',
+      )
+      .all<{ key: LevelTarget; n: number }>(),
+    db
+      .prepare(
+        'SELECT j.value AS key, COUNT(*) AS n FROM discovery_videos v, json_each(v.topic_keys_json) j GROUP BY j.value',
+      )
+      .all<{ key: Topic; n: number }>(),
+  ]);
+  return {
+    total: total?.n ?? 0,
+    levels: Object.fromEntries(levels.results.map((r) => [r.key, r.n])),
+    topics: Object.fromEntries(topics.results.map((r) => [r.key, r.n])),
+  };
+}
 export async function refreshCatalog(
   db: D1Database,
   apiKey?: string,
@@ -117,7 +189,10 @@ export async function refreshCatalog(
     .first();
   if (!acquired) return;
   let searches = 0,
-    refreshed = 0;
+    refreshed = 0,
+    accepted = 0,
+    rejected = 0,
+    backfilled = 0;
   try {
     // Expired public API metadata is deleted even when the key is missing or quota exhausted.
     await db.batch([
@@ -137,6 +212,12 @@ export async function refreshCatalog(
       db
         .prepare('DELETE FROM discovery_quota WHERE day<?')
         .bind(new Date(now - 7 * 86400000).toISOString().slice(0, 10)),
+      db
+        .prepare('DELETE FROM discovery_rejections WHERE rejected_at<?')
+        .bind(new Date(now - REJECTION_DAYS * 86400000).toISOString()),
+      db
+        .prepare('DELETE FROM discovery_seed_runs WHERE run_at<?')
+        .bind(new Date(now - 30 * 86400000).toISOString()),
     ]);
     try {
       if (apiKey) {
@@ -161,40 +242,68 @@ export async function refreshCatalog(
           )
           .bind(new Date(now - 86400000).toISOString())
           .all<{ video_id: string }>();
+        // Refreshed metadata is re-assessed: a video that no longer qualifies leaves the catalogue.
         for (let i = 0; i < stale.results.length; i += 50) {
           const ids = stale.results.slice(i, i + 50).map((v) => v.video_id),
             videos = await api.videos(ids, [], now);
-          await saveVideos(db, videos);
+          const result = await ingestVideos(db, ids, videos, now);
           refreshed += videos.length;
-          const valid = new Set(videos.map((v) => v.videoId));
-          const unavailable = ids.filter((id) => !valid.has(id));
-          if (unavailable.length)
-            await db.batch(
-              unavailable.map((id) =>
-                db.prepare('DELETE FROM discovery_videos WHERE video_id=?').bind(id),
-              ),
-            );
+          rejected += result.rejected;
         }
-        const seeds = await db
-          .prepare(
-            `SELECT id,topic,query FROM discovery_seed_queries WHERE enabled=1
-            AND (next_run_at<=? OR (last_run_at IS NOT NULL AND last_run_at<=?))
-            ORDER BY COALESCE(last_run_at,'1970-01-01T00:00:00.000Z'),id LIMIT 2`,
-          )
-          .bind(time, new Date(now - 3600000).toISOString())
-          .all<{ id: string; topic: Topic; query: string }>();
-        for (const seed of seeds.results) {
-          if (!(seed.topic in TOPICS)) continue;
-          const order = (['relevance', 'date', 'viewCount'] as const)[
-            Math.floor(now / 3600000) % 3
-          ];
-          const ids = await api.search(seed.query, order);
+        // Videos already prepared from trusted Japanese captions are the most useful additions.
+        const backfill = await preparedBackfillIds(db, now);
+        if (backfill.length) {
+          const result = await ingestVideos(db, backfill, await api.videos(backfill, [], now), now);
+          backfilled += result.accepted;
+          rejected += result.rejected;
+        }
+        const seeds = chooseSeeds(await dueSeeds(db, now), await catalogueCoverage(db), now);
+        for (const seed of seeds) {
+          const order = seedOrder(seed);
+          const found = await api.search(seed.query, order);
           searches++;
-          await saveVideos(db, await api.videos(ids, [seed.topic], now));
-          await db
-            .prepare('UPDATE discovery_seed_queries SET last_run_at=?,next_run_at=? WHERE id=?')
-            .bind(time, new Date(now + 3600000).toISOString(), seed.id)
-            .run();
+          // Recently rejected IDs are not re-requested; they still count towards the seed's yield.
+          const skip = await recentlyRejected(db, found, now);
+          const ids = found.filter((id) => !skip.has(id));
+          const result = ids.length
+            ? await ingestVideos(db, ids, await api.videos(ids, [seed.topic], now), now, seed)
+            : { accepted: 0, rejected: 0, reasons: {} as Record<string, number> };
+          if (skip.size) result.reasons['previously-rejected'] = skip.size;
+          accepted += result.accepted;
+          rejected += result.rejected;
+          const updated = {
+            ...seed,
+            runs: seed.runs + 1,
+            returned: seed.returned + found.length,
+            accepted: seed.accepted + result.accepted,
+          };
+          await db.batch([
+            db
+              .prepare(
+                'UPDATE discovery_seed_queries SET last_run_at=?,next_run_at=?,runs=?,returned=?,accepted=? WHERE id=?',
+              )
+              .bind(
+                time,
+                new Date(now + seedCooldown(updated)).toISOString(),
+                updated.runs,
+                updated.returned,
+                updated.accepted,
+                seed.id,
+              ),
+            db
+              .prepare(
+                'INSERT INTO discovery_seed_runs(seed_id,run_at,search_order,returned,accepted,rejected,reasons_json) VALUES(?,?,?,?,?,?,?)',
+              )
+              .bind(
+                seed.id,
+                time,
+                order,
+                found.length,
+                result.accepted,
+                result.rejected,
+                JSON.stringify(result.reasons),
+              ),
+          ]);
         }
       }
     } catch (error) {
@@ -204,7 +313,8 @@ export async function refreshCatalog(
           : 'discover.refresh.provider_unavailable',
       );
     }
-    // An upstream outage/quota limit must not stop independent analysis reuse or metrics.
+    // An upstream outage/quota limit must not stop local re-assessment, analysis reuse or metrics.
+    const reassessed = await reassessCatalogue(db, now);
     await verifyAnalyses(db, now);
     // Minimum ten distinct authenticated learners, unique events per learner/day/video/action.
     await db
@@ -217,7 +327,23 @@ export async function refreshCatalog(
       .bind(new Date(now - 7 * 86400000).toISOString().slice(0, 10))
       .run();
     console.info(
-      JSON.stringify({ event: 'discover.refresh', searches, refreshed, keyConfigured: !!apiKey }),
+      JSON.stringify({
+        event: 'discover.refresh',
+        searches,
+        refreshed,
+        accepted,
+        rejected,
+        backfilled,
+        reassessed: reassessed.reassessed,
+        removed: reassessed.removed,
+        keyConfigured: !!apiKey,
+      }),
+    );
+    console.info(
+      JSON.stringify({
+        event: 'discover.health',
+        ...(await catalogueHealth(db, now, youtubeQuotaWindow(now).day)),
+      }),
     );
   } catch (error) {
     storageEvent(

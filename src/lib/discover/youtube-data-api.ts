@@ -1,5 +1,13 @@
 import { readBoundedText } from '../http-body';
 import { TOPICS, canonicalUrl, validVideoId, type Topic, type Video } from './types';
+import type { QualityInput } from './quality';
+/** Catalogue metadata plus provider signals used only for quality assessment. */
+export type ProviderVideo = Video & {
+  signals: Pick<
+    QualityInput,
+    'defaultAudioLanguage' | 'defaultLanguage' | 'categoryId' | 'topicCategories'
+  > & { fullDescription: string };
+};
 export class YoutubeDataError extends Error {
   constructor(readonly code: 'quota' | 'unavailable' | 'invalid-response') {
     super(code);
@@ -184,7 +192,7 @@ export function youtubeDataApi(
       );
       return [...new Set(items.map((i) => object(object(i).id).videoId).filter(validVideoId))];
     },
-    async videos(ids: string[], topics: Topic[] = [], now = Date.now()): Promise<Video[]> {
+    async videos(ids: string[], topics: Topic[] = [], now = Date.now()): Promise<ProviderVideo[]> {
       if (!ids.length) return [];
       if (
         ids.length > 50 ||
@@ -195,18 +203,20 @@ export function youtubeDataApi(
       const items = await request(
         'videos',
         {
-          part: 'snippet,contentDetails,status',
+          // topicDetails costs no additional quota and identifies music-only videos.
+          part: 'snippet,contentDetails,status,topicDetails',
           id: [...new Set(ids)].join(','),
           maxResults: '50',
         },
         1,
       );
-      const result: Video[] = [];
+      const result: ProviderVideo[] = [];
       for (const value of items) {
         const item = object(value),
           snippet = object(item.snippet),
           status = object(item.status),
-          details = object(item.contentDetails);
+          details = object(item.contentDetails),
+          topicDetails = object(item.topicDetails);
         const id = item.id,
           duration = parseDuration(details.duration);
         if (
@@ -230,6 +240,11 @@ export function youtubeDataApi(
           thumbnailUrl(object(thumbnails.medium).url) ??
           thumbnailUrl(object(thumbnails.default).url);
         const region = object(details.regionRestriction);
+        const language = (v: unknown) => {
+          const value = text(v, 20);
+          return /^[a-zA-Z]{2,3}(?:-[a-zA-Z0-9]{1,8})*$/.test(value) ? value : null;
+        };
+        const category = text(snippet.categoryId, 4);
         const regions = (v: unknown) =>
           Array.isArray(v)
             ? v
@@ -261,6 +276,18 @@ export function youtubeDataApi(
           proof: null,
           audience: null,
           popularity: null,
+          signals: {
+            defaultAudioLanguage: language(snippet.defaultAudioLanguage),
+            defaultLanguage: language(snippet.defaultLanguage),
+            categoryId: /^\d{1,3}$/.test(category) ? category : null,
+            topicCategories: Array.isArray(topicDetails.topicCategories)
+              ? topicDetails.topicCategories
+                  .filter((t): t is string => typeof t === 'string')
+                  .map((t) => t.slice(t.lastIndexOf('/') + 1, t.lastIndexOf('/') + 81))
+                  .slice(0, 10)
+              : [],
+            fullDescription: text(snippet.description, 5000),
+          },
         });
       }
       return result;
