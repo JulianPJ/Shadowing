@@ -325,3 +325,18 @@ test('daily limits accept custom values, zero for either card type and no limit,
   await expect(reviewLimit).toHaveValue('');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
+
+test('phrase cards without a saved reading show generated furigana', async ({ page, context }) => {
+  const remote = await connect(context);
+  await seed(remote, 1);
+  remote.entries[0].term = '気持ちが落ち着きます';
+  await page.goto('/review');
+  await page.getByRole('button', { name: 'Start review', exact: true }).click();
+  const heading = page.locator('.review-card h2');
+  await expect(heading).toHaveText('気持ちが落ち着きます');
+  await page.getByRole('button', { name: 'Show reading', exact: true }).click();
+  await expect(heading.locator('rt').first()).toBeVisible();
+  await expect(heading.locator('rt')).toHaveText(['きも', 'お', 'つ']);
+  await page.getByRole('button', { name: 'Hide reading', exact: true }).click();
+  await expect(heading.locator('rt')).toHaveCount(0);
+});

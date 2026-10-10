@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAccount } from './account';
 import { useReview } from './use-review';
 import { JapaneseText } from './japanese-text';
+import { hasKanji } from '@/lib/japanese-readings';
 import { VocabularyHeader } from './vocabulary-header';
 import {
   acknowledgeReviewConflict,
@@ -409,9 +410,10 @@ export function DailyReview() {
             </button>
           </div>
           <h2 lang="ja" tabIndex={-1} ref={heading}>
-            {entry.term}
+            {/* Phrase cards have no saved reading, so they show generated furigana instead. */}
+            {reading && !entry.reading ? <JapaneseText text={entry.term} furigana /> : entry.term}
           </h2>
-          {entry.reading ? (
+          {entry.reading || hasKanji(entry.term) ? (
             <>
               <button
                 className="text-button"
@@ -420,7 +422,7 @@ export function DailyReview() {
               >
                 {reading ? 'Hide reading' : 'Show reading'}
               </button>
-              {reading ? (
+              {reading && entry.reading ? (
                 <p lang="ja" className="review-reading">
                   {entry.reading}
                 </p>

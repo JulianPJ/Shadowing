@@ -103,6 +103,26 @@
   font-size: 13px;
   min-height: 44px;
 }
+/* The active pill sits inside the 44px target so it stays compact and padded. */
+.site-header nav.desktop-navigation {
+  gap: 4px;
+}
+.site-header nav.desktop-navigation .nav-link {
+  position: relative;
+  isolation: isolate;
+  padding: 0 12px;
+}
+.site-header nav.desktop-navigation .nav-link[aria-current='page'] {
+  background: none;
+}
+.site-header nav.desktop-navigation .nav-link[aria-current='page']::before {
+  content: '';
+  position: absolute;
+  inset: 6px 0;
+  z-index: -1;
+  border-radius: 8px;
+  background: var(--green-pale);
+}
 .navigation-toggle {
   display: none;
 }
