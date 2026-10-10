@@ -205,7 +205,9 @@ test('cursor UI and complete export reach old vocabulary; targeted review remain
   await expect(page.getByRole('heading', { name: '古い語', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Show answer' }).click();
   await page.getByRole('button', { name: /^Good/ }).click();
-  await expect(page.getByRole('heading', { name: 'Caught up for now' })).toBeVisible();
+  // The learning card returns early because nothing else is due.
+  await expect(page.getByRole('heading', { name: '古い語', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Show answer' })).toBeVisible();
 });
 
 test('review keeps the full due queue and bounds each targeted hydration request', async ({

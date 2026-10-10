@@ -35,10 +35,12 @@ for (const plan of ['free', 'pro'] as const)
     await expect(popup.getByTestId('current-japanese')).toHaveText(demo.segments[0].japanese);
     await popup.close();
     await page.getByRole('button', { name: /^Good/ }).click();
-    await expect(page.getByRole('heading', { name: 'Caught up for now' })).toBeVisible();
+    // The learning card returns in the same session instead of ending it.
+    await expect(page.getByRole('button', { name: /Show answer/ })).toBeVisible();
+    await expect(page.getByRole('status')).toHaveText('1 reviewed · 1 left');
     await expect.poll(() => remote.review.cards[0].repetitions).toBe(1);
     await page.reload();
-    await expect(page.getByRole('heading', { name: 'Caught up for now' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Show answer/ })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     );
@@ -59,7 +61,8 @@ test('all four grades advance the session and persist deterministic state across
       await page.getByRole('button', { name: /Show answer/ }).click();
       await page.getByRole('button', { name: new RegExp(`^${grade}`) }).click();
     }
-    await expect(page.getByRole('heading', { name: 'Caught up for now' })).toBeVisible();
+    // Again, Hard and Good leave learning cards that come back in the same session.
+    await expect(page.getByRole('status')).toHaveText('4 reviewed · 3 left');
     await expect.poll(() => remote.review.cards.map((c) => c.revision)).toEqual([1, 1, 1, 1]);
     expect(remote.review.cards.map((c) => c.intervalDays)).toEqual([0, 0, 0, 4]);
     const second = await browser.newContext();

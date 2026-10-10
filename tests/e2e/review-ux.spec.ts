@@ -45,7 +45,7 @@ test('all 25 due cards can be finished; optional limits keep the remaining backl
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
-test('Again returns automatically with actual intervals; later-today study accelerates only learning', async ({
+test('learning cards return in the same session with actual intervals', async ({
   page,
   context,
 }) => {
@@ -59,17 +59,13 @@ test('Again returns automatically with actual intervals; later-today study accel
   await expect(page.getByRole('button', { name: /^Again · 1m/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /^Good · 10m/ })).toBeVisible();
   await page.keyboard.press('1');
-  await expect(page.getByRole('heading', { name: 'Caught up for now' })).toBeVisible();
   await expect.poll(() => remote.review.cards[0].revision).toBe(1);
   expect(
     Date.parse(remote.review.cards[0].dueAt) - Date.parse(remote.review.cards[0].lastReviewedAt!),
   ).toBe(60000);
-  await page.clock.fastForward(61000);
-  await expect(page.getByRole('button', { name: /Show answer/ })).toBeVisible();
+  // Nothing else is due, so the card is shown again without waiting for its step.
   await page.getByRole('button', { name: /Show answer/ }).click();
   await page.getByRole('button', { name: /^Good · 10m/ }).click();
-  await expect(page.getByRole('heading', { name: 'Caught up for now' })).toBeVisible();
-  await page.getByRole('button', { name: 'Study remaining today now', exact: true }).click();
   await page.getByRole('button', { name: /Show answer/ }).click();
   await page.getByRole('button', { name: /^Good · 1d/ }).click();
   await expect(page.getByRole('heading', { name: 'Today’s review is complete' })).toBeVisible();

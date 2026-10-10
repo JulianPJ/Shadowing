@@ -12,12 +12,7 @@ import {
   changeReview,
   pendingReview,
 } from '@/lib/review/client';
-import {
-  dueReviews,
-  previewReview,
-  reviewIntervalLabel,
-  scheduleReview,
-} from '@/lib/review-scheduler';
+import { dueReviews, previewReview, scheduleReview } from '@/lib/review-scheduler';
 import { dictionaryByIds } from '@/lib/dictionary/client';
 import { reviewContextHref, externalReplay } from '@/lib/dictionary/replay';
 import { readStorage, writeStorage } from '@/lib/storage/browser';
@@ -39,7 +34,6 @@ const ContextPlayer = dynamic(
 );
 type StudySession = {
   owner: string;
-  ahead: boolean;
   answered: number;
   skipped: string[];
   currentId: string | null;
@@ -109,7 +103,8 @@ export function DailyReview() {
   const dueCards = limited.cards;
   const limitedCount = allDue.length - dueCards.length;
   const delayed = laterToday(cards, now);
-  const remaining = [...dueCards, ...(activeSession?.ahead ? delayed : [])].filter(
+  // Like Anki, learning cards due later today are shown early once nothing else is due.
+  const remaining = [...dueCards, ...delayed].filter(
     (c) => !activeSession?.skipped.includes(c.entryId),
   );
   const id = activeSession?.currentId ?? (activeSession ? remaining[0]?.entryId : undefined);
@@ -138,7 +133,6 @@ export function DailyReview() {
       Array.isArray(stored.skipped) &&
       Number.isInteger(stored.answered) &&
       stored.answered >= 0 &&
-      typeof stored.ahead === 'boolean' &&
       typeof stored.startedAt === 'string'
     )
       setSession(stored);
@@ -201,10 +195,10 @@ export function DailyReview() {
     };
   }, [owner, hydrationKey, retry]);
   /* eslint-enable react-hooks/set-state-in-effect */
-  function begin(ahead = false) {
+  function begin() {
     if (!owner) return;
     setError('');
-    setSession({ owner, ahead, answered: 0, skipped: [], currentId: null, startedAt: now });
+    setSession({ owner, answered: 0, skipped: [], currentId: null, startedAt: now });
   }
   function updateLimits(value: StudyLimits) {
     setLimits(value);
@@ -311,8 +305,9 @@ export function DailyReview() {
     learning: dueCards.filter((c) => c.status === 'learning').length,
     review: dueCards.filter((c) => c.status === 'review').length,
   };
-  const skippedCount = dueCards.filter((c) => activeSession?.skipped.includes(c.entryId)).length;
-  const upcoming = delayed[0];
+  const skippedCount = [...dueCards, ...delayed].filter((c) =>
+    activeSession?.skipped.includes(c.entryId),
+  ).length;
   return (
     <main className="dictionary-screen review-screen">
       <VocabularyHeader active="review" />
@@ -356,20 +351,11 @@ export function DailyReview() {
               <div className="review-actions">
                 <button
                   className="button primary"
-                  disabled={!dueCards.length || !!review.conflict}
+                  disabled={(!dueCards.length && !delayed.length) || !!review.conflict}
                   onClick={() => begin()}
                 >
                   Start review
                 </button>
-                {delayed.length ? (
-                  <button
-                    className="button"
-                    disabled={!!review.conflict}
-                    onClick={() => begin(true)}
-                  >
-                    Study remaining today now
-                  </button>
-                ) : null}
               </div>
               <details className="review-settings">
                 <summary>Review settings</summary>
@@ -565,33 +551,14 @@ export function DailyReview() {
           <h2>
             {review.loading
               ? 'Opening your review…'
-              : delayed.length || skippedCount || limitedCount
+              : skippedCount || limitedCount
                 ? 'Caught up for now'
                 : 'Today’s review is complete'}
           </h2>
           <p>
             {activeSession.answered} {activeSession.answered === 1 ? 'word' : 'words'} reviewed.
           </p>
-          {delayed.length ? (
-            <p>
-              {delayed.length} learning {delayed.length === 1 ? 'card returns' : 'cards return'}{' '}
-              later today
-              {upcoming
-                ? ` · next in ${reviewIntervalLabel(Math.max(0, Date.parse(upcoming.dueAt) - clock))}`
-                : ''}
-              .
-            </p>
-          ) : null}
           <div className="review-actions">
-            {delayed.length ? (
-              <button
-                className="button primary"
-                disabled={!!review.conflict}
-                onClick={() => setSession({ ...activeSession, ahead: true, currentId: null })}
-              >
-                Study remaining today now
-              </button>
-            ) : null}
             {skippedCount ? (
               <button
                 className="button"
