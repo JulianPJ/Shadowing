@@ -1,7 +1,7 @@
 import baseline from './discover-baseline-2026-10-10.json' with { type: 'json' };
 import type { LevelTarget } from '../../src/lib/discover/acquisition';
 import type { QualityInput } from '../../src/lib/discover/quality';
-import type { Topic } from '../../src/lib/discover/types';
+import type { Band, Topic } from '../../src/lib/discover/types';
 
 /**
  * Labelled candidates for the Discover evaluation harness.
@@ -24,6 +24,8 @@ export type Candidate = QualityInput & {
   levelTarget?: LevelTarget;
   topic?: Topic;
   note?: string;
+  /** Simulated validated transcript analysis (only for prepared videos in real data). */
+  band?: Band;
 };
 
 export const baselineCandidates: Candidate[] = baseline.map((b) => ({
@@ -395,5 +397,22 @@ export const matrixCandidates: Candidate[] = [
     note: 'ambient walk without speech: indistinguishable from metadata',
   }),
 ];
+
+// Some relevant matrix videos have been prepared and analysed, as after a few weeks of use.
+// Each band is held by one or two videos; the rest of the catalogue stays unverified.
+const verified: [number, Band][] = [
+  [0, 'n5_n4'],
+  [2, 'n5_plus'],
+  [4, 'n5_n4'],
+  [6, 'n4_n3'],
+  [7, 'n3_n2'],
+  [10, 'n3_n2'],
+  [12, 'n4_n3'],
+  [15, 'n2_n1'],
+  [16, 'n1_plus'],
+  [18, 'n2_n1'],
+];
+for (const [index, band] of verified)
+  Object.assign(matrixCandidates[index], { band, prepared: true, captionFlag: true });
 
 export const allCandidates = [...baselineCandidates, ...matrixCandidates];

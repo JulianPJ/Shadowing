@@ -270,6 +270,17 @@ export function DiscoverFeed({ library: shared }: { library: ReturnType<typeof u
     });
   }
   const suggested = preferences.preferredBand ?? feed?.suggestedBand ?? null;
+  const exactBand = BANDS.find((b) => b[0] === filters.band)?.[1] ?? null;
+  // The closest band that has estimated videos under the other active filters.
+  const nearest = (() => {
+    const counts = feed?.coverage?.byBand;
+    const index = BANDS.findIndex((b) => b[0] === filters.band);
+    if (!counts || index < 0) return null;
+    const options = BANDS.map((b, i) => [b[0], b[1], counts[b[0]], Math.abs(i - index)] as const)
+      .filter(([, , count]) => count > 0)
+      .sort((a, b) => a[3] - b[3]);
+    return options[0] ?? null;
+  })();
   const bandLabel = suggested ? BANDS.find((b) => b[0] === suggested)![1] : null;
   const lanes = feed?.lanes ?? [],
     laneIds = new Set(lanes.flatMap((l) => l.items.map((v) => v.videoId)));
@@ -323,7 +334,12 @@ export function DiscoverFeed({ library: shared }: { library: ReturnType<typeof u
             <RefreshCw size={15} /> Refresh
           </button>
         </div>
-        <DiscoverFilters key={filters.q} value={filters} onChange={change} />
+        <DiscoverFilters
+          key={filters.q}
+          value={filters}
+          onChange={change}
+          suggestedBand={suggested}
+        />
         {notice ? (
           <div className="discover-notice" role={noticeError ? 'alert' : 'status'}>
             {notice}
@@ -376,7 +392,28 @@ export function DiscoverFeed({ library: shared }: { library: ReturnType<typeof u
             <span className="sr-only">Finding Japanese videos…</span>
           </div>
         ) : null}
-        {!loading && !error && feed?.total === 0 ? (
+        {!loading && !error && feed?.total === 0 && exactBand ? (
+          <div className="discover-empty">
+            <Compass size={32} />
+            <h2>No {exactBand} videos with an estimated level yet.</h2>
+            <p>
+              Hibiki estimates a level only after analysing a video’s full Japanese transcript, so
+              this filter is never filled with guesses.{' '}
+              {feed.coverage?.verified
+                ? `${feed.coverage.verified} ${feed.coverage.verified === 1 ? 'video has' : 'videos have'} an estimated level with your other filters.`
+                : 'No videos have an estimated level with your other filters yet.'}
+            </p>
+            {nearest ? (
+              <button className="button" onClick={() => change({ ...filters, band: nearest[0] })}>
+                Try {nearest[1]} ({nearest[2]})
+              </button>
+            ) : null}
+            <button className="button" onClick={() => change({ ...filters, band: 'all' })}>
+              Browse all levels
+            </button>
+          </div>
+        ) : null}
+        {!loading && !error && feed?.total === 0 && !exactBand ? (
           <div className="discover-empty">
             <Compass size={32} />
             <h2>

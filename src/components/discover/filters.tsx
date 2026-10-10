@@ -1,13 +1,32 @@
 'use client';
 import { Search, SlidersHorizontal, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { BANDS, TOPICS, DEFAULT_FILTERS, type Filters as Values } from '@/lib/discover/types';
+import {
+  BANDS,
+  TOPICS,
+  DEFAULT_FILTERS,
+  type Band,
+  type Filters as Values,
+} from '@/lib/discover/types';
+/** Exact-band shortcuts around the learner's level; each sets an ordinary band filter. */
+function relativeBands(band: Band): [string, Band][] {
+  const index = BANDS.findIndex((b) => b[0] === band);
+  return (
+    [
+      ['Easier', index - 1],
+      ['My level', index],
+      ['Challenge', index + 1],
+    ] as const
+  ).flatMap(([label, i]) => (BANDS[i] ? [[label, BANDS[i][0]] as [string, Band]] : []));
+}
 export function DiscoverFilters({
   value,
   onChange,
+  suggestedBand = null,
 }: {
   value: Values;
   onChange: (value: Values) => void;
+  suggestedBand?: Band | null;
 }) {
   const [search, setSearch] = useState(value.q);
   const [advanced, setAdvanced] = useState(false);
@@ -36,6 +55,26 @@ export function DiscoverFilters({
               </button>
             ))}
           </div>
+          {suggestedBand ? (
+            <div
+              className="discover-level-shortcuts"
+              role="group"
+              aria-label="Compared with your level"
+            >
+              {relativeBands(suggestedBand).map(([label, band]) => (
+                <button
+                  key={label}
+                  aria-pressed={value.band === band}
+                  onClick={() => onChange({ ...value, band })}
+                >
+                  {label} · {BANDS.find((b) => b[0] === band)![1]}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          <p className="discover-level-note">
+            Level filters show only videos whose full Japanese transcript Hibiki has analysed.
+          </p>
         </div>
         <form
           className="discover-search"
@@ -203,7 +242,7 @@ function filterLabel(key: string, selected: string) {
     speed: { slow: 'Slow speech', natural: 'Natural speech', fast: 'Fast speech' },
     captions: { reported: 'YouTube reports captions', prepared: 'Japanese prepared in Hibiki' },
     sort: { newest: 'Recently added', shortest: 'Shortest first', trending: 'Trending in Hibiki' },
-    audience: { learner: 'For learners', native: 'For native audiences' },
+    audience: { learner: 'Made for learners', native: 'Native Japanese content' },
     diversity: { wide: 'More variety' },
   };
   return labels[key]?.[selected] ?? selected;
@@ -224,8 +263,8 @@ function AdvancedControls({
           onChange={(e) => onChange({ ...value, audience: e.target.value as Values['audience'] })}
         >
           <option value="any">Any orientation</option>
-          <option value="learner">For learners · verified only</option>
-          <option value="native">For native audiences · verified only</option>
+          <option value="learner">Made for learners</option>
+          <option value="native">Native Japanese content</option>
         </select>
       </label>
       <label>

@@ -121,6 +121,8 @@ export type Feed = {
   filters: Filters;
   suggestedBand: Band | null;
   catalogueUpdatedAt: string | null;
+  /** Public catalogue counts for the current non-level filters, used for honest empty states. */
+  coverage?: { total: number; verified: number; prepared: number; byBand: Record<Band, number> };
 };
 export const validVideoId = (id: unknown): id is string =>
   typeof id === 'string' && /^[a-zA-Z0-9_-]{11}$/.test(id);

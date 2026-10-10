@@ -14,7 +14,7 @@ Clicking a card goes to `/prepare?video=<canonical URL>`, which reuses Home with
 | --- | --- |
 | UI and responsive styles | `src/components/discover/`, `src/app/styles/discover.css` |
 | Catalogue, eligibility, contracts | `src/lib/discover/catalog.ts`, `eligibility.ts`, `validation.ts`, `types.ts` |
-| Ranking and local vocabulary evidence | `rank.ts`, `vocabulary.ts` |
+| Ranking, explanations and local vocabulary evidence | `score.ts`, `rank.ts`, `vocabulary.ts` |
 | Scheduled provider acquisition | `refresh.ts`, `youtube-data-api.ts`, `ingest.ts` |
 | Seed strategy, quality assessment, catalogue health | `acquisition.ts`, `quality.ts`, `health.ts` |
 | APIs and queue merge | `server.ts`, `account-server.ts`, `watch-later.ts` |
@@ -25,9 +25,21 @@ Clicking a card goes to `/prepare?video=<canonical URL>`, which reuses Home with
 
 `GET /api/discover` is an anonymous metadata-only read with normalized query parameters and `public, max-age=60`. The Worker uses a named Cache API cache segmented by Cloudflare country. `POST /api/discover` accepts `{ filters, context, cursor }`, requires same-origin JSON, is bounded at 16 KB and always `no-store`. Account cookies never personalize a public GET. Private bodies enter neither shared caches nor logs.
 
-Responses contain `{ items, lanes, total, hasMore, nextCursor, filters, suggestedBand, catalogueUpdatedAt }`. Cards contain public metadata and optional transcript identity/version proof, never transcript text or lesson blobs. One bounded D1 join reads the latest 1,000 fresh candidates; pages contain 24 results. Opaque cursors bind filters, bounded aggregate context, region, catalogue revision and hourly ranking epoch. Changed inputs expire the cursor; the UI offers a fresh retry.
+Responses contain `{ items, lanes, total, hasMore, nextCursor, filters, suggestedBand, catalogueUpdatedAt, coverage }`. `coverage` counts estimated levels per band, prepared videos and the total under the current non-level filters; it is a public catalogue aggregate, safe for the shared cache. Cards contain public metadata and optional transcript identity/version proof, never transcript text or lesson blobs. One bounded D1 join reads the latest 1,000 fresh candidates; pages contain 24 results. Opaque cursors bind filters, bounded aggregate context, region, catalogue revision and hourly ranking epoch. Changed inputs expire the cursor; the UI offers a fresh retry.
 
-Explainable ranking uses content-band proximity, chosen topics, catalogue topics from saved/completed/liked Hibiki videos, typical completed-session duration, freshness, prepared captions and repeat avoidance. Balanced/wide variety interleaves channels/topics without deleting candidates. Newest and shortest preserve requested ordering. Trending uses aggregated Hibiki activity, never YouTube engagement statistics. Recommended, Easy listening, Stretch, 5–10 minutes, chosen topic, New discoveries and Trending lanes appear when eligible candidates exist.
+Ranking (`score.ts`, `rank.ts`) adds five bounded parts, and the strongest explains the card:
+
+| Part | Signals |
+| --- | --- |
+| Quality | Versioned quality score, declared Japanese audio, prepared Japanese captions (+6), reported captions; known `needs-captions` (−5) or failed preparation (−3) keeps a video visible without leading |
+| Difficulty | Estimated band only: same band +20, one easier +14, one harder +12, further easier −3, further harder −10. For unverified videos a matching search level target adds +4 and is explained as search intent ("level not yet estimated") |
+| Interest | Chosen topics, topics and channels from More like this, topics of saved/completed videos, typical session length, local vocabulary fit |
+| History | Saved, completed and seen videos fall back |
+| Exploration | Freshness, and +1 for creators the learner has not met |
+
+For you with a known level then applies a progression hypothesis of six comfortable, two easier and two stretch picks per ten. Slots reorder only estimated matches that exist; an empty slot takes the next best video, so scarce levels are never padded with guesses. Balanced/wide variety then interleaves channels/topics without deleting candidates. Newest and shortest preserve requested ordering. Trending uses aggregated Hibiki activity, never YouTube engagement statistics. Recommended, Easy listening, A little stretch, Ready to shadow now (prepared captions), 5–10 minutes, chosen topic, New discoveries and Trending lanes appear when eligible candidates exist.
+
+When a level is known, Easier / My level / Challenge shortcuts set the exact neighbouring band filters; they never widen exact-match semantics. An empty level filter says no video at that level has an estimate yet, reports how many do under the other filters, and offers the closest band with estimates and All levels. Cards say "Level not yet estimated" instead of guessing, label creator-declared learner content and declared-Japanese native content, and distinguish Japanese captions ready in Hibiki from captions YouTube merely reports.
 
 The browser sends bounded video-ID sets and coarse preferences. Anonymous history stays on the device. Suggestions require multiple completed analyzed lessons and do not certify JLPT proficiency. When enough explicit word states exist, lazy local refinement checks up to eight available lessons with exact matching public transcript proof (500 sections / 20,000 characters each). Only aggregate Known percentages leave the browser, without Japanese text or word records. Missing assets/evidence leave the fast first feed intact.
 
@@ -70,7 +82,7 @@ Rejected IDs are kept for 30 days in `discovery_rejections` (ID, channel, reason
 
 **Health.** Each run logs `discover.health` with counts only: catalogue size, captions reported, prepared, declared Japanese audio, orientation, channels and largest-channel share, mean quality, coverage by level target, topic and verified band, 24-hour rejection reasons, per-seed yield, quota used and units per accepted video. `discovery_seed_runs` keeps 30 days of per-search yield and rejection reasons.
 
-**Evaluation.** `npm run eval:discover` reports precision and recall on labelled fixtures without network access: the 50 production videos from 10 October 2026 and 37 hand-written examples of what the new searches return, including traps. `tests/discover-quality.test.ts` enforces the thresholds.
+**Evaluation.** `npm run eval:discover` reports catalogue and learner-level feed metrics. Catalogue precision and recall are measured on labelled fixtures without network access: the 50 production videos from 10 October 2026 and 37 hand-written examples of what the new searches return, including traps. `tests/discover-quality.test.ts` enforces the thresholds.
 
 | Set | Candidates | Accepted | Relevant accepted | Precision | Recall |
 | --- | ---: | ---: | ---: | ---: | ---: |
@@ -80,6 +92,19 @@ Rejected IDs are kept for 30 days in `discovery_rejections` (ID, channel, reason
 | Level-targeted searches, after | 37 | 22 | 21 | 95% | 100% |
 
 Top-of-feed precision rises from 10% to 90% at 10 and from 8% to 92% at 24. The remaining false positives are a Japanese explanation of English pronunciation kept because a trusted Japanese transcript proves Japanese speech, and an ambient walking video whose metadata is indistinguishable from a talking vlog. The matrix fixtures were written alongside the rules, so treat their precision as an upper bound; production health logs are the real measure.
+
+Ranking is evaluated on the accepted catalogue for three learners, with ten fixture videos given simulated estimated bands (`tests/discover-ranking.test.ts` enforces the thresholds). Before is the previous ranker on the same catalogue:
+
+| Learner | Ranker | Precision@10 | Within one band | More than one band harder | More than one band easier |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Beginner (N5–N4) | before | 90% | 5 | 4 | 0 |
+| Beginner (N5–N4) | after | 90% | 5 | 0 | 0 |
+| Intermediate (N4–N3) | before | 90% | 6 | 2 | 1 |
+| Intermediate (N4–N3) | after | 90% | 6 | 0 | 0 |
+| Advanced (N2–N1) | before | 90% | 5 | 0 | 4 |
+| Advanced (N2–N1) | after | 100% | 5 | 0 | 3 |
+
+Every within-one-band estimate in the fixtures reaches each learner's top ten either way; the change removes mismatched levels. The advanced learner still sees three much easier videos because the fixture catalogue has only five estimated videos near N2–N1, which is the scarcity the acquisition matrix and backfill address.
 
 ## Accounts, offline behavior and privacy
 

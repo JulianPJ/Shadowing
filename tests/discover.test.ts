@@ -87,7 +87,7 @@ test('ranking is deterministic, explainable and respects explicit feedback', () 
   assert.deepEqual(first, rankVideos([...videos].reverse(), DEFAULT_FILTERS, context, now));
   assert.equal(first.length, 3);
   assert.equal(first[0].videoId, videos[0].videoId);
-  assert.match(first[0].reason, /usually practise/);
+  assert.match(first[0].reason, /close to your level/);
   assert.match(first.find((v) => v.videoId === videos[2].videoId)!.reason, /travel/);
 });
 test('diversity interleaves dominant channels without dropping results', () => {

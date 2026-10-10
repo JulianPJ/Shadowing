@@ -1,6 +1,12 @@
 import { assessQuality, type Quality } from '../../src/lib/discover/quality';
 import { buildFeed } from '../../src/lib/discover/rank';
-import { DEFAULT_FILTERS, EMPTY_CONTEXT, type Video } from '../../src/lib/discover/types';
+import {
+  BANDS,
+  DEFAULT_FILTERS,
+  EMPTY_CONTEXT,
+  type Band,
+  type Video,
+} from '../../src/lib/discover/types';
 import { LEVEL_TARGETS } from '../../src/lib/discover/acquisition';
 import {
   allCandidates,
@@ -37,6 +43,7 @@ export function toVideo(candidate: Candidate, index: number, quality?: Quality):
     captionFlag: candidate.captionFlag,
     topics: candidate.topic ? [candidate.topic] : [],
     prepared: !!candidate.prepared,
+    band: candidate.band ?? null,
     qualityScore: quality?.score ?? null,
     languageEvidence: quality?.languageEvidence ?? null,
     levelTargets: candidate.levelTarget ? [candidate.levelTarget] : [],
@@ -105,4 +112,46 @@ export async function evaluateDiscover() {
       after: await feedPrecision(afterCatalogue, relevantIds),
     },
   };
+}
+
+const bandIndex = (band: Band | null) => BANDS.findIndex((b) => b[0] === band);
+export const PERSONAS: [string, Band][] = [
+  ['Beginner', 'n5_n4'],
+  ['Intermediate', 'n4_n3'],
+  ['Advanced', 'n2_n1'],
+];
+/**
+ * Top-of-feed quality for learners at three levels, on the accepted catalogue. Bands are only the
+ * simulated verified analyses in the fixtures; unverified videos never count as level matches.
+ */
+export async function evaluatePersonas() {
+  const accepted = assess(allCandidates).filter((c) => c.quality.accepted);
+  const videos = accepted.map((c, i) => toVideo(c, i, c.quality));
+  const relevant = new Set(accepted.flatMap((c, i) => (c.relevant ? [videos[i].videoId] : [])));
+  const results = [];
+  for (const [persona, band] of PERSONAS) {
+    const feed = await buildFeed(
+      videos,
+      DEFAULT_FILTERS,
+      { ...EMPTY_CONTEXT, suggestedBand: band },
+      null,
+      'JP',
+      discoveryNow,
+    );
+    const top = feed.items.slice(0, 10);
+    const verified = top.filter((v) => v.band);
+    const distance = (v: Video) => bandIndex(v.band) - bandIndex(band);
+    results.push({
+      persona,
+      p10: top.filter((v) => relevant.has(v.videoId)).length / 10,
+      verifiedInTop10: verified.length,
+      withinOneBand: verified.filter((v) => Math.abs(distance(v)) <= 1).length,
+      tooHard: verified.filter((v) => distance(v) > 1).length,
+      tooEasy: verified.filter((v) => distance(v) < -1).length,
+      preparedInTop10: top.filter((v) => v.prepared).length,
+      channelsInTop10: new Set(top.map((v) => v.channelId)).size,
+      firstLevelMatch: feed.items.findIndex((v) => v.band && Math.abs(distance(v)) <= 1) + 1,
+    });
+  }
+  return results;
 }
