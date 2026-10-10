@@ -1,15 +1,15 @@
 # Hibiki Bridge — Chrome Web Store release
 
-Hibiki Bridge is a Manifest V3 Chrome 116+ companion extension to https://hibikiapp.net. Initial version: \`0.1.0\`.
+Hibiki Bridge is a Manifest V3 Chrome 116+ companion extension to https://hibikiapp.net. Initial version: `0.1.0`.
 
 ## Build the store upload ZIP
 
-\`\`\`bash
+```bash
 python3 scripts/package-extension.py
 # dist/hibiki-bridge-0.1.0.zip
-\`\`\`
+```
 
-The ZIP contains only the seven packaged runtime files and four PNG icons; \`manifest.json\` is at its root, not inside an enclosing directory. No build source, secrets, npm dependencies or demo fixtures are included. The GitHub Actions workflow **Chrome extension package** validates the ZIP and uploads it as a downloadable artifact.
+The ZIP contains only the seven packaged runtime files and four PNG icons; `manifest.json` is at its root, not inside an enclosing directory. No build source, secrets, npm dependencies or demo fixtures are included. The GitHub Actions workflow **Chrome extension package** validates the ZIP and uploads it as a downloadable artifact.
 
 ## Chrome Web Store listing fields
 
@@ -53,7 +53,7 @@ Works with compatible HTML5 video elements. Embedded players may need optional w
 
 **storage:** Stores the user's chosen Hibiki origin locally and transient connection state (selected tab IDs, URLs and hand-off metadata) in session storage.
 
-**Optional \`<all_urls>\`:** When the learner chooses “Allow embedded players,” the extension requests broad optional host access to inspect cross-origin iframe videos. It is never requested automatically during installation.
+**Optional `<all_urls>`:** When the learner chooses “Allow embedded players,” the extension requests broad optional host access to inspect cross-origin iframe videos. It is never requested automatically during installation.
 
 **Content script origins:** The production Hibiki site, the legacy production workers.dev origin and localhost development environments. The site bridge doesn't run on other ordinary websites; video controllers are injected only on demand.
 
@@ -77,7 +77,7 @@ Choose the exact Google data-disclosure categories based on the language of the 
 
 - [ ] ZIP validates, includes manifest at root and exactly the allowlisted runtime files.
 - [ ] Required 16/32/48/128 PNG icons present at declared paths.
-- [ ] Chrome 116+ user-installed extension can import an HTML5 video with Japanese \`<track>\` captions.
+- [ ] Chrome 116+ user-installed extension can import an HTML5 video with Japanese `<track>` captions.
 - [ ] Playback pause/seek, over-video subtitles and fullscreen overlay work.
 - [ ] Missing captions present upload/paste versus **optional** AI generation.
 - [ ] Cross-origin iframe permission request works only on click, including decline.
