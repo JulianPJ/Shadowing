@@ -230,7 +230,12 @@ test('quota/upstream/malformed response handling is bounded and never retries se
     console.info = originalInfo;
   }
   assert.deepEqual(logged.map((line) => JSON.parse(line)), [
-    { event: 'discover.youtube.http_error', endpoint: 'search', status: 400, reason: 'invalidPart' },
+    {
+      event: 'discover.youtube.http_error',
+      endpoint: 'search',
+      status: 400,
+      reason: 'invalidPart',
+    },
   ]);
   assert.ok(!logged.join('').includes('dont-log-this-key'));
   assert.ok(!logged.join('').includes('secret upstream text'));
