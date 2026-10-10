@@ -16,6 +16,45 @@ export function parseDuration(value: unknown): number | null {
     Number(match[4] ?? 0);
   return seconds > 0 && seconds <= 14400 ? seconds : null;
 }
+// Only emit fixed labels and explicitly known network codes. Never log raw
+// exception messages/stacks/causes: fetch errors can include request details.
+const SAFE_FETCH_ERROR_NAMES = new Set([
+  'TypeError',
+  'AbortError',
+  'TimeoutError',
+  'NetworkError',
+  'Error',
+]);
+const SAFE_FETCH_CAUSE_CODES = new Set([
+  'EAI_AGAIN',
+  'ENOTFOUND',
+  'ECONNREFUSED',
+  'ECONNRESET',
+  'ETIMEDOUT',
+  'ENETUNREACH',
+  'EHOSTUNREACH',
+  'ERR_TLS_CERT_ALTNAME_INVALID',
+  'CERT_HAS_EXPIRED',
+  'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
+]);
+export function youtubeFetchFailureDetails(error: unknown, signal: AbortSignal) {
+  const name = error instanceof Error ? error.name : undefined;
+  const errorType = name && SAFE_FETCH_ERROR_NAMES.has(name) ? name : 'UnknownError';
+  const signalReason = signal.aborted ? signal.reason : undefined;
+  const timeout =
+    (signalReason instanceof Error && signalReason.name === 'TimeoutError') ||
+    (!signal.aborted && name === 'TimeoutError');
+  const failureKind = timeout
+    ? 'timeout'
+    : signal.aborted || name === 'AbortError'
+      ? 'aborted'
+      : 'network';
+  const cause = error instanceof Error ? error.cause : null;
+  const rawCode = cause && typeof cause === 'object' && 'code' in cause ? cause.code : undefined;
+  const causeCode =
+    typeof rawCode === 'string' && SAFE_FETCH_CAUSE_CODES.has(rawCode) ? rawCode : undefined;
+  return { failureKind, errorType, ...(causeCode ? { causeCode } : {}) };
+}
 const object = (v: unknown): Record<string, unknown> =>
   v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
 const text = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
@@ -43,21 +82,67 @@ export function youtubeDataApi(
     params: Record<string, string>,
     units: number,
   ) {
-    if (!key || !(await spend(units))) throw new YoutubeDataError('quota');
+    if (!key || !(await spend(units))) {
+      console.info(JSON.stringify({ event: 'discover.youtube.budget', endpoint, units }));
+      throw new YoutubeDataError('quota');
+    }
     const url = new URL(`https://www.googleapis.com/youtube/v3/${endpoint}`);
     Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+    const timeoutSignal = AbortSignal.timeout(10000);
     let response: Response;
     try {
       response = await fetchImpl(url, {
         headers: { 'X-Goog-Api-Key': key },
-        signal: AbortSignal.timeout(10000),
-        redirect: 'error',
+        signal: timeoutSignal,
+        // Workers does not support redirect: 'error'. Manual allows us to
+        // reject redirects without forwarding the API key to a new origin.
+        redirect: 'manual',
       });
-    } catch {
+    } catch (error) {
+      console.info(
+        JSON.stringify({
+          event: 'discover.youtube.network_error',
+          endpoint,
+          ...youtubeFetchFailureDetails(error, timeoutSignal),
+        }),
+      );
+      throw new YoutubeDataError('unavailable');
+    }
+    // Cloudflare Workers does not support redirect: 'error'. Reject a
+    // manual 3xx (or an opaque redirect) without following its Location header.
+    if (response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400)) {
+      await response.body?.cancel();
+      console.info(
+        JSON.stringify({
+          event: 'discover.youtube.redirect_blocked',
+          endpoint,
+          status: response.status,
+        }),
+      );
       throw new YoutubeDataError('unavailable');
     }
     if (!response.ok) {
-      await response.body?.cancel();
+      // Only expose bounded, allowlisted Google error codes. Never log credentials,
+      // request URLs, arbitrary upstream messages or response bodies.
+      let reason: string | undefined;
+      try {
+        const error = object(object(JSON.parse(await readBoundedText(response, 4096))).error);
+        const detail = Array.isArray(error.errors) ? object(error.errors[0]) : {};
+        const rawReason = detail.reason ?? error.status;
+        if (typeof rawReason === 'string' && /^[a-zA-Z0-9_-]{1,64}$/.test(rawReason)) {
+          reason = rawReason;
+        }
+      } catch {
+        await response.body?.cancel().catch(() => {});
+      }
+      console.info(
+        JSON.stringify({
+          event: 'discover.youtube.http_error',
+          endpoint,
+          status: response.status,
+          ...(reason ? { reason } : {}),
+        }),
+      );
       throw new YoutubeDataError([403, 429].includes(response.status) ? 'quota' : 'unavailable');
     }
     try {
@@ -82,7 +167,9 @@ export function youtubeDataApi(
       const items = await request(
         'search',
         {
-          part: 'id',
+          // search.list documents "snippet" as the supported part; video IDs
+          // remain available on each search result's id object.
+          part: 'snippet',
           q: query,
           order,
           type: 'video',
