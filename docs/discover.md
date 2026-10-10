@@ -44,6 +44,46 @@ The adapter uses fixed official Google endpoints, allowlisted parameters, a serv
 
 Metadata older than 24 hours becomes refreshable and expires after seven days. Validation removes missing/private/deleted IDs. Purge runs even without a key or available quota. Upstream failure leaves independent artifact verification and aggregation running. Server-observed preparation outcomes affect only catalogued IDs: unavailable content receives a 15-minute cooldown, absent captions stay visible with an own-subtitles hint, and network failure never permanently bans a card. Region/playback restrictions remain best effort and are confirmed at preparation/player time.
 
+## Scheduled caption-backed difficulty backfill (opt-in)
+
+The existing metadata refresh does not infer difficulty. A separate bounded cron phase in
+`src/lib/discover/enrich.ts` can now prepare **Japanese** provider captions and classify
+videos with the existing Clef Flash difficulty provider. It runs **only** when
+`DISCOVER_ENRICHMENT_ENABLED` is `true` in `cloudflare.config.ts`; the checked-in
+default is **false**. Merge and apply migration `0013_discovery_enrichment.sql`
+before enabling it, then redeploy with an explicitly reviewed configuration change.
+No secrets need changing.
+
+Each 15-minute invocation acquires an independent D1 lease and processes at most
+**six** uncategorized videos, starting with those where YouTube reports captions
+(the flag does not prove they are Japanese). It reuses any validated, system-owned
+provider transcript and matching full-coverage difficulty artifact, otherwise
+requests captions through Hibiki's existing relay/fallback and performs the
+normal `@cf/cloudflare/clef-flash` inference. It persists trusted caption cues,
+the regular `difficulty-fullcoverage-v1` artifact and matching Discover proof.
+Speech speed is deterministic from cue timings, not AI-generated.
+
+`discovery_enrichment_attempts` records attempts, reason codes and next retry.
+Missing captions and insufficient text retry after 30 days; unavailable videos
+after seven days; blocked/incompatible providers after 12 hours; other failures
+after three hours. Successes are skipped. Network/AI failures preserve good
+captions and never assign unsupported JLPT levels. The feed never triggers
+captions or inference. No `youtube/v3/search` or `youtube/v3/videos` requests
+are added by enrichment.
+
+Monitor `discover.enrichment` and `discover.enrichment.batch` for success/failure
+and `discovery_video_state.difficulty_artifact_id` for validated totals. Model
+invocations consume Workers AI neurons and relay requests use caption-provider
+capacity. A rough lower bound for 748 missing videos is 125 scheduled batches,
+about 31 hours assuming six candidates per tick; missing captions, retries and
+other video ingestion can lengthen this. Set the config flag back to `false`
+and redeploy to stop new jobs without deleting completed analyses.
+
+**Non-goals:** This backfill does not invent missing YouTube descriptions,
+caption languages, native/learner audience evidence, or AI summaries. Those
+require separate grounded inputs and explicit schema/UI treatment. Unknown
+fields remain unknown.
+
 ## Accounts, offline behavior and privacy
 
 New account APIs reuse Better Auth, same-origin JSON checks, verified-email mutations and `X-Hibiki-Account` ownership fencing. They are `no-store`. The separate Discovery limiter permits 90 requests per minute per IP without consuming the six-per-minute AI budget.

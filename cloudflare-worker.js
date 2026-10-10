@@ -2,6 +2,9 @@
 import vinextHandler from 'vinext/server/fetch-handler';
 import { serveDemoAsset } from './src/lib/demo-asset';
 import { refreshCatalog } from './src/lib/discover/refresh';
+import { enrichDiscoveryCatalogue } from './src/lib/discover/enrich';
+import { createYoutubeCaptions } from './src/lib/providers/transcription';
+import { createWorkersAiDifficultyProvider } from './src/lib/providers/difficulty';
 export * from 'vinext/server/fetch-handler';
 
 // API routes live in src/app/api and read bindings from `cloudflare:workers`.
@@ -43,7 +46,26 @@ const worker = {
   scheduled(controller, env, ctx) {
     if (env.HIBIKI_DB)
       ctx.waitUntil(
-        refreshCatalog(env.HIBIKI_DB, env.YOUTUBE_DATA_API_KEY, fetch, controller.scheduledTime),
+        (async () => {
+          // Keep metadata acquisition and D1 verification ahead of optional enrichment.
+          await refreshCatalog(
+            env.HIBIKI_DB,
+            env.YOUTUBE_DATA_API_KEY,
+            fetch,
+            controller.scheduledTime,
+          );
+          // Explicit deployment opt-in: never infer on feed reads or during a normal rollout.
+          if (
+            String(env.DISCOVER_ENABLED) !== 'false' &&
+            String(env.DISCOVER_ENRICHMENT_ENABLED) === 'true'
+          )
+            await enrichDiscoveryCatalogue(
+              env.HIBIKI_DB,
+              createYoutubeCaptions(env.YOUTUBE_CAPTION_RELAY_URL, env.YOUTUBE_CAPTION_RELAY_TOKEN),
+              createWorkersAiDifficultyProvider(env.AI),
+              controller.scheduledTime,
+            );
+        })(),
       );
   },
 };

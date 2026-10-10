@@ -29,6 +29,8 @@ import { segmentTranscript } from '../src/lib/segmentation';
 import { transcriptKey } from '../src/lib/transcript';
 import { resolveMediaUrl } from '../src/lib/media';
 import { DEFAULT_FILTERS, EMPTY_CONTEXT } from '../src/lib/discover/types';
+import { enrichDiscoveryCatalogue } from '../src/lib/discover/enrich';
+import { CaptionError } from '../src/lib/providers/errors';
 import { accountHandler } from '../src/lib/sync/server';
 import { createAuth } from '../src/lib/auth/server';
 import { createD1UserProgressRepository } from '../src/lib/sync/repository';
@@ -63,6 +65,7 @@ before(async () => {
 after(() => mf.dispose());
 beforeEach(async () => {
   for (const table of [
+    'discovery_enrichment_attempts',
     'discovery_video_state',
     'discovery_videos',
     'discovery_feedback',
@@ -599,4 +602,99 @@ test('popularity remains private below ten learners and raw events expire', asyn
       .length,
     0,
   );
+});
+
+test('scheduled enrichment stores trusted Japanese captions and validated full-coverage JLPT level', async () => {
+  await saveVideos(db, [video(0)]);
+  await verifyAnalyses(db);
+  let captionCalls = 0;
+  let inferenceCalls = 0;
+  const cues = Array.from({ length: 6 }, (_, i) => ({
+    start: i * 6,
+    end: i * 6 + 5,
+    text: '今日は日本語のニュースを話します。日本語の勉強を毎日続けましょう。',
+  }));
+  const captions = {
+    name: 'test',
+    async transcribe() {
+      captionCalls++;
+      return { cues, provider: 'test' };
+    },
+  };
+  const classifier = {
+    name: 'test',
+    async analyze() {
+      inferenceCalls++;
+      return {
+        overall: 'n4_n3',
+        vocabulary: 'intermediate',
+        grammar: 'elementary',
+        conversation: 'intermediate',
+        confidence: { overall: 0.7, vocabulary: 0.6, grammar: 0.8, conversation: 0.7 },
+      };
+    },
+  };
+  const first = await enrichDiscoveryCatalogue(db, captions, classifier);
+  assert.equal(first.enriched, 1);
+  assert.equal(first.failed, 0);
+  assert.equal(captionCalls, 1);
+  assert.equal(inferenceCalls, 1);
+  const card = (await readCatalog(db))[0];
+  assert.equal(card.band, 'n4_n3');
+  assert.equal(card.prepared, true);
+  assert.ok(card.speed !== null);
+  assert.ok(card.proof?.transcriptKey);
+
+  // Subsequent ticks skip completed records entirely.
+  const next = await enrichDiscoveryCatalogue(db, captions, classifier);
+  assert.equal(next.processed, 0);
+  assert.equal(captionCalls, 1);
+  assert.equal(inferenceCalls, 1);
+
+  // If only the Discover pointer goes missing, restore it from the validated
+  // content-addressed artifact without re-fetching captions or calling AI.
+  await db
+    .prepare(
+      'UPDATE discovery_video_state SET difficulty_artifact_id=NULL,analysis_verified_at=NULL',
+    )
+    .run();
+  await db.prepare('DELETE FROM discovery_enrichment_attempts').run();
+  const repair = await enrichDiscoveryCatalogue(db, captions, classifier);
+  assert.equal(repair.enriched, 1);
+  assert.equal(captionCalls, 1);
+  assert.equal(inferenceCalls, 1);
+  assert.equal((await readCatalog(db))[0].band, 'n4_n3');
+  assert.equal((await db.prepare('SELECT * FROM discovery_jobs').all()).results.length, 0);
+});
+
+test('missing captions abstain from inferred level and are not retried each refresh', async () => {
+  await saveVideos(db, [video(0)]);
+  await verifyAnalyses(db);
+  let calls = 0;
+  const captions = {
+    name: 'test',
+    async transcribe() {
+      calls++;
+      throw new CaptionError('no-japanese-captions', 'Missing Japanese captions', 'relay');
+    },
+  };
+  const classifier = {
+    name: 'test',
+    async analyze() {
+      throw new Error('Classifier must not run without captions');
+    },
+  };
+  const time = Date.now();
+  const first = await enrichDiscoveryCatalogue(db, captions, classifier, time);
+  assert.equal(first.failed, 1);
+  const result = await db
+    .prepare('SELECT last_result,next_attempt_at FROM discovery_enrichment_attempts')
+    .first<{ last_result: string; next_attempt_at: string }>();
+  assert.equal(result?.last_result, 'no-japanese-captions');
+  assert.ok(Date.parse(result!.next_attempt_at) >= time + 29 * 86400000);
+  assert.equal((await readCatalog(db))[0].band, null);
+  const next = await enrichDiscoveryCatalogue(db, captions, classifier, time + 15 * 60000);
+  assert.equal(next.processed, 0);
+  assert.equal(calls, 1);
+  assert.equal((await db.prepare('SELECT * FROM discovery_jobs').all()).results.length, 0);
 });
