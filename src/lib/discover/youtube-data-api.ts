@@ -43,7 +43,10 @@ export function youtubeDataApi(
     params: Record<string, string>,
     units: number,
   ) {
-    if (!key || !(await spend(units))) throw new YoutubeDataError('quota');
+    if (!key || !(await spend(units))) {
+      console.info(JSON.stringify({ event: 'discover.youtube.budget', endpoint, units }));
+      throw new YoutubeDataError('quota');
+    }
     const url = new URL(`https://www.googleapis.com/youtube/v3/${endpoint}`);
     Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
     let response: Response;
@@ -54,10 +57,31 @@ export function youtubeDataApi(
         redirect: 'error',
       });
     } catch {
+      console.info(JSON.stringify({ event: 'discover.youtube.network_error', endpoint }));
       throw new YoutubeDataError('unavailable');
     }
     if (!response.ok) {
-      await response.body?.cancel();
+      // Only expose bounded, allowlisted Google error codes. Never log credentials,
+      // request URLs, arbitrary upstream messages or response bodies.
+      let reason: string | undefined;
+      try {
+        const error = object(object(JSON.parse(await readBoundedText(response, 4096))).error);
+        const detail = Array.isArray(error.errors) ? object(error.errors[0]) : {};
+        const rawReason = detail.reason ?? error.status;
+        if (typeof rawReason === 'string' && /^[a-zA-Z0-9_-]{1,64}$/.test(rawReason)) {
+          reason = rawReason;
+        }
+      } catch {
+        await response.body?.cancel().catch(() => {});
+      }
+      console.info(
+        JSON.stringify({
+          event: 'discover.youtube.http_error',
+          endpoint,
+          status: response.status,
+          ...(reason ? { reason } : {}),
+        }),
+      );
       throw new YoutubeDataError([403, 429].includes(response.status) ? 'quota' : 'unavailable');
     }
     try {
@@ -82,7 +106,9 @@ export function youtubeDataApi(
       const items = await request(
         'search',
         {
-          part: 'id',
+          // search.list documents "snippet" as the supported part; video IDs
+          // remain available on each search result's id object.
+          part: 'snippet',
           q: query,
           order,
           type: 'video',
