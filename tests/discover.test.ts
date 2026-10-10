@@ -197,6 +197,8 @@ test('official provider validates public/embed/live/age restrictions and never d
   assert.deepEqual(result[0].topics, ['conversations']);
   assert.equal(spent, 101);
   assert.ok(endpoints.every((url) => new URL(url).origin === 'https://www.googleapis.com'));
+  assert.equal(new URL(endpoints[0]).searchParams.get('part'), 'snippet');
+  assert.equal(new URL(endpoints[1]).searchParams.get('part'), 'snippet,contentDetails,status');
   assert.ok(!endpoints.join('').includes('server-only'));
 });
 test('quota/upstream/malformed response handling is bounded and never retries searches', async () => {
@@ -210,6 +212,13 @@ test('quota/upstream/malformed response handling is bounded and never retries se
     (error: unknown) => error instanceof YoutubeDataError && error.code === 'quota',
   );
   assert.equal(requests, 1);
+  const invalidRequest = youtubeDataApi('key', async () =>
+    Response.json({ error: { errors: [{ reason: 'invalidPart' }] } }, { status: 400 }),
+  );
+  await assert.rejects(
+    () => invalidRequest.search('日本語'),
+    (error: unknown) => error instanceof YoutubeDataError && error.code === 'unavailable',
+  );
   const budget = youtubeDataApi(
     'key',
     async () => {
