@@ -12,6 +12,7 @@ import {
   parseDuration,
   thumbnailUrl,
   youtubeDataApi,
+  youtubeFetchFailureDetails,
   YoutubeDataError,
 } from '../src/lib/discover/youtube-data-api';
 import {
@@ -200,6 +201,50 @@ test('official provider validates public/embed/live/age restrictions and never d
   assert.equal(new URL(endpoints[0]).searchParams.get('part'), 'snippet');
   assert.equal(new URL(endpoints[1]).searchParams.get('part'), 'snippet,contentDetails,status');
   assert.ok(!endpoints.join('').includes('server-only'));
+});
+test('YouTube network diagnostics classify failure without leaking exception details', () => {
+  const active = new AbortController().signal;
+  const secret = 'SENSITIVE_API_KEY_DO_NOT_LOG';
+  assert.deepEqual(youtubeFetchFailureDetails(new TypeError(secret), active), {
+    failureKind: 'network',
+    errorType: 'TypeError',
+  });
+  assert.deepEqual(
+    youtubeFetchFailureDetails(
+      new TypeError(secret, { cause: { code: 'ENOTFOUND', message: secret } }),
+      active,
+    ),
+    { failureKind: 'network', errorType: 'TypeError', causeCode: 'ENOTFOUND' },
+  );
+  assert.deepEqual(
+    youtubeFetchFailureDetails(
+      new TypeError(secret, { cause: { code: secret } }),
+      active,
+    ),
+    { failureKind: 'network', errorType: 'TypeError' },
+  );
+  assert.deepEqual(
+    youtubeFetchFailureDetails(
+      new DOMException(secret, 'AbortError'),
+      AbortSignal.abort(),
+    ),
+    { failureKind: 'aborted', errorType: 'AbortError' },
+  );
+  assert.deepEqual(
+    youtubeFetchFailureDetails(
+      new TypeError(secret),
+      AbortSignal.abort(new DOMException(secret, 'TimeoutError')),
+    ),
+    { failureKind: 'timeout', errorType: 'TypeError' },
+  );
+  assert.deepEqual(
+    youtubeFetchFailureDetails(new DOMException(secret, 'TimeoutError'), active),
+    { failureKind: 'timeout', errorType: 'TimeoutError' },
+  );
+  assert.deepEqual(youtubeFetchFailureDetails(secret, active), {
+    failureKind: 'network',
+    errorType: 'UnknownError',
+  });
 });
 test('quota/upstream/malformed response handling is bounded and never retries searches', async () => {
   let requests = 0;

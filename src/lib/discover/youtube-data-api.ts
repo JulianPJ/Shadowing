@@ -16,6 +16,46 @@ export function parseDuration(value: unknown): number | null {
     Number(match[4] ?? 0);
   return seconds > 0 && seconds <= 14400 ? seconds : null;
 }
+// Only emit fixed labels and explicitly known network codes. Never log raw
+// exception messages/stacks/causes: fetch errors can include request details.
+const SAFE_FETCH_ERROR_NAMES = new Set([
+  'TypeError',
+  'AbortError',
+  'TimeoutError',
+  'NetworkError',
+  'Error',
+]);
+const SAFE_FETCH_CAUSE_CODES = new Set([
+  'EAI_AGAIN',
+  'ENOTFOUND',
+  'ECONNREFUSED',
+  'ECONNRESET',
+  'ETIMEDOUT',
+  'ENETUNREACH',
+  'EHOSTUNREACH',
+  'ERR_TLS_CERT_ALTNAME_INVALID',
+  'CERT_HAS_EXPIRED',
+  'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
+]);
+export function youtubeFetchFailureDetails(error: unknown, signal: AbortSignal) {
+  const name = error instanceof Error ? error.name : undefined;
+  const errorType = name && SAFE_FETCH_ERROR_NAMES.has(name) ? name : 'UnknownError';
+  const signalReason = signal.aborted ? signal.reason : undefined;
+  const timeout =
+    (signalReason instanceof Error && signalReason.name === 'TimeoutError') ||
+    (!signal.aborted && name === 'TimeoutError');
+  const failureKind = timeout
+    ? 'timeout'
+    : signal.aborted || name === 'AbortError'
+      ? 'aborted'
+      : 'network';
+  const cause = error instanceof Error ? error.cause : null;
+  const rawCode =
+    cause && typeof cause === 'object' && 'code' in cause ? cause.code : undefined;
+  const causeCode =
+    typeof rawCode === 'string' && SAFE_FETCH_CAUSE_CODES.has(rawCode) ? rawCode : undefined;
+  return { failureKind, errorType, ...(causeCode ? { causeCode } : {}) };
+}
 const object = (v: unknown): Record<string, unknown> =>
   v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
 const text = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
@@ -49,15 +89,22 @@ export function youtubeDataApi(
     }
     const url = new URL(`https://www.googleapis.com/youtube/v3/${endpoint}`);
     Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+    const timeoutSignal = AbortSignal.timeout(10000);
     let response: Response;
     try {
       response = await fetchImpl(url, {
         headers: { 'X-Goog-Api-Key': key },
-        signal: AbortSignal.timeout(10000),
+        signal: timeoutSignal,
         redirect: 'error',
       });
-    } catch {
-      console.info(JSON.stringify({ event: 'discover.youtube.network_error', endpoint }));
+    } catch (error) {
+      console.info(
+        JSON.stringify({
+          event: 'discover.youtube.network_error',
+          endpoint,
+          ...youtubeFetchFailureDetails(error, timeoutSignal),
+        }),
+      );
       throw new YoutubeDataError('unavailable');
     }
     if (!response.ok) {
