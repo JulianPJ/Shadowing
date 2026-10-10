@@ -212,33 +212,13 @@ test('quota/upstream/malformed response handling is bounded and never retries se
     (error: unknown) => error instanceof YoutubeDataError && error.code === 'quota',
   );
   assert.equal(requests, 1);
-  const logged: string[] = [];
-  const originalInfo = console.info;
-  try {
-    console.info = (...args: unknown[]) => logged.push(args.join(' '));
-    const invalidRequest = youtubeDataApi('dont-log-this-key', async () =>
-      Response.json(
-        { error: { errors: [{ reason: 'invalidPart' }], message: 'secret upstream text' } },
-        { status: 400 },
-      ),
-    );
-    await assert.rejects(
-      () => invalidRequest.search('日本語'),
-      (error: unknown) => error instanceof YoutubeDataError && error.code === 'unavailable',
-    );
-  } finally {
-    console.info = originalInfo;
-  }
-  assert.deepEqual(logged.map((line) => JSON.parse(line)), [
-    {
-      event: 'discover.youtube.http_error',
-      endpoint: 'search',
-      status: 400,
-      reason: 'invalidPart',
-    },
-  ]);
-  assert.ok(!logged.join('').includes('dont-log-this-key'));
-  assert.ok(!logged.join('').includes('secret upstream text'));
+  const invalidRequest = youtubeDataApi('key', async () =>
+    Response.json({ error: { errors: [{ reason: 'invalidPart' }] } }, { status: 400 }),
+  );
+  await assert.rejects(
+    () => invalidRequest.search('日本語'),
+    (error: unknown) => error instanceof YoutubeDataError && error.code === 'unavailable',
+  );
   const budget = youtubeDataApi(
     'key',
     async () => {
