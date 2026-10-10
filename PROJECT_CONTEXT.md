@@ -91,7 +91,7 @@ See [architecture](docs/architecture.md) for module ownership and checks.
 4. Polish / monetisation — in progress. Done: navigation and vocabulary simplification, single
    runtime, rate limits, one sync engine. Remaining: analytics, sensible Free/Pro limits,
    subscriptions.
-5. Broaden content sources — Hibiki Bridge v1 done (Chrome). Next: Chrome Web Store listing,
+5. Broaden content sources — Hibiki Bridge v1 done (Chrome). Chrome Web Store release packaging prepared; developer-account submission pending. Next:
    Firefox, `chrome.tabCapture` for sites that block element capture, and using the extension to
    capture YouTube audio for "Improve with Whisper".
 6. End-of-video transcript intelligence (level-appropriate grammar and key vocabulary).
