@@ -1,0 +1,38 @@
+name: Chrome extension package
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'extension/**'
+      - 'scripts/package-extension.py'
+      - '.github/workflows/chrome-extension-package.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'extension/**'
+      - 'scripts/package-extension.py'
+      - '.github/workflows/chrome-extension-package.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Verify Chrome Web Store upload ZIP
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Create store package from allowlisted files
+        run: python3 scripts/package-extension.py
+      - name: Inspect ZIP
+        run: |
+          unzip -l dist/hibiki-bridge-*.zip
+          python3 -m json.tool extension/manifest.json > /dev/null
+      - name: Upload package
+        uses: actions/upload-artifact@v6
+        with:
+          name: hibiki-bridge-chrome-web-store
+          path: dist/hibiki-bridge-*.zip
+          if-no-files-found: error
+          retention-days: 30

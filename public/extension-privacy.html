@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hibiki Bridge — Privacy &amp; Permissions</title>
+  <style>
+    :root { color-scheme:light dark; font:16px/1.65 system-ui,sans-serif }
+    body { max-width:760px; margin:0 auto; padding:28px 20px 60px }
+    h1,h2 { line-height:1.25 }
+    h2 { margin-top:2rem }
+    a { color:#bc5b43 }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Hibiki Bridge — Privacy &amp; Permissions</h1>
+  <p>Last updated: 10 October 2026</p>
+  <p>Hibiki Bridge is a companion extension for <a href="https://hibikiapp.net/">Hibiki</a>, a Japanese listening and shadowing application. This notice explains data handling by the extension and its interaction with Hibiki.</p>
+  <h2>Access to video pages</h2>
+  <p>When you click Hibiki Bridge on a page and select a video, the extension accesses the chosen tab's video element, playback state, page URL, title and subtitle tracks made available by the page. It can play, pause, seek and adjust playback speed, and display Japanese subtitles over that video. It does not continuously scan all your browsing tabs or automatically collect unrelated browsing history.</p>
+  <h2>Extension permissions</h2>
+  <ul>
+    <li><strong>activeTab:</strong> temporary access to the current page after you click the extension.</li>
+    <li><strong>scripting:</strong> insert the packaged video controller into the selected tab or frame.</li>
+    <li><strong>storage:</strong> remember your chosen Hibiki address and temporary connection/import state.</li>
+    <li><strong>Optional website access:</strong> the “Allow embedded players” action requests permission to inspect video elements in cross-origin frames. This is not required for ordinary top-level videos.</li>
+    <li><strong>Hibiki site connection:</strong> a small script on approved Hibiki web origins relays video commands between the page and the extension.</li>
+  </ul>
+  <h2>Information passed to Hibiki</h2>
+  <p>The extension sends the selected page URL, title, video metadata, video playback information and available subtitle cues to the Hibiki website running in your browser. Hibiki can store imported lesson information in your browser. When you sign in and use the website's synchronisation features, lesson and practice information may also be processed by Hibiki's cloud services.</p>
+  <p><strong>AI transcription is optional.</strong> Only if you choose to generate subtitles does the extension capture the selected video's audio as it plays and hand audio segments to the Hibiki website. The website then uploads those audio segments to Hibiki's secure transcription endpoint, backed by Cloudflare processing services, to generate subtitle text. You can instead use available subtitles or upload your own. Some websites block capture.</p>
+  <h2>Sharing, storage and control</h2>
+  <p>Hibiki Bridge does not sell browsing information or send it for advertising. The extension stores the configured Hibiki address in Chrome extension local storage and temporary connected-tab information in Chrome extension session storage. Hibiki's cloud features use infrastructure providers, including Cloudflare, where applicable. Other account and learning data is handled by the Hibiki website.</p>
+  <p>You select which videos to connect. You may decline optional website permissions, stop transcription, close the connected tab, remove lessons using Hibiki's controls or uninstall the extension. Uninstalling removes Chrome extension data, but does not automatically delete separately stored Hibiki account data.</p>
+  <h2>Contact</h2>
+  <p>For support and privacy inquiries, use the <a href="https://github.com/JulianPJ/Shadowing/issues">Hibiki support issue tracker</a> or the account support options available through Hibiki.</p>
+</main>
+</body>
+</html>
