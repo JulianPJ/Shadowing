@@ -84,7 +84,7 @@ export async function enrichDiscoveryCatalogue(
           "WHERE v.status='available' AND v.expires_at>? " +
           'AND s.difficulty_artifact_id IS NULL ' +
           'AND (e.next_attempt_at IS NULL OR e.next_attempt_at<=?) ' +
-          'ORDER BY v.caption_flag DESC, COALESCE(e.last_attempt_at, \'\') ASC, v.indexed_at DESC ' +
+          "ORDER BY v.caption_flag DESC, COALESCE(e.last_attempt_at, '') ASC, v.indexed_at DESC " +
           'LIMIT ?',
       )
       .bind(time, time, Math.max(1, Math.min(batchSize, DISCOVER_ENRICHMENT_BATCH_SIZE)))
@@ -100,7 +100,11 @@ export async function enrichDiscoveryCatalogue(
       try {
         const contentKey = 'youtube:' + videoId;
         let stored = await transcripts.lookup({ contentKey, language: 'ja' });
-        if (!stored || stored.visibility !== 'system' || stored.source.type !== 'provider-captions') {
+        if (
+          !stored ||
+          stored.visibility !== 'system' ||
+          stored.source.type !== 'provider-captions'
+        ) {
           const result = await captions.transcribe(videoId, signal);
           const cues = validateCues(result.cues);
           const hash = await transcriptHash(cues);
@@ -180,7 +184,7 @@ export async function enrichDiscoveryCatalogue(
         await validateDifficultyAnalysis(artifact.payload, lesson);
         const record = await db
           .prepare(
-            "SELECT id FROM generated_artifacts WHERE content_key=? AND transcript_key=? " +
+            'SELECT id FROM generated_artifacts WHERE content_key=? AND transcript_key=? ' +
               "AND source_transcript_hash=? AND artifact_type='difficulty' " +
               'AND schema_version=1 AND generator_version=?',
           )

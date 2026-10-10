@@ -604,7 +604,6 @@ test('popularity remains private below ten learners and raw events expire', asyn
   );
 });
 
-
 test('scheduled enrichment stores trusted Japanese captions and validated full-coverage JLPT level', async () => {
   await saveVideos(db, [video(0)]);
   await verifyAnalyses(db);
@@ -655,7 +654,9 @@ test('scheduled enrichment stores trusted Japanese captions and validated full-c
   // If only the Discover pointer goes missing, restore it from the validated
   // content-addressed artifact without re-fetching captions or calling AI.
   await db
-    .prepare('UPDATE discovery_video_state SET difficulty_artifact_id=NULL,analysis_verified_at=NULL')
+    .prepare(
+      'UPDATE discovery_video_state SET difficulty_artifact_id=NULL,analysis_verified_at=NULL',
+    )
     .run();
   await db.prepare('DELETE FROM discovery_enrichment_attempts').run();
   const repair = await enrichDiscoveryCatalogue(db, captions, classifier);

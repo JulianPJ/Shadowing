@@ -48,7 +48,12 @@ const worker = {
       ctx.waitUntil(
         (async () => {
           // Keep metadata acquisition and D1 verification ahead of optional enrichment.
-          await refreshCatalog(env.HIBIKI_DB, env.YOUTUBE_DATA_API_KEY, fetch, controller.scheduledTime);
+          await refreshCatalog(
+            env.HIBIKI_DB,
+            env.YOUTUBE_DATA_API_KEY,
+            fetch,
+            controller.scheduledTime,
+          );
           // Explicit deployment opt-in: never infer on feed reads or during a normal rollout.
           if (
             String(env.DISCOVER_ENABLED) !== 'false' &&
