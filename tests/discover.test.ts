@@ -173,6 +173,7 @@ test('official provider validates public/embed/live/age restrictions and never d
     async (input, init) => {
       endpoints.push(String(input));
       assert.equal(new Headers(init?.headers).get('X-Goog-Api-Key'), 'server-only');
+      assert.equal(init?.redirect, 'manual');
       return Response.json({
         items:
           endpoints.length === 1
@@ -248,6 +249,17 @@ test('quota/upstream/malformed response handling is bounded and never retries se
     (error: unknown) => error instanceof YoutubeDataError && error.code === 'quota',
   );
   assert.equal(requests, 1);
+  const redirected = youtubeDataApi('key', async (_input, init) => {
+    assert.equal(init?.redirect, 'manual');
+    return new Response(null, {
+      status: 302,
+      headers: { Location: 'https://example.invalid/redirect-target' },
+    });
+  });
+  await assert.rejects(
+    () => redirected.search('日本語'),
+    (error: unknown) => error instanceof YoutubeDataError && error.code === 'unavailable',
+  );
   const invalidRequest = youtubeDataApi('key', async () =>
     Response.json({ error: { errors: [{ reason: 'invalidPart' }] } }, { status: 400 }),
   );
