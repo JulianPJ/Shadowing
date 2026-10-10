@@ -113,7 +113,11 @@ export function youtubeDataApi(
     if (response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400)) {
       await response.body?.cancel();
       console.info(
-        JSON.stringify({ event: 'discover.youtube.redirect_blocked', endpoint, status: response.status }),
+        JSON.stringify({
+          event: 'discover.youtube.redirect_blocked',
+          endpoint,
+          status: response.status,
+        }),
       );
       throw new YoutubeDataError('unavailable');
     }
