@@ -93,3 +93,11 @@ input {
   margin: 4px 0 0;
   font-size: 12px;
 }
+
+.privacy-link {
+  margin: 10px 0 0;
+  font-size: 12px;
+}
+.privacy-link a {
+  color: var(--accent);
+}

@@ -34,7 +34,7 @@ A web page cannot control a video embedded on another site, so Hibiki uses a sma
 
 ## Limits
 
-- Chrome 116+ only. Firefox and the Chrome Web Store listing are not done.
+- Chrome 116+ only. Firefox is not yet supported. See [Chrome Web Store release](chrome-web-store.md) for the packaging and submission process.
 - DRM-protected or capture-blocking sites play but cannot be transcribed; use page subtitles or upload your own.
 - Whisper capture runs in real time.
 - Custom players that draw their own subtitles without `<track>` elements need imported subtitles.
