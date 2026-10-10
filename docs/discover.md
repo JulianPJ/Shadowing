@@ -15,7 +15,8 @@ Clicking a card goes to `/prepare?video=<canonical URL>`, which reuses Home with
 | UI and responsive styles | `src/components/discover/`, `src/app/styles/discover.css` |
 | Catalogue, eligibility, contracts | `src/lib/discover/catalog.ts`, `eligibility.ts`, `validation.ts`, `types.ts` |
 | Ranking and local vocabulary evidence | `rank.ts`, `vocabulary.ts` |
-| Scheduled provider acquisition | `refresh.ts`, `youtube-data-api.ts` |
+| Scheduled provider acquisition | `refresh.ts`, `youtube-data-api.ts`, `ingest.ts` |
+| Seed strategy, quality assessment, catalogue health | `acquisition.ts`, `quality.ts`, `health.ts` |
 | APIs and queue merge | `server.ts`, `account-server.ts`, `watch-later.ts` |
 | Local preferences/feedback and outbox | `client.ts`, existing `library/client.ts` |
 | Explicit preparation | `src/app/prepare/page.tsx`, `src/lib/prepare-client.ts` |
@@ -36,13 +37,49 @@ Classification stays in `generated_artifacts`. Scheduled verification checks eli
 
 Additive migration `0012_video_discovery.sql` creates catalogue, seed schedule, observed preparation state, account preferences, synced Watch Later, feedback, events/aggregates, lease and quota tables. It copies no transcripts or lessons. Account records cascade on account deletion. Watch Later has no catalogue foreign key, so saved links survive expired/removed provider metadata.
 
-The `*/15 * * * *` trigger runs every 15 minutes with a 15-minute D1 lease. Each execution performs at most two stale-metadata batches of 50 IDs and two Japanese-oriented seeded searches. Seeds have a one-hour cooldown and oldest-run-first rotation; existing 24-hour seed schedules automatically adopt the new cooldown. Search ordering rotates hourly between relevance, newest and most viewed. `videos.list` separately validates search results. Atomic reservations enforce a conservative 9,000-point daily budget before calls (100 internal points per search, one per metadata batch), including failed attempts. Search allowance is released gradually through the Pacific local-clock day, leaving one point to validate results; stale metadata can use the full allowance independently. Quota days reset at midnight `America/Los_Angeles`, including daylight saving. Acquisition has no public endpoint and never runs on feed requests.
+The `*/15 * * * *` trigger runs every 15 minutes with a 15-minute D1 lease. Each execution performs at most two stale-metadata batches of 50 IDs, one prepared-transcript backfill batch and two seeded searches (see [Acquisition quality](#acquisition-quality-and-level-targeting)). `videos.list` separately validates search results. Atomic reservations enforce a conservative 9,000-point daily budget before calls (100 internal points per search, one per metadata batch), including failed attempts. Search allowance is released gradually through the Pacific local-clock day, leaving one point to validate results; stale metadata can use the full allowance independently. Quota days reset at midnight `America/Los_Angeles`, including daylight saving. Acquisition has no public endpoint and never runs on feed requests.
 
 [Google's current quota documentation](https://developers.google.com/youtube/v3/determine_quota_cost) lists 100 search calls/day separately from 10,000 daily units for other endpoints. The internal weighted budget conservatively allows roughly 89 search calls plus metadata checks per day, leaving search headroom; it is not a claim that these are one shared Google quota pool. Verify the actual project's quotas and other consumers before release. Bounded provider failures stop acquisition for the invocation while cached browsing, saving, practice and independent maintenance continue. A late initial deployment or provider outage may use less than the budget: useful acquisition takes priority over spending every available point.
 
-The adapter uses fixed official Google endpoints, allowlisted parameters, a server-only API-key header, 10-second requests, a 512 KB response bound and no followed redirects. It rejects private/unembeddable/live/age-restricted/invalid entries, constrains duration and thumbnail hosts, and retains reported country restrictions. Titles do not determine level/speed/orientation. Topic tags are coarse query-seed labels, not verified semantic classification.
+The adapter uses fixed official Google endpoints, allowlisted parameters, a server-only API-key header, 10-second requests, a 512 KB response bound and no followed redirects. It rejects private/unembeddable/live/age-restricted/invalid entries, constrains duration and thumbnail hosts, and retains reported country restrictions. Titles never determine level or speed. Topic tags are coarse seed and YouTube-category labels, not verified semantic classification.
 
 Metadata older than 24 hours becomes refreshable and expires after seven days. Validation removes missing/private/deleted IDs. Purge runs even without a key or available quota. Upstream failure leaves independent artifact verification and aggregation running. Server-observed preparation outcomes affect only catalogued IDs: unavailable content receives a 15-minute cooldown, absent captions stay visible with an own-subtitles hint, and network failure never permanently bans a card. Region/playback restrictions remain best effort and are confirmed at preparation/player time.
+
+## Acquisition quality and level targeting
+
+The original nine broad queries were retired by migration `0014`: in production their only successful search (`日本語 ゆっくり 会話`) returned 50 videos, of which three were spoken-Japanese shadowing material. The rest were English, Chinese, Vietnamese, Portuguese and Russian lessons for Japanese speakers, Japanese sign language, text-to-speech "ゆっくり解説/実況" narration, music and shorts.
+
+**Seed matrix.** 28 searches target three level intents (beginner, intermediate, advanced; 8–11 each), all nine topics, and both learner-oriented and native content. Queries use YouTube's `-term` exclusion for known traps. The scheduler (`acquisition.ts`) chooses two due seeds per run by waiting time, the catalogue share of the seed's level target and topic, and measured yield; the two picks prefer different level targets, and any seed waiting 24 hours runs next. Each seed cycles through relevance, newest and most-viewed ordering. Yield (accepted ÷ returned) sets the cooldown: 1 hour while productive or new, 4 hours below 20%, 12 hours below 8%. Seeds can be disabled in D1 without a release.
+
+**Level targets are not levels.** A seed's level target is stored on the video as `level_targets_json` acquisition intent. It never becomes a displayed band: bands still require a trusted Japanese provider transcript and a matching validated full-coverage difficulty artifact. Exact level filters are unchanged.
+
+**Quality assessment** (`quality.ts`, versioned) scores provider metadata deterministically and records the reasons. What each provider field guarantees:
+
+| Field | Meaning | Use |
+| --- | --- | --- |
+| `snippet.defaultAudioLanguage` | Uploader-declared language of the default audio. Optional, unverified | Japanese: positive evidence. Another language: rejected |
+| `snippet.defaultLanguage` | Language of the title and description, not the audio | Stored only |
+| `contentDetails.caption` | Some uploaded caption track, in any language | Small positive signal; never "Japanese captions" |
+| `snippet.categoryId`, `topicDetails` | Coarse uploader/provider categories (`topicDetails` costs no extra quota) | Music rejection; browse topics |
+
+Hard rejections: declared non-Japanese audio, recorded other-language drills (聞き流し, phrase lists with narrators), sign language, silent vlogs (無言), music, under 60 seconds or over 3 hours. Scored signals: kana in the title/description (Chinese metadata has none), Hangul, Japanese-learner markers (creator-declared, e.g. JLPT, やさしい日本語, comprehensible Japanese), Japanese explanations about another language (−30, not rejected), synthetic voices (−50), ASMR, shorts, compilations, spoken formats, promotion, duration fit, reported captions, channel history from 30 days of acceptances/rejections, and a trusted Japanese transcript (+20). Below 55 is rejected. Japanese titles alone never prove Japanese speech; language evidence is reported as `japanese-transcript`, `reported-japanese-audio`, `japanese-metadata` or `uncertain`.
+
+Rejected IDs are kept for 30 days in `discovery_rejections` (ID, channel, reason only) and are not requested again. Stale metadata refreshes and a local re-assessment of rows with an outdated quality version (100 per run, no provider calls) remove videos that no longer qualify. Orientation is recorded only from creator-declared learner markers (learner) or declared Japanese audio without learner or other-language markers (native).
+
+**Preparation evidence.** Videos already prepared in Hibiki from trusted public Japanese captions but missing from the catalogue are backfilled (50 IDs per metadata unit). This is the cheapest source of verifiable levels: in production, six analysed videos (one N5–N4, four N3–N2) were absent from the catalogue. A successful preparation also clears the video's verification timestamp, so its analysis is linked at the next 15-minute run rather than the next hourly pass. Discover still starts no inference and no caption fetches; probing YouTube for Japanese caption tracks was not enabled, because `captions.list` costs 50 units per video and the caption relay is reserved for learner-initiated preparation.
+
+**Health.** Each run logs `discover.health` with counts only: catalogue size, captions reported, prepared, declared Japanese audio, orientation, channels and largest-channel share, mean quality, coverage by level target, topic and verified band, 24-hour rejection reasons, per-seed yield, quota used and units per accepted video. `discovery_seed_runs` keeps 30 days of per-search yield and rejection reasons.
+
+**Evaluation.** `npm run eval:discover` reports precision and recall on labelled fixtures without network access: the 50 production videos from 10 October 2026 and 37 hand-written examples of what the new searches return, including traps. `tests/discover-quality.test.ts` enforces the thresholds.
+
+| Set | Candidates | Accepted | Relevant accepted | Precision | Recall |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Production baseline, before | 50 | 50 | 3 | 6% | 100% |
+| Production baseline, after | 50 | 4 | 3 | 75% | 100% |
+| Level-targeted searches, unfiltered | 37 | 37 | 21 | 57% | 100% |
+| Level-targeted searches, after | 37 | 22 | 21 | 95% | 100% |
+
+Top-of-feed precision rises from 10% to 90% at 10 and from 8% to 92% at 24. The remaining false positives are a Japanese explanation of English pronunciation kept because a trusted Japanese transcript proves Japanese speech, and an ambient walking video whose metadata is indistinguishable from a talking vlog. The matrix fixtures were written alongside the rules, so treat their precision as an upper bound; production health logs are the real measure.
 
 ## Accounts, offline behavior and privacy
 
@@ -79,7 +116,7 @@ Local workerd/D1 checks need no live key; `npm run dev` reads an explicitly popu
 
 ## Verification
 
-Fixtures use fictional IDs and mocked provider boundaries without spending YouTube/AI quota. `tests/discover.test.ts` covers bands, abstention, filter/freshness/region bounds, ranking/diversity, cursor integrity, provider envelopes, merge ties and preparation transport. `tests/discover-d1.test.ts` applies all twelve migrations to real local D1 and verifies metadata-only reads, public artifact trust, quota/purge, ownership, capacity/replacement and privacy cohorts. `tests/e2e/discover.spec.ts` covers desktop/mobile, blocked storage, filters/back/reload, pagination, save/undo/Library, preference/feedback, card-to-practice, missing captions, account offline/reconnect and explicit anonymous import. The built Worker check verifies new routes and unchanged caption/AI counts beside existing caches.
+Fixtures use fictional IDs and mocked provider boundaries without spending YouTube/AI quota. `tests/discover.test.ts` covers bands, abstention, filter/freshness/region bounds, ranking/diversity, cursor integrity, provider envelopes, merge ties and preparation transport. `tests/discover-d1.test.ts` applies all migrations to real local D1 and verifies metadata-only reads, public artifact trust, quota/purge, ownership, capacity/replacement and privacy cohorts. `tests/e2e/discover.spec.ts` covers desktop/mobile, blocked storage, filters/back/reload, pagination, save/undo/Library, preference/feedback, card-to-practice, missing captions, account offline/reconnect and explicit anonymous import. The built Worker check verifies new routes and unchanged caption/AI counts beside existing caches.
 
 Run typecheck, lint, formatting, unit tests, the build, `test:d1:migrations`, `test:d1:runtime` and Playwright. See [architecture](architecture.md) for commands.
 

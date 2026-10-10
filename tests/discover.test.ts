@@ -200,7 +200,10 @@ test('official provider validates public/embed/live/age restrictions and never d
   assert.equal(spent, 101);
   assert.ok(endpoints.every((url) => new URL(url).origin === 'https://www.googleapis.com'));
   assert.equal(new URL(endpoints[0]).searchParams.get('part'), 'snippet');
-  assert.equal(new URL(endpoints[1]).searchParams.get('part'), 'snippet,contentDetails,status');
+  assert.equal(
+    new URL(endpoints[1]).searchParams.get('part'),
+    'snippet,contentDetails,status,topicDetails',
+  );
   assert.ok(!endpoints.join('').includes('server-only'));
 });
 test('YouTube network diagnostics classify failures without exposing credentials', () => {

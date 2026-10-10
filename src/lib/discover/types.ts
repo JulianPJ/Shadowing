@@ -1,3 +1,5 @@
+import type { LevelTarget } from './acquisition';
+import type { LanguageEvidence } from './quality';
 export const BANDS = [
   ['n5_plus', 'N5+', 'N5', 'N5'],
   ['n5_n4', 'N5–N4', 'N5', 'N4'],
@@ -79,6 +81,12 @@ export type Video = {
   speed: number | null;
   proof: { transcriptKey: string; generatorVersion: string; verifiedAt: string } | null;
   popularity: number | null;
+  /** Versioned metadata quality score; null until assessed. */
+  qualityScore?: number | null;
+  /** Strongest available evidence that the speech is Japanese. Never a difficulty claim. */
+  languageEvidence?: LanguageEvidence | null;
+  /** Search intent that found the video. Not a verified level. */
+  levelTargets?: LevelTarget[];
 };
 export type Card = Video & { reason: string };
 export type Context = {

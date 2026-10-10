@@ -76,11 +76,11 @@ test('feed browses all six bands, filters, persists search and never prepares on
   await expect(page.locator('.discover-card')).toHaveCount(6);
   await expect(page.locator('.discover-band').first()).toContainText('N4–N3');
   await page.getByLabel('Duration', { exact: true }).selectOption('5to10');
-  await page.getByLabel('Search Japanese videos').fill('moment 2');
+  await page.getByLabel('Search Japanese videos').fill('会話 2');
   await page.getByRole('button', { name: 'Search videos', exact: true }).click();
   await expect(page.locator('.discover-card')).toHaveCount(3);
   await page.reload();
-  await expect(page.getByLabel('Search Japanese videos')).toHaveValue('moment 2');
+  await expect(page.getByLabel('Search Japanese videos')).toHaveValue('会話 2');
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
   expect(preparation).toBe(0);
   expect(ai).toBe(0);

@@ -9,6 +9,22 @@ import {
   type Video,
   type Topic,
 } from './types';
+import { LEVEL_TARGETS, type LevelTarget } from './acquisition';
+import { QUALITY_VERSION, type LanguageEvidence, type Quality } from './quality';
+/** Quality evidence recorded with a video at acquisition or re-assessment time. */
+export type Assessment = {
+  quality: Quality;
+  defaultAudioLanguage?: string | null;
+  defaultLanguage?: string | null;
+  categoryId?: string | null;
+};
+export type AssessedVideo = Video & { assessment?: Assessment };
+const LANGUAGE_EVIDENCE: LanguageEvidence[] = [
+  'japanese-transcript',
+  'reported-japanese-audio',
+  'japanese-metadata',
+  'uncertain',
+];
 function array(value: unknown): string[] {
   try {
     const parsed = JSON.parse(String(value));
@@ -57,6 +73,16 @@ function fromRow(row: Record<string, unknown>): Video | null {
   } catch {
     /* Metadata-only videos are still useful. */
   }
+  const prepared = !!row.prepared;
+  const stateAudience =
+    row.audience_evidence && (row.audience === 'native' || row.audience === 'learner')
+      ? row.audience
+      : null;
+  const hintAudience =
+    row.orientation_evidence &&
+    (row.orientation_hint === 'native' || row.orientation_hint === 'learner')
+      ? row.orientation_hint
+      : null;
   return {
     videoId: row.video_id,
     canonicalUrl: canonicalUrl(row.video_id),
@@ -76,11 +102,8 @@ function fromRow(row: Record<string, unknown>): Video | null {
     status: row.status === 'available' ? 'available' : 'unavailable',
     regionAllowed: array(row.region_allowed_json),
     regionBlocked: array(row.region_blocked_json),
-    audience:
-      row.audience_evidence && (row.audience === 'native' || row.audience === 'learner')
-        ? row.audience
-        : null,
-    prepared: !!row.prepared,
+    audience: stateAudience ?? hintAudience,
+    prepared,
     preparationStatus:
       row.preparation_status === 'needs-captions'
         ? 'needs-captions'
@@ -93,6 +116,15 @@ function fromRow(row: Record<string, unknown>): Video | null {
     speed,
     proof,
     popularity: typeof row.popularity === 'number' ? row.popularity : null,
+    qualityScore: typeof row.quality_score === 'number' ? row.quality_score : null,
+    languageEvidence: prepared
+      ? 'japanese-transcript'
+      : LANGUAGE_EVIDENCE.includes(row.language_evidence as LanguageEvidence)
+        ? (row.language_evidence as LanguageEvidence)
+        : null,
+    levelTargets: array(row.level_targets_json).filter((t): t is LevelTarget =>
+      (LEVEL_TARGETS as readonly string[]).includes(t),
+    ),
   };
 }
 /** A single bounded join. No captions, remote metadata or inference on feed reads. */
@@ -122,20 +154,31 @@ export async function readCatalog(db: Database, now = Date.now()): Promise<Video
     .all<Record<string, unknown>>();
   return rows.results.map(fromRow).filter((v): v is Video => v !== null);
 }
-export async function saveVideos(db: Database, videos: Video[]) {
+export async function saveVideos(db: Database, videos: AssessedVideo[]) {
   if (!videos.length) return;
   await db.batch(
     videos.map((v) =>
       db
         .prepare(
           `INSERT INTO discovery_videos
-    (video_id,canonical_url,title,channel_id,channel_title,thumbnail_url,duration_seconds,description_excerpt,published_at,caption_flag,embeddable,status,region_allowed_json,region_blocked_json,fetched_at,expires_at,indexed_at,topic_keys_json)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(video_id) DO UPDATE SET
+    (video_id,canonical_url,title,channel_id,channel_title,thumbnail_url,duration_seconds,description_excerpt,published_at,caption_flag,embeddable,status,region_allowed_json,region_blocked_json,fetched_at,expires_at,indexed_at,topic_keys_json,
+    quality_score,quality_version,quality_reasons_json,language_evidence,default_audio_language,default_language,category_id,level_targets_json,orientation_hint,orientation_evidence)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(video_id) DO UPDATE SET
     title=excluded.title,channel_id=excluded.channel_id,channel_title=excluded.channel_title,thumbnail_url=excluded.thumbnail_url,
     duration_seconds=excluded.duration_seconds,description_excerpt=excluded.description_excerpt,published_at=excluded.published_at,
     caption_flag=excluded.caption_flag,embeddable=excluded.embeddable,status=excluded.status,region_allowed_json=excluded.region_allowed_json,
     region_blocked_json=excluded.region_blocked_json,fetched_at=excluded.fetched_at,expires_at=excluded.expires_at,
-    topic_keys_json=(SELECT json_group_array(value) FROM (SELECT value FROM json_each(discovery_videos.topic_keys_json) UNION SELECT value FROM json_each(excluded.topic_keys_json)))`,
+    topic_keys_json=(SELECT json_group_array(value) FROM (SELECT value FROM json_each(discovery_videos.topic_keys_json) UNION SELECT value FROM json_each(excluded.topic_keys_json))),
+    level_targets_json=(SELECT json_group_array(value) FROM (SELECT value FROM json_each(discovery_videos.level_targets_json) UNION SELECT value FROM json_each(excluded.level_targets_json))),
+    quality_score=COALESCE(excluded.quality_score,discovery_videos.quality_score),
+    quality_version=COALESCE(excluded.quality_version,discovery_videos.quality_version),
+    quality_reasons_json=CASE WHEN excluded.quality_version IS NULL THEN discovery_videos.quality_reasons_json ELSE excluded.quality_reasons_json END,
+    language_evidence=COALESCE(excluded.language_evidence,discovery_videos.language_evidence),
+    default_audio_language=COALESCE(excluded.default_audio_language,discovery_videos.default_audio_language),
+    default_language=COALESCE(excluded.default_language,discovery_videos.default_language),
+    category_id=COALESCE(excluded.category_id,discovery_videos.category_id),
+    orientation_hint=CASE WHEN excluded.quality_version IS NULL THEN discovery_videos.orientation_hint ELSE excluded.orientation_hint END,
+    orientation_evidence=CASE WHEN excluded.quality_version IS NULL THEN discovery_videos.orientation_evidence ELSE excluded.orientation_evidence END`,
         )
         .bind(
           v.videoId,
@@ -156,6 +199,16 @@ export async function saveVideos(db: Database, videos: Video[]) {
           v.expiresAt,
           v.indexedAt,
           JSON.stringify(v.topics),
+          v.assessment?.quality.score ?? null,
+          v.assessment ? QUALITY_VERSION : null,
+          JSON.stringify(v.assessment?.quality.reasons ?? []),
+          v.assessment?.quality.languageEvidence ?? null,
+          v.assessment?.defaultAudioLanguage ?? null,
+          v.assessment?.defaultLanguage ?? null,
+          v.assessment?.categoryId ?? null,
+          JSON.stringify(v.levelTargets ?? []),
+          v.assessment?.quality.orientation ?? null,
+          v.assessment?.quality.orientationEvidence ?? null,
         ),
     ),
   );
