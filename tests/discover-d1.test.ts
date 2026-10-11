@@ -832,3 +832,150 @@ test('a successful preparation queues the video for analysis verification at the
   assert.equal(rows[1].preparation_status, 'needs-captions');
   assert.notEqual(rows[1].last_catalog_check_at, null);
 });
+// Counts the rows a code path reads and writes through real D1 statements.
+function metered() {
+  const usage = { read: 0, written: 0 };
+  const count = (meta: { rows_read: number; rows_written: number }) => {
+    usage.read += meta.rows_read;
+    usage.written += meta.rows_written;
+  };
+  const wrap = (statement: ReturnType<D1Database['prepare']>) => ({
+    bind: (...values: unknown[]) => wrap(statement.bind(...values)),
+    all: async () => {
+      const result = await statement.all();
+      count(result.meta);
+      return result;
+    },
+    first: async () => {
+      const result = await statement.all();
+      count(result.meta);
+      return result.results[0] ?? null;
+    },
+    run: async () => {
+      const result = await statement.run();
+      count(result.meta);
+      return result;
+    },
+  });
+  return {
+    usage,
+    db: { prepare: (sql: string) => wrap(db.prepare(sql)) } as unknown as D1Database,
+  };
+}
+/** A trusted transcript for `id`; `analyse` then stores its validated difficulty artifact. */
+async function transcriptForAnalysis(id: string) {
+  const cues = Array.from({ length: 6 }, (_, i) => ({
+    start: i * 8,
+    end: i * 8 + 7,
+    text: `今日は日本語の勉強について話します。毎日練習すると少しずつ上手になります。${i}。`,
+  }));
+  const hash = await transcriptHash(cues),
+    media = (await resolveMediaUrl(`https://www.youtube.com/watch?v=${id}`)).media;
+  await createD1LinkedTranscriptRepository(db).save({
+    schemaVersion: 1,
+    contentKey: `youtube:${id}`,
+    media: storedMediaIdentity(media),
+    language: 'ja',
+    transcriptHash: hash,
+    cues,
+    source: {
+      schemaVersion: 1,
+      type: 'provider-captions',
+      language: 'ja',
+      provenance: 'test',
+      provider: 'test',
+      transcriptHash: hash,
+      normalizationVersion: 1,
+      segmentationVersion: 1,
+    },
+    visibility: 'system',
+    createdAt: new Date().toISOString(),
+  });
+  const lesson = { id: `youtube-${id}`, segments: segmentTranscript(cues) };
+  return {
+    async analyse() {
+      const difficulty = await createDifficultyAnalysis(
+        {
+          overall: 'n4_n3',
+          vocabulary: 'intermediate',
+          grammar: 'elementary',
+          conversation: 'intermediate',
+          confidence: { overall: 0.5, vocabulary: 0.5, grammar: 0.5, conversation: 0.5 },
+        },
+        lesson,
+      );
+      await createD1GeneratedArtifactRepository(db).save(
+        {
+          contentKey: `youtube:${id}`,
+          transcriptKey: await transcriptKey(lesson),
+          sourceTranscriptHash: hash,
+          artifactType: 'difficulty',
+          schemaVersion: 1,
+          generatorVersion: DIFFICULTY_GENERATOR_VERSION,
+          payload: difficulty,
+          payloadId: difficulty.id,
+          createdAt: difficulty.generatedAt,
+        },
+        lesson,
+      );
+    },
+  };
+}
+test('analysis verification checks only transcript-backed videos, and only after a change', async () => {
+  await saveVideos(
+    db,
+    Array.from({ length: 150 }, (_, i) => video(i)),
+  );
+  const [analysed, pending] = [video(0).videoId, video(1).videoId];
+  await (await transcriptForAnalysis(analysed)).analyse();
+  const later = await transcriptForAnalysis(pending);
+  const verified = async () =>
+    (
+      await db
+        .prepare(
+          'SELECT video_id,analysis_verified_at FROM discovery_video_state ORDER BY video_id',
+        )
+        .all<{ video_id: string; analysis_verified_at: string | null }>()
+    ).results.map((r) => [r.video_id, !!r.analysis_verified_at]);
+  const band = async (id: string, time: number) =>
+    (await readCatalog(db, time)).find((v) => v.videoId === id)?.band;
+  let time = now();
+  await verifyAnalyses(db, time);
+  // Videos without a transcript are never checked and need no state row.
+  assert.deepEqual(await verified(), [
+    [analysed, true],
+    [pending, false],
+  ]);
+  assert.equal(await band(analysed, time), 'n4_n3');
+  // Nothing changed: a later run writes nothing and reads only per-transcript entries.
+  await db.prepare('ANALYZE').run();
+  const steady = metered();
+  time += 2 * 3600000;
+  await verifyAnalyses(steady.db, time);
+  assert.equal(steady.usage.written, 0);
+  // A handful per transcript, independent of the 150-video catalogue (the hourly sweep read all).
+  assert.ok(steady.usage.read <= 20, `read ${steady.usage.read} rows`);
+  // An analysis created by ordinary practice is verified at the next run after the hourly mark.
+  await later.analyse();
+  await verifyAnalyses(db, time);
+  assert.deepEqual(await verified(), [
+    [analysed, true],
+    [pending, true],
+  ]);
+  // A removed or superseded artifact clears the stored verification.
+  await db
+    .prepare('DELETE FROM generated_artifacts WHERE content_key=?')
+    .bind(`youtube:${analysed}`)
+    .run();
+  time += 2 * 3600000;
+  await verifyAnalyses(db, time);
+  assert.deepEqual((await verified())[0], [analysed, false]);
+  assert.equal(await band(analysed, time), null);
+  // A failing check is retried at most hourly instead of on every 15-minute run.
+  await (await transcriptForAnalysis(analysed)).analyse();
+  const throttled = metered();
+  await verifyAnalyses(throttled.db, time + 15 * 60000);
+  assert.equal(throttled.usage.written, 0);
+  await verifyAnalyses(db, time + 3600000 + 1);
+  assert.deepEqual((await verified())[0], [analysed, true]);
+});

@@ -58,14 +58,14 @@ Every application row has a queryable `user_id`, with a foreign key to `user.id`
 
 ## API
 
-| Endpoint                                           | Behaviour                                                                                              |
-| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `GET /api/account/me`                              | Identity and configured sign-in methods; never session or token fields                                 |
-| `GET /api/sync/bootstrap?cursor=…`                 | Up to 50 rows from one collection plus preferences, with a keyset cursor                               |
-| `POST /api/sync/push`                              | 512 KB streaming limit; at most 50 records per collection; strict validation                           |
-| `GET /api/sync/lesson?id=…`                        | Restores a public YouTube lesson from matching trusted captions; 404 when the media must be reattached |
-| `/api/dictionary`, `/api/review`, `/api/knowledge` | Saved words, review cards and word statuses                                                            |
-| `/api/discover/*`, `/api/watch-later`              | Discover preferences and events, and Watch later                                                       |
+| Endpoint                                           | Behaviour                                                                                                                 |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/account/me`                              | Identity and configured sign-in methods; never session or token fields                                                    |
+| `GET /api/sync/bootstrap?cursor=…`                 | Preferences plus up to 50 rows from every collection in one D1 batch; the keyset cursor lists only unfinished collections |
+| `POST /api/sync/push`                              | 512 KB streaming limit; at most 50 records per collection; strict validation                                              |
+| `GET /api/sync/lesson?id=…`                        | Restores a public YouTube lesson from matching trusted captions; 404 when the media must be reattached                    |
+| `/api/dictionary`, `/api/review`, `/api/knowledge` | Saved words, review cards and word statuses                                                                               |
+| `/api/discover/*`, `/api/watch-later`              | Discover preferences and events, and Watch later                                                                          |
 
 **Request rules**
 

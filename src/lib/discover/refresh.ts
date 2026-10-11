@@ -53,68 +53,106 @@ export function youtubeQuotaWindow(now: number) {
     ),
   };
 }
-/** Only scheduled execution calls this. Existing validated artifacts are reused without inference. */
-export async function verifyAnalyses(db: D1Database, now = Date.now()) {
+// The hosted-transcript filter of the repository lookup, which verification mirrors.
+const hosted = (t: string) => `${t}.language='ja' AND ${t}.visibility IN ('system','shared')
+  AND ${t}.owner_user_id IS NULL AND ${t}.source_type IN ('provider-captions','generated')
+  AND ${t}.schema_version=1 AND ${t}.normalization_version=1 AND ${t}.segmentation_version=1`;
+/**
+ * Catalogue videos whose stored verification no longer matches their latest hosted transcript or
+ * difficulty artifact. Only videos with a transcript can ever be verified, so the search starts
+ * from transcripts (a few dozen) rather than re-checking every catalogue video each hour. Each
+ * video is re-checked at most hourly, so a transcript or artifact that fails validation cannot
+ * repeat the work on every run. A successful preparation clears the hourly mark.
+ */
+async function analysesToVerify(db: D1Database, now: number) {
   const rows = await db
     .prepare(
-      `SELECT v.video_id FROM discovery_videos v LEFT JOIN discovery_video_state s ON s.video_id=v.video_id
-    WHERE s.last_catalog_check_at IS NULL OR s.last_catalog_check_at<? ORDER BY s.last_catalog_check_at,v.video_id LIMIT 100`,
+      `WITH latest AS (
+        SELECT substr(t.content_key,9) AS video_id,
+          CASE WHEN t.visibility='system' AND t.source_type='provider-captions' THEN t.transcript_hash END AS hash
+        FROM linked_transcripts t
+        WHERE t.content_key LIKE 'youtube:%' AND length(t.content_key)=19 AND ${hosted('t')}
+        AND NOT EXISTS(SELECT 1 FROM linked_transcripts n WHERE n.content_key=t.content_key AND ${hosted('n')}
+          AND (n.created_at>t.created_at OR (n.created_at=t.created_at AND n.storage_key>t.storage_key))))
+      SELECT l.video_id FROM latest l JOIN discovery_videos v ON v.video_id=l.video_id
+      LEFT JOIN discovery_video_state s ON s.video_id=l.video_id
+      WHERE (s.last_catalog_check_at IS NULL OR s.last_catalog_check_at<?) AND (
+        s.transcript_hash IS NOT l.hash
+        OR (s.analysis_verified_at IS NULL AND l.hash IS NOT NULL AND EXISTS(SELECT 1 FROM generated_artifacts a
+          WHERE a.content_key='youtube:'||l.video_id AND a.artifact_type='difficulty' AND a.schema_version=1
+          AND a.generator_version=? AND a.source_transcript_hash=l.hash))
+        OR (s.analysis_verified_at IS NOT NULL AND NOT EXISTS(SELECT 1 FROM generated_artifacts a
+          WHERE a.id=s.difficulty_artifact_id AND a.generator_version=? AND a.source_transcript_hash=s.transcript_hash)))
+      LIMIT 100`,
     )
-    .bind(new Date(now - 3600000).toISOString())
+    .bind(
+      new Date(now - 3600000).toISOString(),
+      DIFFICULTY_GENERATOR_VERSION,
+      DIFFICULTY_GENERATOR_VERSION,
+    )
     .all<{ video_id: string }>();
+  return rows.results.map((r) => r.video_id);
+}
+/** Only scheduled execution calls this. Existing validated artifacts are reused without inference. */
+export async function verifyAnalyses(db: D1Database, now = Date.now()) {
   const transcripts = createD1LinkedTranscriptRepository(db),
     artifacts = createD1GeneratedArtifactRepository(db);
-  for (const { video_id: id } of rows.results) {
-    let artifactId: string | null = null,
-      key: string | null = null,
-      hash: string | null = null;
-    const stored = await transcripts.lookup({ contentKey: `youtube:${id}`, language: 'ja' });
-    if (
-      stored &&
-      stored.visibility === 'system' &&
-      stored.ownerId == null &&
-      stored.source.type === 'provider-captions'
-    ) {
-      const lesson = { id: `youtube-${id}`, segments: segmentTranscript(stored.cues) };
-      key = await transcriptKey(lesson);
-      hash = stored.transcriptHash;
-      const artifact = await artifacts.lookup({
-        contentKey: stored.contentKey,
-        transcriptKey: key,
-        artifactType: 'difficulty',
-        schemaVersion: 1,
-        generatorVersion: DIFFICULTY_GENERATOR_VERSION,
-      });
-      if (artifact && artifact.sourceTranscriptHash === hash) {
-        try {
-          await validateDifficultyAnalysis(artifact.payload, lesson);
-          const row = await db
-            .prepare(
-              `SELECT id FROM generated_artifacts WHERE content_key=? AND transcript_key=? AND source_transcript_hash=? AND artifact_type='difficulty' AND schema_version=1 AND generator_version=?`,
-            )
-            .bind(stored.contentKey, key, hash, DIFFICULTY_GENERATOR_VERSION)
-            .first<{ id: string }>();
-          artifactId = row?.id ?? null;
-        } catch {
-          /* Invalid estimates remain unknown. */
+  for (const id of await analysesToVerify(db, now)) {
+    // One failing video stays unverified until its next hourly check; the rest still run.
+    try {
+      let artifactId: string | null = null,
+        key: string | null = null,
+        hash: string | null = null;
+      const stored = await transcripts.lookup({ contentKey: `youtube:${id}`, language: 'ja' });
+      if (
+        stored &&
+        stored.visibility === 'system' &&
+        stored.ownerId == null &&
+        stored.source.type === 'provider-captions'
+      ) {
+        const lesson = { id: `youtube-${id}`, segments: segmentTranscript(stored.cues) };
+        key = await transcriptKey(lesson);
+        hash = stored.transcriptHash;
+        const artifact = await artifacts.lookup({
+          contentKey: stored.contentKey,
+          transcriptKey: key,
+          artifactType: 'difficulty',
+          schemaVersion: 1,
+          generatorVersion: DIFFICULTY_GENERATOR_VERSION,
+        });
+        if (artifact && artifact.sourceTranscriptHash === hash) {
+          try {
+            await validateDifficultyAnalysis(artifact.payload, lesson);
+            const row = await db
+              .prepare(
+                `SELECT id FROM generated_artifacts WHERE content_key=? AND transcript_key=? AND source_transcript_hash=? AND artifact_type='difficulty' AND schema_version=1 AND generator_version=?`,
+              )
+              .bind(stored.contentKey, key, hash, DIFFICULTY_GENERATOR_VERSION)
+              .first<{ id: string }>();
+            artifactId = row?.id ?? null;
+          } catch {
+            /* Invalid estimates remain unknown. */
+          }
         }
       }
+      await db
+        .prepare(
+          `INSERT INTO discovery_video_state(video_id,last_catalog_check_at,difficulty_artifact_id,transcript_key,transcript_hash,analysis_verified_at)
+        VALUES(?,?,?,?,?,?) ON CONFLICT(video_id) DO UPDATE SET last_catalog_check_at=excluded.last_catalog_check_at,difficulty_artifact_id=excluded.difficulty_artifact_id,
+        transcript_key=excluded.transcript_key,transcript_hash=excluded.transcript_hash,analysis_verified_at=excluded.analysis_verified_at`,
+        )
+        .bind(
+          id,
+          new Date(now).toISOString(),
+          artifactId,
+          key,
+          hash,
+          artifactId ? new Date(now).toISOString() : null,
+        )
+        .run();
+    } catch {
+      storageEvent('discover.verify.failed');
     }
-    await db
-      .prepare(
-        `INSERT INTO discovery_video_state(video_id,last_catalog_check_at,difficulty_artifact_id,transcript_key,transcript_hash,analysis_verified_at)
-      VALUES(?,?,?,?,?,?) ON CONFLICT(video_id) DO UPDATE SET last_catalog_check_at=excluded.last_catalog_check_at,difficulty_artifact_id=excluded.difficulty_artifact_id,
-      transcript_key=excluded.transcript_key,transcript_hash=excluded.transcript_hash,analysis_verified_at=excluded.analysis_verified_at`,
-      )
-      .bind(
-        id,
-        new Date(now).toISOString(),
-        artifactId,
-        key,
-        hash,
-        artifactId ? new Date(now).toISOString() : null,
-      )
-      .run();
   }
 }
 // Seeds whose schedule lies beyond the longest adaptive cooldown are treated as legacy and due.

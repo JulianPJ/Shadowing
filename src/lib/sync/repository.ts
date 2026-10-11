@@ -23,6 +23,39 @@ const tables: Record<SyncCollection, string> = {
   difficulties: 'user_difficulty_refs',
   archives: 'user_practice_archives',
 };
+/**
+ * The last ID read from each unfinished collection; no cursor starts every collection. The older
+ * `[collection index, last ID]` form, from a tab paginating across a deploy, resumes that
+ * collection and reads the later ones from their start.
+ */
+function parseCursor(cursor?: string | null): Partial<Record<SyncCollection, string>> {
+  if (!cursor) return Object.fromEntries(syncCollections.map((kind) => [kind, '']));
+  const parsed: unknown = JSON.parse(cursor);
+  const validId = (id: unknown): id is string => typeof id === 'string' && id.length <= 1000;
+  if (Array.isArray(parsed)) {
+    const [index, last] = parsed;
+    if (
+      parsed.length !== 2 ||
+      !Number.isInteger(index) ||
+      index < 0 ||
+      index >= syncCollections.length ||
+      !validId(last)
+    )
+      throw new Error('Invalid cursor');
+    return Object.fromEntries(
+      syncCollections.slice(index).map((kind, i) => [kind, i === 0 ? last : '']),
+    );
+  }
+  const entries = parsed && typeof parsed === 'object' ? Object.entries(parsed) : [];
+  if (
+    !entries.length ||
+    entries.some(
+      ([kind, id]) => !(syncCollections as readonly string[]).includes(kind) || !validId(id),
+    )
+  )
+    throw new Error('Invalid cursor');
+  return Object.fromEntries(entries);
+}
 export function createD1UserProgressRepository(db: ProgressDatabase): UserProgressRepository {
   return {
     async lesson(userId, id) {
@@ -32,28 +65,31 @@ export function createD1UserProgressRepository(db: ProgressDatabase): UserProgre
         .first<{ payload_json: string }>();
       return row ? JSON.parse(row.payload_json) : null;
     },
+    // One page holds up to 50 records of every unfinished collection, read in one D1 round trip,
+    // so a typical pull is a single request (and session check) rather than one per collection.
     async bootstrap(userId, cursor) {
-      let index = 0,
-        last = '';
-      if (cursor) {
-        const parsed = JSON.parse(cursor);
-        if (
-          !Array.isArray(parsed) ||
-          parsed.length !== 2 ||
-          !Number.isInteger(parsed[0]) ||
-          parsed[0] < 0 ||
-          parsed[0] >= syncCollections.length ||
-          typeof parsed[1] !== 'string' ||
-          parsed[1].length > 1000
-        )
-          throw new Error('Invalid cursor');
-        [index, last] = parsed;
-      }
+      const pending = parseCursor(cursor);
+      const kinds = syncCollections.filter((kind) => pending[kind] !== undefined);
+      const [prefsResult, ...pages] = (await db.batch([
+        db.prepare('SELECT * FROM user_preferences WHERE user_id=?').bind(userId),
+        // Composite primary key supplies the user-scoped keyset index, never OFFSET.
+        ...kinds.map((kind) =>
+          db
+            .prepare(
+              `SELECT id,payload_json FROM ${tables[kind]} WHERE user_id=? AND id>? ORDER BY id LIMIT 51`,
+            )
+            .bind(userId, pending[kind]!),
+        ),
+      ])) as { results: Record<string, unknown>[] }[];
       const data = emptySync();
-      const prefs = await db
-        .prepare('SELECT * FROM user_preferences WHERE user_id=?')
-        .bind(userId)
-        .first<Record<string, unknown>>();
+      const next: Partial<Record<SyncCollection, string>> = {};
+      kinds.forEach((kind, i) => {
+        const rows = pages[i].results as { id: string; payload_json: string }[];
+        const page = rows.slice(0, 50);
+        Object.assign(data, { [kind]: page.map((r) => JSON.parse(r.payload_json)) });
+        if (rows.length > 50) next[kind] = page.at(-1)!.id;
+      });
+      const prefs = prefsResult.results[0];
       if (prefs)
         data.preferences = {
           schemaVersion: 1,
@@ -66,25 +102,7 @@ export function createD1UserProgressRepository(db: ProgressDatabase): UserProgre
             : {}),
           updatedAt: prefs.updated_at as string,
         };
-      const kind = syncCollections[index];
-      // Composite primary key supplies the user-scoped keyset index, never OFFSET.
-      const rows = await db
-        .prepare(
-          `SELECT id,payload_json FROM ${tables[kind]} WHERE user_id=? AND id>? ORDER BY id LIMIT 51`,
-        )
-        .bind(userId, last)
-        .all<{ id: string; payload_json: string }>();
-      const page = rows.results.slice(0, 50);
-      Object.assign(data, { [kind]: page.map((r) => JSON.parse(r.payload_json)) });
-      return {
-        data,
-        nextCursor:
-          rows.results.length > 50
-            ? JSON.stringify([index, page.at(-1)!.id])
-            : index + 1 < syncCollections.length
-              ? JSON.stringify([index + 1, ''])
-              : null,
-      };
+      return { data, nextCursor: Object.keys(next).length ? JSON.stringify(next) : null };
     },
     async push(userId, input) {
       const data = validateSync(input);
