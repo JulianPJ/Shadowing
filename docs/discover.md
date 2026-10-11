@@ -10,32 +10,32 @@ Cards show actual provider thumbnails, channels, duration, coarse topics and tru
 
 Clicking a card goes to `/prepare?video=<canonical URL>`, which reuses Home with explicit auto-start, shared `prepareLinkedVideo`, existing `/api/prepare`, subtitle-choice dialog and ordinary `/practice/youtube-<id>`. Successful auto-preparation replaces its transitional history entry, so Back returns to Discover without preparing again. A ten-minute account-scoped return marker restores filters, loaded result-page count and scroll after the feed is ready. Ordinary Home prefill remains compatible. Save adds only a canonical link/title to Library > Watch Later, without preparing content.
 
-| Concern | Files |
-| --- | --- |
-| UI and responsive styles | `src/components/discover/`, `src/app/styles/discover.css` |
-| Catalogue, eligibility, contracts | `src/lib/discover/catalog.ts`, `eligibility.ts`, `validation.ts`, `types.ts` |
-| Ranking, explanations and local vocabulary evidence | `score.ts`, `rank.ts`, `vocabulary.ts` |
-| Scheduled provider acquisition | `refresh.ts`, `youtube-data-api.ts`, `ingest.ts` |
-| Seed strategy, quality assessment, catalogue health | `acquisition.ts`, `quality.ts`, `health.ts` |
-| APIs and queue merge | `server.ts`, `account-server.ts`, `watch-later.ts` |
-| Local preferences/feedback and outbox | `client.ts`, existing `library/client.ts` |
-| Explicit preparation | `src/app/prepare/page.tsx`, `src/lib/prepare-client.ts` |
+| Concern                                             | Files                                                                        |
+| --------------------------------------------------- | ---------------------------------------------------------------------------- |
+| UI and responsive styles                            | `src/components/discover/`, `src/app/styles/discover.css`                    |
+| Catalogue, eligibility, contracts                   | `src/lib/discover/catalog.ts`, `eligibility.ts`, `validation.ts`, `types.ts` |
+| Ranking, explanations and local vocabulary evidence | `score.ts`, `rank.ts`, `vocabulary.ts`                                       |
+| Scheduled provider acquisition                      | `refresh.ts`, `youtube-data-api.ts`, `ingest.ts`                             |
+| Seed strategy, quality assessment, catalogue health | `acquisition.ts`, `quality.ts`, `health.ts`                                  |
+| APIs and queue merge                                | `server.ts`, `account-server.ts`, `watch-later.ts`                           |
+| Local preferences/feedback and outbox               | `client.ts`, existing `library/client.ts`                                    |
+| Explicit preparation                                | `src/app/prepare/page.tsx`, `src/lib/prepare-client.ts`                      |
 
 ## Feed and recommendation contracts
 
 `GET /api/discover` is an anonymous metadata-only read with normalized query parameters and `public, max-age=60`. The Worker uses a named Cache API cache segmented by Cloudflare country. `POST /api/discover` accepts `{ filters, context, cursor }`, requires same-origin JSON, is bounded at 16 KB and always `no-store`. Account cookies never personalize a public GET. Private bodies enter neither shared caches nor logs.
 
-Responses contain `{ items, lanes, total, hasMore, nextCursor, filters, suggestedBand, catalogueUpdatedAt, coverage }`. `coverage` counts estimated levels per band, prepared videos and the total under the current non-level filters; it is a public catalogue aggregate, safe for the shared cache. Cards contain public metadata and optional transcript identity/version proof, never transcript text or lesson blobs. One bounded D1 join reads the latest 1,000 fresh candidates; pages contain 24 results. Opaque cursors bind filters, bounded aggregate context, region, catalogue revision and hourly ranking epoch. Changed inputs expire the cursor; the UI offers a fresh retry.
+Responses contain `{ items, lanes, total, hasMore, nextCursor, filters, suggestedBand, catalogueUpdatedAt, coverage }`. `coverage` counts estimated levels per band, prepared videos and the total under the current non-level filters; it is a public catalogue aggregate, safe for the shared cache. Cards contain public metadata and optional transcript identity/version proof, never transcript text or lesson blobs. One bounded D1 join reads the latest 1,000 fresh candidates; pages contain 24 results. That join reads about 4.5 D1 rows per candidate, so the Worker shares its result between isolates through a per-data-centre Cache API entry for five minutes (keyed by deployed version) and each isolate keeps it for one minute; preparation outcomes and new acquisitions can take up to six minutes to appear in the feed. Opaque cursors bind filters, bounded aggregate context, region, catalogue revision and hourly ranking epoch. Changed inputs expire the cursor; the UI offers a fresh retry.
 
 Ranking (`score.ts`, `rank.ts`) adds five bounded parts, and the strongest explains the card:
 
-| Part | Signals |
-| --- | --- |
-| Quality | Versioned quality score, declared Japanese audio, prepared Japanese captions (+6), reported captions; known `needs-captions` (−5) or failed preparation (−3) keeps a video visible without leading |
-| Difficulty | Estimated band only: same band +20, one easier +14, one harder +12, further easier −3, further harder −10. For unverified videos a matching search level target adds +4 and is explained as search intent ("level not yet estimated") |
-| Interest | Chosen topics, topics and channels from More like this, topics of saved/completed videos, typical session length, local vocabulary fit |
-| History | Saved, completed and seen videos fall back |
-| Exploration | Freshness, and +1 for creators the learner has not met |
+| Part        | Signals                                                                                                                                                                                                                               |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Quality     | Versioned quality score, declared Japanese audio, prepared Japanese captions (+6), reported captions; known `needs-captions` (−5) or failed preparation (−3) keeps a video visible without leading                                    |
+| Difficulty  | Estimated band only: same band +20, one easier +14, one harder +12, further easier −3, further harder −10. For unverified videos a matching search level target adds +4 and is explained as search intent ("level not yet estimated") |
+| Interest    | Chosen topics, topics and channels from More like this, topics of saved/completed videos, typical session length, local vocabulary fit                                                                                                |
+| History     | Saved, completed and seen videos fall back                                                                                                                                                                                            |
+| Exploration | Freshness, and +1 for creators the learner has not met                                                                                                                                                                                |
 
 For you with a known level then applies a progression hypothesis of six comfortable, two easier and two stretch picks per ten. Slots reorder only estimated matches that exist; an empty slot takes the next best video, so scarce levels are never padded with guesses. Balanced/wide variety then interleaves channels/topics without deleting candidates. Newest and shortest preserve requested ordering. Trending uses aggregated Hibiki activity, never YouTube engagement statistics. Recommended, Easy listening, A little stretch, Ready to shadow now (prepared captions), 5–10 minutes, chosen topic, New discoveries and Trending lanes appear when eligible candidates exist.
 
@@ -67,12 +67,12 @@ The original nine broad queries were retired by migration `0014`: in production 
 
 **Quality assessment** (`quality.ts`, versioned) scores provider metadata deterministically and records the reasons. What each provider field guarantees:
 
-| Field | Meaning | Use |
-| --- | --- | --- |
-| `snippet.defaultAudioLanguage` | Uploader-declared language of the default audio. Optional, unverified | Japanese: positive evidence. Another language: rejected |
-| `snippet.defaultLanguage` | Language of the title and description, not the audio | Stored only |
-| `contentDetails.caption` | Some uploaded caption track, in any language | Small positive signal; never "Japanese captions" |
-| `snippet.categoryId`, `topicDetails` | Coarse uploader/provider categories (`topicDetails` costs no extra quota) | Music rejection; browse topics |
+| Field                                | Meaning                                                                   | Use                                                     |
+| ------------------------------------ | ------------------------------------------------------------------------- | ------------------------------------------------------- |
+| `snippet.defaultAudioLanguage`       | Uploader-declared language of the default audio. Optional, unverified     | Japanese: positive evidence. Another language: rejected |
+| `snippet.defaultLanguage`            | Language of the title and description, not the audio                      | Stored only                                             |
+| `contentDetails.caption`             | Some uploaded caption track, in any language                              | Small positive signal; never "Japanese captions"        |
+| `snippet.categoryId`, `topicDetails` | Coarse uploader/provider categories (`topicDetails` costs no extra quota) | Music rejection; browse topics                          |
 
 Hard rejections: declared non-Japanese audio, recorded other-language drills (聞き流し, phrase lists with narrators), sign language, silent vlogs (無言), music, under 60 seconds or over 3 hours. Scored signals: kana in the title/description (Chinese metadata has none), Hangul, Japanese-learner markers (creator-declared, e.g. JLPT, やさしい日本語, comprehensible Japanese), Japanese explanations about another language (−30, not rejected), synthetic voices (−50), ASMR, shorts, compilations, spoken formats, promotion, duration fit, reported captions, channel history from 30 days of acceptances/rejections, and a trusted Japanese transcript (+20). Below 55 is rejected. Japanese titles alone never prove Japanese speech; language evidence is reported as `japanese-transcript`, `reported-japanese-audio`, `japanese-metadata` or `uncertain`.
 
@@ -80,29 +80,29 @@ Rejected IDs are kept for 30 days in `discovery_rejections` (ID, channel, reason
 
 **Preparation evidence.** Videos already prepared in Hibiki from trusted public Japanese captions but missing from the catalogue are backfilled (50 IDs per metadata unit). This is the cheapest source of verifiable levels: in production, six analysed videos (one N5–N4, four N3–N2) were absent from the catalogue. A successful preparation also clears the video's verification timestamp, so its analysis is linked at the next 15-minute run rather than the next hourly pass. Discover still starts no inference and no caption fetches; probing YouTube for Japanese caption tracks was not enabled, because `captions.list` costs 50 units per video and the caption relay is reserved for learner-initiated preparation.
 
-**Health.** Each run logs `discover.health` with counts only: catalogue size, captions reported, prepared, declared Japanese audio, orientation, channels and largest-channel share, mean quality, coverage by level target, topic and verified band, 24-hour rejection reasons, per-seed yield, quota used and units per accepted video. `discovery_seed_runs` keeps 30 days of per-search yield and rejection reasons.
+**Health.** The first run of each UTC day logs `discover.health` (the aggregates read the whole catalogue and every JSON array element) with counts only: catalogue size, captions reported, prepared, declared Japanese audio, orientation, channels and largest-channel share, mean quality, coverage by level target, topic and verified band, 24-hour rejection reasons, per-seed yield, quota used and units per accepted video. `discovery_seed_runs` keeps 30 days of per-search yield and rejection reasons.
 
 **Evaluation.** `npm run eval:discover` reports catalogue and learner-level feed metrics. Catalogue precision and recall are measured on labelled fixtures without network access: the 50 production videos from 10 October 2026 and 37 hand-written examples of what the new searches return, including traps. `tests/discover-quality.test.ts` enforces the thresholds.
 
-| Set | Candidates | Accepted | Relevant accepted | Precision | Recall |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| Production baseline, before | 50 | 50 | 3 | 6% | 100% |
-| Production baseline, after | 50 | 4 | 3 | 75% | 100% |
-| Level-targeted searches, unfiltered | 37 | 37 | 21 | 57% | 100% |
-| Level-targeted searches, after | 37 | 22 | 21 | 95% | 100% |
+| Set                                 | Candidates | Accepted | Relevant accepted | Precision | Recall |
+| ----------------------------------- | ---------: | -------: | ----------------: | --------: | -----: |
+| Production baseline, before         |         50 |       50 |                 3 |        6% |   100% |
+| Production baseline, after          |         50 |        4 |                 3 |       75% |   100% |
+| Level-targeted searches, unfiltered |         37 |       37 |                21 |       57% |   100% |
+| Level-targeted searches, after      |         37 |       22 |                21 |       95% |   100% |
 
 Top-of-feed precision rises from 10% to 90% at 10 and from 8% to 92% at 24. The remaining false positives are a Japanese explanation of English pronunciation kept because a trusted Japanese transcript proves Japanese speech, and an ambient walking video whose metadata is indistinguishable from a talking vlog. The matrix fixtures were written alongside the rules, so treat their precision as an upper bound; production health logs are the real measure.
 
 Ranking is evaluated on the accepted catalogue for three learners, with ten fixture videos given simulated estimated bands (`tests/discover-ranking.test.ts` enforces the thresholds). Before is the previous ranker on the same catalogue:
 
-| Learner | Ranker | Precision@10 | Within one band | More than one band harder | More than one band easier |
-| --- | --- | ---: | ---: | ---: | ---: |
-| Beginner (N5–N4) | before | 90% | 5 | 4 | 0 |
-| Beginner (N5–N4) | after | 90% | 5 | 0 | 0 |
-| Intermediate (N4–N3) | before | 90% | 6 | 2 | 1 |
-| Intermediate (N4–N3) | after | 90% | 6 | 0 | 0 |
-| Advanced (N2–N1) | before | 90% | 5 | 0 | 4 |
-| Advanced (N2–N1) | after | 100% | 5 | 0 | 3 |
+| Learner              | Ranker | Precision@10 | Within one band | More than one band harder | More than one band easier |
+| -------------------- | ------ | -----------: | --------------: | ------------------------: | ------------------------: |
+| Beginner (N5–N4)     | before |          90% |               5 |                         4 |                         0 |
+| Beginner (N5–N4)     | after  |          90% |               5 |                         0 |                         0 |
+| Intermediate (N4–N3) | before |          90% |               6 |                         2 |                         1 |
+| Intermediate (N4–N3) | after  |          90% |               6 |                         0 |                         0 |
+| Advanced (N2–N1)     | before |          90% |               5 |                         0 |                         4 |
+| Advanced (N2–N1)     | after  |         100% |               5 |                         0 |                         3 |
 
 Every within-one-band estimate in the fixtures reaches each learner's top ten either way; the change removes mismatched levels. The advanced learner still sees three much easier videos because the fixture catalogue has only five estimated videos near N2–N1, which is the scarcity the acquisition matrix and backfill address.
 
@@ -110,13 +110,13 @@ Every within-one-band estimate in the fixtures reaches each learner's top ten ei
 
 New account APIs reuse Better Auth, same-origin JSON checks, verified-email mutations and `X-Hibiki-Account` ownership fencing. They are `no-store`. The separate Discovery limiter permits 90 requests per minute per IP without consuming the six-per-minute AI budget.
 
-| Endpoint | Behavior |
-| --- | --- |
-| `GET/PATCH /api/discover/preferences` | Strict band/topics/duration/variety; latest accepted PATCH wins |
-| `GET/POST /api/discover/feedback` | Account-owned latest feedback; reset supports undo; server receipt orders writes |
-| `GET/POST /api/watch-later` | Read records; idempotently save an ID or merge up to 120 records per write |
-| `DELETE /api/watch-later/<id>` | Timestamped removal without fetching content |
-| `POST /api/discover/events` | Up to 24 validated events; cannot write catalogue state |
+| Endpoint                              | Behavior                                                                         |
+| ------------------------------------- | -------------------------------------------------------------------------------- |
+| `GET/PATCH /api/discover/preferences` | Strict band/topics/duration/variety; latest accepted PATCH wins                  |
+| `GET/POST /api/discover/feedback`     | Account-owned latest feedback; reset supports undo; server receipt orders writes |
+| `GET/POST /api/watch-later`           | Read records; idempotently save an ID or merge up to 120 records per write       |
+| `DELETE /api/watch-later/<id>`        | Timestamped removal without fetching content                                     |
+| `POST /api/discover/events`           | Up to 24 validated events; cannot write catalogue state                          |
 
 Existing current-account local queues migrate once. Anonymous saves require Library's explicit **Add this device's anonymous saves to my account** action. Sign-in never infers consent. Namespaces remain isolated across account changes/logout. Vimeo/direct links retain local behavior; cross-device Watch Later covers canonical YouTube links. Device-only media reserve places in the 40-link local view; any additional account saves remain in records/D1, with a visible overflow count, and appear when a local place is freed.
 

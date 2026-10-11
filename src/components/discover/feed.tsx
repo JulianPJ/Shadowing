@@ -201,8 +201,27 @@ export function DiscoverFeed({ library: shared }: { library: ReturnType<typeof u
     setItems([]);
     void fetchPage(null, true);
   });
+  const loaded = useRef<{
+    inputs: string;
+    revision: number;
+    fetchPage: typeof fetchPage;
+    user: string | undefined;
+  } | null>(null);
   useEffect(() => {
     if (!ready || !libraryReady || !account.loaded) return;
+    // The learner profile is rebuilt on every storage event, including other tabs' writes. Reload
+    // only when the recommendation inputs change; seen IDs adjust ranking but never force a reload.
+    const inputs = JSON.stringify({ ...discoveryContext(profile), seen: [], vocabularyFit: {} });
+    const last = loaded.current;
+    if (
+      last &&
+      last.inputs === inputs &&
+      last.revision === revision &&
+      last.fetchPage === fetchPage &&
+      last.user === account.user?.id
+    )
+      return;
+    loaded.current = { inputs, revision, fetchPage, user: account.user?.id };
     // Reset the in-flight request when browser-owned inputs or account hydration change.
     refreshFeed();
   }, [ready, libraryReady, profile, account.loaded, account.user?.id, revision, fetchPage]);

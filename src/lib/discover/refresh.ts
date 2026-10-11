@@ -153,25 +153,29 @@ async function dueSeeds(db: D1Database, now: number): Promise<Seed[]> {
       lastRunAt: r.last_run_at,
     }));
 }
+// One row per video, tallied here: COUNT(*) plus json_each in SQL read the catalogue three times
+// and bill every array element as a D1 row.
 async function catalogueCoverage(db: D1Database): Promise<Coverage> {
-  const [total, levels, topics] = await Promise.all([
-    db.prepare('SELECT COUNT(*) AS n FROM discovery_videos').first<{ n: number }>(),
-    db
-      .prepare(
-        'SELECT j.value AS key, COUNT(*) AS n FROM discovery_videos v, json_each(v.level_targets_json) j GROUP BY j.value',
-      )
-      .all<{ key: LevelTarget; n: number }>(),
-    db
-      .prepare(
-        'SELECT j.value AS key, COUNT(*) AS n FROM discovery_videos v, json_each(v.topic_keys_json) j GROUP BY j.value',
-      )
-      .all<{ key: Topic; n: number }>(),
-  ]);
-  return {
-    total: total?.n ?? 0,
-    levels: Object.fromEntries(levels.results.map((r) => [r.key, r.n])),
-    topics: Object.fromEntries(topics.results.map((r) => [r.key, r.n])),
+  const rows = await db
+    .prepare('SELECT level_targets_json AS levels, topic_keys_json AS topics FROM discovery_videos')
+    .all<{ levels: string; topics: string }>();
+  const levels: Coverage['levels'] = {},
+    topics: Coverage['topics'] = {};
+  const tally = <K extends string>(counts: Partial<Record<K, number>>, json: string) => {
+    let values: unknown;
+    try {
+      values = JSON.parse(json);
+    } catch {
+      return;
+    }
+    if (Array.isArray(values))
+      for (const value of values) counts[value as K] = (counts[value as K] ?? 0) + 1;
   };
+  for (const row of rows.results) {
+    tally<LevelTarget>(levels, row.levels);
+    tally<Topic>(topics, row.topics);
+  }
+  return { total: rows.results.length, levels, topics };
 }
 export async function refreshCatalog(
   db: D1Database,
@@ -196,7 +200,13 @@ export async function refreshCatalog(
   try {
     // Expired public API metadata is deleted even when the key is missing or quota exhausted.
     await db.batch([
-      db.prepare('DELETE FROM discovery_videos WHERE expires_at<=?').bind(time),
+      // Naming both CHECK-constrained statuses lets the purge use discovery_videos_fresh
+      // instead of scanning the whole catalogue on every run.
+      db
+        .prepare(
+          "DELETE FROM discovery_videos WHERE status IN ('available','unavailable') AND expires_at<=?",
+        )
+        .bind(time),
       db
         .prepare('DELETE FROM discovery_metric_events WHERE day<?')
         .bind(new Date(now - 30 * 86400000).toISOString().slice(0, 10)),
@@ -251,13 +261,16 @@ export async function refreshCatalog(
           rejected += result.rejected;
         }
         // Videos already prepared from trusted Japanese captions are the most useful additions.
-        const backfill = await preparedBackfillIds(db, now);
+        // The candidate query reads every YouTube transcript, so it runs once an hour.
+        const backfill =
+          new Date(now).getUTCMinutes() < 15 ? await preparedBackfillIds(db, now) : [];
         if (backfill.length) {
           const result = await ingestVideos(db, backfill, await api.videos(backfill, [], now), now);
           backfilled += result.accepted;
           rejected += result.rejected;
         }
-        const seeds = chooseSeeds(await dueSeeds(db, now), await catalogueCoverage(db), now);
+        const due = await dueSeeds(db, now);
+        const seeds = due.length ? chooseSeeds(due, await catalogueCoverage(db), now) : [];
         for (const seed of seeds) {
           const order = seedOrder(seed);
           const found = await api.search(seed.query, order);
@@ -339,12 +352,15 @@ export async function refreshCatalog(
         keyConfigured: !!apiKey,
       }),
     );
-    console.info(
-      JSON.stringify({
-        event: 'discover.health',
-        ...(await catalogueHealth(db, now, youtubeQuotaWindow(now).day)),
-      }),
-    );
+    // Health aggregates read the whole catalogue and every JSON array element (about 40,000 D1
+    // rows at 1,500 videos), so only the first run of each UTC day logs them.
+    if (new Date(now).getUTCHours() === 0 && new Date(now).getUTCMinutes() < 15)
+      console.info(
+        JSON.stringify({
+          event: 'discover.health',
+          ...(await catalogueHealth(db, now, youtubeQuotaWindow(now).day)),
+        }),
+      );
   } catch (error) {
     storageEvent(
       error instanceof YoutubeDataError

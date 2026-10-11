@@ -36,6 +36,41 @@ export function tooManyRequests(error: string) {
   );
 }
 
+export type SharedCache = {
+  match(key: string): Promise<Response | undefined>;
+  put(key: string, value: Response): Promise<void>;
+};
+/**
+ * Shares a JSON read between the isolates of one data centre through the Cache API for
+ * `ttlSeconds`. An unavailable cache or unreadable entry falls back to `read`; failures are not stored.
+ */
+export async function sharedRead<T>(
+  open: () => Promise<SharedCache>,
+  key: string,
+  ttlSeconds: number,
+  read: () => Promise<T>,
+  defer: (promise: Promise<unknown>) => void,
+): Promise<T> {
+  const cache = await Promise.resolve()
+    .then(open)
+    .catch(() => undefined);
+  const hit = await cache?.match(key).catch(() => undefined);
+  if (hit)
+    try {
+      return (await hit.json()) as T;
+    } catch {
+      /* Replaced below. */
+    }
+  const value = await read();
+  if (cache)
+    defer(
+      cache
+        .put(key, Response.json(value, { headers: { 'Cache-Control': `max-age=${ttlSeconds}` } }))
+        .catch(() => undefined),
+    );
+  return value;
+}
+
 /** Reuses one in-flight or recent read for `ttlMs`; a failed read is not cached. */
 export function cachedRead<T>(read: () => Promise<T>, ttlMs: number, now = () => Date.now()) {
   let cached: { at: number; value: Promise<T> } | null = null;

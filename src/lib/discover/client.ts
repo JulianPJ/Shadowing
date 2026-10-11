@@ -132,11 +132,14 @@ export function giveFeedback(videoId: string, action: Feedback['action']) {
   void syncDiscover();
   return saved;
 }
+/**
+ * Adds newly shown IDs, newest first. Already-seen IDs keep their place, so reloading the same
+ * feed leaves the list (and every tab's storage listeners) untouched.
+ */
 export function rememberSeen(ids: string[]) {
-  writeStorage(
-    'discover:seen',
-    [...new Set([...ids, ...readStorage<string[]>('discover:seen', [])])].slice(0, 120),
-  );
+  const seen = readStorage<string[]>('discover:seen', []);
+  const fresh = [...new Set(ids)].filter((id) => !seen.includes(id));
+  if (fresh.length) writeStorage('discover:seen', [...fresh, ...seen].slice(0, 120));
 }
 export function discoveryContext(profile: LearnerProfile | null): Context {
   const prefs = discoveryPreferences();
@@ -176,18 +179,25 @@ export function discoveryContext(profile: LearnerProfile | null): Context {
     vocabularyFit: {},
   };
 }
+// The server keeps one event per learner, day, video and action, so a repeat only costs requests.
+const recordedEvents = new Set<string>();
 export async function recordDiscoveryEvents(
   events: { videoId: string; action: 'impression' | 'open' | 'prepared' | 'complete' | 'save' }[],
 ) {
   const owner = storageAccount();
   if (!owner || syncStatus().user?.id !== owner || !syncStatus().user?.emailVerified) return;
+  const day = new Date().toISOString().slice(0, 10);
+  const key = (e: (typeof events)[number]) => `${owner}:${day}:${e.videoId}:${e.action}`;
+  const fresh = events.filter((e) => !recordedEvents.has(key(e))).slice(0, 24);
+  if (!fresh.length) return;
   try {
-    await fetch('/api/discover/events', {
+    const response = await fetch('/api/discover/events', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Hibiki-Account': owner },
-      body: JSON.stringify({ events: events.slice(0, 24) }),
+      body: JSON.stringify({ events: fresh }),
       signal: AbortSignal.timeout(5000),
     });
+    if (response.ok) for (const e of fresh) recordedEvents.add(key(e));
   } catch {
     /* Best-effort diagnostics never block practice. */
   }

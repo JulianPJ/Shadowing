@@ -157,14 +157,15 @@ export async function ingestVideos(
 }
 /**
  * Re-assess stored rows whose quality version is missing or outdated, using stored metadata only.
- * This cleans an existing catalogue without spending provider quota.
+ * This cleans an existing catalogue without spending provider quota. No ORDER BY: rows are
+ * independent, and ordering would make SQLite scan the catalogue instead of two index searches.
  */
 export async function reassessCatalogue(db: D1Database, now: number, limit = 100) {
   const rows = await db
     .prepare(
       `SELECT video_id,title,description_excerpt,channel_id,channel_title,duration_seconds,caption_flag,
         default_audio_language,default_language,category_id FROM discovery_videos
-      WHERE quality_version IS NULL OR quality_version<? ORDER BY video_id LIMIT ?`,
+      WHERE quality_version IS NULL OR quality_version<? LIMIT ?`,
     )
     .bind(QUALITY_VERSION, limit)
     .all<{
@@ -242,14 +243,16 @@ export async function reassessCatalogue(db: D1Database, now: number, limit = 100
 /**
  * Videos already prepared in Hibiki from trusted public Japanese captions, but missing from the
  * catalogue. Adding them costs one metadata unit per 50 and gives Discover verifiable levels.
+ * The NOT EXISTS checks compare primary keys: building 'youtube:'||video_id instead would scan the
+ * whole catalogue for every transcript.
  */
 export async function preparedBackfillIds(db: D1Database, now: number, limit = 50) {
   const rows = await db
     .prepare(
       `SELECT DISTINCT substr(t.content_key,9) AS id FROM linked_transcripts t
       WHERE t.content_key LIKE 'youtube:%' AND length(t.content_key)=19 AND ${TRUSTED_TRANSCRIPT}
-      AND NOT EXISTS(SELECT 1 FROM discovery_videos v WHERE 'youtube:'||v.video_id=t.content_key)
-      AND NOT EXISTS(SELECT 1 FROM discovery_rejections r WHERE 'youtube:'||r.video_id=t.content_key AND r.rejected_at>=?)
+      AND NOT EXISTS(SELECT 1 FROM discovery_videos v WHERE v.video_id=substr(t.content_key,9))
+      AND NOT EXISTS(SELECT 1 FROM discovery_rejections r WHERE r.video_id=substr(t.content_key,9) AND r.rejected_at>=?)
       ORDER BY t.content_key LIMIT ?`,
     )
     .bind(new Date(now - REJECTION_DAYS * 86400000).toISOString(), limit)
