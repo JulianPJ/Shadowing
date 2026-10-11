@@ -79,8 +79,15 @@ for (const plan of ['free', 'pro'] as const)
     await expect(recap.getByRole('heading', { name: 'Worth another listen' })).toHaveCount(0);
     await expect(recap.getByRole('link', { name: 'Choose next lesson' })).toBeVisible();
     await recap.getByText('Saved words and practice details', { exact: true }).click();
-    if (plan === 'pro')
-      await expect(recap.getByText('コーヒー', { exact: true })).toBeVisible({ timeout: 15000 });
+    if (plan === 'pro') {
+      // Essential vocabulary lives in the Vocabulary tab, not the completion recap.
+      const tools = page.getByRole('navigation', { name: 'Lesson tools' });
+      await tools.getByRole('button', { name: 'Vocabulary', exact: true }).click();
+      await expect(
+        page.locator('.topic-vocabulary-card').getByText('コーヒー', { exact: true }),
+      ).toBeVisible({ timeout: 15000 });
+      await tools.getByRole('button', { name: 'Lesson review', exact: true }).click();
+    }
     expect(inference).toEqual([]);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,

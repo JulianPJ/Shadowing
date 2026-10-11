@@ -126,6 +126,10 @@ test('word states highlight across lessons and update coverage, bulk status and 
   await seed(page);
   await page.goto('/practice/adaptive-one');
   await expect(page.getByRole('button', { name: 'Listen', exact: true })).toBeEnabled();
+  await page
+    .getByRole('navigation', { name: 'Lesson tools' })
+    .getByRole('button', { name: 'Vocabulary', exact: true })
+    .click();
   const coverage = page.getByRole('region', { name: 'Personal vocabulary coverage' });
   await expect(coverage).toContainText('67% marked Known');
   await expect(coverage.locator('.good-line')).toHaveCount(2);
@@ -175,6 +179,10 @@ test('word states highlight across lessons and update coverage, bulk status and 
   await expect(page.getByLabel('Status for 猫')).toHaveValue('learning');
   await page.getByLabel('Status for 猫').selectOption('known');
   await page.goto('/practice/adaptive-one');
+  await page
+    .getByRole('navigation', { name: 'Lesson tools' })
+    .getByRole('button', { name: 'Vocabulary', exact: true })
+    .click();
   await expect(coverage).toContainText('100% marked Known');
   await expect(coverage.locator('.good-line')).toHaveCount(0);
   await expect(page.locator('#current-japanese [data-lemma="猫"]')).toHaveAttribute(
