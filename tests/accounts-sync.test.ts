@@ -445,8 +445,20 @@ test('user-scoped keyset pagination and indexed queries', async () => {
   const page = await repo.bootstrap(userA);
   assert.equal(page.data.lessons.length, 50);
   assert.ok(page.nextCursor);
+  // Every other collection arrives on the same page; only the unfinished one continues.
+  assert.ok(page.data.bookmarks.length > 0 && page.data.preferences);
+  assert.deepEqual(Object.keys(JSON.parse(page.nextCursor!)), ['lessons']);
   const second = await repo.bootstrap(userA, page.nextCursor);
   assert.equal(second.data.lessons.length, 1);
+  assert.equal(second.data.bookmarks.length, 0);
+  assert.equal(second.nextCursor, null);
+  // A tab paginating with the old per-collection cursor across a deploy resumes where it was.
+  const legacy = await repo.bootstrap(userA, JSON.stringify([0, page.data.lessons[49].id]));
+  assert.equal(legacy.data.lessons.length, 1);
+  assert.equal(legacy.data.bookmarks.length, page.data.bookmarks.length);
+  assert.equal((await repo.bootstrap(userA, JSON.stringify([2, '']))).data.lessons.length, 0);
+  for (const bad of ['{}', '{"users":""}', '{"lessons":1}', '[6,""]', '"x"', 'null'])
+    await assert.rejects(repo.bootstrap(userA, bad), /Invalid cursor/);
   const plan = await db
     .prepare(
       'EXPLAIN QUERY PLAN SELECT id FROM user_lessons WHERE user_id=? AND id>? ORDER BY id LIMIT 51',

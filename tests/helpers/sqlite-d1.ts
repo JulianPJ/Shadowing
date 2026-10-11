@@ -30,7 +30,10 @@ export function localProgressDatabase(db: DatabaseSync): ProgressDatabase & Dict
       try {
         const result = statements.map((s) => {
           if (!(s instanceof Statement)) throw new Error('Invalid statement');
-          return db.prepare(s.sql).run(...s.values);
+          // Like D1, a batched read returns its rows.
+          return /^\s*(SELECT|WITH)\b/i.test(s.sql)
+            ? { results: db.prepare(s.sql).all(...s.values) }
+            : db.prepare(s.sql).run(...s.values);
         });
         db.exec('COMMIT');
         return result;
