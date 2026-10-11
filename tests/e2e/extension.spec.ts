@@ -71,7 +71,7 @@ test.beforeAll(async () => {
   temporary.push(extension, profile);
   fs.cpSync(path.resolve('extension'), extension, { recursive: true });
   const manifest = JSON.parse(fs.readFileSync(path.join(extension, 'manifest.json'), 'utf8'));
-  manifest.host_permissions = ['http://127.0.0.1/*'];
+  manifest.host_permissions = ['http://127.0.0.1/*', 'https://www.youtube.com/*'];
   fs.writeFileSync(path.join(extension, 'manifest.json'), JSON.stringify(manifest));
   // Branded Chrome ignores --load-extension, so stay on Playwright's Chromium even when
   // PLAYWRIGHT_CHROME_PATH selects Chrome for the other specs.
@@ -179,4 +179,60 @@ test('a page video without subtitles gets Whisper subtitles from its own audio',
   const seconds = (wav.length - 44) / 32000;
   expect(seconds).toBeGreaterThan(2);
   expect(seconds).toBeLessThan(15);
+});
+
+test('YouTube has one popup choice and requests native captions', async () => {
+  test.setTimeout(120_000);
+  const id = 'dQw4w9WgXcQ';
+  const canonical = `https://www.youtube.com/watch?v=${id}`;
+  const watch = `${canonical}&list=PL123`;
+  await context.route('https://www.youtube.com/watch**', (route) =>
+    route.fulfill({
+      contentType: 'text/html',
+      body: [
+        '<!doctype html><html><title>YouTube fixture</title><body>',
+        '<video></video><video></video></body></html>',
+      ].join(''),
+    }),
+  );
+  let preparedUrl = '';
+  await context.route('**/api/prepare', async (route) => {
+    preparedUrl = route.request().postDataJSON().url;
+    await route.fulfill({
+      contentType: 'application/x-ndjson',
+      body:
+        JSON.stringify({
+          code: 'no-japanese-captions',
+          error: 'No Japanese captions in this test fixture',
+        }) + '\n',
+    });
+  });
+  const video = await context.newPage();
+  await video.goto(watch);
+  const worker = context.serviceWorkers()[0];
+  const tabId = await worker.evaluate(
+    async (url) => (await chrome.tabs.query({})).find((tab) => tab.url === url)?.id,
+    watch,
+  );
+  expect(tabId).toBeTruthy();
+  const popup = await context.newPage();
+  await popup.goto(`chrome-extension://${extensionId}/popup.html?tab=${tabId}`);
+  await expect(popup.getByRole('button', { name: 'Practise in Hibiki' })).toHaveCount(1);
+  const youtubeSummary = popup.getByText(
+    'YouTube video · Japanese subtitles checked automatically',
+  );
+  await expect(youtubeSummary).toBeVisible();
+
+  const openedPromise = context.waitForEvent('page', (page) => page.url().startsWith(hibiki));
+  await popup.getByRole('button', { name: 'Practise in Hibiki' }).click();
+  const opened = await openedPromise;
+  await expect(opened).toHaveURL(/\/prepare\?video=/);
+  await expect.poll(() => preparedUrl).toBe(canonical);
+  await expect(opened.getByRole('dialog', { name: 'Your next listening session.' })).toBeVisible();
+
+  await popup.close();
+  await opened.close();
+  await video.close();
+  await context.unroute('https://www.youtube.com/watch**');
+  await context.unroute('**/api/prepare');
 });

@@ -16,6 +16,7 @@ FILES = (
     "popup.html",
     "popup.css",
     "popup.js",
+    "youtube.js",
 )
 SIZES = (16, 32, 48, 128)
 

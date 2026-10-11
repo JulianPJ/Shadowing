@@ -1,3 +1,5 @@
+import { canonicalYouTubeUrl } from './youtube.js';
+
 // Hibiki Bridge service worker. It only ever controls tabs the learner connected from the popup,
 // and only Hibiki pages (where bridge.js runs) can send it commands.
 const VERSION = chrome.runtime.getManifest().version;
@@ -157,6 +159,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const { connected, waiting } = await state();
       const waitingFor = Object.keys(waiting).find((url) => samePage(url, message.pageUrl));
       return { connected: !!connected[message.tabId], waiting: !!waitingFor, origin };
+    }
+    if (message.action === 'youtube-import') {
+      // Do not trust a stale popup URL: validate Chrome's current tab URL.
+      const tab = await chrome.tabs.get(message.tabId);
+      const canonicalUrl = tab?.url === message.pageUrl ? canonicalYouTubeUrl(tab.url) : null;
+      if (!canonicalUrl) throw new Error('Open a YouTube video and try again.');
+      await chrome.tabs.create({
+        url: `${origin}/prepare?video=${encodeURIComponent(canonicalUrl)}`,
+      });
+      return { ok: true };
     }
     if (message.action === 'import') {
       const { description } = await attach(

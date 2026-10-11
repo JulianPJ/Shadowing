@@ -1,3 +1,5 @@
+import { canonicalYouTubeUrl } from './youtube.js';
+
 // Lists the videos on the current page and hands the chosen one to Hibiki.
 const statusLine = document.getElementById('status');
 const list = document.getElementById('videos');
@@ -52,6 +54,40 @@ async function render() {
     statusLine.textContent = 'Open a web page with a video, then click Hibiki Bridge.';
     return;
   }
+  // A YouTube watch page has one canonical video even if it contains many media
+  // elements. Hibiki's native import finds YouTube captions; textTracks does not.
+  const youtubeUrl = canonicalYouTubeUrl(tab.url);
+  let status;
+  if (youtubeUrl) {
+    status = await send({ action: 'status', tabId: tab.id, pageUrl: tab.url });
+    // Preserve reconnection of lessons previously created with the generic page bridge.
+    if (!status.waiting) {
+      statusLine.textContent = 'Practise this YouTube video with Hibiki.';
+      const item = document.createElement('li');
+      const details = document.createElement('span');
+      details.textContent = 'YouTube video · Japanese subtitles checked automatically';
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'primary';
+      button.textContent = 'Practise in Hibiki';
+      button.addEventListener('click', async () => {
+        button.disabled = true;
+        statusLine.textContent = 'Opening Hibiki…';
+        try {
+          await send({ action: 'youtube-import', tabId: tab.id, pageUrl: tab.url });
+          statusLine.textContent = 'Opened in Hibiki.';
+          if (!new URLSearchParams(location.search).get('tab')) window.close();
+        } catch (error) {
+          statusLine.textContent = error.message;
+          button.disabled = false;
+        }
+      });
+      item.append(details, button);
+      list.append(item);
+      return;
+    }
+  }
+
   let frames = [];
   try {
     frames = await chrome.scripting.executeScript({
@@ -73,7 +109,7 @@ async function render() {
     allow.hidden = false;
     return;
   }
-  const status = await send({ action: 'status', tabId: tab.id, pageUrl: tab.url });
+  status ??= await send({ action: 'status', tabId: tab.id, pageUrl: tab.url });
   statusLine.textContent = status.waiting
     ? 'Your Hibiki lesson is waiting for this video.'
     : found.length === 1
