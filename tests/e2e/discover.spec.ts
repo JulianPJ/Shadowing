@@ -66,9 +66,7 @@ test('feed browses all six bands, filters, persists search and never prepares on
     return route.abort();
   });
   await page.goto('/discover');
-  await expect(
-    page.getByRole('heading', { name: 'Find something worth listening to' }),
-  ).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Your discovery feed' })).toBeVisible();
   await expect(page.locator('.discover-card')).not.toHaveCount(0);
   for (const [, label] of BANDS)
     await expect(page.getByRole('button', { name: label, exact: true })).toBeVisible();
@@ -86,7 +84,8 @@ test('feed browses all six bands, filters, persists search and never prepares on
   expect(ai).toBe(0);
   await page.getByRole('button', { name: 'Clear all', exact: true }).click();
   await expect(page.getByLabel('Search Japanese videos')).toHaveValue('');
-  await expect(page.getByRole('button', { name: 'For you', exact: true })).toHaveAttribute(
+  // Without a known level the personalised default is shown as All levels.
+  await expect(page.getByRole('button', { name: 'All levels', exact: true })).toHaveAttribute(
     'aria-pressed',
     'true',
   );
@@ -204,11 +203,14 @@ test('caption absence opens current subtitle-choice flow without another start c
 });
 test('preferences do not change practice history and feedback has undo', async ({ page }) => {
   await page.goto('/discover');
-  await page.getByRole('button', { name: 'Edit level' }).click();
+  await page.getByRole('button', { name: 'Preferences', exact: true }).click();
   await page.getByLabel('Your preferred content level').selectOption('n4_n3');
   await page.getByRole('dialog').getByLabel('Travel', { exact: true }).check();
   await page.getByRole('button', { name: 'Save preferences' }).click();
-  await expect(page.locator('.discover-level-display')).toHaveText('N4–N3');
+  await expect(page.getByRole('button', { name: 'N4–N3 Your level' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
   const card = page.locator('.discover-card').first(),
     title = await card.locator('h3').innerText();
   await card.locator('summary').click();
@@ -223,28 +225,25 @@ test('preferences do not change practice history and feedback has undo', async (
   expect(preferences.discovery.preferredBand).toBe('n4_n3');
   expect(preferences.learning).toBeNull();
 });
-test('easier, my level and challenge shortcuts are exact band filters', async ({ page }) => {
+test('your level is the personalised default and other levels are exact filters', async ({
+  page,
+}) => {
   await page.goto('/discover');
-  await expect(page.getByRole('group', { name: 'Compared with your level' })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Edit level' }).click();
+  await expect(page.locator('.discover-level-mine')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Preferences', exact: true }).click();
   await page.getByLabel('Your preferred content level').selectOption('n4_n3');
   await page.getByRole('button', { name: 'Save preferences' }).click();
-  const shortcuts = page.getByRole('group', { name: 'Compared with your level' });
-  await shortcuts.getByRole('button', { name: 'Challenge · N3–N2', exact: true }).click();
+  const mine = page.getByRole('button', { name: 'N4–N3 Your level' });
+  await expect(mine).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'N3–N2', exact: true }).click();
   await expect(page).toHaveURL(/band=n3_n2/);
   await expect(page.locator('.discover-card')).toHaveCount(6);
   for (const band of await page.locator('.discover-band').allInnerTexts())
     expect(band).toContain('N3–N2');
-  await expect(page.getByRole('button', { name: 'N3–N2', exact: true })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
-  await shortcuts.getByRole('button', { name: 'Easier · N5–N4', exact: true }).click();
-  await expect(page).toHaveURL(/band=n5_n4/);
-  await expect(shortcuts.getByRole('button', { name: 'My level · N4–N3' })).toHaveAttribute(
-    'aria-pressed',
-    'false',
-  );
+  await expect(mine).toHaveAttribute('aria-pressed', 'false');
+  await mine.click();
+  await expect(page).not.toHaveURL(/band=/);
+  await expect(mine).toHaveAttribute('aria-pressed', 'true');
 });
 test('a level with no estimated videos explains why and offers honest alternatives', async ({
   page,

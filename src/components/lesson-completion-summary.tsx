@@ -16,7 +16,6 @@ import { useReview } from './use-review';
 import { useAccount } from './account';
 import { ShadowingCompletion } from './shadowing-completion';
 import { LessonReviewRecap } from './lesson-review-recap';
-import { TopicVocabularyOverview } from './topic-vocabulary-overview';
 import { ComprehensionQuiz } from './comprehension-quiz';
 import { LessonDifficulty } from './lesson-difficulty';
 import { useProAccess } from './pro-feature';
@@ -177,7 +176,6 @@ export function LessonCompletionSummary({
                 </ul>
               </div>
             ) : null}
-            <TopicVocabularyOverview lesson={lesson} onReview={onReview} />
           </details>
         </>
       ) : null}

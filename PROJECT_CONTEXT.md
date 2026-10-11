@@ -50,7 +50,9 @@ and audio.
   and the bundled demo.
 - **Learning:** Pro comprehension checks with evidence replay, content difficulty estimates, local
   learner profile, weekly report and daily goal, Discover catalogue with Watch later.
-- **Vocabulary:** one model — see [vocabulary](docs/vocabulary.md). Look up a word in the sentence,
+- **Vocabulary:** one model — see [vocabulary](docs/vocabulary.md). The player's Vocabulary tab
+  leads with Pro **Essential vocabulary** (local topic-word ranking with meanings and one-click
+  Add to review), then personal coverage. Look up a word in the sentence,
   **Add to review** (saved word + review card + Learning), or mark **Known** / **Ignore**. Review
   intervals of 21+ days count as Known; a lapse returns the word to Learning. No decks or tags.
 - **Accounts:** Better Auth (email with verification, Google linking). Anonymous use is

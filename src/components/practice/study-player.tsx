@@ -127,6 +127,9 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
   const [secondaryTool, setSecondaryTool] = useState<'transcript' | 'vocabulary' | 'review'>(
     'transcript',
   );
+  // Outside Studio Mode the transcript keeps its own column, so the tabs choose between the
+  // panes below the player, starting with the lesson review.
+  const activeTool = !studioMode && secondaryTool === 'transcript' ? 'review' : secondaryTool;
   const [evidenceQuestion, setEvidenceQuestion] = useState('');
   const [difficultyWaiting, setDifficultyWaiting] = useState(false);
   const [replayRange, setReplayRange] = useState<QuizEvidence | null>(null);
@@ -876,16 +879,6 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
             {timestamp(duration)}
           </p>
         </div>
-        <div className="practice-progress">
-          <span>
-            {index + 1}
-            <span> / {lesson.segments.length}</span>
-          </span>
-          <div>
-            <i style={{ width: `${((index + 1) / lesson.segments.length) * 100}%` }} />
-          </div>
-          <span className="small muted">Section position</span>
-        </div>
       </div>
       <div className="practice-grid" ref={practiceArea}>
         <div className="player-column">
@@ -1008,7 +1001,6 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
               recentAttempts={shadowingScores.recentAttempts?.[segment.id]}
               onManualStop={stopAutomation}
               referenceAudio={accessibleReference ? referenceAudio : undefined}
-              onReplayNative={replaySection}
             />
           </div>
           <nav className="practice-tool-navigation" aria-label="Lesson tools">
@@ -1018,33 +1010,27 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
                 ['vocabulary', 'Vocabulary', 'practice-vocabulary'],
                 ['review', 'Lesson review', 'practice-review'],
               ] as const
-            ).map(([tool, label, target]) => (
-              <button
-                key={tool}
-                className="button"
-                aria-pressed={secondaryTool === tool}
-                aria-controls={target}
-                onClick={() => {
-                  setSecondaryTool(tool);
-                  if (!studioMode)
-                    document.getElementById(target)?.scrollIntoView({
-                      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
-                        ? 'instant'
-                        : 'smooth',
-                      block: 'start',
-                    });
-                }}
-              >
-                {label}
-              </button>
-            ))}
+            )
+              .filter(([tool]) => studioMode || tool !== 'transcript')
+              .map(([tool, label, target]) => (
+                <button
+                  key={tool}
+                  className="button"
+                  aria-pressed={activeTool === tool}
+                  aria-controls={target}
+                  onClick={() => setSecondaryTool(tool)}
+                >
+                  {label}
+                </button>
+              ))}
           </nav>
           <div
             id="practice-vocabulary"
             className="practice-secondary-pane"
-            hidden={studioMode && secondaryTool !== 'vocabulary'}
+            hidden={activeTool !== 'vocabulary'}
           >
             <LessonVocabulary
+              active={activeTool === 'vocabulary'}
               lesson={lesson}
               onPractice={(sectionId) => {
                 const targetIndex = lesson.segments.findIndex((s) => s.id === sectionId);
@@ -1057,7 +1043,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
           <div
             id="practice-review"
             className="practice-secondary-pane"
-            hidden={studioMode && secondaryTool !== 'review'}
+            hidden={activeTool !== 'review'}
           >
             <LessonCompletionSummary
               lesson={lesson}
@@ -1111,7 +1097,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
           </div>
         </div>
         <TranscriptPanel
-          hidden={studioMode && secondaryTool !== 'transcript'}
+          hidden={activeTool !== 'transcript' && studioMode}
           lesson={lesson}
           index={index}
           favorites={favorites}

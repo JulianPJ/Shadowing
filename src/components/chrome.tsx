@@ -179,7 +179,10 @@ export function Footer() {
   return (
     <footer className="site-footer">
       <span>Made for a little progress, every day.</span>
-      <span lang="ja">聞く。まねる。身につく。</span>
+      <span className="site-footer-links">
+        <Link href="/notices">Notices</Link>
+        <span lang="ja">聞く。まねる。身につく。</span>
+      </span>
     </footer>
   );
 }

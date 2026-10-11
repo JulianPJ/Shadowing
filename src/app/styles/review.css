@@ -94,6 +94,13 @@
 .review-card > .primary kbd {
   margin-left: 0.75rem;
 }
+/* The base kbd chip is paper-coloured, which hides white text on a primary button. */
+.review-screen .button.primary kbd {
+  color: inherit;
+  background: rgb(255 255 255 / 0.16);
+  border-color: rgb(255 255 255 / 0.45);
+  box-shadow: none;
+}
 .review-answer {
   margin-top: 1.5rem;
   border-top: 1px solid var(--line);
@@ -151,4 +158,12 @@
   color: inherit;
   border: 1px solid var(--line);
   border-radius: 8px;
+}
+.review-card h2 rt {
+  font-size: 0.4em;
+  font-weight: 500;
+  color: var(--muted);
+}
+.review-card .text-button kbd {
+  margin-left: 0.4rem;
 }

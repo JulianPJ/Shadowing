@@ -130,18 +130,11 @@
 }
 :root[data-theme='dark'] .practice-breadcrumb,
 :root[data-theme='dark'] .practice-breadcrumb > a,
-:root[data-theme='dark'] .practice-title p,
-:root[data-theme='dark'] .practice-progress > span:first-child > span {
+:root[data-theme='dark'] .practice-title p {
   color: var(--muted);
 }
 :root[data-theme='dark'] .practice-title p > span {
   color: #697168;
-}
-:root[data-theme='dark'] .practice-progress > div {
-  background: #2c322c;
-}
-:root[data-theme='dark'] .practice-progress i {
-  background: #7f947a;
 }
 :root[data-theme='dark'] .media-frame {
   border-color: #343c34;

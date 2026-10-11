@@ -55,7 +55,7 @@ test('full forms, sense choice and keyboard/touch phrase lookup retain exact con
   await expect(panel.locator('.dictionary-save-heading')).toContainText('話せます');
   await expect(panel.locator('.dictionary-save-heading')).toContainText('話せる');
   expect(assets.length).toBeGreaterThan(0);
-  await expect(panel.locator('[aria-pressed="true"]')).not.toHaveCount(0);
+  await expect(panel.getByRole('radio', { checked: true })).not.toHaveCount(0);
   await close(page);
   await expect(full).toBeFocused();
 
@@ -173,13 +173,10 @@ test('a chosen lexical sense and retry preserve one contextual saved word', asyn
   const panel = page.getByRole('complementary', { name: 'Save vocabulary' });
   await expect(panel.locator('.dictionary-save-heading')).toContainText('上がりました');
   const chosen = panel.locator('.lexicon-match').first().locator('li').nth(1);
-  await expect(chosen.getByRole('button', { name: 'Use sense 2' })).toBeVisible();
+  await expect(chosen.getByRole('radio', { name: 'Use sense 2' })).toBeVisible();
   const meaning = (await chosen.locator('p').textContent())!;
-  await chosen.getByRole('button', { name: 'Use sense 2' }).click();
-  await expect(chosen.getByRole('button', { name: 'Selected', exact: true })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
+  await chosen.locator('p').click();
+  await expect(chosen.getByRole('radio', { name: 'Use sense 2' })).toBeChecked();
   await panel.getByText('Edit before saving', { exact: true }).click();
   await expect(panel.getByLabel('Vocabulary meaning')).toHaveValue(meaning);
   await panel.getByLabel('Source sentence meaning').fill('The voice rose.');

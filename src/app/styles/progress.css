@@ -135,3 +135,13 @@
     align-items: center;
   }
 }
+.progress-level select {
+  max-width: 100%;
+  font: inherit;
+  font-size: 18px;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 4px 8px;
+}

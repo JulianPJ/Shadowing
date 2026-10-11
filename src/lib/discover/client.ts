@@ -141,17 +141,20 @@ export function rememberSeen(ids: string[]) {
   const fresh = [...new Set(ids)].filter((id) => !seen.includes(id));
   if (fresh.length) writeStorage('discover:seen', [...fresh, ...seen].slice(0, 120));
 }
+/** The content band estimated from completed, analysed lessons; null until there are two. */
+export function practiceBand(profile: LearnerProfile | null) {
+  const bands = (profile?.lessons ?? [])
+    .filter((l) => l.completed && l.difficulty)
+    .map((l) => bandFromRange(l.difficulty!.jlptMin, l.difficulty!.jlptMax))
+    .filter((b) => b !== null);
+  return profile?.typicalContent && bands.length >= 2
+    ? bandFromRange(profile.typicalContent.min, profile.typicalContent.max)
+    : null;
+}
 export function discoveryContext(profile: LearnerProfile | null): Context {
   const prefs = discoveryPreferences();
   const completed = profile?.lessons.filter((l) => l.completed) ?? [];
-  const measured = completed.filter((l) => l.difficulty);
-  const bands = measured
-    .map((l) => bandFromRange(l.difficulty!.jlptMin, l.difficulty!.jlptMax))
-    .filter((b) => b !== null);
-  const suggestion =
-    profile?.typicalContent && bands.length >= 2
-      ? bandFromRange(profile.typicalContent.min, profile.typicalContent.max)
-      : null;
+  const suggestion = practiceBand(profile);
   const durations = completed
     .map((l) => l.lesson.duration)
     .filter((d) => d > 0)

@@ -174,6 +174,11 @@ test('Studio and Furigana preserve quiz answers, difficulty, identity and bounde
     { key: proStorageKey('completion:demo'), revision: transcriptRevision(demo as Lesson) },
   );
   await open(page);
+  // Outside Studio Mode the lesson tools still choose which pane is shown.
+  await page
+    .getByRole('navigation', { name: 'Lesson tools' })
+    .getByRole('button', { name: 'Lesson review', exact: true })
+    .click();
   await page.getByText('About this lesson’s difficulty', { exact: true }).click();
   await expect(page.locator('.difficulty-summary')).toBeVisible();
   await page.getByRole('button', { name: 'Take comprehension check' }).click();
@@ -437,7 +442,7 @@ test('Studio tool panes keep the player mounted and transcript lookup never seek
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.getByRole('button', { name: 'Previous section', exact: true }).click();
   await expect(page.getByTestId('current-japanese')).toHaveText(demo.segments[8].japanese);
-  await expect(page.getByText('Section position', { exact: true })).toBeVisible();
+  await expect(page.getByText('Section position', { exact: true })).toHaveCount(0);
   expect(
     await page.locator('video').evaluate((video: HTMLVideoElement) => video.dataset.uxPlayer),
   ).toBe('same-player');

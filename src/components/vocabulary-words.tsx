@@ -17,16 +17,25 @@ import { useReview } from './use-review';
 import { useWordKnowledge } from './use-word-knowledge';
 import { VocabularyHeader } from './vocabulary-header';
 
-type Filter = 'all' | 'learning' | 'known';
+type Filter = 'all' | 'learning' | 'known' | 'ignored';
 const MARKED_PAGE = 100;
 
 export function VocabularyWords() {
   const account = useAccount();
+  const marked = useMarkedWords();
+  // One filter covers saved words and the other marked words below them.
+  const [filter, setFilter] = useState<Filter>('all');
+  const markedVisible = marked.filter((record) => filter === 'all' || record.state === filter);
   return (
     <main className="dictionary-screen">
       <VocabularyHeader active="words" />
       {account.user ? (
-        <SavedWords key={account.user.id} />
+        <SavedWords
+          key={account.user.id}
+          filter={filter}
+          setFilter={setFilter}
+          otherMatches={markedVisible.length}
+        />
       ) : (
         <section className="dictionary-empty">
           <h2>Keep words with their sentence.</h2>
@@ -39,15 +48,22 @@ export function VocabularyWords() {
           </Link>
         </section>
       )}
-      <MarkedWords />
+      <MarkedWords marked={account.user ? markedVisible : marked} />
     </main>
   );
 }
 
-function SavedWords() {
+function SavedWords({
+  filter,
+  setFilter,
+  otherMatches,
+}: {
+  filter: Filter;
+  setFilter: (filter: Filter) => void;
+  otherMatches: number;
+}) {
   const account = useAccount();
   const review = useReview();
-  const [filter, setFilter] = useState<Filter>('all');
   const [term, setTerm] = useState('');
   const [search, setSearch] = useState('');
   const [attempt, setAttempt] = useState(0);
@@ -93,8 +109,12 @@ function SavedWords() {
   const ready = loaded?.key === queryKey;
   const entries = ready ? loaded.entries : [];
   const learning = (entry: DictionaryEntry) => !!activeCard(entry.id, review.data.cards);
+  // Saved words are Learning while they have a review card and Known otherwise.
   const visible = entries.filter(
-    (entry) => filter === 'all' || (filter === 'learning') === learning(entry),
+    (entry) =>
+      filter === 'all' ||
+      (filter === 'learning' && learning(entry)) ||
+      (filter === 'known' && !learning(entry)),
   );
   async function loadMore() {
     if (!nextCursor || busy) return;
@@ -196,6 +216,7 @@ function SavedWords() {
               ['all', 'All'],
               ['learning', 'Learning'],
               ['known', 'Known'],
+              ['ignored', 'Ignored'],
             ] as const
           ).map(([value, label]) => (
             <button key={value} aria-pressed={filter === value} onClick={() => setFilter(value)}>
@@ -283,7 +304,7 @@ function SavedWords() {
             );
           })}
         </div>
-      ) : (
+      ) : filter !== 'all' && !search && otherMatches ? null : (
         <div className="dictionary-empty">
           <h2>
             {search || filter !== 'all'
@@ -359,18 +380,21 @@ const stateLabels: Record<WordState, string> = {
 };
 
 /** Words marked Known, Learning or Ignored that have no saved sentence. Works without an account. */
-function MarkedWords() {
+function useMarkedWords() {
   const { states } = useWordKnowledge();
-  const [limit, setLimit] = useState(MARKED_PAGE);
   const saved = useMemo(
     () => new Set(Object.values(cachedDictionary().records).map((r) => r.entry.term)),
     // Recompute when knowledge changes; saved words share the same refresh cadence.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [states],
   );
-  const marked = Object.values(states)
+  return Object.values(states)
     .filter((record) => record.state !== 'unknown' && !saved.has(record.lemma))
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+}
+
+function MarkedWords({ marked }: { marked: ReturnType<typeof useMarkedWords> }) {
+  const [limit, setLimit] = useState(MARKED_PAGE);
   if (!marked.length) return null;
   return (
     <section className="marked-words" aria-labelledby="marked-words-title">

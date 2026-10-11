@@ -7,6 +7,14 @@ import { identityKey } from '@/lib/learner/constants';
 import { timestamp } from '@/lib/youtube';
 import { useAccount, AccountSettings } from './account';
 import { WeeklyReport } from './weekly-report';
+import { useEffect, useState } from 'react';
+import { BANDS, type Preferences } from '@/lib/discover/types';
+import {
+  discoveryPreferences,
+  practiceBand,
+  saveDiscoveryPreferences,
+} from '@/lib/discover/client';
+import type { LearnerProfile } from '@/lib/learner-types';
 
 function practiceTime(seconds: number) {
   if (seconds < 60) return seconds > 0 ? 'Less than a minute' : 'No time recorded yet';
@@ -129,6 +137,7 @@ export function LearnerProgress() {
                 </span>
               </div>
             ) : null}
+            <ContentLevel profile={profile} />
           </dl>
           {profile.attention.length ? (
             <section className="progress-panel">
@@ -261,5 +270,61 @@ export function LearnerProgress() {
       )}
       <AccountSettings />
     </main>
+  );
+}
+
+/** The level Discover starts from: estimated from practice unless the learner chooses one. */
+function ContentLevel({ profile }: { profile: LearnerProfile }) {
+  const [preferences, setPreferences] = useState<Preferences | null>(null);
+  useEffect(() => {
+    const load = () => setPreferences(discoveryPreferences());
+    load();
+    window.addEventListener('hibiki:discover-change', load);
+    window.addEventListener('hibiki:account-change', load);
+    return () => {
+      window.removeEventListener('hibiki:discover-change', load);
+      window.removeEventListener('hibiki:account-change', load);
+    };
+  }, []);
+  if (!preferences) return null;
+  const estimated = practiceBand(profile);
+  const label = (band: string | null) => BANDS.find((b) => b[0] === band)?.[1] ?? null;
+  return (
+    <div className="progress-level">
+      <dt>
+        <label htmlFor="progress-level">Discover level</label>
+      </dt>
+      <dd>
+        <select
+          id="progress-level"
+          value={preferences.preferredBand ?? 'auto'}
+          onChange={(event) => {
+            const preferredBand =
+              event.target.value === 'auto'
+                ? null
+                : (event.target.value as Preferences['preferredBand']);
+            const next = { ...discoveryPreferences(), preferredBand };
+            saveDiscoveryPreferences(next);
+            setPreferences(next);
+          }}
+        >
+          <option value="auto">
+            {estimated ? `Estimated: ${label(estimated)}` : 'Estimate from my practice'}
+          </option>
+          {BANDS.map(([band, name]) => (
+            <option key={band} value={band}>
+              {name}
+            </option>
+          ))}
+        </select>
+      </dd>
+      <span>
+        {preferences.preferredBand
+          ? 'Chosen by you. Discover starts here.'
+          : estimated
+            ? 'From your completed lessons. Discover starts here.'
+            : 'Complete two analysed lessons for an estimate.'}
+      </span>
+    </div>
   );
 }
