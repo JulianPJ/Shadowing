@@ -44,10 +44,6 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Generate formatting patch for review
-        run: |
-          npx prettier --write extension/youtube.js tests/extension-youtube.test.mjs tests/e2e/extension.spec.ts
-          git diff -- extension/youtube.js tests/extension-youtube.test.mjs tests/e2e/extension.spec.ts
       - name: Check formatting
         run: npm run format:check
 

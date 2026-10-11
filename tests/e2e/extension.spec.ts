@@ -200,10 +200,11 @@ test('YouTube has one popup choice and requests native captions', async () => {
     preparedUrl = route.request().postDataJSON().url;
     await route.fulfill({
       contentType: 'application/x-ndjson',
-      body: JSON.stringify({
-        code: 'no-japanese-captions',
-        error: 'No Japanese captions in this test fixture',
-      }) + '\n',
+      body:
+        JSON.stringify({
+          code: 'no-japanese-captions',
+          error: 'No Japanese captions in this test fixture',
+        }) + '\n',
     });
   });
   const video = await context.newPage();
@@ -217,7 +218,9 @@ test('YouTube has one popup choice and requests native captions', async () => {
   const popup = await context.newPage();
   await popup.goto(`chrome-extension://${extensionId}/popup.html?tab=${tabId}`);
   await expect(popup.getByRole('button', { name: 'Practise in Hibiki' })).toHaveCount(1);
-  const youtubeSummary = popup.getByText('YouTube video · Japanese subtitles checked automatically');
+  const youtubeSummary = popup.getByText(
+    'YouTube video · Japanese subtitles checked automatically',
+  );
   await expect(youtubeSummary).toBeVisible();
 
   const openedPromise = context.waitForEvent('page', (page) => page.url().startsWith(hibiki));
@@ -233,4 +236,3 @@ test('YouTube has one popup choice and requests native captions', async () => {
   await context.unroute('https://www.youtube.com/watch**');
   await context.unroute('**/api/prepare');
 });
-

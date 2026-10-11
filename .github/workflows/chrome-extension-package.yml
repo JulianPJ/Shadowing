@@ -23,17 +23,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - name: Use Node.js 24 for formatting patch
-        uses: actions/setup-node@v5
-        with:
-          node-version: 24
-          cache: npm
-      - name: Install formatter
-        run: npm ci
-      - name: Print exact Prettier patch
-        run: |
-          npx prettier --write extension/youtube.js tests/extension-youtube.test.mjs tests/e2e/extension.spec.ts
-          git diff -- extension/youtube.js tests/extension-youtube.test.mjs tests/e2e/extension.spec.ts
       - name: Test canonical YouTube video detection
         run: node --test tests/extension-youtube.test.mjs
       - name: Create store package from allowlisted files

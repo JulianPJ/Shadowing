@@ -30,4 +30,3 @@ export function canonicalYouTubeUrl(input) {
 
   return id && /^[\w-]{11}$/.test(id) ? 'https://www.youtube.com/watch?v=' + id : null;
 }
-

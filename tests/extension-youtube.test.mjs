@@ -36,4 +36,3 @@ test('reject unrelated pages, invalid IDs and lookalike domains', () => {
     assert.equal(canonicalYouTubeUrl(input), null, input);
   }
 });
-
