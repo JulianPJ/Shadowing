@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Hibiki Bridge",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Practise Japanese shadowing with videos on other sites using page subtitles or optional AI transcription.",
   "minimum_chrome_version": "116",
   "icons": {
