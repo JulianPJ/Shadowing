@@ -23,6 +23,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+      - name: Test canonical YouTube video detection
+        run: node --test tests/extension-youtube.test.mjs
       - name: Create store package from allowlisted files
         run: python3 scripts/package-extension.py
       - name: Inspect ZIP

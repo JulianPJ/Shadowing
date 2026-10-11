@@ -5,6 +5,8 @@ A web page cannot control a video embedded on another site, so Hibiki uses a sma
 ## What it does
 
 1. On a page with a video, the learner clicks **Hibiki Bridge** and chooses **Practise in Hibiki**.
+   - **YouTube watch, Shorts, live, embed, and youtu.be links** are matched by video ID: the popup shows one video regardless of extra HTML `<video>` elements. The extension opens `/prepare?video=...` with a canonical YouTube link and the site runs its existing `/api/prepare` Japanese caption pipeline.
+   - **Other websites** use the page-video bridge in the following steps.
 2. The extension injects a controller into the frame holding that video and reads its subtitle tracks. It then opens Hibiki at `/?bridge=import`.
 3. Hibiki asks the extension for the hand-off:
    - **With a Japanese track**, it builds the lesson straight away (`provider-captions`, labelled "Subtitles from the page").
@@ -20,6 +22,7 @@ A web page cannot control a video embedded on another site, so Hibiki uses a sma
 | --- | --- |
 | `extension/manifest.json` | Permissions: `activeTab`, `scripting`, `storage`; optional `<all_urls>` only for embedded players |
 | `extension/popup.*` | Lists the page's videos; Practise / Connect; Hibiki address setting |
+| `extension/youtube.js` | Shared YouTube URL validation / canonicalization for the popup and service worker |
 | `extension/background.js` | Routes commands from Hibiki pages to connected tabs and video events back; state in `chrome.storage.session` |
 | `extension/bridge.js` | Content script on Hibiki origins only; relays `window.postMessage` traffic |
 | `extension/controller.js` | Injected on demand into the chosen frame: playback, tracks, overlay, audio capture |
@@ -46,4 +49,5 @@ A web page cannot control a video embedded on another site, so Hibiki uses a sma
 ## Tests
 
 - `tests/extension.test.ts`: hand-off validation, track choice, page lessons, sync and saved-word identity.
-- `tests/e2e/extension.spec.ts`: loads a copy of the extension into Chromium. The copy is granted the stand-in site so no toolbar click is needed. It covers the page-subtitle lesson, remote playback and section pause, the overlay, and Whisper capture with a mocked transcription endpoint.
+- `tests/extension-youtube.test.mjs`: canonical YouTube video detection and rejection of unrelated URLs.
+- `tests/e2e/extension.spec.ts`: loads a copy of the extension into Chromium. The copy is granted the stand-in site so no toolbar click is needed. It covers the page-subtitle lesson, remote playback and section pause, the overlay, and Whisper capture with a mocked transcription endpoint, plus single-choice YouTube routing to the native caption endpoint.
