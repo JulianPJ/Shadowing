@@ -183,7 +183,7 @@ test('a page video without subtitles gets Whisper subtitles from its own audio',
 
 test('YouTube offers one video and uses the native Japanese-caption preparation endpoint', async () => {
   test.setTimeout(120_000);
-  const id = 'dQw4w9WgXc';
+  const id = 'dQw4w9WgXcQ';
   const canonical = `https://www.youtube.com/watch?v=${id}`;
   const watch = `${canonical}&list=PL123`;
   await context.route('https://www.youtube.com/watch**', (route) =>

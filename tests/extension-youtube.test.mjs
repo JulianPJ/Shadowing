@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { canonicalYouTubeUrl } from '../extension/youtube.js';
 
-const id = 'dQw4w9WgXc';
+const id = 'dQw4w9WgXcQ';
 const canonical = 'https://www.youtube.com/watch?v=' + id;
 
 test('all links for one YouTube video have the same canonical identity', () => {
@@ -24,10 +24,10 @@ test('reject unrelated pages, invalid IDs and lookalike domains', () => {
     'https://www.youtube.com/',
     'https://www.youtube.com/results?search_query=japanese',
     'https://www.youtube.com/watch?v=short',
-    'https://www.youtube.com/watch?v=dQw4w9WgXc123',
-    'https://youtube.com.evil.test/watch?v=dQw4w9WgXc',
-    'https://fake-youtube.com/watch?v=dQw4w9WgXc',
-    'https://youtu.be/dQw4w9WgXc/another',
+    'https://www.youtube.com/watch?v=dQw4w9WgXcQ123',
+    'https://youtube.com.evil.test/watch?v=dQw4w9WgXcQ',
+    'https://fake-youtube.com/watch?v=dQw4w9WgXcQ',
+    'https://youtu.be/dQw4w9WgXcQ/another',
   ]) assert.equal(canonicalYouTubeUrl(input), null, input);
 });
 
