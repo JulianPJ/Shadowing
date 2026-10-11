@@ -23,6 +23,9 @@ import {
 } from '../src/lib/discover/watch-later';
 import { discoveryNow as now, discoveryVideo as video, youtubeMetadata } from './helpers/discover';
 import { prepareLinkedVideo } from '../src/lib/prepare-client';
+import { rememberSeen } from '../src/lib/discover/client';
+import { readStorage } from '../src/lib/storage/browser';
+import { installMemoryStorage } from './helpers/memory-storage';
 
 test('six exact bands remain compatible; unknown levels only enter For you/All', () => {
   assert.equal(BANDS.length, 6);
@@ -336,4 +339,20 @@ test('shared browser preparation handles final unterminated NDJSON and explicit 
   } finally {
     globalThis.fetch = previous;
   }
+});
+test('reloading the same feed leaves the seen list untouched', () => {
+  const storage = installMemoryStorage();
+  const writes: string[] = [];
+  const setItem = storage.setItem;
+  storage.setItem = (key, value) => {
+    writes.push(key);
+    setItem(key, value);
+  };
+  rememberSeen(['video000001', 'video000002']);
+  // A re-ranked reload of the same cards must not rewrite storage: other tabs react to each write.
+  rememberSeen(['video000002', 'video000001']);
+  assert.equal(writes.length, 1);
+  rememberSeen(['video000003', 'video000001']);
+  assert.deepEqual(readStorage('discover:seen', []), ['video000003', 'video000001', 'video000002']);
+  assert.equal(writes.length, 2);
 });

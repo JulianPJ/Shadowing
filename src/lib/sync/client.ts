@@ -234,6 +234,7 @@ export async function synchronize() {
       cursor = page.nextCursor;
     } while (cursor);
     // Only the account namespace and explicitly accepted anonymous snapshot reach this point.
+    let pushed = false;
     for (const kind of syncCollections) {
       const byId = new Map(remote[kind].map((x) => [x.id, x]));
       const changed = data[kind].filter(
@@ -244,17 +245,24 @@ export async function synchronize() {
         Object.assign(batch, { [kind]: changed.slice(offset, offset + 20) });
         if (storageAccount() !== owner || ticket !== generation) return;
         await transport('/api/sync/push', batch);
+        pushed = true;
       }
     }
-    if (data.preferences && JSON.stringify(data.preferences) !== JSON.stringify(remote.preferences))
+    if (
+      data.preferences &&
+      JSON.stringify(data.preferences) !== JSON.stringify(remote.preferences)
+    ) {
       await transport('/api/sync/push', { ...emptySync(), preferences: data.preferences });
+      pushed = true;
+    }
     if (storageAccount() !== owner || ticket !== generation) return;
     // Include edits made while the request was in flight before applying any remote state.
     data = mergeSync(data, await deviceSnapshot());
     if (storageAccount() !== owner || ticket !== generation) return;
-    // Read server-normalized scores and conflict results after pushing.
+    // Read server-normalized scores and conflict results after pushing. Without a push the
+    // server still holds exactly what the first pull returned.
     cursor = null;
-    do {
+    while (pushed) {
       const page = (await (
         await transport(
           `/api/sync/bootstrap${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`,
@@ -263,7 +271,8 @@ export async function synchronize() {
       if (storageAccount() !== owner || ticket !== generation) return;
       data = mergeSync(data, page.data);
       cursor = page.nextCursor;
-    } while (cursor);
+      if (!cursor) break;
+    }
     const latest = await deviceSnapshot();
     if (storageAccount() !== owner || ticket !== generation) return;
     // In-flight local edits with a newer date survive; equal-date server quiz scoring is authoritative.
@@ -307,18 +316,15 @@ export async function synchronize() {
   }
 }
 
+// Only these keys hold records that learner sync uploads.
+const LEARNER_KEY =
+  /^(preferences$|history$|position:|favorites:|completion:|learner-history$|quiz-attempts$)/;
 function localChange(event: Event) {
   if (applying) return;
   const { key, previous, value } = (
     event as CustomEvent<{ key: string; previous: unknown; value: unknown }>
   ).detail;
-  if (
-    key.startsWith('sync:') ||
-    !/^(preferences$|history$|position:|favorites:|completion:|learner-history$|quiz-attempts$)/.test(
-      key,
-    )
-  )
-    return;
+  if (key.startsWith('sync:') || !LEARNER_KEY.test(key)) return;
   const now = new Date().toISOString();
   if (key === 'preferences') writeStorage('sync:preferences-date', now);
   if (key.startsWith('position:') || key.startsWith('completion:'))
@@ -352,20 +358,21 @@ export function startSync() {
       void refreshAccount();
       return;
     }
-    if (
-      event.key &&
-      event.key.startsWith(`hibiki:v1:account:${storageAccount()}:`) &&
-      !event.key.includes(':sync:')
-    )
+    // Another tab's learner edit is synced here too in case that tab closes first. Other account
+    // keys (Discover's seen list, review, caches) must not start a learner sync: hydrating writes
+    // in this tab would otherwise wake the other tab, and the two tabs would sync each other forever.
+    const prefix = `hibiki:v1:account:${storageAccount()}:`;
+    if (event.key?.startsWith(prefix) && LEARNER_KEY.test(event.key.slice(prefix.length)))
       scheduleSync();
   };
   window.addEventListener('online', online);
   window.addEventListener('focus', online);
   document.addEventListener('visibilitychange', visible);
   window.addEventListener('storage', crossTab);
+  // A shorter poll would only re-check the session: syncs within the window are reused anyway.
   const interval = setInterval(() => {
     if (!document.hidden) void refreshAccount();
-  }, 60000);
+  }, LEARNER_FRESH_MS);
   void refreshAccount();
   return () => {
     initialized = false;
