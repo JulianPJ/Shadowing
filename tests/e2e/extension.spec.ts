@@ -181,7 +181,7 @@ test('a page video without subtitles gets Whisper subtitles from its own audio',
   expect(seconds).toBeLessThan(15);
 });
 
-test('YouTube offers one video and uses the native Japanese-caption preparation endpoint', async () => {
+test('YouTube has one popup choice and requests native captions', async () => {
   test.setTimeout(120_000);
   const id = 'dQw4w9WgXcQ';
   const canonical = `https://www.youtube.com/watch?v=${id}`;
@@ -189,7 +189,10 @@ test('YouTube offers one video and uses the native Japanese-caption preparation 
   await context.route('https://www.youtube.com/watch**', (route) =>
     route.fulfill({
       contentType: 'text/html',
-      body: '<!doctype html><html><title>YouTube fixture</title><body><video></video><video></video></body></html>',
+      body: [
+        '<!doctype html><html><title>YouTube fixture</title><body>',
+        '<video></video><video></video></body></html>',
+      ].join(''),
     }),
   );
   let preparedUrl = '';
@@ -214,7 +217,8 @@ test('YouTube offers one video and uses the native Japanese-caption preparation 
   const popup = await context.newPage();
   await popup.goto(`chrome-extension://${extensionId}/popup.html?tab=${tabId}`);
   await expect(popup.getByRole('button', { name: 'Practise in Hibiki' })).toHaveCount(1);
-  await expect(popup.getByText('YouTube video · Japanese subtitles checked automatically')).toBeVisible();
+  const youtubeSummary = popup.getByText('YouTube video · Japanese subtitles checked automatically');
+  await expect(youtubeSummary).toBeVisible();
 
   const openedPromise = context.waitForEvent('page', (page) => page.url().startsWith(hibiki));
   await popup.getByRole('button', { name: 'Practise in Hibiki' }).click();

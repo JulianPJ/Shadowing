@@ -15,12 +15,16 @@ test('all links for one YouTube video have the same canonical identity', () => {
     'https://www.youtube.com/shorts/' + id,
     'https://www.youtube.com/live/' + id + '?feature=share',
     'https://www.youtube-nocookie.com/embed/' + id,
-  ]) assert.equal(canonicalYouTubeUrl(input), canonical, input);
+  ]) {
+    assert.equal(canonicalYouTubeUrl(input), canonical, input);
+  }
 });
 
 test('reject unrelated pages, invalid IDs and lookalike domains', () => {
   for (const input of [
-    '', 'not a url', 'javascript:alert(1)',
+    '',
+    'not a url',
+    'javascript:alert(1)',
     'https://www.youtube.com/',
     'https://www.youtube.com/results?search_query=japanese',
     'https://www.youtube.com/watch?v=short',
@@ -28,6 +32,8 @@ test('reject unrelated pages, invalid IDs and lookalike domains', () => {
     'https://youtube.com.evil.test/watch?v=dQw4w9WgXcQ',
     'https://fake-youtube.com/watch?v=dQw4w9WgXcQ',
     'https://youtu.be/dQw4w9WgXcQ/another',
-  ]) assert.equal(canonicalYouTubeUrl(input), null, input);
+  ]) {
+    assert.equal(canonicalYouTubeUrl(input), null, input);
+  }
 });
 
