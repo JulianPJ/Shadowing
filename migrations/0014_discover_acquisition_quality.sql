@@ -57,4 +57,4 @@ INSERT INTO discovery_seed_queries(id,topic,query,level_target,orientation) VALU
  ('a_lecture','education','講義 解説 歴史 -ゆっくり','advanced','native'),
  ('a_science','education','科学 解説 研究者 -ゆっくり','advanced','native'),
  ('a_culture','travel','日本文化 解説 伝統','advanced','native'),
- ('a_native_speed','education','Japanese listening advanced native speed','advanced','learner')
+ ('a_native_speed','education','Japanese listening advanced native speed','advanced','learner');

@@ -4,6 +4,18 @@ import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
 
 // Real persisted workerd/D1, independent of production bindings and CLI process lifetime.
 const files = (await readdir('migrations')).filter((name) => /^\d{4}_.*\.sql$/.test(name)).sort();
+// `cf d1 migrations apply` appends its ledger INSERT to the file text, so a missing final
+// semicolon is a remote syntax error even though the statement split below accepts it.
+for (const name of files) {
+  const sql = await readFile('migrations/' + name, 'utf8');
+  assert.ok(
+    sql
+      .replace(/--[^\n]*/g, '')
+      .trimEnd()
+      .endsWith(';'),
+    `${name} must end with ;`,
+  );
+}
 await mkdir('artifacts', { recursive: true });
 const mf = new Miniflare(
   convertV4MiniflareOptions({
