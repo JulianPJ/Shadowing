@@ -11,6 +11,7 @@ import {
   verifyAnalyses,
   youtubeQuotaWindow,
 } from '../src/lib/discover/refresh';
+import { reassessCatalogue } from '../src/lib/discover/ingest';
 import { handleFeedRequest } from '../src/lib/discover/server';
 import { handleDiscoverAccountRequest } from '../src/lib/discover/account-server';
 import { readWatchLater, writeWatchLater, type WatchRecord } from '../src/lib/discover/watch-later';
@@ -755,6 +756,32 @@ test('re-assessment removes unsuitable stored videos without provider calls', as
     )?.reason,
     'low-score',
   );
+});
+test('re-assessing a current catalogue reads index entries, not rows, after ANALYZE', async () => {
+  await saveVideos(
+    db,
+    Array.from({ length: 150 }, (_, i) => video(i)),
+  );
+  while ((await reassessCatalogue(db, now())).reassessed);
+  // Production statistics: one distinct quality_version, which alone would plan a full scan.
+  await db.prepare('ANALYZE').run();
+  let rowsRead = 0;
+  const metered = {
+    prepare: (sql: string) => ({
+      bind: (...values: unknown[]) => ({
+        all: async () => {
+          const result = await db
+            .prepare(sql)
+            .bind(...values)
+            .all();
+          rowsRead += result.meta.rows_read;
+          return result;
+        },
+      }),
+    }),
+  } as unknown as D1Database;
+  assert.deepEqual(await reassessCatalogue(metered, now()), { reassessed: 0, removed: 0 });
+  assert.ok(rowsRead <= 2, `read ${rowsRead} rows`);
 });
 test('videos prepared from trusted captions are backfilled once with one metadata unit', async () => {
   await trustedTranscript('prepared001');

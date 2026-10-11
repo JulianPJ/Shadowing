@@ -157,15 +157,18 @@ export async function ingestVideos(
 }
 /**
  * Re-assess stored rows whose quality version is missing or outdated, using stored metadata only.
- * This cleans an existing catalogue without spending provider quota. No ORDER BY: rows are
- * independent, and ordering would make SQLite scan the catalogue instead of two index searches.
+ * This cleans an existing catalogue without spending provider quota. Runs every cron, so it must
+ * cost almost nothing once the catalogue is current: two pinned index searches. Without INDEXED BY,
+ * ANALYZE statistics for a single-valued column make SQLite scan the catalogue for `IS NULL`.
  */
 export async function reassessCatalogue(db: D1Database, now: number, limit = 100) {
+  const columns = `video_id,title,description_excerpt,channel_id,channel_title,duration_seconds,caption_flag,
+    default_audio_language,default_language,category_id`;
   const rows = await db
     .prepare(
-      `SELECT video_id,title,description_excerpt,channel_id,channel_title,duration_seconds,caption_flag,
-        default_audio_language,default_language,category_id FROM discovery_videos
-      WHERE quality_version IS NULL OR quality_version<? LIMIT ?`,
+      `SELECT ${columns} FROM discovery_videos INDEXED BY discovery_videos_quality WHERE quality_version IS NULL
+      UNION ALL SELECT ${columns} FROM discovery_videos INDEXED BY discovery_videos_quality
+      WHERE quality_version<? LIMIT ?`,
     )
     .bind(QUALITY_VERSION, limit)
     .all<{
