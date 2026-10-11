@@ -8,17 +8,6 @@ import {
   type Band,
   type Filters as Values,
 } from '@/lib/discover/types';
-/** Exact-band shortcuts around the learner's level; each sets an ordinary band filter. */
-function relativeBands(band: Band): [string, Band][] {
-  const index = BANDS.findIndex((b) => b[0] === band);
-  return (
-    [
-      ['Easier', index - 1],
-      ['My level', index],
-      ['Challenge', index + 1],
-    ] as const
-  ).flatMap(([label, i]) => (BANDS[i] ? [[label, BANDS[i][0]] as [string, Band]] : []));
-}
 export function DiscoverFilters({
   value,
   onChange,
@@ -40,40 +29,30 @@ export function DiscoverFilters({
           <span className="eyebrow">LEVEL</span>
           <div className="discover-levels" role="group" aria-label="Content level">
             {(
-              [
-                ['for_you', 'For you'],
-                ...BANDS.map((b) => [b[0], b[1]]),
-                ['all', 'All levels'],
-              ] as [Values['band'], string][]
-            ).map(([band, label]) => (
-              <button
-                key={band}
-                aria-pressed={value.band === band}
-                onClick={() => onChange({ ...value, band })}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          {suggestedBand ? (
-            <div
-              className="discover-level-shortcuts"
-              role="group"
-              aria-label="Compared with your level"
-            >
-              {relativeBands(suggestedBand).map(([label, band]) => (
+              [...BANDS.map((b) => [b[0], b[1]]), ['all', 'All levels']] as [Band | 'all', string][]
+            ).map(([band, label]) => {
+              // The personalised feed (for_you) is shown as the learner's own level, or as All
+              // levels until a level is known. It also keeps unestimated videos, unlike exact bands.
+              const home = band === (suggestedBand ?? 'all');
+              const target: Values['band'] = home ? 'for_you' : band;
+              return (
                 <button
-                  key={label}
-                  aria-pressed={value.band === band}
-                  onClick={() => onChange({ ...value, band })}
+                  key={band}
+                  aria-pressed={value.band === target || (home && value.band === band)}
+                  onClick={() => onChange({ ...value, band: target })}
                 >
-                  {label} · {BANDS.find((b) => b[0] === band)![1]}
+                  {label}{' '}
+                  {home && suggestedBand ? (
+                    <span className="discover-level-mine">Your level</span>
+                  ) : null}
                 </button>
-              ))}
-            </div>
-          ) : null}
+              );
+            })}
+          </div>
           <p className="discover-level-note">
-            Level filters show only videos whose full Japanese transcript Hibiki has analysed.
+            {suggestedBand
+              ? 'Your level also includes videos not yet estimated. Other levels show only videos whose full Japanese transcript Hibiki has analysed.'
+              : 'Level filters show only videos whose full Japanese transcript Hibiki has analysed.'}
           </p>
         </div>
         <form

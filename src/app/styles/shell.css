@@ -324,3 +324,24 @@
 .page-import-source strong {
   color: var(--ink);
 }
+.notices-main {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 40px 24px 64px;
+  line-height: 1.7;
+}
+.notices-main h2 {
+  font-size: 18px;
+  margin: 32px 0 8px;
+}
+.notices-main a {
+  text-decoration: underline;
+}
+.site-footer a {
+  color: inherit;
+  text-decoration: underline;
+}
+.site-footer-links {
+  display: flex;
+  gap: 16px;
+}

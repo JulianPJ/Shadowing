@@ -130,3 +130,13 @@
     font-size: 19px;
   }
 }
+.topic-vocabulary-meaning {
+  margin: 6px 0 0;
+  font-size: 14px;
+}
+.topic-vocabulary-term .word-status {
+  font-size: 11px;
+}
+.practice-secondary-pane .topic-vocabulary-card {
+  margin-top: 0;
+}

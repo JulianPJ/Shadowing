@@ -107,7 +107,7 @@ test('full Japanese lexicon loads real readings, senses and deinflection without
   await expect(lookup).toContainText('たべる');
   await expect(lookup).toContainText('to eat');
   await expect(lookup).toContainText('Ichidan verb');
-  await expect(lookup).toContainText('CC BY-SA 4.0');
+  await expect(lookup).not.toContainText('CC BY-SA 4.0');
   await lookup.getByRole('button', { name: 'Known', exact: true }).click();
   await page.goto('/words');
   await expect(page.getByLabel('Status for 食べる')).toHaveValue('known');
@@ -230,4 +230,12 @@ test('Free account knowledge survives offline edits and replays its durable outb
       ),
     )
     .toBe(0);
+});
+test('dictionary attribution lives on the Notices page linked from the footer', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.locator('.site-footer').getByRole('link', { name: 'Notices', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Notices', level: 1 })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'CC BY-SA 4.0' })).toBeVisible();
 });

@@ -1,4 +1,5 @@
 'use client';
+import { useId, type ReactNode } from 'react';
 import type { LexiconResult } from '@/lib/lexicon/types';
 export function LexiconDefinitions({
   result,
@@ -9,6 +10,8 @@ export function LexiconDefinitions({
   onSense?: (meaning: string, reading: string, lemma: string, senseId: string) => void;
   selectedSense?: string;
 }) {
+  // One radio group across every match: a lookup saves exactly one sense.
+  const group = useId();
   return (
     <div className="lexicon-definitions">
       {result.matches.length ? (
@@ -31,46 +34,52 @@ export function LexiconDefinitions({
                 Dictionary form of <span lang="ja">{result.selected}</span>
               </p>
             ) : null}
-            <ol>
-              {match.senses.map((sense, index) => (
-                <li key={index}>
-                  <span className="lexicon-pos">
-                    {sense.partOfSpeech.map((tag) => result.tags[tag] ?? tag).join(' · ')}
-                  </span>
-                  <p>{sense.gloss.join('; ')}</p>
-                  {sense.info.length ? <small>{sense.info.join(' · ')}</small> : null}
-                  {[...sense.field, ...sense.dialect, ...sense.misc].length ? (
-                    <small>
-                      {[...sense.field, ...sense.dialect, ...sense.misc]
-                        .map((tag) => result.tags[tag] ?? tag)
-                        .join(' · ')}
-                    </small>
-                  ) : null}
-                  {onSense ? (
-                    <button
-                      className="text-button"
-                      type="button"
-                      aria-pressed={
-                        selectedSense ===
-                        `${match.entry.id}:${match.lemma}:${match.reading}:${index}`
-                      }
-                      onClick={() =>
-                        onSense(
-                          sense.gloss.join('; ').slice(0, 1000),
-                          match.reading,
-                          match.lemma,
-                          `${match.entry.id}:${match.lemma}:${match.reading}:${index}`,
-                        )
-                      }
-                    >
-                      {selectedSense ===
-                      `${match.entry.id}:${match.lemma}:${match.reading}:${index}`
-                        ? 'Selected'
-                        : `Use sense ${index + 1}`}
-                    </button>
-                  ) : null}
-                </li>
-              ))}
+            <ol className={onSense ? 'lexicon-senses selectable' : 'lexicon-senses'}>
+              {match.senses.map((sense, index) => {
+                const id = `${match.entry.id}:${match.lemma}:${match.reading}:${index}`;
+                const details: ReactNode = (
+                  <>
+                    <span className="lexicon-pos">
+                      {sense.partOfSpeech.map((tag) => result.tags[tag] ?? tag).join(' · ')}
+                    </span>
+                    <p>{sense.gloss.join('; ')}</p>
+                    {sense.info.length ? <small>{sense.info.join(' · ')}</small> : null}
+                    {[...sense.field, ...sense.dialect, ...sense.misc].length ? (
+                      <small>
+                        {[...sense.field, ...sense.dialect, ...sense.misc]
+                          .map((tag) => result.tags[tag] ?? tag)
+                          .join(' · ')}
+                      </small>
+                    ) : null}
+                  </>
+                );
+                return (
+                  <li key={index}>
+                    {onSense ? (
+                      <label className="lexicon-sense-option">
+                        <input
+                          type="radio"
+                          name={group}
+                          aria-label={`Use sense ${index + 1}`}
+                          checked={selectedSense === id}
+                          onChange={() =>
+                            onSense(
+                              sense.gloss.join('; ').slice(0, 1000),
+                              match.reading,
+                              match.lemma,
+                              id,
+                            )
+                          }
+                        />
+                        <span className="lexicon-sense-number">{index + 1}.</span>
+                        <span>{details}</span>
+                      </label>
+                    ) : (
+                      details
+                    )}
+                  </li>
+                );
+              })}
             </ol>
           </article>
         ))
@@ -80,21 +89,6 @@ export function LexiconDefinitions({
           sentence meaning or your own gloss.
         </p>
       )}
-      <p className="lexicon-attribution">
-        <a
-          href="https://www.edrdg.org/wiki/index.php/JMdict-EDICT_Dictionary_Project"
-          target="_blank"
-          rel="noreferrer"
-        >
-          JMdict © James William Breen / EDRDG
-        </a>{' '}
-        ·{' '}
-        <a href="https://www.edrdg.org/edrdg/licence.html" target="_blank" rel="noreferrer">
-          CC BY-SA 4.0
-        </a>{' '}
-        · {result.dictionaryDate}. English data converted by scriptin, compacted by Hibiki.
-        Commonness is a dictionary marker, not a frequency rank. No dictionary audio is included.
-      </p>
     </div>
   );
 }

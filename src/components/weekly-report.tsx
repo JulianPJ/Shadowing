@@ -135,18 +135,20 @@ export function WeeklyReport() {
                     ? 'You made room for Japanese today.'
                     : 'Any amount of practice is a useful step.'}
                 </p>
-                <button
-                  className="text-button"
-                  onClick={() => {
-                    setMinutes(String(goal.minutes));
-                    setEditingGoal(true);
-                  }}
-                >
-                  Edit daily goal
-                </button>
-                <button className="text-button" onClick={() => saveGoal(null)}>
-                  Turn off daily goal
-                </button>
+                <div className="daily-goal-actions">
+                  <button
+                    className="text-button"
+                    onClick={() => {
+                      setMinutes(String(goal.minutes));
+                      setEditingGoal(true);
+                    }}
+                  >
+                    Edit daily goal
+                  </button>
+                  <button className="text-button" onClick={() => saveGoal(null)}>
+                    Turn off daily goal
+                  </button>
+                </div>
               </div>
             )}
           </div>

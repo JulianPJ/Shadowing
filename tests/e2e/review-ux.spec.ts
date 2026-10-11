@@ -118,14 +118,14 @@ test('reading and bounded inline context preserve the answer and session', async
   await expect(page.locator('.review-card button')).toHaveCount(3);
   await expect(page.locator('.review-card a')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Play this section', exact: true })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'End review session', exact: true })).toBeVisible();
   await expect(page.getByText('あさ', { exact: true })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Show reading', exact: true }).click();
+  await page.getByRole('button', { name: /^Show reading/ }).click();
   await expect(page.getByText('あさ', { exact: true })).toBeVisible();
   expect(remote.writes).toHaveLength(0);
   await page.getByRole('button', { name: /Show answer/ }).click();
   await expect(page.getByRole('link', { name: 'Open full lesson ↗', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'End review session', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Play this section', exact: true }).click();
   await page.getByRole('button', { name: 'Play section', exact: true }).click();
   const video = page.locator('.review-context video');
@@ -302,7 +302,7 @@ test('daily limits accept custom values, zero for either card type and no limit,
   await page.getByRole('button', { name: 'Start review', exact: true }).click();
   await expect(page.locator('.review-card h2')).toHaveText(remote.entries[0].term);
   await page.getByRole('button', { name: /Show answer/ }).click();
-  await page.getByRole('button', { name: 'Pause', exact: true }).click();
+  await page.getByRole('button', { name: 'End review session', exact: true }).click();
   await page.getByText('Review settings', { exact: true }).click();
   await newLimit.fill('');
   await expect(newLimit).toHaveValue('');
@@ -316,7 +316,7 @@ test('daily limits accept custom values, zero for either card type and no limit,
   await expect(page.getByRole('button', { name: 'Undo last rating', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: /Show answer/ }).click();
   await expect(page.getByRole('button', { name: 'Undo last rating', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Pause', exact: true }).click();
+  await page.getByRole('button', { name: 'End review session', exact: true }).click();
   await page.getByText('Review settings', { exact: true }).click();
   await reviewLimit.fill('');
   await page.reload();
@@ -334,9 +334,9 @@ test('phrase cards without a saved reading show generated furigana', async ({ pa
   await page.getByRole('button', { name: 'Start review', exact: true }).click();
   const heading = page.locator('.review-card h2');
   await expect(heading).toHaveText('気持ちが落ち着きます');
-  await page.getByRole('button', { name: 'Show reading', exact: true }).click();
+  await page.getByRole('button', { name: /^Show reading/ }).click();
   await expect(heading.locator('rt').first()).toBeVisible();
   await expect(heading.locator('rt')).toHaveText(['きも', 'お', 'つ']);
-  await page.getByRole('button', { name: 'Hide reading', exact: true }).click();
+  await page.getByRole('button', { name: /^Hide reading/ }).click();
   await expect(heading.locator('rt')).toHaveCount(0);
 });

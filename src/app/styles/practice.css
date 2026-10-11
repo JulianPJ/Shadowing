@@ -49,36 +49,6 @@
 .practice-title p > span {
   color: #bbc0b0;
 }
-.practice-progress {
-  min-width: 110px;
-  text-align: right;
-  flex-shrink: 0;
-}
-.practice-progress > span:first-child {
-  font-family: Georgia, serif;
-  font-size: 25px;
-}
-.practice-progress > span:first-child > span {
-  font-family: var(--font);
-  color: #a8ad9a;
-  font-size: 12px;
-}
-.practice-progress > div {
-  height: 3px;
-  background: #e4e7da;
-  border-radius: 3px;
-  margin: 8px 0 5px;
-}
-.practice-progress i {
-  display: block;
-  height: 3px;
-  background: #9fae8c;
-  border-radius: 3px;
-  transition: width 0.3s;
-}
-.practice-progress .small {
-  font-size: 9px;
-}
 .practice-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);

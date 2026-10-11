@@ -145,3 +145,31 @@
 .practice-main .speed-control select {
   border-color: color-mix(in srgb, var(--muted) 75%, var(--paper));
 }
+/* Sense choice: a radio beside each numbered meaning. The whole row selects it. */
+.lexicon-senses.selectable {
+  list-style: none;
+  padding-left: 0;
+}
+.lexicon-sense-option {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 8px;
+  margin: 0 -8px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.lexicon-sense-option:hover,
+.lexicon-sense-option:has(input:checked) {
+  background: var(--pale);
+}
+.lexicon-sense-option input {
+  accent-color: var(--accent);
+  margin: 0;
+  transform: translateY(2px);
+}
+.lexicon-sense-number {
+  font-size: 13px;
+  color: var(--muted);
+}

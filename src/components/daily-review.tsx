@@ -5,7 +5,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAccount } from './account';
 import { useReview } from './use-review';
 import { JapaneseText } from './japanese-text';
-import { hasKanji } from '@/lib/japanese-readings';
+import { X } from 'lucide-react';
+import { alignReading, hasKanji, hiragana } from '@/lib/japanese-readings';
 import { VocabularyHeader } from './vocabulary-header';
 import {
   acknowledgeReviewConflict,
@@ -289,6 +290,10 @@ export function DailyReview() {
         event.preventDefault();
         setRevealed(true);
       }
+      if (event.code === 'KeyF' && !event.shiftKey && (entry.reading || hasKanji(entry.term))) {
+        event.preventDefault();
+        setReading((value) => !value);
+      }
       const index = ['1', '2', '3', '4'].indexOf(event.key);
       if (revealed && index >= 0) {
         event.preventDefault();
@@ -405,13 +410,33 @@ export function DailyReview() {
             <p role="status">
               {activeSession.answered} reviewed · {remaining.length} left
             </p>
-            <button className="text-button" onClick={pause}>
-              Pause
+            <button
+              className="icon-button review-end"
+              onClick={pause}
+              aria-label="End review session"
+              title="End review session"
+            >
+              <X size={18} />
             </button>
           </div>
           <h2 lang="ja" tabIndex={-1} ref={heading}>
             {/* Phrase cards have no saved reading, so they show generated furigana instead. */}
-            {reading && !entry.reading ? <JapaneseText text={entry.term} furigana /> : entry.term}
+            {!reading ? (
+              entry.term
+            ) : entry.reading ? (
+              alignReading(entry.term, hiragana(entry.reading)).map((part, i) =>
+                part.reading ? (
+                  <ruby key={i}>
+                    {part.text}
+                    <rt>{part.reading}</rt>
+                  </ruby>
+                ) : (
+                  <span key={i}>{part.text}</span>
+                ),
+              )
+            ) : (
+              <JapaneseText text={entry.term} furigana />
+            )}
           </h2>
           {entry.reading || hasKanji(entry.term) ? (
             <>
@@ -420,13 +445,8 @@ export function DailyReview() {
                 aria-expanded={reading}
                 onClick={() => setReading(!reading)}
               >
-                {reading ? 'Hide reading' : 'Show reading'}
+                {reading ? 'Hide reading' : 'Show reading'} <kbd>F</kbd>
               </button>
-              {reading && entry.reading ? (
-                <p lang="ja" className="review-reading">
-                  {entry.reading}
-                </p>
-              ) : null}
             </>
           ) : null}
           {!revealed ? (

@@ -408,18 +408,6 @@
     gap: 7px;
     flex-wrap: wrap;
   }
-  .practice-progress {
-    min-width: 70px;
-  }
-  .practice-progress > span:first-child {
-    font-size: 21px;
-  }
-  .practice-progress > span:first-child > span {
-    font-size: 10px;
-  }
-  .practice-progress .small {
-    font-size: 8px;
-  }
   .practice-grid {
     grid-template-columns: 1fr;
     gap: 25px;

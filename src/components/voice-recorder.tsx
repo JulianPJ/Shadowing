@@ -43,7 +43,6 @@ export function VoiceRecorder({
   recentAttempts = [],
   onManualStop,
   referenceAudio,
-  onReplayNative,
 }: {
   ref?: Ref<VoiceRecorderHandle>;
   enabled: boolean;
@@ -59,7 +58,6 @@ export function VoiceRecorder({
   recentAttempts?: ShadowingRecentAttempt[];
   onManualStop?: () => void;
   referenceAudio?: (signal: AbortSignal) => Promise<VoiceRecorderReference>;
-  onReplayNative?: () => void;
 }) {
   const { isPro } = useProAccess();
   const [recording, setRecording] = useState(false);
@@ -453,16 +451,6 @@ export function VoiceRecorder({
                 <Trash2 size={16} />
               </button>
             </div>
-            {onReplayNative ? (
-              <button
-                className="button recording-compare"
-                disabled={recording || requesting}
-                onClick={onReplayNative}
-              >
-                <RotateCcw size={15} />
-                Replay source to compare
-              </button>
-            ) : null}
           </>
         ) : null}
       </div>

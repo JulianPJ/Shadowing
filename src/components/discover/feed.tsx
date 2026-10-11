@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react';
-import { ArrowRight, RefreshCw, Compass, LoaderCircle } from 'lucide-react';
+import { ArrowRight, RefreshCw, Compass, LoaderCircle, Settings2 } from 'lucide-react';
 import type { useLibrary } from '../use-library';
 import { useLearnerProfile } from '../use-learner-profile';
 import { useAccount } from '../account';
@@ -300,7 +300,6 @@ export function DiscoverFeed({ library: shared }: { library: ReturnType<typeof u
       .sort((a, b) => a[3] - b[3]);
     return options[0] ?? null;
   })();
-  const bandLabel = suggested ? BANDS.find((b) => b[0] === suggested)![1] : null;
   const lanes = feed?.lanes ?? [],
     laneIds = new Set(lanes.flatMap((l) => l.items.map((v) => v.videoId)));
   const card = (video: Card) => (
@@ -324,34 +323,20 @@ export function DiscoverFeed({ library: shared }: { library: ReturnType<typeof u
   return (
     <>
       <section className="discover-main" aria-label="Discover">
-        <section className="discover-personal" aria-label="Your discovery level">
-          <div>
-            <span className="eyebrow">
-              {preferences.preferredBand ? 'YOUR PREFERRED CONTENT LEVEL' : 'SUGGESTED FOR YOU'}
-            </span>
-            <h2>Find something worth listening to</h2>
-            <p>
-              {bandLabel
-                ? `${preferences.preferredBand ? 'Your starting point' : 'Suggested from your practice'}: ${bandLabel}.`
-                : 'Follow your interests, or choose a level to start from.'}
-            </p>
-          </div>
-          <div className="discover-personal-actions">
-            <span className="discover-level-display">{bandLabel ?? 'Your own pace'}</span>
-            <button className="button discover-primary" onClick={() => setEdit(true)}>
-              Edit level
-            </button>
-          </div>
-        </section>
         <div className="section-heading discover-feed-heading">
           <h2>Your discovery feed</h2>
-          <button
-            className="text-button"
-            onClick={() => setRevision((n) => n + 1)}
-            disabled={loading}
-          >
-            <RefreshCw size={15} /> Refresh
-          </button>
+          <div className="discover-feed-actions">
+            <button className="text-button" onClick={() => setEdit(true)}>
+              <Settings2 size={15} /> Preferences
+            </button>
+            <button
+              className="text-button"
+              onClick={() => setRevision((n) => n + 1)}
+              disabled={loading}
+            >
+              <RefreshCw size={15} /> Refresh
+            </button>
+          </div>
         </div>
         <DiscoverFilters
           key={filters.q}

@@ -4,17 +4,52 @@ import { useEffect, useState } from 'react';
 import type { Lesson } from '@/lib/types';
 import { useLessonVocabulary, useWordKnowledge } from './use-word-knowledge';
 import { JapaneseText } from './japanese-text';
+import { TopicVocabularyOverview } from './topic-vocabulary-overview';
 
 export function LessonVocabulary({
+  active = true,
   lesson,
   onPractice,
   onFilter,
   filterActive = false,
 }: {
+  active?: boolean;
   lesson: Lesson;
   onPractice: (segmentId: string) => void;
   onFilter?: (segmentIds: string[] | null) => void;
   filterActive?: boolean;
+}) {
+  // Essential vocabulary analyses the whole transcript, so it starts when the tab is first opened.
+  const [opened, setOpened] = useState(active);
+  if (active && !opened) setOpened(true);
+  return (
+    <>
+      {opened ? (
+        <TopicVocabularyOverview
+          lesson={lesson}
+          onReview={(segmentIndex) => onPractice(lesson.segments[segmentIndex].id)}
+        />
+      ) : null}
+      <LessonCoverage
+        lesson={lesson}
+        onPractice={onPractice}
+        onFilter={onFilter}
+        filterActive={filterActive}
+      />
+    </>
+  );
+}
+
+function LessonCoverage({
+  lesson,
+  onPractice,
+  onFilter,
+  filterActive,
+}: {
+  lesson: Lesson;
+  onPractice: (segmentId: string) => void;
+  onFilter?: (segmentIds: string[] | null) => void;
+  filterActive: boolean;
 }) {
   const { states } = useWordKnowledge();
   const [requested, setRequested] = useState(false);
@@ -31,7 +66,7 @@ export function LessonVocabulary({
   return (
     <section className="lesson-vocabulary" aria-label="Personal vocabulary coverage">
       <div className="vocabulary-heading">
-        <h2>Your vocabulary in this lesson</h2>
+        <h2>Your coverage</h2>
         <Link className="text-button" href="/words">
           Your words
         </Link>

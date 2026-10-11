@@ -97,10 +97,6 @@
   margin: 8px 0;
   line-height: 1.6;
 }
-.recording-compare {
-  width: 100%;
-  white-space: normal;
-}
 .evidence-banner small {
   display: block;
   color: var(--muted);
@@ -175,9 +171,6 @@
 .practice-main .translation-button {
   min-height: 44px;
   font-size: 13px;
-}
-.practice-main .practice-progress .small {
-  font-size: 12px;
 }
 .practice-main .practice-breadcrumb {
   font-size: 13px;
