@@ -3,7 +3,13 @@ import { test } from 'node:test';
 import demo from '../src/data/demo.json';
 import type { Lesson } from '../src/lib/types';
 import { installMemoryStorage } from './helpers/memory-storage';
-import { cachedRead, rateLimited, tooManyRequests } from '../src/lib/server/rate-limit';
+import {
+  cachedRead,
+  rateLimited,
+  sharedRead,
+  tooManyRequests,
+  type SharedCache,
+} from '../src/lib/server/rate-limit';
 import {
   loadLesson,
   recentLessons,
@@ -67,6 +73,53 @@ test('cached reads share one request within the window and never cache failures'
   fail = false;
   assert.equal(await read(), 3);
   assert.equal(reads, 3);
+});
+
+test('shared reads reuse the data-centre cache and fall back to the database', async () => {
+  const store = new Map<string, Response>();
+  const cache: SharedCache = {
+    async match(key) {
+      return store.get(key)?.clone();
+    },
+    async put(key, value) {
+      store.set(key, value);
+    },
+  };
+  const deferred: Promise<unknown>[] = [];
+  let reads = 0;
+  const read = async () => [{ id: ++reads }];
+  const shared = () =>
+    sharedRead(
+      async () => cache,
+      'https://example.com/k',
+      300,
+      read,
+      (p) => deferred.push(p),
+    );
+  assert.deepEqual(await shared(), [{ id: 1 }]);
+  await Promise.all(deferred);
+  assert.equal(store.get('https://example.com/k')?.headers.get('Cache-Control'), 'max-age=300');
+  assert.deepEqual(await shared(), [{ id: 1 }]);
+  assert.equal(reads, 1);
+  store.set('https://example.com/k', new Response('not json'));
+  assert.deepEqual(await shared(), [{ id: 2 }]);
+  const unavailable = await sharedRead(
+    () => Promise.reject(new Error('no cache')),
+    'https://example.com/k',
+    300,
+    read,
+    () => assert.fail('nothing to store'),
+  );
+  assert.deepEqual(unavailable, [{ id: 3 }]);
+  await assert.rejects(
+    sharedRead(
+      async () => cache,
+      'https://example.com/missing',
+      300,
+      () => Promise.reject(new Error('D1 unavailable')),
+      () => assert.fail('failures are not stored'),
+    ),
+  );
 });
 
 test('recent history stores references; section moves write only the position', () => {

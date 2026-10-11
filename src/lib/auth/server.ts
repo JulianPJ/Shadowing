@@ -119,6 +119,9 @@ export function createAuth(
     advanced: {
       useSecureCookies: origin.startsWith('https:'),
       ipAddress: { ipAddressHeaders: ['cf-connecting-ip'] },
+      // D1 migrations own the schema and tests/auth-schema.test.ts checks it against Better Auth.
+      // Runtime validation would introspect every table (~400 D1 rows) in each new isolate.
+      database: { validateSchema: false },
       ...(background ? { backgroundTasks: { handler: background } } : {}),
     },
   });

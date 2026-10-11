@@ -12,7 +12,13 @@ import { createD1LinkedTranscriptRepository, linkedTranscripts } from '../linked
 import { createD1GeneratedArtifactRepository, generatedArtifacts } from '../generated-artifacts';
 import { readCatalog } from '../discover/catalog';
 import { createWorkersAiShadowingProvider } from '../providers/shadowing';
-import { InferenceDenied, cachedRead, rateLimited, tooManyRequests } from './rate-limit';
+import {
+  InferenceDenied,
+  cachedRead,
+  rateLimited,
+  sharedRead,
+  tooManyRequests,
+} from './rate-limit';
 
 export { env as workerEnv, waitUntil };
 
@@ -26,8 +32,10 @@ export function accountsConfigured() {
   return !!(env.HIBIKI_DB && env.AUTH_SECRET && env.AUTH_BASE_URL);
 }
 
+// One Better Auth instance per isolate; sessions are still validated on every request.
+let auth: ReturnType<typeof createAuth> | undefined;
 export function hibikiAuth() {
-  return createAuth(env.HIBIKI_DB, env, waitUntil);
+  return (auth ??= createAuth(env.HIBIKI_DB, env, waitUntil));
 }
 
 export function sharedStorage() {
@@ -160,9 +168,25 @@ export function shadowingRoute(
   };
 }
 
-// The catalogue changes only on the 15-minute refresh, so one isolate reuses it briefly
-// instead of reading up to 1,000 rows for every feed page.
-const catalog = cachedRead(() => readCatalog(env.HIBIKI_DB), 60_000);
+// The catalogue join reads ~4.5 D1 rows per video (about 4,500 per read) and changes mainly on the
+// 15-minute refresh. Isolates in one data centre share it for five minutes and each keeps it for a
+// minute, so feed traffic costs at most one read per data centre per five minutes. Keys carry the
+// deployed version so a new release never parses an older catalogue shape.
+const CATALOG_SHARED_SECONDS = 300;
+const catalog = cachedRead(
+  () =>
+    sharedRead(
+      () => caches.open('discover-catalog'),
+      new URL(
+        `/__cache/discover-catalog/${env.CF_VERSION_METADATA?.id ?? 'local'}`,
+        env.AUTH_BASE_URL || 'https://hibikiapp.net',
+      ).href,
+      CATALOG_SHARED_SECONDS,
+      () => readCatalog(env.HIBIKI_DB),
+      waitUntil,
+    ),
+  60_000,
+);
 export function cachedCatalog() {
   return catalog();
 }

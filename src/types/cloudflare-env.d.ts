@@ -6,8 +6,13 @@ type HibikiOptionalSecrets = Omit<
   keyof HibikiBindings
 >;
 
+// vinext's cache config binds version metadata under a computed key that InferEnv cannot see.
+type HibikiVersionMetadata = {
+  CF_VERSION_METADATA?: { id: string; tag: string; timestamp: string };
+};
+
 declare namespace Cloudflare {
-  interface Env extends HibikiBindings, HibikiOptionalSecrets {}
+  interface Env extends HibikiBindings, HibikiOptionalSecrets, HibikiVersionMetadata {}
 }
 
 // Only the runtime exports the app uses; workerd provides the module in dev, preview and production.
