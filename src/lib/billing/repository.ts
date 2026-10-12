@@ -69,7 +69,7 @@ export class BillingRepository {
 
   async createIntent(userId: string, priceId: string, now: number) {
     const id = crypto.randomUUID();
-    // Atomic reservation blocks concurrent checkout clicks; a failed call can be retried after 30 min.
+    // Atomic reservation blocks concurrent checkout clicks; a failed provider call releases it.
     await this.db.batch([
       this.db
         .prepare(
@@ -91,6 +91,16 @@ export class BillingRepository {
         ),
     ]);
     return await this.intent(id);
+  }
+
+  async release(id: string) {
+    await this.db.batch([
+      this.db
+        .prepare(
+          'DELETE FROM billing_checkouts WHERE id=? AND environment=? AND transaction_id IS NULL',
+        )
+        .bind(id, this.environment),
+    ]);
   }
 
   async attachTransaction(id: string, transactionId: string) {

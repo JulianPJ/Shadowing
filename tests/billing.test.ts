@@ -756,6 +756,48 @@ test('Paddle transport uses sandbox API, bounded responses, server authorization
     )('/transactions'),
     /Billing provider unavailable/,
   );
+  const logged: unknown[] = [];
+  const log = console.error;
+  console.error = (...args: unknown[]) => logged.push(args);
+  try {
+    await assert.rejects(
+      paddleApi(settings, async () =>
+        Response.json(
+          { error: { code: 'transaction_default_checkout_url_not_set', detail: 'Set a URL' } },
+          { status: 400 },
+        ),
+      )(`/customers/${id('ctm')}/portal-sessions`, {}),
+      /Billing provider unavailable/,
+    );
+  } finally {
+    console.error = log;
+  }
+  assert.deepEqual(logged, [
+    [
+      'Paddle API error',
+      {
+        path: '/customers/:id/portal-sessions',
+        status: 400,
+        code: 'transaction_default_checkout_url_not_set',
+        detail: 'Set a URL',
+      },
+    ],
+  ]);
+});
+
+test('a failed transaction call releases its reservation so checkout can be retried at once', async () => {
+  const handler = billingHandler(db, auth, settings, api, now);
+  providerFails = true;
+  assert.equal(
+    (await handler(request('/api/billing/checkout', { interval: 'monthly' }))).status,
+    503,
+  );
+  providerFails = false;
+  assert.equal(
+    (await db.prepare('SELECT COUNT(*) AS n FROM billing_checkouts').first<{ n: number }>())!.n,
+    0,
+  );
+  await checkout();
 });
 
 test('equal-time restrictive states win; a newer invalid transition cannot resurrect a canceled subscription', async () => {

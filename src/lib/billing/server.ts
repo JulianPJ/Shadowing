@@ -136,17 +136,23 @@ export function billingHandler(
         if (!transactionId) {
           const intent = await repo.createIntent(userId, price, now());
           if (!intent) return respond({ error: 'A checkout is already being prepared.' }, 409);
-          const customer = await repo.customer(userId);
-          const transaction = await api('/transactions', {
-            items: [{ price_id: price, quantity: 1 }],
-            collection_mode: 'automatic',
-            ...(customer ? { customer_id: customer.customer_id } : {}),
-            custom_data: { hibiki_user_id: userId, hibiki_checkout_id: intent.id },
-            checkout: { url: `${url.origin}/profile` },
-          });
-          if (!paddleId(transaction.id, 'txn')) throw new Error('Invalid checkout response');
-          transactionId = transaction.id;
-          await repo.attachTransaction(intent.id, transactionId);
+          try {
+            const customer = await repo.customer(userId);
+            const transaction = await api('/transactions', {
+              items: [{ price_id: price, quantity: 1 }],
+              collection_mode: 'automatic',
+              ...(customer ? { customer_id: customer.customer_id } : {}),
+              custom_data: { hibiki_user_id: userId, hibiki_checkout_id: intent.id },
+              checkout: { url: `${url.origin}/profile` },
+            });
+            if (!paddleId(transaction.id, 'txn')) throw new Error('Invalid checkout response');
+            transactionId = transaction.id;
+            await repo.attachTransaction(intent.id, transactionId);
+          } catch (error) {
+            // An unlinked transaction can never be opened, so the learner may retry at once.
+            await repo.release(intent.id).catch(() => {});
+            throw error;
+          }
         }
         return respond({
           transactionId,
