@@ -282,6 +282,10 @@ test('monthly and annual prices are server-owned; checkout response has no secre
     (await handler(request('/api/billing/checkout', { interval: 'lifetime' }))).status,
     400,
   );
+  assert.equal(
+    (await handler(request('/api/billing/checkout', { interval: ['annual'] }))).status,
+    400,
+  );
   const response = await checkout('annual');
   const text = await response.text();
   assert.ok(

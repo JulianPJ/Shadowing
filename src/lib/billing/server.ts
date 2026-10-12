@@ -78,7 +78,7 @@ export function billingHandler(
         if (!billingConfigured(settings))
           return respond({ error: 'Subscriptions are awaiting setup.' }, 503);
         if (
-          !['monthly', 'annual'].includes(String(body.interval)) ||
+          (body.interval !== 'monthly' && body.interval !== 'annual') ||
           Object.keys(body).some((key) => key !== 'interval')
         )
           return respond({ error: 'Choose a monthly or annual subscription.' }, 400);

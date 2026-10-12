@@ -184,7 +184,8 @@ export function paddleWebhook(
         if (
           !paddleId(data.id, 'adj') ||
           !paddleId(data.transaction_id, 'txn') ||
-          !['approved', 'pending_approval', 'rejected', 'reversed'].includes(String(data.status))
+          typeof data.status !== 'string' ||
+          !['approved', 'pending_approval', 'rejected', 'reversed'].includes(data.status)
         )
           return invalid();
         if (
