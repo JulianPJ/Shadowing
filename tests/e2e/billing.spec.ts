@@ -128,7 +128,7 @@ test('checkout completion keeps Free until the server confirms Pro, then refresh
   await expect(page.getByRole('status').filter({ hasText: 'Payment received' })).toBeVisible();
   await expect(page.locator('.account-plan')).toHaveText('Hibiki Free');
   server.paid();
-  await page.getByRole('button', { name: 'Refresh plan' }).click();
+  await page.getByRole('button', { name: 'Check plan status' }).click();
   await expect(page.locator('.account-plan')).toHaveText('Hibiki Pro');
   await expect(page.getByRole('button', { name: 'Upgrade · Monthly' })).toHaveCount(0);
 });
@@ -138,6 +138,8 @@ test('disabled configuration and unverified accounts cannot open checkout', asyn
   await page.goto('/profile');
   await expect(page.getByText('Subscriptions are awaiting setup.')).toBeVisible();
   await expect(page.getByRole('button', { name: /Upgrade ·/ })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Check plan status' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Plan checked. No confirmed subscription yet.' })).toBeVisible();
   await billingPage(page, { verified: false });
   await page.reload();
   await expect(page.getByRole('button', { name: 'Upgrade · Monthly' })).toBeDisabled();
