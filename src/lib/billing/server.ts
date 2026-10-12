@@ -70,6 +70,40 @@ export function billingHandler(
             : {}),
         });
       }
+      if (request.method === 'GET' && url.pathname === '/api/billing/prices') {
+        if (!billingConfigured(settings))
+          return respond({ error: 'Subscriptions are awaiting setup.' }, 503);
+        // Paddle localises currency and estimates tax from the learner's IP, as checkout will.
+        const ip = request.headers.get('CF-Connecting-IP');
+        const preview = await api('/pricing-preview', {
+          items: [
+            { price_id: settings.PADDLE_PRO_MONTHLY_PRICE_ID, quantity: 1 },
+            { price_id: settings.PADDLE_PRO_ANNUAL_PRICE_ID, quantity: 1 },
+          ],
+          ...(ip ? { customer_ip_address: ip } : {}),
+        });
+        const items = object(preview.details).line_items;
+        const price = (id: string | undefined) => {
+          const item = object(
+            (Array.isArray(items) ? items : []).find(
+              (value) => object(object(value).price).id === id,
+            ),
+          );
+          const amount = object(item.totals).total;
+          const formatted = object(item.formatted_totals).total;
+          if (typeof amount !== 'string' || !/^\d+$/.test(amount) || typeof formatted !== 'string')
+            throw new Error('Invalid pricing response');
+          return { amount, formatted };
+        };
+        const currency = preview.currency_code;
+        if (typeof currency !== 'string' || !/^[A-Z]{3}$/.test(currency))
+          throw new Error('Invalid pricing response');
+        return respond({
+          currency,
+          monthly: price(settings.PADDLE_PRO_MONTHLY_PRICE_ID),
+          annual: price(settings.PADDLE_PRO_ANNUAL_PRICE_ID),
+        });
+      }
       if (request.method !== 'POST') return respond({ error: 'Method not supported' }, 405);
       if (!session.user.emailVerified)
         return respond({ error: 'Verify your email before subscribing.' }, 403);

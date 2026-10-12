@@ -42,6 +42,7 @@ const now = () => clock;
 const apiCalls: { path: string; body: unknown }[] = [];
 let transaction: Record<string, unknown>;
 let providerFails = false;
+let pricing: Record<string, unknown>;
 const api: PaddleRequest = async (path, body) => {
   apiCalls.push({ path, body });
   if (providerFails) throw new Error('provider down');
@@ -52,6 +53,7 @@ const api: PaddleRequest = async (path, body) => {
       },
     };
   if (path === '/transactions') return { id: id('txn') };
+  if (path === '/pricing-preview') return pricing;
   if (path.startsWith('/transactions/')) return transaction;
   throw new Error('Unexpected Paddle call');
 };
@@ -217,6 +219,19 @@ beforeEach(async () => {
   );
   await db.prepare('DELETE FROM user_access WHERE user_id=?').bind(userId).run();
   await db.prepare('UPDATE "user" SET emailVerified=1 WHERE id=?').bind(userId).run();
+  pricing = {
+    currency_code: 'EUR',
+    details: {
+      line_items: [
+        [settings.PADDLE_PRO_ANNUAL_PRICE_ID, '9999', '€99.99'],
+        [settings.PADDLE_PRO_MONTHLY_PRICE_ID, '999', '€9.99'],
+      ].map(([price, total, formatted]) => ({
+        price: { id: price },
+        totals: { total },
+        formatted_totals: { total: formatted },
+      })),
+    },
+  };
   transaction = {
     id: id('txn'),
     subscription_id: id('sub'),
@@ -620,6 +635,40 @@ test('provider or D1 failures leave events retryable with no partial entitlement
   await db.exec('DROP TRIGGER reject_billing_projection');
   assert.equal((await deliver(payload)).status, 200);
   assert.equal(await createD1AccessRepository(db).plan(userId), 'pro');
+});
+
+test('prices are previewed server-side for the configured prices only and fail closed', async () => {
+  const handler = billingHandler(db, auth, settings, api, now);
+  assert.equal(
+    (await handler(request('/api/billing/prices', undefined, { cookie: '' }))).status,
+    401,
+  );
+  const localised = request('/api/billing/prices');
+  localised.headers.set('CF-Connecting-IP', '203.0.113.7');
+  const response = await handler(localised);
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('Cache-Control'), 'no-store');
+  assert.deepEqual(await response.json(), {
+    currency: 'EUR',
+    monthly: { amount: '999', formatted: '€9.99' },
+    annual: { amount: '9999', formatted: '€99.99' },
+  });
+  assert.deepEqual(apiCalls.at(-1), {
+    path: '/pricing-preview',
+    body: {
+      items: [
+        { price_id: settings.PADDLE_PRO_MONTHLY_PRICE_ID, quantity: 1 },
+        { price_id: settings.PADDLE_PRO_ANNUAL_PRICE_ID, quantity: 1 },
+      ],
+      customer_ip_address: '203.0.113.7',
+    },
+  });
+  pricing = { ...pricing, details: { line_items: [] } };
+  assert.equal((await handler(request('/api/billing/prices'))).status, 503);
+  const calls = apiCalls.length;
+  const disabled = billingHandler(db, auth, { ...settings, PADDLE_ENABLED: 'false' }, api, now);
+  assert.equal((await disabled(request('/api/billing/prices'))).status, 503);
+  assert.equal(apiCalls.length, calls);
 });
 
 test('portal resolves the signed-in customer only and authenticated links are never cached', async () => {

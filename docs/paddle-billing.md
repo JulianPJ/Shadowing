@@ -38,6 +38,7 @@ Local development: set the bindings in `.dev.vars`, apply local migrations, and 
 | Route                        | Rules                                                                                                                     |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | `GET /api/billing`           | Better Auth session and mandatory `X-Hibiki-Account`; own subscription summaries only                                     |
+| `GET /api/billing/prices`    | Same session and account header; configured billing only. Paddle pricing preview of the two server-owned prices, localised by `CF-Connecting-IP`; fetched only when the options dialog opens |
 | `POST /api/billing/checkout` | Same-origin JSON, verified session, account header; accepts only `{ "interval": "monthly" }` or `annual`                  |
 | `POST /api/billing/portal`   | Same authorization; body `{}`; customer resolved from D1, temporary portal URL returned without caching                   |
 | `POST /api/billing/webhook`  | Raw body, bounded to 256 KiB; timestamped HMAC-SHA256 signature with five-second tolerance; independent of cookies/origin |
@@ -65,7 +66,7 @@ Event deduplication, conditional subscription/adjustment updates and the entitle
 | Adjustment reversed                       | Newer reversed adjustment restores period eligibility if subscription is still active |
 | Browser success / `transaction.completed` | No entitlement change                                                                 |
 
-Refunds use an authenticated transaction lookup for the original billing period rather than the notification arrival time. Subscription updates cannot undo a current-period refund. The UI refreshes the server account after checkout and offers **Refresh plan** while webhook confirmation is pending; returning from the portal reloads billing state. Manual Pro is independent of subscription refunds or expiry.
+Refunds use an authenticated transaction lookup for the original billing period rather than the notification arrival time. Subscription updates cannot undo a current-period refund. Free learners see the subscription section at the top of Profile; its **View subscription options** dialog shows previewed prices and the Free/Pro comparison, and closes before Paddle's overlay opens (a modal dialog would sit above it). After checkout the UI polls billing and the account with backoff (about 100 seconds, within the billing rate limit) until the webhook confirms; there is no manual status button. Once Pro, the section moves into Account. Returning from the portal or refocusing the tab reloads billing state. Manual Pro is independent of subscription refunds or expiry.
 
 ## Verification and release
 

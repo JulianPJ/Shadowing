@@ -15,6 +15,11 @@ export type BillingSummary = {
     refunded: boolean;
   }[];
 };
+export type BillingInterval = 'monthly' | 'annual';
+/** Paddle pricing preview: `amount` is in the currency's minor unit, `formatted` includes tax. */
+export type BillingPrices = {
+  currency: string;
+} & Record<BillingInterval, { amount: string; formatted: string }>;
 export type Checkout = {
   transactionId: string;
   clientToken: string;

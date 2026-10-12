@@ -133,8 +133,8 @@ test('three desktop sections and profile aliases keep account and plan informati
     await expect(page.getByRole('heading', { name: 'Account', exact: true })).toBeVisible();
     await expect(page.getByText(user.email, { exact: true })).toBeVisible();
     await expect(page.getByText(/Email and password/)).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Free and Pro' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'View subscription options' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Your subscription' })).toBeVisible();
-    await expect(page.getByText('Subscriptions are awaiting setup.')).toBeVisible();
+    await expect(page.getByText('Subscriptions are awaiting setup.').first()).toBeVisible();
   }
 });

@@ -124,6 +124,20 @@ export function PlanComparison() {
   );
 }
 
+/** Subscription status, shown first on Profile until the learner has Pro. */
+export function SubscriptionOffer() {
+  const account = useAccount();
+  if (!account.user || account.user.plan === 'pro') return null;
+  return (
+    <BillingSettings
+      key={account.user.id}
+      userId={account.user.id}
+      verified={account.user.emailVerified}
+      plan="free"
+    />
+  );
+}
+
 /** Sign-in, plan and sign-in methods. Rendered at the bottom of the Profile page. */
 export function AccountSettings() {
   const account = useAccount();
@@ -265,13 +279,14 @@ export function AccountSettings() {
         </button>
       </div>
       {message ? <p role="alert">{message}</p> : null}
-      <BillingSettings
-        key={account.user.id}
-        userId={account.user.id}
-        verified={account.user.emailVerified}
-        plan={account.user.plan}
-      />
-      <PlanComparison />
+      {account.user.plan === 'pro' ? (
+        <BillingSettings
+          key={account.user.id}
+          userId={account.user.id}
+          verified={account.user.emailVerified}
+          plan="pro"
+        />
+      ) : null}
     </section>
   );
 }

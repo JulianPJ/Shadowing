@@ -8,10 +8,11 @@ async function billingPage(
     enabled?: boolean;
     managed?: boolean;
     paymentSuccess?: boolean;
+    plan?: 'free' | 'pro';
   } = {},
 ) {
   await mockProAccount(page);
-  let plan = 'free';
+  let plan = options.plan ?? 'free';
   await page.route('**/api/account/me', (route) =>
     route.fulfill({
       json: {
@@ -46,6 +47,15 @@ async function billingPage(
       },
     });
   });
+  await page.route('**/api/billing/prices', (route) =>
+    route.fulfill({
+      json: {
+        currency: 'USD',
+        monthly: { amount: '999', formatted: '$9.99' },
+        annual: { amount: '9999', formatted: '$99.99' },
+      },
+    }),
+  );
   await page.route('**/api/billing/checkout', (route) =>
     route.fulfill({
       json: {
@@ -98,8 +108,17 @@ test('monthly/annual upgrade opens sandbox Paddle overlay with an authenticated 
     });
   });
   await page.goto('/profile');
-  await page.getByRole('button', { name: 'Upgrade · Annual' }).click();
+  await page.getByRole('button', { name: 'View subscription options' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Hear more. Understand more.' });
+  await expect(dialog.getByRole('radio', { name: /Annual/ })).toBeChecked();
+  await expect(dialog.getByText('Save 17%')).toBeVisible();
+  await expect(dialog.getByText('$8.33 a month', { exact: false })).toBeVisible();
+  const marks = dialog.getByRole('row', { name: /Comprehension checks/ }).getByRole('img');
+  await expect(marks.first()).toHaveAccessibleName('Not included');
+  await expect(marks.last()).toHaveAccessibleName('Included');
+  await dialog.getByRole('button', { name: 'Continue with Annual · $99.99 / year' }).click();
   expect(interval).toBe('annual');
+  await expect(dialog).toBeHidden();
   await expect
     .poll(() =>
       page.evaluate(
@@ -119,32 +138,58 @@ test('monthly/annual upgrade opens sandbox Paddle overlay with an authenticated 
   await expect(page.getByText('Hibiki Free', { exact: true }).first()).toBeVisible();
 });
 
-test('checkout completion keeps Free until the server confirms Pro, then refresh updates the profile', async ({
+test('checkout completion keeps Free until the server confirms Pro, then the profile updates itself', async ({
   page,
 }) => {
   const server = await billingPage(page, { paymentSuccess: true });
   await page.goto('/profile');
-  await page.getByRole('button', { name: 'Upgrade · Monthly' }).click();
+  await page.getByRole('button', { name: 'View subscription options' }).click();
+  await page.getByRole('radio', { name: /Monthly/ }).check();
+  await page.getByRole('button', { name: 'Continue with Monthly · $9.99 / month' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Payment received' })).toBeVisible();
   await expect(page.locator('.account-plan')).toHaveText('Hibiki Free');
   server.paid();
-  await page.getByRole('button', { name: 'Check plan status' }).click();
-  await expect(page.locator('.account-plan')).toHaveText('Hibiki Pro');
-  await expect(page.getByRole('button', { name: 'Upgrade · Monthly' })).toHaveCount(0);
+  await expect(page.locator('.account-plan')).toHaveText('Hibiki Pro', { timeout: 15000 });
+  await expect(page.getByRole('button', { name: 'View subscription options' })).toHaveCount(0);
+});
+
+test('the offer leads Profile until Pro; subscribers find it in Account', async ({ page }) => {
+  await billingPage(page);
+  await page.goto('/profile#plans');
+  await expect(page.getByRole('dialog', { name: 'Hear more. Understand more.' })).toBeVisible();
+  await page.getByRole('button', { name: 'Close subscription options' }).click();
+  const offer = await page.getByRole('heading', { name: 'Your subscription' }).boundingBox();
+  const progress = await page.getByRole('heading', { name: 'Your progress' }).boundingBox();
+  const account = await page.getByRole('heading', { name: 'Account', exact: true }).boundingBox();
+  expect(offer!.y).toBeGreaterThan(progress!.y);
+  expect(offer!.y).toBeLessThan(account!.y);
+  await expect(page.getByRole('button', { name: 'Check plan status' })).toHaveCount(0);
+
+  await billingPage(page, { plan: 'pro' });
+  await page.reload();
+  await expect(page.getByText('Pro access has been enabled for your account.')).toBeVisible();
+  const subscribed = await page.getByRole('heading', { name: 'Your subscription' }).boundingBox();
+  const settings = await page.getByRole('heading', { name: 'Account', exact: true }).boundingBox();
+  expect(subscribed!.y).toBeGreaterThan(settings!.y);
+  await expect(page.getByRole('button', { name: 'View subscription options' })).toHaveCount(0);
 });
 
 test('disabled configuration and unverified accounts cannot open checkout', async ({ page }) => {
   await billingPage(page, { enabled: false });
   await page.goto('/profile');
-  await expect(page.getByText('Subscriptions are awaiting setup.')).toBeVisible();
-  await expect(page.getByRole('button', { name: /Upgrade ·/ })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Check plan status' }).click();
-  await expect(
-    page.getByRole('status').filter({ hasText: 'Plan checked. No confirmed subscription yet.' }),
-  ).toBeVisible();
+  let previewed = false;
+  await page.route('**/api/billing/prices', (route) => {
+    previewed = true;
+    return route.abort();
+  });
+  await expect(page.getByText('Subscriptions are awaiting setup.').first()).toBeVisible();
+  await page.getByRole('button', { name: 'View subscription options' }).click();
+  await expect(page.getByRole('button', { name: /Continue with Annual/ })).toBeDisabled();
+  expect(previewed).toBe(false);
   await billingPage(page, { verified: false });
   await page.reload();
-  await expect(page.getByRole('button', { name: 'Upgrade · Monthly' })).toBeDisabled();
+  await page.getByRole('button', { name: 'View subscription options' }).click();
+  await expect(page.getByRole('button', { name: /Continue with Annual/ })).toBeDisabled();
   await expect(page.getByText('Verify your email before subscribing.')).toBeVisible();
 });
 
@@ -212,7 +257,7 @@ test('an unowned payment link cannot load Paddle or open checkout', async ({ pag
     route.fulfill({ status: 403, json: { error: 'Checkout does not belong to this account.' } }),
   );
   await page.goto('/profile?_ptxn=txn_foreign');
-  await expect(page.getByText('Could not load billing. Try refreshing your plan.')).toBeVisible();
+  await expect(page.getByText('Could not load billing. Please refresh the page.')).toBeVisible();
   expect(paddleLoaded).toBe(false);
   await expect(page.locator('.account-plan')).toHaveText('Hibiki Free');
 });

@@ -5,7 +5,7 @@ import { ArrowRight } from 'lucide-react';
 import { TaskReturn } from './chrome';
 import { identityKey } from '@/lib/learner/constants';
 import { timestamp } from '@/lib/youtube';
-import { useAccount, AccountSettings } from './account';
+import { useAccount, AccountSettings, SubscriptionOffer } from './account';
 import { WeeklyReport } from './weekly-report';
 import { useEffect, useState } from 'react';
 import { BANDS, type Preferences } from '@/lib/discover/types';
@@ -55,6 +55,7 @@ export function LearnerProgress() {
           ? 'Synced with your account.'
           : 'Saved on this device. Sign in to keep it across devices.'}
       </p>
+      <SubscriptionOffer />
       {warning ? (
         <p className="error-message" role="status">
           Progress for this visit may not be saved.
