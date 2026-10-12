@@ -59,12 +59,19 @@ export function BillingSettings({
     };
   }, [userId]);
 
-  async function refresh() {
+  async function refresh(announce = true) {
     const value = await billingRequest<BillingSummary>(userId);
     await refreshAccount();
     if (mounted.current) {
       setSummary(value);
       setCheckedAt(Date.now());
+      if (announce) {
+        setMessage(
+          value.subscriptions.length === 0 && plan === 'free'
+            ? 'Plan checked. No confirmed subscription yet.'
+            : 'Subscription status checked. Your account details are up to date.',
+        );
+      }
     }
   }
   async function action(operation: () => Promise<void>) {
@@ -92,7 +99,7 @@ export function BillingSettings({
           setMessage(
             'Payment received. Your plan will update after confirmation. Refresh your plan in a moment.',
           );
-          void refresh().catch(() => {
+          void refresh(false).catch(() => {
             /* Manual refresh remains available. */
           });
         } else if (event.name === 'checkout.error')
@@ -177,8 +184,8 @@ export function BillingSettings({
             Manage billing
           </button>
         ) : null}
-        <button className="button" disabled={busy} onClick={() => void action(refresh)}>
-          Refresh plan
+        <button className="button" disabled={busy} onClick={() => void action(() => refresh())}>
+          Check plan status
         </button>
       </div>
       {message ? <p role="status">{message}</p> : null}
