@@ -50,7 +50,7 @@ export const worker = defineWorker({
     PADDLE_ENABLED: bindings.text('false'),
     PADDLE_PRO_MONTHLY_PRICE_ID: bindings.text('pri_01m4rfc9mnwz6r29ys2bwm34gj'),
     PADDLE_PRO_ANNUAL_PRICE_ID: bindings.text('pri_01m4rfehggj6a3362ycdrry1y6'),
-    PADDLE_CLIENT_TOKEN: bindings.text(''),
+    PADDLE_CLIENT_TOKEN: bindings.text('test_8ee319c806849e54fd3431691e2'),
     PADDLE_API_KEY: bindings.secret(),
     PADDLE_WEBHOOK_SECRET: bindings.secret(),
     BILLING_RATE_LIMIT: bindings.rateLimit({
