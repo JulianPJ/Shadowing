@@ -399,13 +399,13 @@ export function DiscoverFeed({ library: shared }: { library: ReturnType<typeof u
         {!loading && !error && feed?.total === 0 && exactBand ? (
           <div className="discover-empty">
             <Compass size={32} />
-            <h2>No {exactBand} videos with an estimated level yet.</h2>
+            <h2>No {exactBand} videos found yet.</h2>
             <p>
-              Hibiki estimates a level only after analysing a video’s full Japanese transcript, so
-              this filter is never filled with guesses.{' '}
-              {feed.coverage?.verified
-                ? `${feed.coverage.verified} ${feed.coverage.verified === 1 ? 'video has' : 'videos have'} an estimated level with your other filters.`
-                : 'No videos have an estimated level with your other filters yet.'}
+              A level filter only shows videos whose level Hibiki estimated from the full Japanese
+              transcript or the creator stated, so it is never filled with guesses.{' '}
+              {feed.coverage?.placed
+                ? `${feed.coverage.placed} ${feed.coverage.placed === 1 ? 'video has' : 'videos have'} a level with your other filters.`
+                : 'No videos have a level with your other filters yet.'}
             </p>
             {nearest ? (
               <button className="button" onClick={() => change({ ...filters, band: nearest[0] })}>
@@ -427,7 +427,7 @@ export function DiscoverFeed({ library: shared }: { library: ReturnType<typeof u
             </h2>
             <p>
               {filters.band !== 'for_you' && filters.band !== 'all'
-                ? 'Only videos with a verified Hibiki estimate appear in a level filter. Try All levels for more possibilities.'
+                ? 'Only videos with an estimated or creator-stated level appear in a level filter. Try All levels for more possibilities.'
                 : 'Try another topic or relax a filter. New videos join the catalogue as it refreshes.'}
             </p>
             <button className="button" onClick={() => change(DEFAULT_FILTERS)}>

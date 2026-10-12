@@ -1,5 +1,6 @@
 import type { LevelTarget } from './acquisition';
 import type { LanguageEvidence } from './quality';
+import type { LevelSource } from './declared-level';
 export const BANDS = [
   ['n5_plus', 'N5+', 'N5', 'N5'],
   ['n5_n4', 'N5–N4', 'N5', 'N4'],
@@ -78,6 +79,8 @@ export type Video = {
   prepared: boolean;
   preparationStatus?: 'unknown' | 'prepared' | 'needs-captions' | 'failed';
   band: Band | null;
+  /** Evidence for band: a transcript analysis (the default), the creator's label or the channel's. */
+  levelSource?: LevelSource;
   speed: number | null;
   proof: { transcriptKey: string; generatorVersion: string; verifiedAt: string } | null;
   popularity: number | null;
@@ -85,7 +88,7 @@ export type Video = {
   qualityScore?: number | null;
   /** Strongest available evidence that the speech is Japanese. Never a difficulty claim. */
   languageEvidence?: LanguageEvidence | null;
-  /** Search intent that found the video. Not a verified level. */
+  /** Search intent that found the video. Balances acquisition only; never a level. */
   levelTargets?: LevelTarget[];
 };
 export type Card = Video & { reason: string };
@@ -122,7 +125,15 @@ export type Feed = {
   suggestedBand: Band | null;
   catalogueUpdatedAt: string | null;
   /** Public catalogue counts for the current non-level filters, used for honest empty states. */
-  coverage?: { total: number; verified: number; prepared: number; byBand: Record<Band, number> };
+  coverage?: {
+    total: number;
+    /** Levels from a full transcript analysis. */
+    verified: number;
+    /** Videos with any level: analysed, creator-labelled or inferred from the channel. */
+    placed: number;
+    prepared: number;
+    byBand: Record<Band, number>;
+  };
 };
 export const validVideoId = (id: unknown): id is string =>
   typeof id === 'string' && /^[a-zA-Z0-9_-]{11}$/.test(id);

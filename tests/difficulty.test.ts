@@ -15,6 +15,7 @@ import { loadDifficulty, saveDifficulty } from '../src/lib/storage/learning';
 import {
   createWorkersAiDifficultyProvider,
   generateLessonDifficulty,
+  MAX_DECISION_CHARS,
   WORKERS_AI_DIFFICULTY_MODEL,
 } from '../src/lib/providers/difficulty';
 import { handleDifficultyRequest } from '../src/lib/difficulty-api';
@@ -141,10 +142,12 @@ test('very long transcripts are fully covered by multiple decision calls and det
     })),
   });
   let calls = 0,
-    seenChars = 0;
+    seenChars = 0,
+    largest = 0;
   const provider = createWorkersAiDifficultyProvider({
     async run(_model, input) {
       calls++;
+      largest = Math.max(largest, (input.state as string).length);
       seenChars += (input.state as string).replace(/\n/g, '').length;
       return clefResponse(calls === 1 ? { overall: 'n4_n3' } : { overall: 'n3_n2' });
     },
@@ -152,6 +155,9 @@ test('very long transcripts are fully covered by multiple decision calls and det
   const analysis = await generateLessonDifficulty(long, signal(), provider);
   assert.ok(calls >= 2);
   assert.ok(seenChars >= fullDifficultyTranscript(long).coverage.totalCharacters);
+  // Every chunk fits Clef-flash's 24,576-token context window with room for the questions.
+  assert.ok(largest <= MAX_DECISION_CHARS);
+  assert.ok(MAX_DECISION_CHARS <= 16000);
   assert.ok(['Approximately N4–N3', 'Approximately N3–N2'].includes(analysis.overall.label));
 });
 

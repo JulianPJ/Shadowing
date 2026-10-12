@@ -11,6 +11,7 @@ import {
 } from './types';
 import { LEVEL_TARGETS, type LevelTarget } from './acquisition';
 import { QUALITY_VERSION, type LanguageEvidence, type Quality } from './quality';
+import { declaredBand, withChannelLevels } from './declared-level';
 /** Quality evidence recorded with a video at acquisition or re-assessment time. */
 export type Assessment = {
   quality: Quality;
@@ -83,6 +84,11 @@ function fromRow(row: Record<string, unknown>): Video | null {
     (row.orientation_hint === 'native' || row.orientation_hint === 'learner')
       ? row.orientation_hint
       : null;
+  const audience = stateAudience ?? hintAudience;
+  // A transcript analysis wins; otherwise the creator's own label, never the search that found it.
+  const declared = band
+    ? null
+    : declaredBand(row.title, String(row.description_excerpt ?? ''), audience === 'learner');
   return {
     videoId: row.video_id,
     canonicalUrl: canonicalUrl(row.video_id),
@@ -102,7 +108,7 @@ function fromRow(row: Record<string, unknown>): Video | null {
     status: row.status === 'available' ? 'available' : 'unavailable',
     regionAllowed: array(row.region_allowed_json),
     regionBlocked: array(row.region_blocked_json),
-    audience: stateAudience ?? hintAudience,
+    audience,
     prepared,
     preparationStatus:
       row.preparation_status === 'needs-captions'
@@ -112,7 +118,8 @@ function fromRow(row: Record<string, unknown>): Video | null {
           : row.preparation_status === 'prepared'
             ? 'prepared'
             : 'unknown',
-    band,
+    band: band ?? declared,
+    ...(declared ? { levelSource: 'creator' as const } : {}),
     speed,
     proof,
     popularity: typeof row.popularity === 'number' ? row.popularity : null,
@@ -152,7 +159,7 @@ export async function readCatalog(db: Database, now = Date.now()): Promise<Video
       new Date(now).toISOString(),
     )
     .all<Record<string, unknown>>();
-  return rows.results.map(fromRow).filter((v): v is Video => v !== null);
+  return withChannelLevels(rows.results.map(fromRow).filter((v): v is Video => v !== null));
 }
 export async function saveVideos(db: Database, videos: AssessedVideo[]) {
   if (!videos.length) return;

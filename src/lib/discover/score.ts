@@ -1,5 +1,5 @@
-import { BANDS, TOPICS, type Band, type Context, type Topic, type Video } from './types';
-import type { LevelTarget } from './acquisition';
+import { BANDS, TOPICS, type Context, type Topic, type Video } from './types';
+import { levelSource } from './declared-level';
 
 /**
  * Transparent recommendation scoring. Each part is a small, bounded number so no single signal
@@ -20,11 +20,6 @@ export type Profile = {
   familiarChannels: Set<string>;
 };
 export const bandIndex = (band: string | null | undefined) => BANDS.findIndex((b) => b[0] === band);
-/** The acquisition intent closest to a band. Used only for unverified videos. */
-export function levelForBand(band: Band | null): LevelTarget | null {
-  const index = bandIndex(band);
-  return index < 0 ? null : index <= 1 ? 'beginner' : index <= 3 ? 'intermediate' : 'advanced';
-}
 export function learnerProfile(videos: Video[], context: Context): Profile {
   const liked = videos.filter((v) => context.liked.includes(v.videoId));
   const familiar = videos.filter(
@@ -38,7 +33,7 @@ export function learnerProfile(videos: Video[], context: Context): Profile {
     familiarChannels: new Set([...liked, ...familiar].map((v) => v.channelId)),
   };
 }
-/** Signed verified-band distance from the learner's level, or null when either is unknown. */
+/** Signed band distance from the learner's level, or null when either is unknown. */
 export function bandDistance(video: Video, profile: Profile) {
   return profile.target >= 0 && video.band ? bandIndex(video.band) - profile.target : null;
 }
@@ -57,17 +52,15 @@ export function scoreParts(v: Video, context: Context, profile: Profile, now: nu
   if (v.preparationStatus === 'needs-captions') quality -= 5;
   if (v.preparationStatus === 'failed') quality -= 3;
 
-  // Difficulty fit: verified bands only. Search intent is a weak hint for unverified videos.
+  // Difficulty fit. A creator's label counts for less than an analysed transcript, and a level
+  // inferred from the channel's other videos for less again. Search intent is never a level.
   let difficulty = 0;
   const distance = bandDistance(v, profile);
   // One band either side is comfortable or a stretch. Further away stays reachable through the
   // level filters but is not a default pick: much harder discourages, much easier bores.
   const FIT: Record<string, number> = { '-1': 14, '0': 20, '1': 12 };
-  if (distance !== null) difficulty = FIT[distance] ?? (distance < 0 ? -3 : -10);
-  else if (profile.target >= 0 && !v.band) {
-    const level = levelForBand(BANDS[profile.target][0]);
-    if (level && v.levelTargets?.includes(level)) difficulty = 4;
-  }
+  if (distance !== null)
+    difficulty = (FIT[distance] ?? (distance < 0 ? -3 : -10)) * EVIDENCE_WEIGHT[levelSource(v)!];
 
   let interest = 0;
   if (context.preferredTopics.some((t) => v.topics.includes(t))) interest += 12;
@@ -89,32 +82,32 @@ export function scoreParts(v: Video, context: Context, profile: Profile, now: nu
   if (profile.familiarChannels.size && !profile.familiarChannels.has(v.channelId)) exploration += 1;
   return { quality, difficulty, interest, history, exploration };
 }
+const EVIDENCE_WEIGHT = { transcript: 1, creator: 0.8, channel: 0.6 } as const;
 export const totalScore = (parts: ScoreParts) =>
   parts.quality + parts.difficulty + parts.interest + parts.history + parts.exploration;
 
-const LEVEL_NAMES: Record<LevelTarget, string> = {
-  beginner: 'beginner',
-  intermediate: 'intermediate',
-  advanced: 'advanced',
-};
-/** One honest sentence. Verified levels are named as estimates; search intent is named as such. */
+/** One honest sentence. Each level is named with its evidence: an estimate or a label. */
 export function explain(v: Video, context: Context, profile: Profile): string {
   const fit = context.vocabularyFit[v.videoId];
   if (fit !== undefined) return `${fit}% of content words explicitly marked Known on this device`;
   const distance = bandDistance(v, profile);
   const band = v.band ? BANDS.find((b) => b[0] === v.band)![1] : null;
-  if (distance === 0) return `Estimated ${band}, close to your level`;
-  if (distance === -1) return `Estimated ${band}: an easier, comfortable listen`;
-  if (distance === 1) return `Estimated ${band}: a little above your level`;
+  const source = levelSource(v);
+  const level =
+    source === 'creator'
+      ? `Labelled ${band} by the creator`
+      : source === 'channel'
+        ? `Usually ${band} on this channel`
+        : `Estimated ${band}`;
+  if (distance === 0) return `${level}, close to your level`;
+  if (distance === -1) return `${level}: an easier, comfortable listen`;
+  if (distance === 1) return `${level}: a little above your level`;
   const topic = v.topics.find(
     (t) => context.preferredTopics.includes(t) || profile.likedTopics.has(t),
   );
   if (topic) return `More ${TOPICS[topic].toLowerCase()} videos`;
   if (profile.likedChannels.has(v.channelId)) return `More from ${v.channelTitle}`;
   if (v.prepared) return 'Japanese captions already prepared in Hibiki';
-  const level = profile.target >= 0 ? levelForBand(BANDS[profile.target][0]) : null;
-  if (!v.band && level && v.levelTargets?.includes(level))
-    return `Found by a search for ${LEVEL_NAMES[level]} listening · level not yet estimated`;
   if (v.audience === 'learner') return 'Made for Japanese learners';
   if (v.durationSeconds <= 600) return 'A shorter session';
   if (v.languageEvidence === 'reported-japanese-audio') return 'Spoken Japanese, newly found';

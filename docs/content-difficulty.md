@@ -26,7 +26,7 @@ No Qwen generation is used for difficulty classification.
 
 The classifier receives **only normalized Japanese transcript text**. It does not receive timestamps, segment IDs, media URLs, translations, quiz results, learner history, recordings, or user/account data.
 
-For normal lessons the entire Japanese transcript is one decision state. To avoid silent model-side truncation on unusually large scripts, inputs above the application's conservative character budget are split into consecutive full-coverage chunks. Every chunk is classified with the same closed questions, and category probabilities/confidence are combined deterministically with character-count weighting. Nothing is sparsely sampled.
+For normal lessons the entire Japanese transcript is one decision state. To avoid silent model-side truncation on unusually large scripts, inputs above the application's conservative character budget (16,000 characters, sized for Clef-flash's 24,576-token context window including the question schema) are split into consecutive full-coverage chunks. Every chunk is classified with the same closed questions, and category probabilities/confidence are combined deterministically with character-count weighting. Nothing is sparsely sampled.
 
 ## Persistence
 

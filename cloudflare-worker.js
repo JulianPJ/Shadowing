@@ -2,10 +2,13 @@
 import vinextHandler from 'vinext/server/fetch-handler';
 import { serveDemoAsset } from './src/lib/demo-asset';
 import { refreshCatalog } from './src/lib/discover/refresh';
+import { analyseUnplacedVideos } from './src/lib/discover/analysis';
+import { ANALYSIS_CRON } from './src/lib/discover/schedule';
+import { createYoutubeCaptions } from './src/lib/providers/transcription';
 export * from 'vinext/server/fetch-handler';
 
 // API routes live in src/app/api and read bindings from `cloudflare:workers`.
-// This entry only adds what a route handler cannot: byte-range assets and the cron trigger.
+// This entry only adds what a route handler cannot: byte-range assets and the cron triggers.
 // Preserve vinext's response-stage exports above.
 /** @typedef {import('cf/config').InferEnv<typeof import('./cloudflare.config').worker>} WorkerEnv */
 
@@ -41,7 +44,22 @@ const worker = {
    * @param {import('@cloudflare/workers-types').ExecutionContext} ctx
    */
   scheduled(controller, env, ctx) {
-    if (env.HIBIKI_DB)
+    if (!env.HIBIKI_DB) return;
+    // Each schedule is its own invocation, so nightly analysis never shares the catalogue run's
+    // CPU or subrequest budget.
+    if (controller.cron === ANALYSIS_CRON)
+      ctx.waitUntil(
+        analyseUnplacedVideos({
+          db: env.HIBIKI_DB,
+          ai: env.AI,
+          captions: createYoutubeCaptions(
+            env.YOUTUBE_CAPTION_RELAY_URL,
+            env.YOUTUBE_CAPTION_RELAY_TOKEN,
+          ),
+          now: controller.scheduledTime,
+        }),
+      );
+    else
       ctx.waitUntil(
         refreshCatalog(env.HIBIKI_DB, env.YOUTUBE_DATA_API_KEY, fetch, controller.scheduledTime),
       );

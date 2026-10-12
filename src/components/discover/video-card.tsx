@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { Bookmark, BookmarkCheck, ArrowUpRight, Captions, Heart, EyeOff } from 'lucide-react';
 import { BANDS, TOPICS, type Card } from '@/lib/discover/types';
+import { levelSource } from '@/lib/discover/declared-level';
 import { timestamp } from '@/lib/youtube';
 import { recordDiscoveryEvents } from '@/lib/discover/client';
 export function VideoCard({
@@ -18,6 +19,7 @@ export function VideoCard({
   onOpen: () => void;
 }) {
   const label = video.band ? BANDS.find((b) => b[0] === video.band)![1] : 'Level not yet estimated';
+  const source = levelSource(video);
   return (
     <article className="discover-card">
       <Link
@@ -57,13 +59,18 @@ export function VideoCard({
             <span
               className={video.band ? 'discover-band' : 'discover-band unknown'}
               title={
-                video.band
-                  ? 'Approximate content difficulty from a validated full Japanese transcript.'
-                  : 'Hibiki estimates a level after analysing the full Japanese transcript.'
+                source === 'creator'
+                  ? 'The level the creator states for this video. Hibiki has not analysed it yet.'
+                  : source === 'channel'
+                    ? 'The level this channel states for its other videos. Hibiki has not analysed this one yet.'
+                    : video.band
+                      ? 'Approximate content difficulty from a validated full Japanese transcript.'
+                      : 'Hibiki estimates a level after analysing the full Japanese transcript.'
               }
             >
-              {video.band ? '≈ ' : ''}
+              {source === 'transcript' ? '≈ ' : ''}
               {label}
+              {source === 'creator' ? ' · creator' : source === 'channel' ? ' · channel' : ''}
             </span>
             {video.topics[0] ? <span>{TOPICS[video.topics[0]]}</span> : null}
             {video.audience ? (

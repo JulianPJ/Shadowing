@@ -24,7 +24,10 @@ export class DifficultyProviderError extends Error {
 }
 const UNAVAILABLE = 'Difficulty analysis is unavailable right now. Please try again.';
 const MALFORMED = 'We could not make a reliable difficulty estimate. Please try again.';
-const MAX_DECISION_CHARS = 40000;
+// Hosted Clef-flash accepts 24,576 tokens (reduced from 64K in October 2026), shared with the
+// question schema. Kanji-dense Japanese can tokenise at more than one token per character, so
+// 16,000 characters per chunk leaves headroom for both.
+export const MAX_DECISION_CHARS = 16000;
 
 const QUESTIONS = {
   overall: {

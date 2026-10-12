@@ -16,7 +16,12 @@ export const worker = defineWorker({
   // Public routing is required when fetching the relay's workers.dev endpoint.
   compatibilityFlags: ['nodejs_compat', 'global_fetch_strictly_public'],
   assets: { notFoundHandling: 'none', runWorkerFirst: ['/demo.mp4'] },
-  triggers: [triggers.scheduled({ schedule: '*/15 * * * *' })],
+  // The scheduled handler tells these apart by schedule: keep them equal to
+  // src/lib/discover/schedule.ts (the config loader cannot import application modules).
+  triggers: [
+    triggers.scheduled({ schedule: '*/15 * * * *' }),
+    triggers.scheduled({ schedule: '7,22,37,52 20-23 * * *' }),
+  ],
   env: {
     ...cache.env,
     ASSETS: bindings.assets(),
@@ -59,6 +64,8 @@ export const worker = defineWorker({
       simple: { limit: 10, period: 60 },
     }),
     DEEPL_AUTH_KEY: bindings.secret(),
+    // Operator token for POST /api/admin/discover-analysis; unset disables the route.
+    DISCOVER_ADMIN_TOKEN: bindings.secret(),
     YOUTUBE_CAPTION_RELAY_URL: bindings.secret(),
     YOUTUBE_CAPTION_RELAY_TOKEN: bindings.secret(),
   },

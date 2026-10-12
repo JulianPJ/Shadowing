@@ -38,7 +38,7 @@ Hibiki is one Cloudflare Worker built with vinext (Next.js App Router on Vite). 
 | Completion recap and revisit evidence | `src/components/lesson-completion-summary.tsx`, `src/lib/lesson-completion.ts` |
 | Quiz documents, attempts, prompts and providers | `src/lib/quiz/`, `src/lib/providers/quiz/` |
 | Worker runtime: bindings, rate limits, account route wiring | `src/lib/server/runtime.ts`, `src/lib/server/rate-limit.ts`, `src/types/cloudflare-env.d.ts` |
-| Worker entry: demo asset, Discover flag, scheduled refresh | `cloudflare-worker.js`, `cloudflare.config.ts` |
+| Worker entry: demo asset, Discover flag, scheduled refresh and nightly analysis | `cloudflare-worker.js`, `cloudflare.config.ts`, `src/lib/discover/schedule.ts` |
 | Styles (imported in order; `shell.css` last) | `src/app/globals.css`, `src/app/styles/` |
 
 Import the module you need directly; there are no compatibility facades. Keep server providers out of client components.

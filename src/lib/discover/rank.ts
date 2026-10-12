@@ -10,6 +10,7 @@ import {
   type Video,
 } from './types';
 import { eligible } from './eligibility';
+import { levelSource } from './declared-level';
 import {
   bandDistance,
   bandIndex,
@@ -102,14 +103,15 @@ export function rankVideos(
   }
   return diverse.map((v) => ({ ...v, reason: explain(v, context, profile) }));
 }
-/** Verified-band availability for the current non-level filters. Public catalogue aggregates only. */
+/** Level availability for the current non-level filters. Public catalogue aggregates only. */
 function coverage(videos: Video[], filters: Filters, region: string, now: number) {
   const unbanded = videos.filter((v) => eligible(v, { ...filters, band: 'all' }, region, now));
   const byBand = Object.fromEntries(BANDS.map((b) => [b[0], 0])) as Record<Band, number>;
   for (const v of unbanded) if (v.band) byBand[v.band]++;
   return {
     total: unbanded.length,
-    verified: unbanded.filter((v) => v.band).length,
+    verified: unbanded.filter((v) => levelSource(v) === 'transcript').length,
+    placed: unbanded.filter((v) => v.band).length,
     prepared: unbanded.filter((v) => v.prepared).length,
     byBand,
   };
@@ -129,7 +131,14 @@ export async function buildFeed(
       context,
       region,
       epoch,
-      videos.map((v) => [v.videoId, v.fetchedAt, v.proof, v.popularity, v.qualityScore ?? null]),
+      videos.map((v) => [
+        v.videoId,
+        v.fetchedAt,
+        v.proof,
+        v.band,
+        v.popularity,
+        v.qualityScore ?? null,
+      ]),
     ]),
   );
   let offset = 0;

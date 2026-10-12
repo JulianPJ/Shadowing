@@ -69,7 +69,7 @@ and audio.
   from `cloudflare:workers` through [`src/lib/server/runtime.ts`](src/lib/server/runtime.ts); every
   API route exports `dynamic = 'force-dynamic'` so the framework response cache never sees it.
   [`cloudflare-worker.js`](cloudflare-worker.js) only adds `/demo.mp4` byte ranges, the Discover
-  kill switch and the 15-minute catalogue cron.
+  kill switch, the 15-minute catalogue cron and the nightly Discover difficulty analysis.
 - **Rate limits:** keyed by a constant route name and client IP. `SHADOWING_AI_RATE_LIMIT`
   (6/min, fails closed) for Workers AI routes (transcribe, difficulty, quiz, shadowing); `PUBLIC_API_RATE_LIMIT` (60/min, fails open) for translation and caption preparation;
   `DISCOVERY_RATE_LIMIT` (90/min) for Discover and Watch later.

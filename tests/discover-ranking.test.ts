@@ -31,13 +31,12 @@ test('scarce verified levels are not padded with guesses', async () => {
   );
   const feed = await buildFeed(videos, DEFAULT_FILTERS, learner('n5_n4'), null, 'JP', now);
   assert.equal(feed.total, 12);
-  // Unverified videos keep honest explanations; none claims an estimated level.
+  // The search that found a video is never presented as its level.
   for (const card of feed.items) {
     assert.equal(card.band, null);
-    assert.doesNotMatch(card.reason, /Estimated|your level/);
+    assert.doesNotMatch(card.reason, /Estimated|Labelled|your level|beginner/);
   }
-  assert.match(feed.items[0].reason, /search for beginner listening · level not yet estimated/);
-  // Exact filters stay exact: a beginner search target is not a verified N5–N4 video.
+  // Exact filters stay exact: a beginner search target is not an N5–N4 video.
   const exact = await buildFeed(
     videos,
     { ...DEFAULT_FILTERS, band: 'n5_n4' },
@@ -50,6 +49,7 @@ test('scarce verified levels are not padded with guesses', async () => {
   assert.deepEqual(exact.coverage, {
     total: 12,
     verified: 0,
+    placed: 0,
     prepared: 0,
     byBand: Object.fromEntries(BANDS.map((b) => [b[0], 0])),
   });

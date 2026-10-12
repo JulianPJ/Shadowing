@@ -18,6 +18,9 @@ import { readWatchLater, writeWatchLater, type WatchRecord } from '../src/lib/di
 import { discoveryVideo, youtubeMetadata } from './helpers/discover';
 import { catalogueHealth } from '../src/lib/discover/health';
 import { recordPreparationState } from '../src/lib/discover/preparation-state';
+import { analyseUnplacedVideos, ANALYSIS_PER_NIGHT } from '../src/lib/discover/analysis';
+import { CaptionError } from '../src/lib/providers/errors';
+import { handleManualAnalysis, MANUAL_ANALYSIS_MAX } from '../src/lib/discover/analysis-admin';
 import {
   createD1LinkedTranscriptRepository,
   storedMediaIdentity,
@@ -978,4 +981,173 @@ test('analysis verification checks only transcript-backed videos, and only after
   assert.equal(throttled.usage.written, 0);
   await verifyAnalyses(db, time + 3600000 + 1);
   assert.deepEqual((await verified())[0], [analysed, true]);
+});
+
+const clefAnswers = {
+  answers: Object.fromEntries(
+    Object.entries({
+      overall: 'n4_n3',
+      vocabulary: 'intermediate',
+      grammar: 'elementary',
+      conversation: 'intermediate',
+    }).map(([key, choice]) => [
+      key,
+      { type: 'choice', choice, confidence: 0.6, probabilities: { [choice]: 0.8, other: 0.2 } },
+    ]),
+  ),
+};
+const spokenCues = Array.from({ length: 6 }, (_, i) => ({
+  start: i * 8,
+  end: i * 8 + 7,
+  text: `今日は日本語の勉強について話します。毎日練習すると少しずつ上手になります。${i}。`,
+}));
+function nightly(
+  outcomes: Record<string, 'ok' | CaptionError>,
+  ai: () => unknown = () => clefAnswers,
+) {
+  const fetched: string[] = [];
+  return {
+    fetched,
+    run: (time: number, options: { limit?: number; nightlyCap?: number | null } = {}) =>
+      analyseUnplacedVideos({
+        ...options,
+        db,
+        ai: { run: async () => ai() },
+        captions: {
+          name: 'test captions',
+          async transcribe(id: string) {
+            fetched.push(id);
+            const outcome = outcomes[id] ?? 'ok';
+            if (outcome !== 'ok') throw outcome;
+            return { cues: spokenCues, provider: 'test captions' };
+          },
+        },
+        now: time,
+      }),
+  };
+}
+const preparationState = async (id: string) =>
+  db
+    .prepare(
+      'SELECT preparation_status AS status, last_failure_code AS code FROM discovery_video_state WHERE video_id=?',
+    )
+    .bind(id)
+    .first<{ status: string; code: string | null }>();
+
+test('nightly analysis places unlabelled videos and skips creator-labelled ones', async () => {
+  await saveVideos(db, [{ ...video(0), title: 'JLPT N5 listening practice' }, video(1), video(2)]);
+  const job = nightly({
+    video000002: new CaptionError('no-japanese-captions', 'none', 'captions'),
+  });
+  const time = Date.now();
+  assert.deepEqual(await job.run(time), {
+    attempted: 2,
+    analysed: 1,
+    reused: 0,
+    noCaptions: 1,
+    failed: 0,
+    stopped: null,
+    results: [
+      { videoId: 'video000001', title: '日本の朝の会話 1', outcome: 'analysed', band: 'n4_n3' },
+      {
+        videoId: 'video000002',
+        title: '日本の朝の会話 2',
+        outcome: 'no-captions',
+        band: undefined,
+      },
+    ],
+  });
+  // The creator's label already places video 0; only unplaced videos spend captions.
+  assert.deepEqual(job.fetched, ['video000001', 'video000002']);
+  await verifyAnalyses(db, time);
+  const cards = Object.fromEntries((await readCatalog(db)).map((v) => [v.videoId, v]));
+  assert.deepEqual([cards.video000000.band, cards.video000000.levelSource], ['n5_plus', 'creator']);
+  assert.deepEqual([cards.video000001.band, cards.video000001.levelSource], ['n4_n3', undefined]);
+  assert.equal(cards.video000001.prepared, true);
+  assert.equal(cards.video000002.band, null);
+  assert.equal(cards.video000002.preparationStatus, 'needs-captions');
+  // Analysed and captionless videos are not attempted again.
+  assert.equal((await job.run(time + 15 * 60000))?.attempted, 0);
+  assert.equal(job.fetched.length, 2);
+});
+
+test('nightly analysis stops on relay or inference outages without marking videos', async () => {
+  await saveVideos(db, [video(3)]);
+  const time = Date.now();
+  const blocked = nightly({
+    video000003: new CaptionError('provider-blocked', 'busy', 'captions'),
+  });
+  assert.equal((await blocked.run(time))?.stopped, 'captions:provider-blocked');
+  assert.equal(await preparationState('video000003'), null);
+  // Captions succeed but the model is unavailable (for example, the daily allocation is spent).
+  const exhausted = nightly({}, () => {
+    throw new Error('daily allocation exceeded');
+  });
+  assert.equal((await exhausted.run(time + 1))?.stopped, 'inference-unavailable');
+  assert.deepEqual(await preparationState('video000003'), { status: 'prepared', code: null });
+  // The next run reuses the stored transcript and analyses it without fetching captions again.
+  const next = nightly({});
+  assert.equal((await next.run(time + 2))?.analysed, 1);
+  assert.deepEqual(next.fetched, []);
+});
+
+test('nightly analysis respects the nightly cap', async () => {
+  await saveVideos(db, [video(4)]);
+  const time = Date.now();
+  await db
+    .prepare('INSERT INTO discovery_quota(day,units) VALUES(?,?)')
+    .bind(`analysis:${new Date(time).toISOString().slice(0, 10)}`, ANALYSIS_PER_NIGHT)
+    .run();
+  const job = nightly({});
+  assert.deepEqual(await job.run(time), {
+    attempted: 0,
+    analysed: 0,
+    reused: 0,
+    noCaptions: 0,
+    failed: 0,
+    stopped: 'nightly-cap',
+    results: [],
+  });
+  assert.deepEqual(job.fetched, []);
+  // A manual run is not bound by the nightly cap and takes its own limit.
+  await saveVideos(db, [video(5), video(6)]);
+  const manual = await job.run(time, { limit: 3, nightlyCap: null });
+  assert.deepEqual([manual.attempted, manual.analysed, manual.stopped], [3, 3, null]);
+  assert.deepEqual(job.fetched, ['video000004', 'video000005', 'video000006']);
+});
+
+test('the manual analysis endpoint requires the operator token and a bounded count', async () => {
+  const token = 'a'.repeat(40);
+  const runs: number[] = [];
+  const call = (
+    headers: Record<string, string>,
+    body: unknown,
+    configured: string | undefined = token,
+  ) =>
+    handleManualAnalysis(
+      new Request('https://hibiki.example/api/admin/discover-analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify(body),
+      }),
+      configured,
+      async (limit) => {
+        runs.push(limit);
+        return { attempted: limit };
+      },
+    );
+  const bearer = { Authorization: `Bearer ${token}` };
+  assert.equal((await call({}, { count: 1 })).status, 404);
+  assert.equal((await call({ Authorization: 'Bearer wrong' }, { count: 1 })).status, 404);
+  // An unset or short secret disables the route even when the request matches it.
+  assert.equal((await call(bearer, { count: 1 }, '')).status, 404);
+  assert.equal((await call({ Authorization: 'Bearer short' }, { count: 1 }, 'short')).status, 404);
+  for (const count of [0, MANUAL_ANALYSIS_MAX + 1, 1.5, '2', null])
+    assert.equal((await call(bearer, { count })).status, 400);
+  assert.deepEqual(runs, []);
+  const ok = await call(bearer, { count: 2 });
+  assert.equal(ok.status, 200);
+  assert.equal(ok.headers.get('Cache-Control'), 'no-store');
+  assert.deepEqual(await ok.json(), { attempted: 2 });
+  assert.deepEqual(runs, [2]);
 });
