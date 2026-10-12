@@ -45,10 +45,10 @@ export const worker = defineWorker({
     GOOGLE_CLIENT_SECRET: bindings.secret(),
     RESEND_API_KEY: bindings.secret(),
     AUTH_EMAIL_FROM: bindings.text('Hibiki <accounts@hibikiapp.net>'),
-    // Production-hosted Paddle sandbox: keep checkout off until deployed and verified.
+    // Production-hosted sandbox checkout only: no live payments or charges.
     // The two price IDs are stored as Cloudflare secrets to match existing bindings.
     PADDLE_ENVIRONMENT: bindings.text('sandbox'),
-    PADDLE_ENABLED: bindings.text('false'),
+    PADDLE_ENABLED: bindings.text('true'),
     PADDLE_PRO_MONTHLY_PRICE_ID: bindings.secret(),
     PADDLE_PRO_ANNUAL_PRICE_ID: bindings.secret(),
     PADDLE_CLIENT_TOKEN: bindings.text('test_8ee319c806849e54fd3431691e2'),
