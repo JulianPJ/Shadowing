@@ -73,6 +73,7 @@
     "@cloudflare/workers-response-store": "^1.0.1",
     "@fontsource-variable/dm-sans": "^5.3.0",
     "@fontsource/noto-sans-jp": "^5.3.0",
+    "@paddle/paddle-js": "^1.6.5",
     "@vimeo/player": "^2.30.4",
     "@vinext/cloudflare": "^1.0.1",
     "better-auth": "1.7.7",

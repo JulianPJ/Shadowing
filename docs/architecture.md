@@ -25,6 +25,7 @@ Hibiki is one Cloudflare Worker built with vinext (Next.js App Router on Vite). 
 | Learner validation, sessions, aggregation, migration | `src/lib/learner/` |
 | Browser persistence: lessons (history stores references), preferences | `src/lib/storage/` |
 | Authentication (Better Auth on D1) | `src/lib/auth/` |
+| Paddle subscriptions, checkout, webhook projection and portal | `src/lib/billing/`, `src/components/billing-settings.tsx` ([setup](paddle-billing.md)) |
 | Learner sync contract, validation, merge, D1 repository, hydration | `src/lib/sync/` |
 | Shared sync engine for review, word states and Watch Later | `src/lib/sync/channel.ts`, `src/lib/sync/channel-status.ts` |
 | One word status: saving, Known, grading side effects | `src/lib/vocabulary.ts` ([details](vocabulary.md)) |

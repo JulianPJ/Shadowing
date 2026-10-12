@@ -21,6 +21,11 @@ async function services(
   await context.route('**/api/auth/list-accounts', (route) =>
     route.fulfill({ json: [{ providerId: 'credential' }] }),
   );
+  await context.route('**/api/billing', (route) =>
+    route.fulfill({
+      json: { enabled: false, environment: 'sandbox', canManage: false, subscriptions: [] },
+    }),
+  );
   await context.route('**/api/sync/bootstrap*', (route) =>
     route.fulfill({ json: { data: emptySync(), nextCursor: null } }),
   );
@@ -129,6 +134,7 @@ test('three desktop sections and profile aliases keep account and plan informati
     await expect(page.getByText(user.email, { exact: true })).toBeVisible();
     await expect(page.getByText(/Email and password/)).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Free and Pro' })).toBeVisible();
-    await expect(page.getByText(/Online subscriptions are not available yet/)).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Your subscription' })).toBeVisible();
+    await expect(page.getByText('Subscriptions are awaiting setup.')).toBeVisible();
   }
 });

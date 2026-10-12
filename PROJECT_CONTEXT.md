@@ -57,6 +57,10 @@ and audio.
   intervals of 21+ days count as Known; a lapse returns the word to Learning. No decks or tags.
 - **Accounts:** Better Auth (email with verification, Google linking). Anonymous use is
   local-first; signing in offers a one-time import of device progress.
+- **Billing:** Paddle merchant-of-record monthly/annual Pro checkout and customer portal,
+  signature-verified subscription/refund webhooks, and paid expiry projected into the existing
+  account/access row. Manual/test Pro grants remain independent. Sandbox is the default and
+  checkout is disabled pending configuration; no live billing activation ([setup](docs/paddle-billing.md)).
 
 ## Architecture
 
@@ -92,7 +96,7 @@ See [architecture](docs/architecture.md) for module ownership and checks.
 3. Progress and learner modelling — done.
 4. Polish / monetisation — in progress. Done: navigation and vocabulary simplification, single
    runtime, rate limits, one sync engine. Remaining: analytics, sensible Free/Pro limits,
-   subscriptions.
+   sandbox billing configuration and verification, then an explicitly approved live billing release.
 5. Broaden content sources — Hibiki Bridge v1 done (Chrome). Chrome Web Store release packaging prepared; developer-account submission pending. Next:
    Firefox, `chrome.tabCapture` for sites that block element capture, and using the extension to
    capture YouTube audio for "Improve with Whisper".

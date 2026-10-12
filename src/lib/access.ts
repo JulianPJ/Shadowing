@@ -1,4 +1,5 @@
 import type { HibikiAuth } from './auth/server';
+import type { BillingEnvironment } from './billing/config';
 
 export type AccessPlan = 'free' | 'pro';
 export type ProFeature =
@@ -29,14 +30,21 @@ export const freeAccess: AccessRepository = {
   },
 };
 
-export function createD1AccessRepository(db: AccessDatabase): AccessRepository {
+export function createD1AccessRepository(
+  db: AccessDatabase,
+  environment: BillingEnvironment = 'sandbox',
+): AccessRepository {
   return {
     async plan(userId) {
       const row = await db
-        .prepare('SELECT plan FROM user_access WHERE user_id=?')
+        .prepare(
+          `SELECT plan, ${environment === 'sandbox' ? 'paddle_sandbox_until' : 'paddle_live_until'} AS paid_until FROM user_access WHERE user_id=?`,
+        )
         .bind(userId)
-        .first<{ plan: unknown }>();
-      return row?.plan === 'pro' ? 'pro' : 'free';
+        .first<{ plan: unknown; paid_until: string | null }>();
+      return row?.plan === 'pro' || (row?.paid_until && Date.parse(row.paid_until) > Date.now())
+        ? 'pro'
+        : 'free';
     },
   };
 }

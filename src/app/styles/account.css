@@ -44,6 +44,14 @@
 .account-actions a {
   text-underline-offset: 4px;
 }
+.billing-settings {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+.billing-settings h3 {
+  font-size: 1rem;
+}
 .account-import {
   position: fixed;
   z-index: 45;

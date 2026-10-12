@@ -22,6 +22,7 @@ import {
   subscribeChannels,
 } from '@/lib/sync/channel-status';
 import { useTaskReturn } from './task-return';
+import { BillingSettings } from './billing-settings';
 const initial: SyncStatus = {
   user: null,
   state: 'local',
@@ -119,10 +120,6 @@ export function PlanComparison() {
           </dd>
         </div>
       </dl>
-      <p className="muted">
-        Online subscriptions are not available yet. Pro access is available to accounts that have
-        already been enabled; sign in with that account to use it.
-      </p>
     </section>
   );
 }
@@ -268,6 +265,12 @@ export function AccountSettings() {
         </button>
       </div>
       {message ? <p role="alert">{message}</p> : null}
+      <BillingSettings
+        key={account.user.id}
+        userId={account.user.id}
+        verified={account.user.emailVerified}
+        plan={account.user.plan}
+      />
       <PlanComparison />
     </section>
   );

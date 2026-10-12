@@ -7,6 +7,8 @@ import { Miniflare, convertV4MiniflareOptions, Response } from 'miniflare';
 const root = path.resolve('.cloudflare/output/v0/workers/default/bundle');
 let captions = 0;
 const emails = [];
+const billingId = (prefix) => `${prefix}_${'a'.repeat(26)}`;
+let billingTransaction;
 const cues = Array.from({ length: 6 }, (_, i) => ({
   start: i * 8,
   end: i * 8 + 7,
@@ -26,6 +28,7 @@ const options = convertV4MiniflareOptions({
         SHADOWING_AI_RATE_LIMIT: { namespace_id: '19001', simple: { limit: 6, period: 60 } },
         DISCOVERY_RATE_LIMIT: { namespace_id: '19002', simple: { limit: 90, period: 60 } },
         PUBLIC_API_RATE_LIMIT: { namespace_id: '19003', simple: { limit: 60, period: 60 } },
+        BILLING_RATE_LIMIT: { namespace_id: '19004', simple: { limit: 10, period: 60 } },
       },
       serviceBindings: { AI: 'ai-mock' },
       bindings: {
@@ -35,9 +38,40 @@ const options = convertV4MiniflareOptions({
         AUTH_EMAIL_FROM: 'Hibiki <noreply@example.com>',
         YOUTUBE_CAPTION_RELAY_URL: 'https://relay.example',
         YOUTUBE_CAPTION_RELAY_TOKEN: 'mock-test-token',
+        PADDLE_ENABLED: 'true',
+        PADDLE_ENVIRONMENT: 'sandbox',
+        PADDLE_API_KEY: 'mock-server-paddle-key',
+        PADDLE_WEBHOOK_SECRET: 'mock-server-paddle-webhook-secret',
+        PADDLE_CLIENT_TOKEN: 'test_mock-public-paddle-token',
+        PADDLE_PRO_MONTHLY_PRICE_ID: billingId('pri'),
+        PADDLE_PRO_ANNUAL_PRICE_ID: `pri_${'b'.repeat(26)}`,
       },
       outboundService: async (request) => {
         const url = new URL(request.url);
+        if (url.hostname === 'sandbox-api.paddle.com') {
+          assert.equal(request.headers.get('Authorization'), 'Bearer mock-server-paddle-key');
+          if (url.pathname === '/transactions' && request.method === 'POST') {
+            billingTransaction = {
+              ...(await request.json()),
+              id: billingId('txn'),
+              customer_id: billingId('ctm'),
+              subscription_id: billingId('sub'),
+            };
+            return Response.json({ data: billingTransaction });
+          }
+          if (url.pathname === `/transactions/${billingId('txn')}`)
+            return Response.json({ data: billingTransaction });
+          if (url.pathname === `/customers/${billingId('ctm')}/portal-sessions`)
+            return Response.json({
+              data: {
+                urls: {
+                  general: {
+                    overview: 'https://sandbox-customer-portal.paddle.com/session?token=mock',
+                  },
+                },
+              },
+            });
+        }
         if (url.hostname === 'api.resend.com') {
           emails.push(await request.json());
           return Response.json({ id: 'mock-message' });
@@ -140,6 +174,112 @@ try {
   const identity = await me.json();
   assert.equal(identity.user.email, 'runtime@example.com');
   assert.equal(identity.user.plan, 'free');
+
+  // Exercise the built route handlers, egress, Web Crypto verification and D1 projection together.
+  const billingHeaders = {
+    Cookie: cookie,
+    Origin: 'https://example.com',
+    'Content-Type': 'application/json',
+    'X-Hibiki-Account': identity.user.id,
+    'cf-connecting-ip': '192.0.2.30',
+  };
+  const checkout = await mf.dispatchFetch('https://example.com/api/billing/checkout', {
+    method: 'POST',
+    headers: billingHeaders,
+    body: JSON.stringify({ interval: 'monthly' }),
+  });
+  assert.equal(checkout.status, 200, await checkout.clone().text());
+  assert.equal((await checkout.json()).transactionId, billingId('txn'));
+  assert.equal(
+    (
+      await (
+        await mf.dispatchFetch('https://example.com/api/account/me', {
+          headers: { Cookie: cookie },
+        })
+      ).json()
+    ).user.plan,
+    'free',
+  );
+  const billingTime = Date.now();
+  const billingEvent = {
+    event_id: billingId('evt'),
+    event_type: 'subscription.activated',
+    occurred_at: new Date(billingTime).toISOString(),
+    data: {
+      id: billingId('sub'),
+      customer_id: billingId('ctm'),
+      status: 'active',
+      collection_mode: 'automatic',
+      custom_data: billingTransaction.custom_data,
+      items: [
+        {
+          price: { id: billingId('pri'), billing_cycle: { interval: 'month', frequency: 1 } },
+          quantity: 1,
+        },
+      ],
+      current_billing_period: {
+        starts_at: new Date(billingTime - 1000).toISOString(),
+        ends_at: new Date(billingTime + 30 * 86400_000).toISOString(),
+      },
+    },
+  };
+  async function sendBillingEvent(event) {
+    const body = JSON.stringify(event),
+      timestamp = Math.floor(Date.now() / 1000);
+    const { createHmac } = await import('node:crypto');
+    const signature = createHmac('sha256', 'mock-server-paddle-webhook-secret')
+      .update(`${timestamp}:${body}`)
+      .digest('hex');
+    return mf.dispatchFetch('https://example.com/api/billing/webhook', {
+      method: 'POST',
+      headers: { 'Paddle-Signature': `ts=${timestamp};h1=${signature}` },
+      body,
+    });
+  }
+  const forgedWebhook = await mf.dispatchFetch('https://example.com/api/billing/webhook', {
+    method: 'POST',
+    body: JSON.stringify(billingEvent),
+  });
+  assert.equal(forgedWebhook.status, 401);
+  const activation = await sendBillingEvent(billingEvent);
+  assert.equal(activation.status, 200, await activation.clone().text());
+  assert.equal((await sendBillingEvent(billingEvent)).status, 200);
+  assert.equal(
+    (
+      await (
+        await mf.dispatchFetch('https://example.com/api/account/me', {
+          headers: { Cookie: cookie },
+        })
+      ).json()
+    ).user.plan,
+    'pro',
+  );
+  const portal = await mf.dispatchFetch('https://example.com/api/billing/portal', {
+    method: 'POST',
+    headers: billingHeaders,
+    body: '{}',
+  });
+  assert.equal(portal.status, 200, await portal.clone().text());
+  assert.equal(portal.headers.get('Cache-Control'), 'no-store');
+  const canceled = await sendBillingEvent({
+    ...billingEvent,
+    event_id: `evt_${'b'.repeat(26)}`,
+    event_type: 'subscription.canceled',
+    occurred_at: new Date(billingTime + 1).toISOString(),
+    data: { ...billingEvent.data, status: 'canceled', current_billing_period: null },
+  });
+  assert.equal(canceled.status, 200, await canceled.clone().text());
+  assert.equal(
+    (
+      await (
+        await mf.dispatchFetch('https://example.com/api/account/me', {
+          headers: { Cookie: cookie },
+        })
+      ).json()
+    ).user.plan,
+    'free',
+  );
+  await db.prepare('DELETE FROM user_access WHERE user_id=?').bind(identity.user.id).run();
 
   const freeDictionary = await mf.dispatchFetch('https://example.com/api/dictionary', {
     headers: { Cookie: cookie },

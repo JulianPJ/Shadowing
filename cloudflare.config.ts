@@ -45,6 +45,18 @@ export const worker = defineWorker({
     GOOGLE_CLIENT_SECRET: bindings.secret(),
     RESEND_API_KEY: bindings.secret(),
     AUTH_EMAIL_FROM: bindings.text('Hibiki <accounts@hibikiapp.net>'),
+    // Billing is disabled until the sandbox catalogue and secrets have been configured.
+    PADDLE_ENVIRONMENT: bindings.text('sandbox'),
+    PADDLE_ENABLED: bindings.text('false'),
+    PADDLE_PRO_MONTHLY_PRICE_ID: bindings.text(''),
+    PADDLE_PRO_ANNUAL_PRICE_ID: bindings.text(''),
+    PADDLE_CLIENT_TOKEN: bindings.text(''),
+    PADDLE_API_KEY: bindings.secret(),
+    PADDLE_WEBHOOK_SECRET: bindings.secret(),
+    BILLING_RATE_LIMIT: bindings.rateLimit({
+      namespace: '19004',
+      simple: { limit: 10, period: 60 },
+    }),
     DEEPL_AUTH_KEY: bindings.secret(),
     YOUTUBE_CAPTION_RELAY_URL: bindings.secret(),
     YOUTUBE_CAPTION_RELAY_TOKEN: bindings.secret(),

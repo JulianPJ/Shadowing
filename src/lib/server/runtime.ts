@@ -2,6 +2,9 @@
 // Route handlers stay thin: bindings, auth and limits live here; domain logic stays in src/lib.
 import { env, waitUntil } from 'cloudflare:workers';
 import { createAuth } from '../auth/server';
+import { billingEnvironment } from '../billing/config';
+import { billingHandler } from '../billing/server';
+import { paddleWebhook } from '../billing/webhook';
 import { createD1AccessRepository, requirePro } from '../access';
 import { accountHandler } from '../sync/server';
 import { createD1UserProgressRepository } from '../sync/repository';
@@ -92,7 +95,11 @@ export function limitedInference<P extends object>(
 
 export async function requireProAccess(request: Request) {
   if (!accountsConfigured()) return json({ error: 'Accounts are awaiting configuration.' }, 503);
-  return requirePro(request, hibikiAuth(), createD1AccessRepository(env.HIBIKI_DB));
+  return requirePro(
+    request,
+    hibikiAuth(),
+    createD1AccessRepository(env.HIBIKI_DB, billingEnvironment(env)),
+  );
 }
 
 /** Authenticated account, sync, vocabulary and Watch Later routes. */
@@ -109,13 +116,27 @@ export async function accountRoute(request: Request) {
       env,
       db,
       dictionary: createD1DictionaryRepository(db),
-      access: createD1AccessRepository(db),
+      access: createD1AccessRepository(db, billingEnvironment(env)),
       review: createD1ReviewRepository(db),
       knowledge: new D1KnowledgeRepository(db),
     })(request);
   } catch {
     return json({ error: 'Account service temporarily unavailable.' }, 503);
   }
+}
+
+/** Cookie-authenticated billing operations have a separate, fail-closed quota. */
+export async function billingRoute(request: Request) {
+  if (!accountsConfigured()) return json({ error: 'Accounts are awaiting configuration.' }, 503);
+  if (await rateLimited(env.BILLING_RATE_LIMIT, request, { failClosed: true, route: 'billing' }))
+    return tooManyRequests('Too many billing requests. Try again shortly.');
+  return billingHandler(env.HIBIKI_DB, hibikiAuth(), env)(request);
+}
+
+/** Webhook authorization is Paddle's signature, independent of cookies, origin and browser quotas. */
+export async function billingWebhookRoute(request: Request) {
+  if (!env.HIBIKI_DB) return json({ error: 'Billing unavailable' }, 503);
+  return paddleWebhook(env.HIBIKI_DB, env)(request);
 }
 
 export function discoverEnabled() {
