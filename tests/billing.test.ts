@@ -43,6 +43,7 @@ const apiCalls: { path: string; body: unknown }[] = [];
 let transaction: Record<string, unknown>;
 let providerFails = false;
 let pricing: Record<string, unknown>;
+let nextTransaction = id('txn');
 const api: PaddleRequest = async (path, body) => {
   apiCalls.push({ path, body });
   if (providerFails) throw new Error('provider down');
@@ -52,7 +53,7 @@ const api: PaddleRequest = async (path, body) => {
         general: { overview: 'https://sandbox-customer-portal.paddle.com/session?token=temporary' },
       },
     };
-  if (path === '/transactions') return { id: id('txn') };
+  if (path === '/transactions') return { id: nextTransaction };
   if (path === '/pricing-preview') return pricing;
   if (path.startsWith('/transactions/')) return transaction;
   throw new Error('Unexpected Paddle call');
@@ -208,6 +209,7 @@ beforeEach(async () => {
   cookie = verifiedCookie;
   providerFails = false;
   apiCalls.length = 0;
+  nextTransaction = id('txn');
   await db.batch(
     [
       'billing_subscriptions',
@@ -332,6 +334,43 @@ test('concurrent and repeated checkout attempts reuse one transaction and existi
     (await handler(request('/api/billing/checkout', { interval: 'monthly' }))).status,
     409,
   );
+});
+
+test('switching interval replaces a ready checkout and the earlier transaction still links', async () => {
+  const handler = billingHandler(db, auth, settings, api, now);
+  await checkout('annual');
+  const first = await db
+    .prepare('SELECT id FROM billing_checkouts WHERE user_id=?')
+    .bind(userId)
+    .first<{ id: string }>();
+  nextTransaction = id('txn', 'c');
+  const response = await handler(request('/api/billing/checkout', { interval: 'monthly' }));
+  assert.equal(response.status, 200, await response.clone().text());
+  const transactions = apiCalls.filter((c) => c.path === '/transactions');
+  assert.equal(transactions.length, 2);
+  assert.deepEqual((transactions[1].body as { items: unknown }).items, [
+    { price_id: settings.PADDLE_PRO_MONTHLY_PRICE_ID, quantity: 1 },
+  ]);
+  const { results } = await db
+    .prepare('SELECT 1 FROM billing_checkouts WHERE user_id=? AND expires_at>?')
+    .bind(userId, new Date(clock).toISOString())
+    .all();
+  assert.equal(results.length, 1);
+  // The retired annual checkout can still complete: its webhook resolves the original intent.
+  transaction.custom_data = { hibiki_user_id: userId, hibiki_checkout_id: first!.id };
+  const annual = subscription({
+    items: [
+      {
+        price: {
+          id: settings.PADDLE_PRO_ANNUAL_PRICE_ID,
+          billing_cycle: { interval: 'year', frequency: 1 },
+        },
+        quantity: 1,
+      },
+    ],
+  });
+  assert.equal((await deliver(event('subscription.activated', annual))).status, 200);
+  assert.equal(await createD1AccessRepository(db).plan(userId), 'pro');
 });
 
 test('signatures reject forged, changed, old, future and ambiguous timestamps and accept rotated signatures', async () => {

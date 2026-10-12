@@ -101,6 +101,16 @@ export class BillingRepository {
     ]);
   }
 
+  async retire(userId: string, transactionId: string, now: number) {
+    await this.db.batch([
+      this.db
+        .prepare(
+          'UPDATE billing_checkouts SET expires_at=? WHERE user_id=? AND environment=? AND transaction_id=?',
+        )
+        .bind(new Date(now).toISOString(), userId, this.environment, transactionId),
+    ]);
+  }
+
   async pending(userId: string, now: number) {
     return this.db
       .prepare(

@@ -123,8 +123,14 @@ export function billingHandler(
           body.interval === 'annual'
             ? settings.PADDLE_PRO_ANNUAL_PRICE_ID!
             : settings.PADDLE_PRO_MONTHLY_PRICE_ID!;
-        const pending = await repo.pending(userId, now());
-        if (pending && (pending.price_id !== price || !pending.transaction_id))
+        let pending = await repo.pending(userId, now());
+        // Switching interval retires the ready checkout. Its transaction stays owned, so a payment
+        // completed on it still links through its intent.
+        if (pending?.transaction_id && pending.price_id !== price) {
+          await repo.retire(userId, pending.transaction_id, now());
+          pending = null;
+        }
+        if (pending && !pending.transaction_id)
           return respond({ error: 'A checkout is already being prepared. Try again later.' }, 409);
         let transactionId = pending?.transaction_id;
         if (!transactionId) {
