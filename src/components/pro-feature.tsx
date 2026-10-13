@@ -4,12 +4,13 @@ import { LockKeyhole } from 'lucide-react';
 import { useAccount } from './account';
 import { authPath } from '@/lib/auth/return-path';
 import { useTaskReturn } from './task-return';
+import { canUseFeature, type ProFeature } from '@/lib/access';
 
-export function useProAccess() {
+export function useProAccess(feature: ProFeature = 'shadowing-analysis') {
   const account = useAccount();
   return {
     account,
-    isPro: account.user?.plan === 'pro',
+    isPro: canUseFeature(account.user?.plan, feature),
   };
 }
 
@@ -28,7 +29,7 @@ export function ProFeatureNotice({
         Checking feature access…
       </p>
     );
-  if (account.user?.plan === 'pro') return null;
+  if (canUseFeature(account.user?.plan, 'shadowing-analysis')) return null;
   return (
     <div className={`pro-feature-notice${compact ? ' compact' : ''}`} role="status">
       <LockKeyhole size={compact ? 14 : 17} />

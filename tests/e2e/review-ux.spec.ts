@@ -98,7 +98,7 @@ test('offline undo restores the card and a corrected grade syncs in revision ord
   expect(remote.review.cards[0].status).toBe('learning');
   expect(remote.writes.map((op) => op.action)).toEqual(['grade', 'undo', 'grade']);
   const history = await page.evaluate(() =>
-    JSON.parse(localStorage.getItem('hibiki:v1:account:retention-free:review:history') || '[]'),
+    JSON.parse(localStorage.getItem('hibiki:v1:account:retention-pro:review:history') || '[]'),
   );
   expect(history).toHaveLength(1);
   expect(history[0].grade).toBe('good');
@@ -187,11 +187,11 @@ test('a new account opens its own schedule while the previous account fetch is s
     route.fulfill({
       json: {
         user: {
-          id: otherAccount ? 'review-other' : 'retention-free',
+          id: otherAccount ? 'review-other' : 'retention-pro',
           email: 'learner@example.com',
           name: 'Learner',
           emailVerified: true,
-          plan: 'free',
+          plan: 'pro',
         },
         googleEnabled: false,
         emailEnabled: false,
@@ -209,7 +209,7 @@ test('a new account opens its own schedule while the previous account fetch is s
   let first = true;
   await context.route('**/api/review', async (route) => {
     const owner = route.request().headers()['x-hibiki-account'];
-    if (owner === 'retention-free' && first) {
+    if (owner === 'retention-pro' && first) {
       first = false;
       held();
       await blocked;
@@ -256,7 +256,7 @@ test('a second device applies shared daily counts from accepted grades', async (
   await connect(second);
   await second.addInitScript(() =>
     localStorage.setItem(
-      'hibiki:v1:account:retention-free:review:study-settings',
+      'hibiki:v1:account:retention-pro:review:study-settings',
       JSON.stringify({ defaults: { new: 1, review: null }, extensions: {} }),
     ),
   );

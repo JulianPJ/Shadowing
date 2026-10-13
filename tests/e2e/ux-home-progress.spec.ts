@@ -1,3 +1,4 @@
+import { mockProAccount } from '../helpers/pro-account';
 import { test, expect } from '@playwright/test';
 import demo from '../../src/data/demo.json' with { type: 'json' };
 
@@ -41,6 +42,7 @@ test('preparation failure preserves the link and offers direct retry into a work
 test('progress attention opens the exact section and daily goal can be edited', async ({
   page,
 }) => {
+  await mockProAccount(page);
   await page.goto('/practice/demo');
   await expect(page.getByRole('button', { name: 'Listen', exact: true })).toBeEnabled();
   await page.getByTestId('transcript-1').click();

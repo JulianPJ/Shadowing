@@ -1,4 +1,5 @@
 'use client';
+import { ProFeatureNotice, useProAccess } from './pro-feature';
 import Link from 'next/link';
 import { ExternalLink, Play, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -21,6 +22,17 @@ type Filter = 'all' | 'learning' | 'known' | 'ignored';
 const MARKED_PAGE = 100;
 
 export function VocabularyWords() {
+  const { isPro } = useProAccess('vocabulary');
+  return isPro ? (
+    <VocabularyWordsContent />
+  ) : (
+    <main className="dictionary-screen">
+      <VocabularyHeader active="words" />
+      <ProFeatureNotice feature="Saved vocabulary and word management" />
+    </main>
+  );
+}
+function VocabularyWordsContent() {
   const account = useAccount();
   const marked = useMarkedWords();
   // One filter covers saved words and the other marked words below them.

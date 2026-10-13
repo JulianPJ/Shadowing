@@ -1,8 +1,10 @@
 import { handleTranslationRequest } from '@/lib/translation-api';
 import { createDeepLTranslationProvider } from '@/lib/providers/translation';
-import { publicLimit, workerEnv } from '@/lib/server/runtime';
+import { publicLimit, requireProAccess, workerEnv } from '@/lib/server/runtime';
 
 export async function POST(request: Request) {
+  const denied = await requireProAccess(request);
+  if (denied) return denied;
   const limited = await publicLimit(request, 'translate');
   if (limited) return limited;
   const key = workerEnv.DEEPL_AUTH_KEY;

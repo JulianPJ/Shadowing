@@ -2,6 +2,10 @@ import { expect, test, type Page } from '@playwright/test';
 import demo from '../../src/data/demo.json' with { type: 'json' };
 import { mockProAccount } from '../helpers/pro-account';
 
+test.beforeEach(async ({ context }) => {
+  await mockProAccount(context);
+});
+
 async function openDemo(page: Page) {
   await page.goto('/practice/demo');
   await expect(page.getByRole('button', { name: 'Listen', exact: true })).toBeEnabled();

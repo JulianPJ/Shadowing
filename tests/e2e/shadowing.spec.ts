@@ -108,6 +108,7 @@ test('real MediaRecorder captures and replays; native replay stops the recording
   page,
   context,
 }) => {
+  await mockProAccount(page);
   await context.grantPermissions(['microphone']);
   await openDemo(page);
   await page.locator('body').click({ position: { x: 3, y: 3 } });
@@ -130,6 +131,7 @@ test('real MediaRecorder captures and replays; native replay stops the recording
   await expect(page.getByLabel('Your recorded attempt')).toHaveCount(0);
 });
 test('denied microphone permission offers recovery without blocking playback', async ({ page }) => {
+  await mockProAccount(page);
   await openDemo(page);
   await page.getByRole('button', { name: 'Record yourself', exact: true }).click();
   await expect(page.locator('.recording-error')).toContainText('Microphone access was denied');
@@ -159,6 +161,7 @@ test('imported local media and SRT play, pause, translate and recover on refresh
 test('invalid URL, shortcut typing guard, bookmarks, search, and mobile layout', async ({
   page,
 }) => {
+  await mockProAccount(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');
   await page

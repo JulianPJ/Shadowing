@@ -250,9 +250,7 @@ test('a level with no estimated videos explains why and offers honest alternativ
 }) => {
   // Only video 0 matches this search, and it has no estimated level.
   await page.goto('/discover?band=n1_plus&q=%E4%BC%9A%E8%A9%B1+0');
-  await expect(
-    page.getByRole('heading', { name: 'No N1+ videos with an estimated level yet.' }),
-  ).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'No N1+ videos found yet.' })).toBeVisible();
   await expect(page.getByText('never filled with guesses', { exact: false })).toBeVisible();
   await expect(page.getByRole('button', { name: /^Try / })).toHaveCount(0);
   await page.getByRole('button', { name: 'Browse all levels', exact: true }).click();

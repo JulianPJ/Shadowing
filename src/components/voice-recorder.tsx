@@ -28,22 +28,7 @@ export type VoiceRecorderReference = {
   playbackSpeed: number;
 };
 
-export function VoiceRecorder({
-  ref,
-  enabled,
-  nativePlaying,
-  onBeforeRecord,
-  onRecording,
-  onAttempt,
-  analysis,
-  analyzing = false,
-  analysisError = '',
-  onAnalyze,
-  onNewRecording,
-  recentAttempts = [],
-  onManualStop,
-  referenceAudio,
-}: {
+type VoiceRecorderProps = {
   ref?: Ref<VoiceRecorderHandle>;
   enabled: boolean;
   nativePlaying: boolean;
@@ -58,7 +43,32 @@ export function VoiceRecorder({
   recentAttempts?: ShadowingRecentAttempt[];
   onManualStop?: () => void;
   referenceAudio?: (signal: AbortSignal) => Promise<VoiceRecorderReference>;
-}) {
+};
+
+export function VoiceRecorder(props: VoiceRecorderProps) {
+  const { isPro } = useProAccess('recording');
+  return isPro ? (
+    <VoiceRecorderContent {...props} />
+  ) : (
+    <ProFeatureNotice feature="Voice recording, recorded playback and speaking analysis" compact />
+  );
+}
+function VoiceRecorderContent({
+  ref,
+  enabled,
+  nativePlaying,
+  onBeforeRecord,
+  onRecording,
+  onAttempt,
+  analysis,
+  analyzing = false,
+  analysisError = '',
+  onAnalyze,
+  onNewRecording,
+  recentAttempts = [],
+  onManualStop,
+  referenceAudio,
+}: VoiceRecorderProps) {
   const { isPro } = useProAccess();
   const [recording, setRecording] = useState(false);
   const [requesting, setRequesting] = useState(false);

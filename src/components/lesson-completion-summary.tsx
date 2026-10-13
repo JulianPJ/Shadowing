@@ -52,14 +52,15 @@ export function LessonCompletionSummary({
     review = useReview();
   const owner = account.user?.id ?? 'anonymous';
   const { isPro } = useProAccess();
-  const dueCount = dueReviews(review.data.cards, new Date().toISOString()).length;
+  const dueCount = isPro ? dueReviews(review.data.cards, new Date().toISOString()).length : 0;
   const [result, setResult] = useState<{
     owner: string;
     attempt: QuizAttempt | null;
     key: string | null;
   } | null>(null);
-  const attempt = result?.owner === owner ? result.attempt : null;
+  const attempt = isPro && result?.owner === owner ? result.attempt : null;
   useEffect(() => {
+    if (!isPro) return;
     let active = true;
     // Cache-only read: completion never generates a quiz.
     void loadQuiz(validateQuizLesson(lesson))
@@ -75,7 +76,7 @@ export function LessonCompletionSummary({
     return () => {
       active = false;
     };
-  }, [lesson, owner]);
+  }, [lesson, owner, isPro]);
   const revisit = completionRevisitSections(
     lesson,
     scores,
@@ -134,49 +135,55 @@ export function LessonCompletionSummary({
               Practice again
             </button>
           </div>
-          <details className="completion-details">
-            <summary>Saved words and practice details</summary>
-            <div className="completion-results">
-              {aggregate ? (
-                <div>
-                  <ShadowingCompletion
-                    aggregate={aggregate}
-                    summary={summary}
-                    loading={summaryLoading}
-                  />
-                  {onSummarize && !summary ? (
-                    <button className="text-button" disabled={summaryLoading} onClick={onSummarize}>
-                      Summarise Shadowing Match
-                    </button>
-                  ) : null}
-                </div>
-              ) : null}
-              {attempt?.completedAt ? (
-                <div className="completion-comprehension">
-                  <h3>Comprehension</h3>
-                  <strong>
-                    {attempt.score} / {attempt.totalQuestions}
-                  </strong>
-                </div>
-              ) : null}
-            </div>
-            <LessonReviewRecap lesson={lesson} />
-            {revisit.length ? (
-              <div className="completion-revisit">
-                <h3>Worth another listen</h3>
-                <ul>
-                  {revisit.map((s) => (
-                    <li key={s.index}>
-                      <button className="text-button" onClick={() => onReview(s.index)}>
-                        Section {s.index + 1}
+          {isPro ? (
+            <details className="completion-details">
+              <summary>Saved words and practice details</summary>
+              <div className="completion-results">
+                {aggregate ? (
+                  <div>
+                    <ShadowingCompletion
+                      aggregate={aggregate}
+                      summary={summary}
+                      loading={summaryLoading}
+                    />
+                    {onSummarize && !summary ? (
+                      <button
+                        className="text-button"
+                        disabled={summaryLoading}
+                        onClick={onSummarize}
+                      >
+                        Summarise Shadowing Match
                       </button>
-                      <span className="small muted">{s.reason}</span>
-                    </li>
-                  ))}
-                </ul>
+                    ) : null}
+                  </div>
+                ) : null}
+                {attempt?.completedAt ? (
+                  <div className="completion-comprehension">
+                    <h3>Comprehension</h3>
+                    <strong>
+                      {attempt.score} / {attempt.totalQuestions}
+                    </strong>
+                  </div>
+                ) : null}
               </div>
-            ) : null}
-          </details>
+              <LessonReviewRecap lesson={lesson} />
+              {revisit.length ? (
+                <div className="completion-revisit">
+                  <h3>Worth another listen</h3>
+                  <ul>
+                    {revisit.map((s) => (
+                      <li key={s.index}>
+                        <button className="text-button" onClick={() => onReview(s.index)}>
+                          Section {s.index + 1}
+                        </button>
+                        <span className="small muted">{s.reason}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </details>
+          ) : null}
         </>
       ) : null}
       {quiz.available ? (

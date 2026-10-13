@@ -8,10 +8,27 @@ const features: [name: string, detail: string, free: boolean][] = [
   ['Essential vocabulary', 'The topic words that matter most, with meanings', false],
   ['Auto-generated subtitles', 'Accurate subtitles for media without captions', false],
   ['Shadowing Match', 'See how closely your recording follows the speaker', false],
-  ['Shadowing and recording', 'Listen, pause and repeat, section by section', true],
-  ['Dictionary and saved words', 'Look up any word and keep it for review', true],
-  ['Daily word review', 'Spaced review of the words you save', true],
-  ['Progress sync', 'Your practice on every device', true],
+  ['Immersion viewer', 'Discover, imports, captions, transcripts and manual replay', true],
+  ['Dictionary lookup', 'Definitions, readings and furigana', true],
+  ['Watch Later sync', 'Your watch list and basic viewer preferences across devices', true],
+  [
+    'Sentence translations',
+    'On-demand translations; subtitle-supplied translations stay Free',
+    false,
+  ],
+  ['Detailed difficulty', 'Lesson language demands and breakdowns', false],
+  [
+    'Recording and advanced drills',
+    'Recorded attempts, local diagnostics and hands-free practice',
+    false,
+  ],
+  ['Saved words and sentences', 'Word statuses, vocabulary management and Anki/CSV export', false],
+  ['Daily word review', 'Spaced review of the words you save', false],
+  [
+    'Progress and learning sync',
+    'Detailed analytics, weekly reports, daily goals and learning data across devices',
+    false,
+  ],
 ];
 
 /** Savings and per-month figures derived from Paddle's minor-unit totals. */

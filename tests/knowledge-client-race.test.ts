@@ -17,7 +17,7 @@ const user = (id: string): AccountUser => ({
   name: 'Learner',
   email: `${id}@example.com`,
   emailVerified: true,
-  plan: 'free',
+  plan: 'pro',
 });
 const word = (
   state: WordKnowledgeRecord['state'],

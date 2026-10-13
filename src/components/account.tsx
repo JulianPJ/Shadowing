@@ -23,6 +23,8 @@ import {
 } from '@/lib/sync/channel-status';
 import { useTaskReturn } from './task-return';
 import { BillingSettings } from './billing-settings';
+import { canUseFeature } from '@/lib/access';
+import { readStorage, storageKeys } from '@/lib/storage/browser';
 const initial: SyncStatus = {
   user: null,
   state: 'local',
@@ -66,7 +68,7 @@ export function AccountBridge() {
         </div>
       </aside>
     );
-  return account.importPending ? (
+  return account.importPending && canUseFeature(account.user?.plan, 'learning-sync') ? (
     <aside className="account-import" aria-label="Import device progress">
       <strong>Add this device’s Hibiki progress to your account?</strong>
       <p>
@@ -108,18 +110,26 @@ export function PlanComparison() {
         <div>
           <dt>Hibiki Free</dt>
           <dd>
-            Shadowing, recording, dictionary lookup, saved words and review, with progress synced to
-            your account.
+            Watch &amp; Understand: Discover, Watch Later, supported media imports, provider
+            captions and your own subtitles, interactive transcripts, dictionary lookup, furigana
+            and manual replay. Free accounts can sync Watch Later and basic viewer preferences.
           </dd>
         </div>
         <div>
           <dt>Hibiki Pro</dt>
           <dd>
-            Everything in Free, plus comprehension checks, topic vocabulary, automatic subtitles and
-            Shadowing Match analysis.
+            Practice &amp; Improve: everything in Free, plus automatic subtitles, on-demand
+            translations, quizzes, essential vocabulary and detailed difficulty analysis. Record and
+            analyse speaking, run advanced drills, save words and sentences, review flashcards,
+            export to Anki/CSV and track learning progress with weekly reports, daily goals and
+            learning sync across devices.
           </dd>
         </div>
       </dl>
+      <p className="small muted">
+        Your learning data is kept when Pro ends. Resubscribing restores access. Signed-in learners
+        can download their personal data from Account on either plan.
+      </p>
     </section>
   );
 }
@@ -184,7 +194,9 @@ export function AccountSettings() {
     return (
       <section className="account-settings" aria-labelledby="account-title">
         <h2 id="account-title">Account</h2>
-        <p>Sign in to save words and keep your progress across devices.</p>
+        <p>
+          Sign in to sync Watch Later. Hibiki Pro adds saved vocabulary, review and learning sync.
+        </p>
         <Link className="button primary" href={authPath('/sign-in', destination)}>
           Sign in
         </Link>
@@ -242,6 +254,37 @@ export function AccountSettings() {
             : 'Could not load sign-in methods.'}
       </p>
       <div className="account-actions">
+        <button
+          className="button"
+          disabled={busy}
+          onClick={() =>
+            void action(async () => {
+              const owner = account.user!.id;
+              const response = await fetch('/api/account/export', {
+                cache: 'no-store',
+                headers: { 'X-Hibiki-Account': owner },
+              });
+              if (!response.ok) throw new Error('Export unavailable');
+              const remote = await response.json();
+              if (syncStatus().user?.id !== owner) return;
+              const device = Object.fromEntries(
+                storageKeys().map((key) => [key, readStorage(key, null)]),
+              );
+              const url = URL.createObjectURL(
+                new Blob([JSON.stringify({ remote, device }, null, 2)], {
+                  type: 'application/json',
+                }),
+              );
+              const anchor = document.createElement('a');
+              anchor.href = url;
+              anchor.download = 'hibiki-personal-data.json';
+              anchor.click();
+              URL.revokeObjectURL(url);
+            })
+          }
+        >
+          Download personal data
+        </button>
         {account.googleEnabled && methods && !methods.includes('google') ? (
           <button
             className="button"

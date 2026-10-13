@@ -1,4 +1,5 @@
 'use client';
+import { ProFeatureNotice, useProAccess } from './pro-feature';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -65,6 +66,17 @@ function inputTarget(target: EventTarget | null) {
   );
 }
 export function DailyReview() {
+  const { isPro } = useProAccess('review');
+  return isPro ? (
+    <DailyReviewContent />
+  ) : (
+    <main className="dictionary-screen review-screen">
+      <VocabularyHeader active="review" />
+      <ProFeatureNotice feature="Spaced repetition reviews" />
+    </main>
+  );
+}
+function DailyReviewContent() {
   const account = useAccount();
   const review = useReview();
   const [loaded, setLoaded] = useState<{

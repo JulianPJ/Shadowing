@@ -284,9 +284,39 @@ try {
   const freeDictionary = await mf.dispatchFetch('https://example.com/api/dictionary', {
     headers: { Cookie: cookie },
   });
-  assert.equal(freeDictionary.status, 200);
-  assert.deepEqual((await freeDictionary.json()).entries, []);
+  assert.equal(freeDictionary.status, 403);
+  assert.equal((await freeDictionary.json()).code, 'pro-required');
+  for (const endpoint of [
+    'translate',
+    'difficulty',
+    'quiz',
+    'transcribe',
+    'shadowing/transcribe',
+    'shadowing/feedback',
+    'shadowing/summary',
+    'dictionary',
+    'review',
+    'knowledge',
+  ]) {
+    for (const signedIn of [false, true]) {
+      const response = await mf.dispatchFetch('https://example.com/api/' + endpoint, {
+        method: 'POST',
+        headers: {
+          ...(signedIn ? { Cookie: cookie } : {}),
+          Origin: 'https://example.com',
+          'Content-Type': 'application/json',
+        },
+        body: '{}',
+      });
+      assert.equal(response.status, signedIn ? 403 : 401, endpoint);
+    }
+  }
   assert.equal((await mf.dispatchFetch('https://example.com/api/knowledge')).status, 401);
+  await db
+    .prepare('INSERT INTO user_access (user_id,plan,source,updated_at) VALUES (?,?,?,?)')
+    .bind(identity.user.id, 'pro', 'test', new Date().toISOString())
+    .run();
+
   const knowledgeHeaders = {
     Cookie: cookie,
     Origin: 'https://example.com',
@@ -336,23 +366,6 @@ try {
     ).n,
     1,
   );
-  const freeQuiz = await mf.dispatchFetch('https://example.com/api/quiz', {
-    method: 'POST',
-    headers: { Cookie: cookie },
-    body: '{}',
-  });
-  assert.equal(freeQuiz.status, 403);
-  const freeTranscription = await mf.dispatchFetch('https://example.com/api/transcribe', {
-    method: 'POST',
-    headers: { Cookie: cookie },
-    body: new Uint8Array(),
-  });
-  assert.equal(freeTranscription.status, 403);
-
-  await db
-    .prepare('INSERT INTO user_access (user_id,plan,source,updated_at) VALUES (?,?,?,?)')
-    .bind(identity.user.id, 'pro', 'test', new Date().toISOString())
-    .run();
   const upgraded = await mf.dispatchFetch('https://example.com/api/account/me', {
     headers: { Cookie: cookie },
   });
@@ -586,6 +599,64 @@ try {
     ).status,
     403,
   );
+  // Expiry preserves vocabulary/reviews/knowledge; raw export stays available on Free.
+  await db
+    .prepare("UPDATE user_access SET plan='free' WHERE user_id=?")
+    .bind(identity.user.id)
+    .run();
+  for (const endpoint of ['dictionary', 'review', 'knowledge'])
+    assert.equal(
+      (
+        await mf.dispatchFetch('https://example.com/api/' + endpoint, {
+          headers: { Cookie: cookie },
+        })
+      ).status,
+      403,
+    );
+  const exported = await mf.dispatchFetch('https://example.com/api/account/export', {
+    headers: { Cookie: cookie },
+  });
+  assert.equal(exported.status, 200);
+  const personal = await exported.json();
+  assert.equal(personal.vocabulary.length, 1);
+  assert.equal(personal.review.cards.length, 1);
+  assert.equal(personal.wordStates.length, 1);
+  const freePrefs = await mf.dispatchFetch('https://example.com/api/sync/push', {
+    method: 'POST',
+    headers: reviewHeaders,
+    body: JSON.stringify({
+      ...sync,
+      preferences: { ...sync.preferences, reviewLimits: undefined },
+    }),
+  });
+  assert.equal(freePrefs.status, 200);
+  const freeProgress = await mf.dispatchFetch('https://example.com/api/sync/bootstrap', {
+    headers: { Cookie: cookie },
+  });
+  assert.equal(freeProgress.status, 200);
+  const freeData = await freeProgress.json();
+  assert.deepEqual(freeData.data.sessions, []);
+  assert.equal(freeData.data.preferences.reviewLimits, undefined);
+  assert.equal(
+    (
+      await mf.dispatchFetch('https://example.com/api/sync/push', {
+        method: 'POST',
+        headers: reviewHeaders,
+        body: JSON.stringify(sync),
+      })
+    ).status,
+    403,
+  );
+  await db
+    .prepare("UPDATE user_access SET plan='pro' WHERE user_id=?")
+    .bind(identity.user.id)
+    .run();
+  assert.equal(
+    (await mf.dispatchFetch('https://example.com/api/dictionary', { headers: { Cookie: cookie } }))
+      .status,
+    200,
+  );
+
   const dictionaryDeleted = await mf.dispatchFetch('https://example.com/api/dictionary', {
     method: 'POST',
     headers: { Cookie: cookie, Origin: 'https://example.com', 'Content-Type': 'application/json' },
@@ -609,10 +680,15 @@ try {
     ).n,
     0,
   );
+  await db
+    .prepare("UPDATE user_access SET plan='free' WHERE user_id=?")
+    .bind(identity.user.id)
+    .run();
   let lesson;
   for (let i = 0; i < 2; i++) {
     const response = await mf.dispatchFetch('https://example.com/api/prepare', {
       method: 'POST',
+      headers: i === 1 ? { Cookie: cookie } : {},
       body: JSON.stringify({ url: 'https://youtu.be/IJ6R4u05ppw' }),
     });
     const last = JSON.parse((await response.text()).trim().split('\n').at(-1));
@@ -620,6 +696,10 @@ try {
     lesson = last.lesson;
   }
   assert.equal(captions, 1);
+  await db
+    .prepare("UPDATE user_access SET plan='pro' WHERE user_id=?")
+    .bind(identity.user.id)
+    .run();
   for (const endpoint of ['quiz', 'difficulty']) {
     let first;
     for (let i = 0; i < 2; i++) {
@@ -670,6 +750,10 @@ try {
   assert.equal(feedData.items.length, 1);
   assert.equal(feedData.items[0].band, null);
   assert.ok(!('segments' in feedData.items[0]));
+  await db
+    .prepare("UPDATE user_access SET plan='free' WHERE user_id=?")
+    .bind(identity.user.id)
+    .run();
   const watchHeaders = {
     Cookie: cookie,
     Origin: 'https://example.com',

@@ -194,7 +194,9 @@ test('account plan controls paid UI without hiding the core account experience',
   await account(page);
   await expect(page.locator('.account-plan').filter({ hasText: 'Hibiki Free' })).toBeVisible();
   await page.goto('/dictionary');
-  await expect(page.getByText('No saved words yet.')).toBeVisible();
+  await expect(
+    page.getByText('Saved vocabulary and word management is a Hibiki Pro feature.'),
+  ).toBeVisible();
   await expect(page.getByText('Opening your words…')).toHaveCount(0);
 });
 
@@ -255,10 +257,15 @@ test('declining device import leaves anonymous history local across reloads and 
   await expect(page.getByRole('complementary', { name: 'Import device progress' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Sign out', exact: true }).click();
   await expect(
-    page.getByRole('main').getByRole('link', { name: 'Sign in', exact: true }),
+    page.locator('.account-settings').getByRole('link', { name: 'Sign in', exact: true }),
   ).toBeVisible();
   await page.goto('/progress');
-  await expect(page.locator('.progress-summary')).toContainText('Lessons practised');
+  await expect(
+    page.getByText(
+      'Detailed learning progress, weekly reports and daily goals is a Hibiki Pro feature.',
+    ),
+  ).toBeVisible();
+  expect(await page.evaluate(() => localStorage.getItem('hibiki:v1:learner-history'))).toBeTruthy();
 });
 test('two devices sync preferences, bookmarks, completion and retakes; offline edits retry without duplicates', async ({
   browser,

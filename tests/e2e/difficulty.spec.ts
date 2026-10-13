@@ -9,6 +9,10 @@ import { transcriptRevision } from '../../src/lib/transcript';
 import type { Lesson } from '../../src/lib/types';
 import { mockProAccount, proStorageKey } from '../helpers/pro-account';
 
+test.beforeEach(async ({ context }) => {
+  await mockProAccount(context);
+});
+
 async function openDemo(page: Page) {
   await page.goto('/practice/demo');
   await page.getByText('About this lesson’s difficulty', { exact: true }).click();
@@ -76,9 +80,11 @@ test('API failure and malformed result can be retried while playback and the com
   await expect(card.locator('dl')).toContainText('N5–N4');
   expect(calls).toBe(3);
 });
-test('real authored demo route works without provider credentials and fits mobile', async ({
+test('authored demo analysis behind Pro works without provider inference and fits mobile', async ({
   page,
 }) => {
+  const analysis = await createDifficultyAnalysis(authored, demo as Lesson);
+  await page.route('**/api/difficulty', (route) => route.fulfill({ json: { analysis } }));
   await page.setViewportSize({ width: 390, height: 844 });
   await openDemo(page);
   const card = page.getByTestId('lesson-difficulty');

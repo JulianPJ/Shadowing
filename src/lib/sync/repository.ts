@@ -67,9 +67,11 @@ export function createD1UserProgressRepository(db: ProgressDatabase): UserProgre
     },
     // One page holds up to 50 records of every unfinished collection, read in one D1 round trip,
     // so a typical pull is a single request (and session check) rather than one per collection.
-    async bootstrap(userId, cursor) {
+    async bootstrap(userId, cursor, viewerOnly = false) {
       const pending = parseCursor(cursor);
-      const kinds = syncCollections.filter((kind) => pending[kind] !== undefined);
+      const kinds = syncCollections.filter(
+        (kind) => pending[kind] !== undefined && (!viewerOnly || kind === 'lessons'),
+      );
       const [prefsResult, ...pages] = (await db.batch([
         db.prepare('SELECT * FROM user_preferences WHERE user_id=?').bind(userId),
         // Composite primary key supplies the user-scoped keyset index, never OFFSET.
@@ -97,7 +99,7 @@ export function createD1UserProgressRepository(db: ProgressDatabase): UserProgre
           speed: prefs.speed as number,
           studioMode: prefs.studio_mode === 1,
           furigana: prefs.furigana === 1,
-          ...(typeof prefs.review_limits_json === 'string'
+          ...(!viewerOnly && typeof prefs.review_limits_json === 'string'
             ? { reviewLimits: validateReviewLimits(JSON.parse(prefs.review_limits_json)) }
             : {}),
           updatedAt: prefs.updated_at as string,

@@ -6,6 +6,8 @@ import {
   setStorageAccount,
   storageKeys,
 } from '../storage/browser';
+import { canUseFeature } from '../access';
+import { basicSyncData } from './access';
 import { migrateLearnerHistory } from '../learner/migration';
 import {
   emptySync,
@@ -133,6 +135,7 @@ export async function refreshAccount() {
       emailEnabled: boolean;
     };
     if (ticket !== generation) return;
+    if (info.user?.plan !== status.user?.plan) lastSynced = null;
     if (info.user?.id !== storageAccount()) {
       lastSynced = null;
       // Freeze anonymous eligibility before switching. Declined data remains in its own namespace.
@@ -168,6 +171,7 @@ export async function refreshAccount() {
       lastSync: saved,
       state: info.user ? (skip ? status.state : 'syncing') : 'local',
       importPending:
+        canUseFeature(info.user?.plan, 'learning-sync') &&
         !!info.user &&
         !!readStorage('sync:import-candidate', null) &&
         !readStorage('sync:import-decision', null),
@@ -234,10 +238,11 @@ export async function synchronize() {
       cursor = page.nextCursor;
     } while (cursor);
     // Only the account namespace and explicitly accepted anonymous snapshot reach this point.
+    const upload = canUseFeature(status.user?.plan, 'learning-sync') ? data : basicSyncData(data);
     let pushed = false;
     for (const kind of syncCollections) {
       const byId = new Map(remote[kind].map((x) => [x.id, x]));
-      const changed = data[kind].filter(
+      const changed = upload[kind].filter(
         (x) => JSON.stringify(x) !== JSON.stringify(byId.get(x.id)),
       );
       for (let offset = 0; offset < changed.length; offset += 20) {
@@ -249,10 +254,10 @@ export async function synchronize() {
       }
     }
     if (
-      data.preferences &&
-      JSON.stringify(data.preferences) !== JSON.stringify(remote.preferences)
+      upload.preferences &&
+      JSON.stringify(upload.preferences) !== JSON.stringify(remote.preferences)
     ) {
-      await transport('/api/sync/push', { ...emptySync(), preferences: data.preferences });
+      await transport('/api/sync/push', { ...emptySync(), preferences: upload.preferences });
       pushed = true;
     }
     if (storageAccount() !== owner || ticket !== generation) return;
@@ -293,7 +298,7 @@ export async function synchronize() {
     saveCache(data);
     applying = true;
     try {
-      await hydrateSync(data);
+      await hydrateSync(data, canUseFeature(status.user?.plan, 'learning-sync'));
     } finally {
       applying = false;
     }

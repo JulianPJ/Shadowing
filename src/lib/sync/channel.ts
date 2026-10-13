@@ -1,4 +1,5 @@
 'use client';
+import { canUseFeature } from '../access';
 import { storageAccount } from '../storage/browser';
 import { syncStatus, subscribeSync } from './client';
 import { reportChannel, syncFailure, type SyncChannel } from './channel-status';
@@ -84,6 +85,8 @@ export function createSyncChannel(options: {
     // Signed-out data stays on this device. Unverified accounts cannot sync until they verify,
     // and asking anyway would surface a 403 as an expired session.
     if (!owner || user?.id !== owner || !user.emailVerified) return Promise.resolve();
+    if (options.channel !== 'discovery' && !canUseFeature(user.plan, 'learning-sync'))
+      return Promise.resolve();
     const active = running.get(owner);
     if (active) {
       queued.set(owner, force || (queued.get(owner) ?? false));
@@ -141,7 +144,7 @@ export function startChannels(channels: SyncChannelHandle[], pollMs = 60_000) {
   };
   const identityChanged = () => {
     const user = syncStatus().user;
-    const next = `${storageAccount() ?? ''}:${user?.id ?? ''}:${user?.emailVerified ?? false}`;
+    const next = `${storageAccount() ?? ''}:${user?.id ?? ''}:${user?.emailVerified ?? false}:${user?.plan ?? 'free'}`;
     if (next === identity) return;
     identity = next;
     each(true);

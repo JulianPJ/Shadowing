@@ -1,4 +1,5 @@
 'use client';
+import { ProFeatureNotice, useProAccess } from '../pro-feature';
 import { useState } from 'react';
 import {
   Mic,
@@ -72,6 +73,7 @@ export function CurrentSection({
   continuePractice,
   lastIndex,
 }: CurrentSectionProps) {
+  const { isPro } = useProAccess('vocabulary');
   const [lookup, setLookup] = useState<{ segmentId: string; term: string } | null>(() => {
     if (typeof window === 'undefined') return null;
     const query = new URLSearchParams(window.location.search);
@@ -144,11 +146,16 @@ export function CurrentSection({
           className={`icon-button favorite-button ${isFavorite ? 'saved' : ''}`}
           aria-label={isFavorite ? 'Unsave this section' : 'Save this section for practice'}
           aria-pressed={isFavorite}
+          disabled={!isPro}
+          title={!isPro ? 'Saving sentences requires Hibiki Pro' : undefined}
           onClick={toggleFavorite}
         >
           <Bookmark size={18} fill={isFavorite ? 'currentColor' : 'none'} />
         </button>
       </div>
+      {!isPro && !segment.translation ? (
+        <ProFeatureNotice feature="On-demand sentence translations" compact />
+      ) : null}
       {revealed ? (
         <div id="current-translation" className="current-translation" lang="en">
           <>

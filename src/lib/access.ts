@@ -2,16 +2,36 @@ import type { HibikiAuth } from './auth/server';
 import type { BillingEnvironment } from './billing/config';
 
 export type AccessPlan = 'free' | 'pro';
-export type ProFeature =
-  'ai-transcription' | 'shadowing-analysis' | 'quiz' | 'topic-vocabulary' | 'grammar-analysis';
-
-export const PRO_FEATURES: readonly ProFeature[] = [
+export const PRO_FEATURES = [
   'ai-transcription',
+  'translation',
   'shadowing-analysis',
   'quiz',
   'topic-vocabulary',
   'grammar-analysis',
-];
+  'difficulty',
+  'recording',
+  'advanced-practice',
+  'vocabulary',
+  'review',
+  'knowledge',
+  'progress',
+  'learning-sync',
+] as const;
+export type ProFeature = (typeof PRO_FEATURES)[number];
+
+/** One policy for browser controls and authenticated server operations. */
+export function canUseFeature(plan: AccessPlan | undefined, feature: ProFeature): boolean {
+  return plan === 'pro' && PRO_FEATURES.includes(feature);
+}
+
+/** Lookup is local/public; /api/dictionary stores personal learning data. */
+export function accountRouteFeature(path: string): ProFeature | null {
+  if (path === '/api/dictionary') return 'vocabulary';
+  if (path === '/api/review') return 'review';
+  if (path === '/api/knowledge') return 'knowledge';
+  return null;
+}
 
 export interface AccessRepository {
   plan(userId: string): Promise<AccessPlan>;

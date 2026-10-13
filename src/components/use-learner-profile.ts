@@ -10,12 +10,15 @@ import type { LearnerProfile } from '@/lib/learner-types';
 import { accountBookmarks } from '@/lib/sync/client';
 import { transcriptKey } from '@/lib/transcript';
 import { storageAccount } from '@/lib/storage/browser';
+import { useProAccess } from './pro-feature';
 
 export function useLearnerProfile() {
+  const { isPro } = useProAccess('progress');
   const [profile, setProfile] = useState<LearnerProfile | null>(null);
   const [available, setAvailable] = useState<string[]>([]);
   const [warning, setWarning] = useState(false);
   useEffect(() => {
+    if (!isPro) return;
     let active = true;
     let refreshing = false;
     let pending = false;
@@ -113,6 +116,10 @@ export function useLearnerProfile() {
       window.removeEventListener('hibiki:sync-hydrated', synced);
       window.removeEventListener('hibiki:account-change', accountChanged);
     };
-  }, []);
-  return { profile, available, warning };
+  }, [isPro]);
+  return {
+    profile: isPro ? profile : null,
+    available: isPro ? available : [],
+    warning: isPro && warning,
+  };
 }

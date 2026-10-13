@@ -1,4 +1,5 @@
 'use client';
+import { useProAccess } from './pro-feature';
 import { studyDay } from '@/lib/study-day';
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { storageAccount } from '@/lib/storage/browser';
@@ -42,16 +43,21 @@ export function usePracticeProgress(
   },
   readPlaybackTime: () => number,
 ) {
+  const { isPro } = useProAccess('progress');
   const scope = useSyncExternalStore(subscribeAccount, storageAccount, () => null);
   const initial = useRef(lesson);
   const mediaTime = useRef(readPlaybackTime);
   const controller = useRef<Controller | null>(null);
   const pending = useRef<((c: Controller) => void)[]>([]);
   const [warning, setWarning] = useState(false);
-  const send = useCallback((action: (c: Controller) => void) => {
-    if (controller.current) action(controller.current);
-    else pending.current.push(action);
-  }, []);
+  const send = useCallback(
+    (action: (c: Controller) => void) => {
+      if (!isPro) return;
+      if (controller.current) action(controller.current);
+      else pending.current.push(action);
+    },
+    [isPro],
+  );
   const signal = useCallback(
     (segment: Segment, kind: PracticeSignal) => send((c) => c.signal(segment, kind)),
     [send],
@@ -59,6 +65,7 @@ export function usePracticeProgress(
   const complete = useCallback(() => send((c) => c.complete()), [send]);
   const interact = useCallback(() => send((c) => c.interact()), [send]);
   useEffect(() => {
+    if (!isPro) return;
     let disposed = false,
       timer: ReturnType<typeof setInterval> | undefined,
       debounce: ReturnType<typeof setTimeout> | undefined;
@@ -228,7 +235,7 @@ export function usePracticeProgress(
       window.removeEventListener('hibiki:storage-warning', warningEvent);
       window.removeEventListener('hibiki:account-changing', accountChanging);
     };
-  }, [scope]);
+  }, [scope, isPro]);
   useEffect(() => {
     send((c) =>
       c.update({ playing: state.playing, recording: state.recording, excluded: state.excluded }),

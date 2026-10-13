@@ -1,4 +1,5 @@
 'use client';
+import { canUseFeature } from '@/lib/access';
 import { useEffect, useState } from 'react';
 import { useAccount } from './account';
 import { cachedReview, pendingReview, refreshReview } from '@/lib/review/client';
@@ -22,7 +23,7 @@ export function useReview() {
   const [error, setError] = useState('');
   useEffect(() => {
     const owner = account.user?.id;
-    if (!owner) return;
+    if (!owner || !canUseFeature(account.user?.plan, 'review')) return;
     let active = true;
     let settled = false;
     const update = () => {
@@ -58,8 +59,11 @@ export function useReview() {
       window.removeEventListener('hibiki:review-change', update);
       window.removeEventListener('storage', cross);
     };
-  }, [account.user?.id]);
-  const owned = loaded?.owner === account.user?.id ? loaded : null;
+  }, [account.user?.id, account.user?.plan]);
+  const owned =
+    canUseFeature(account.user?.plan, 'review') && loaded?.owner === account.user?.id
+      ? loaded
+      : null;
   return {
     data: owned?.data ?? emptyReview(),
     pending: owned?.pending ?? 0,

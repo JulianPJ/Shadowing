@@ -1,4 +1,5 @@
 'use client';
+import { ProFeatureNotice, useProAccess } from '../pro-feature';
 import { SlidersHorizontal } from 'lucide-react';
 import type { Dispatch, SetStateAction } from 'react';
 import type { Mode } from '@/lib/types';
@@ -45,11 +46,12 @@ export function PracticeSettings({
   onHandsFree: () => void;
   onStopTimed: () => void;
 }) {
+  const { isPro } = useProAccess('advanced-practice');
   const defaults = practicePreset(drill.preset);
   const customized = (['repeats', 'pause', 'reveal', 'responseSeconds'] as const).some(
     (key) => drill[key] !== defaults[key],
   );
-  const locked = mode === 'continuous' || recording || drillRunning;
+  const locked = !isPro || mode === 'continuous' || recording || drillRunning;
   function shift(delta: number) {
     stopAutomation();
     setPlaybackOffsetMs((value) =>
@@ -57,6 +59,7 @@ export function PracticeSettings({
     );
   }
   function update(patch: Partial<DrillSettings>) {
+    if (!isPro) return;
     stopAutomation();
     setDrill((current) => ({ ...current, ...patch }));
   }
@@ -72,8 +75,12 @@ export function PracticeSettings({
             onChange={(event) => selectPreset(event.target.value as PracticePreset)}
           >
             <option value="focus">Focus — listen, pause, repeat</option>
-            <option value="support">Support — meaning after a pause</option>
-            <option value="drill">Drill — listen twice, record</option>
+            <option value="support" disabled={!isPro}>
+              Support — meaning after a pause{!isPro ? ' · Pro' : ''}
+            </option>
+            <option value="drill" disabled={!isPro}>
+              Drill — listen twice, record{!isPro ? ' · Pro' : ''}
+            </option>
             <option value="continuous">Continuous — listen through</option>
           </select>
         </label>
@@ -119,6 +126,12 @@ export function PracticeSettings({
           <SlidersHorizontal size={15} aria-hidden="true" />
           Advanced settings{customized ? ' · Customized' : ''}
         </summary>
+        {!isPro ? (
+          <ProFeatureNotice
+            feature="Advanced presets, repeated play and timed speaking drills"
+            compact
+          />
+        ) : null}
         <div className="drill-advanced-fields">
           <label>
             Source repeats

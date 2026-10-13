@@ -28,7 +28,7 @@ async function open(context: BrowserContext, page: Page, initialLesson = lesson)
     .poll(() =>
       page.evaluate(() => JSON.parse(localStorage.getItem('hibiki:v1:active-account') ?? 'null')),
     )
-    .toBe('retention-free');
+    .toBe('retention-pro');
   await expect(page.getByRole('button', { name: 'Listen', exact: true })).toBeEnabled();
   await expect(page.locator('#current-japanese .lookup-token').first()).toBeVisible();
   return remote;
@@ -127,7 +127,7 @@ test('translation failure preserves Japanese context and add to review is duplic
   await expect.poll(() => remote.review.cards.length).toBe(1);
   expect(saves).toBe(1);
   const records = await page.evaluate(() =>
-    JSON.parse(localStorage.getItem('hibiki:v1:account:retention-free:knowledge:records') ?? '[]'),
+    JSON.parse(localStorage.getItem('hibiki:v1:account:retention-pro:knowledge:records') ?? '[]'),
   );
   expect(records).toEqual([expect.objectContaining({ lemma: '話せる', state: 'learning' })]);
 });

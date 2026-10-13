@@ -78,8 +78,8 @@ for (const plan of ['free', 'pro'] as const)
     await expect(recap.locator('.shadowing-completion')).toHaveCount(0);
     await expect(recap.getByRole('heading', { name: 'Worth another listen' })).toHaveCount(0);
     await expect(recap.getByRole('link', { name: 'Choose next lesson' })).toBeVisible();
-    await recap.getByText('Saved words and practice details', { exact: true }).click();
     if (plan === 'pro') {
+      await recap.getByText('Saved words and practice details', { exact: true }).click();
       // Essential vocabulary lives in the Vocabulary tab, not the completion recap.
       const tools = page.getByRole('navigation', { name: 'Lesson tools' });
       await tools.getByRole('button', { name: 'Vocabulary', exact: true }).click();
@@ -258,7 +258,7 @@ test('account switching clears word search while retaining isolated caches', asy
           email: 'another@example.com',
           name: 'Another learner',
           emailVerified: true,
-          plan: 'free',
+          plan: 'pro',
         },
         googleEnabled: false,
         emailEnabled: false,
@@ -276,9 +276,8 @@ test('account switching clears word search while retaining isolated caches', asy
   await expect(page.getByRole('heading', { name: 'No saved words yet.' })).toBeVisible();
   const records = await page.evaluate(() => ({
     previous: Object.keys(
-      JSON.parse(
-        localStorage.getItem('hibiki:v1:account:retention-free:dictionary:entries') ?? '{}',
-      ).records ?? {},
+      JSON.parse(localStorage.getItem('hibiki:v1:account:retention-pro:dictionary:entries') ?? '{}')
+        .records ?? {},
     ),
     current: Object.keys(
       JSON.parse(

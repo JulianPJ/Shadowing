@@ -5,6 +5,7 @@ import type { Lesson, Mode, Segment } from '@/lib/types';
 import { timestamp } from '@/lib/youtube';
 import { JapaneseText } from '../japanese-text';
 import { DictionarySavePanel } from '../dictionary-save';
+import { useProAccess } from '../pro-feature';
 type TranscriptProps = {
   lesson: Lesson;
   index: number;
@@ -33,6 +34,7 @@ export const TranscriptPanel = memo(function TranscriptPanel({
   onClearRecommendations,
   hidden = false,
 }: TranscriptProps) {
+  const { isPro } = useProAccess('vocabulary');
   const [search, setSearch] = useState('');
   const [onlyFavorites, setOnlyFavorites] = useState(false);
   const transcript = useRef<HTMLDivElement>(null);
@@ -56,11 +58,11 @@ export const TranscriptPanel = memo(function TranscriptPanel({
       .map((s, n) => ({ segment: s, index: n }))
       .filter(
         (item) =>
-          (!onlyFavorites || savedIds.has(item.segment.id)) &&
+          (!isPro || !onlyFavorites || savedIds.has(item.segment.id)) &&
           (!recommendedSegmentIds || recommendedSegmentIds.has(item.segment.id)) &&
           (!search || item.segment.japanese.includes(phrase)),
       );
-  }, [lesson.segments, onlyFavorites, savedIds, search, recommendedSegmentIds]);
+  }, [lesson.segments, onlyFavorites, savedIds, search, recommendedSegmentIds, isPro]);
   useEffect(() => {
     const row = activeRow.current;
     const container = transcript.current;
@@ -111,8 +113,12 @@ export const TranscriptPanel = memo(function TranscriptPanel({
         <button
           className={`icon-button ${onlyFavorites ? 'saved' : ''}`}
           aria-label={onlyFavorites ? 'Show all sections' : 'Show saved sections'}
-          aria-pressed={onlyFavorites}
-          onClick={() => setOnlyFavorites(!onlyFavorites)}
+          aria-pressed={isPro && onlyFavorites}
+          disabled={!isPro}
+          title={!isPro ? 'Saved sentences require Hibiki Pro' : undefined}
+          onClick={() => {
+            if (isPro) setOnlyFavorites(!onlyFavorites);
+          }}
         >
           <Bookmark size={16} fill={onlyFavorites ? 'currentColor' : 'none'} />
         </button>

@@ -75,26 +75,22 @@ test('saved-word search and empty results have recovery and revision-aware conte
   expect(remote.entries).toHaveLength(1);
 });
 
-test('other marked words remain editable without a saved review card', async ({ page }) => {
+test('anonymous word management preserves cached words behind a Pro notice', async ({ page }) => {
   await page.route('**/api/account/me', (route) =>
     route.fulfill({ json: { user: null, googleEnabled: false, emailEnabled: false } }),
   );
-  await page.addInitScript(() => {
-    if (localStorage.getItem('hibiki:v1:knowledge:records')) return;
+  await page.addInitScript(() =>
     localStorage.setItem(
       'hibiki:v1:knowledge:records',
-      JSON.stringify([
-        { lemma: '食べる', reading: 'たべる', state: 'known', updatedAt: new Date().toISOString() },
-      ]),
-    );
-  });
+      JSON.stringify([{ lemma: '???', state: 'known' }]),
+    ),
+  );
   await page.goto('/words');
-  await expect(page.getByRole('heading', { name: 'Other words you’ve marked' })).toBeVisible();
-  await page.getByLabel('Status for 食べる').selectOption('learning');
-  await page.reload();
-  await expect(page.getByLabel('Status for 食べる')).toHaveValue('learning');
-  await page.getByLabel('Status for 食べる').selectOption('ignored');
-  await expect(page.getByLabel('Status for 食べる')).toHaveValue('ignored');
-  await page.getByLabel('Status for 食べる').selectOption('unknown');
-  await expect(page.getByLabel('Status for 食べる')).toHaveCount(0);
+  await expect(
+    page.getByText('Saved vocabulary and word management is a Hibiki Pro feature.'),
+  ).toBeVisible();
+  await expect(page.getByLabel('Status for ???')).toHaveCount(0);
+  expect(await page.evaluate(() => localStorage.getItem('hibiki:v1:knowledge:records'))).toContain(
+    '???',
+  );
 });

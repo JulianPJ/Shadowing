@@ -49,7 +49,7 @@ test('display defaults, lazy assets, Studio playback continuity, navigation and 
   await expect(offset).toHaveText('+350 ms');
   await expect(page.getByLabel('Practice preset', { exact: true })).toHaveValue('continuous');
   expect(assets).toEqual([]);
-  await page.getByRole('button', { name: 'Save this section for practice' }).click();
+  await expect(page.getByRole('button', { name: 'Save this section for practice' })).toBeDisabled();
   await page.getByRole('button', { name: 'Play', exact: true }).click();
   await expect
     .poll(() => page.locator('video').evaluate((v: HTMLVideoElement) => v.currentTime))
@@ -98,10 +98,7 @@ test('display defaults, lazy assets, Studio playback continuity, navigation and 
   await studio(page).click();
   await expect(page.locator('.practice-main')).not.toHaveClass(/studio-mode/);
   expect(await page.locator('video').evaluate((v: HTMLVideoElement) => v.currentTime)).toBe(paused);
-  await expect(page.getByRole('button', { name: 'Unsave this section' })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
+  await expect(page.getByRole('button', { name: 'Save this section for practice' })).toBeDisabled();
   await studio(page).click();
   await page.getByRole('link', { name: 'Your practice', exact: true }).click();
   await page.goto('/practice/demo');
@@ -278,6 +275,7 @@ test('layout toggles preserve in-progress recording and recorded A/B audio', asy
   page,
   context,
 }) => {
+  await mockProAccount(page);
   await context.grantPermissions(['microphone']);
   await open(page);
   await page.getByRole('button', { name: 'Record yourself', exact: true }).click();
@@ -296,6 +294,7 @@ test('layout toggles preserve in-progress recording and recorded A/B audio', asy
 test('Studio desktop/mobile/tablet, long ruby text, translations and screenshots', async ({
   page,
 }) => {
+  await mockProAccount(page);
   await open(page);
   await page.screenshot({ path: 'artifacts/normal-desktop.png', fullPage: true });
   await studio(page).click();

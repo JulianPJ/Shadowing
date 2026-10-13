@@ -1,3 +1,4 @@
+import { mockProAccount } from '../helpers/pro-account';
 import { expect, test, type Page } from '@playwright/test';
 import type { Lesson } from '../../src/lib/types';
 import source from '../../scripts/lexicon-source.json' with { type: 'json' };
@@ -41,7 +42,7 @@ async function anonymous(page: Page) {
   );
 }
 async function seed(page: Page) {
-  await anonymous(page);
+  await mockProAccount(page);
   await page.addInitScript(
     ({ first, second }) => {
       if (localStorage.getItem('adaptive-seeded')) return;
@@ -61,7 +62,7 @@ async function seed(page: Page) {
         ]),
       );
       localStorage.setItem(
-        'hibiki:v1:knowledge:records',
+        'hibiki:v1:account:e2e-pro-account:knowledge:records',
         JSON.stringify(
           ['魚', '食べる', '家', '寝る', 'が'].map((lemma) => ({
             lemma,
@@ -108,11 +109,12 @@ test('full Japanese lexicon loads real readings, senses and deinflection without
   await expect(lookup).toContainText('to eat');
   await expect(lookup).toContainText('Ichidan verb');
   await expect(lookup).not.toContainText('CC BY-SA 4.0');
-  await lookup.getByRole('button', { name: 'Known', exact: true }).click();
-  await page.goto('/words');
-  await expect(page.getByLabel('Status for 食べる')).toHaveValue('known');
-  await page.reload();
-  await expect(page.getByLabel('Status for 食べる')).toHaveValue('known');
+  await expect(lookup.getByRole('button', { name: 'Known', exact: true })).toHaveCount(0);
+  await expect(
+    lookup.getByText(
+      'Saving words and sentences, review and word statuses is a Hibiki Pro feature.',
+    ),
+  ).toBeVisible();
   await page.goto('/practice/adaptive-lexicon?section=cat-sleeps');
   await page.locator('#current-japanese .lookup-token').first().click();
   await expect(lookup).toContainText('しんしゃく');
@@ -191,15 +193,15 @@ test('word states highlight across lessons and update coverage, bulk status and 
   );
 });
 
-test('Free account knowledge survives offline edits and replays its durable outbox', async ({
+test('Pro account knowledge survives offline edits and replays its durable outbox', async ({
   page,
   context,
 }) => {
-  await connect(context, 'free');
+  await connect(context, 'pro');
   let offline = true;
   const remote = new Map<string, WordKnowledgeRecord>();
   await context.route('**/api/knowledge*', (route) => {
-    expect(route.request().headers()['x-hibiki-account']).toBe('retention-free');
+    expect(route.request().headers()['x-hibiki-account']).toBe('retention-pro');
     if (offline) return route.fulfill({ status: 503, json: { error: 'offline' } });
     if (route.request().method() === 'POST') {
       for (const record of route.request().postDataJSON().records) remote.set(record.lemma, record);
@@ -217,7 +219,7 @@ test('Free account knowledge survives offline edits and replays its durable outb
       page.evaluate(
         () =>
           JSON.parse(
-            localStorage.getItem('hibiki:v1:account:retention-free:knowledge:outbox') ?? '[]',
+            localStorage.getItem('hibiki:v1:account:retention-pro:knowledge:outbox') ?? '[]',
           ).length,
       ),
     )
@@ -233,7 +235,7 @@ test('Free account knowledge survives offline edits and replays its durable outb
       page.evaluate(
         () =>
           JSON.parse(
-            localStorage.getItem('hibiki:v1:account:retention-free:knowledge:outbox') ?? '[]',
+            localStorage.getItem('hibiki:v1:account:retention-pro:knowledge:outbox') ?? '[]',
           ).length,
       ),
     )

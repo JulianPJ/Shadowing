@@ -4,12 +4,16 @@ import { loadLesson } from '../storage/lessons';
 import { loadKnowledge } from '../knowledge/client';
 import { transcriptKey } from '../transcript';
 import type { Video } from './types';
+import { canUseFeature } from '../access';
+import { syncStatus } from '../sync/client';
 /** Refine already-rendered recommendations only when this device has matching prepared content. */
 export async function localVocabularyFit(
   videos: Video[],
   signal: AbortSignal,
 ): Promise<Record<string, number>> {
   const owner = storageAccount();
+  const allowed = () => canUseFeature(syncStatus().user?.plan, 'knowledge');
+  if (!allowed()) return {};
   if (Object.keys(loadKnowledge()).length < 5) return {};
   const candidates = videos
     .slice(0, 24)
@@ -27,7 +31,7 @@ export async function localVocabularyFit(
   const { lessonVocabulary } = await import('../knowledge/lesson');
   const result: Record<string, number> = {};
   for (const { video, lesson } of candidates) {
-    if (signal.aborted || owner !== storageAccount()) return {};
+    if (signal.aborted || owner !== storageAccount() || !allowed()) return {};
     if ((await transcriptKey(lesson)) !== video.proof!.transcriptKey) continue;
     const analysis = await lessonVocabulary(lesson);
     if (
@@ -38,5 +42,5 @@ export async function localVocabularyFit(
     )
       result[video.videoId] = analysis.knownPercent;
   }
-  return !signal.aborted && owner === storageAccount() ? result : {};
+  return !signal.aborted && owner === storageAccount() && allowed() ? result : {};
 }

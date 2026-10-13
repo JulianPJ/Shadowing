@@ -1,4 +1,5 @@
 'use client';
+import { ProFeatureNotice, useProAccess } from './pro-feature';
 import { useEffect, useState } from 'react';
 import { Target } from 'lucide-react';
 import { readStorage, writeStorage } from '@/lib/storage/browser';
@@ -16,6 +17,14 @@ import {
 } from '@/lib/reports/weekly';
 
 export function WeeklyReport() {
+  const { isPro } = useProAccess('progress');
+  return isPro ? (
+    <WeeklyReportContent />
+  ) : (
+    <ProFeatureNotice feature="Weekly reports and daily goals" />
+  );
+}
+function WeeklyReportContent() {
   const [report, setReport] = useState<Report | null>(null);
   const [goal, setGoal] = useState<Goal>({ version: 1, minutes: null });
   const [minutes, setMinutes] = useState('5');

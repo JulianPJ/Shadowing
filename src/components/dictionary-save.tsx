@@ -1,4 +1,5 @@
 'use client';
+import { ProFeatureNotice, useProAccess } from './pro-feature';
 import Link from 'next/link';
 import { BookPlus, Check, LoaderCircle, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -94,7 +95,8 @@ function DictionarySaveContent({
   const sentenceTouched = useRef(false);
   const closeButton = useRef<HTMLButtonElement>(null);
   const panel = useRef<HTMLElement>(null);
-  const verified = !!account.user?.emailVerified;
+  const { isPro } = useProAccess('vocabulary');
+  const verified = isPro && !!account.user?.emailVerified;
   const status = states[normalizeLemma(lemma)]?.state ?? 'unknown';
   const inReview = !!saved && !!activeCard(saved.id, review.data.cards);
 
@@ -208,6 +210,7 @@ function DictionarySaveContent({
   }
 
   function setStatus(state: WordState) {
+    if (!isPro) return;
     setError('');
     try {
       if (state === 'known' && saved) markWordKnown(saved);
@@ -295,40 +298,44 @@ function DictionarySaveContent({
         <p lang="ja">{segment.japanese}</p>
         {sentenceMeaning ? <p>{sentenceMeaning}</p> : null}
       </div>
-      <div className="word-actions" role="group" aria-label={`Status for ${lemma}`}>
-        {verified ? (
-          inReview ? (
-            <span className="word-status in-review">
-              <Check size={15} /> In review
-            </span>
-          ) : (
-            <button
-              className="button primary"
-              disabled={saving || !translation.trim()}
-              onClick={() => void addToReview()}
-            >
-              <BookPlus size={15} />
-              {saving ? 'Saving…' : saved ? 'Learn again' : 'Add to review'}
-            </button>
-          )
-        ) : null}
-        <button
-          className="button small-button"
-          aria-pressed={status === 'known'}
-          onClick={() => setStatus(status === 'known' && !saved ? 'unknown' : 'known')}
-        >
-          Known
-        </button>
-        <button
-          className="button small-button"
-          aria-pressed={status === 'ignored'}
-          onClick={() => setStatus(status === 'ignored' ? 'unknown' : 'ignored')}
-        >
-          Ignore
-        </button>
-      </div>
-      {statusNote[status] ? <p className="small muted">{statusNote[status]}</p> : null}
-      {!account.user ? (
+      {isPro ? (
+        <div className="word-actions" role="group" aria-label={`Status for ${lemma}`}>
+          {verified ? (
+            inReview ? (
+              <span className="word-status in-review">
+                <Check size={15} /> In review
+              </span>
+            ) : (
+              <button
+                className="button primary"
+                disabled={saving || !translation.trim()}
+                onClick={() => void addToReview()}
+              >
+                <BookPlus size={15} />
+                {saving ? 'Saving…' : saved ? 'Learn again' : 'Add to review'}
+              </button>
+            )
+          ) : null}
+          <button
+            className="button small-button"
+            aria-pressed={status === 'known'}
+            onClick={() => setStatus(status === 'known' && !saved ? 'unknown' : 'known')}
+          >
+            Known
+          </button>
+          <button
+            className="button small-button"
+            aria-pressed={status === 'ignored'}
+            onClick={() => setStatus(status === 'ignored' ? 'unknown' : 'ignored')}
+          >
+            Ignore
+          </button>
+        </div>
+      ) : (
+        <ProFeatureNotice feature="Saving words and sentences, review and word statuses" compact />
+      )}
+      {isPro && statusNote[status] ? <p className="small muted">{statusNote[status]}</p> : null}
+      {!isPro ? null : !account.user ? (
         <p className="dictionary-signin small">
           <Link
             href={authPath(
@@ -399,7 +406,7 @@ function DictionarySaveContent({
           {error}
         </p>
       ) : null}
-      {saved ? (
+      {isPro && saved ? (
         <Link className="text-button" href="/words">
           View your words
         </Link>

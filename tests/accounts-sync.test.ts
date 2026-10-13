@@ -25,6 +25,9 @@ import demoQuiz from '../src/data/demo-quiz.json';
 import type { D1Database } from '../src/lib/d1';
 import type { Lesson } from '../src/lib/types';
 import { createD1AccessRepository, requirePro } from '../src/lib/access';
+import { createD1DictionaryRepository } from '../src/lib/dictionary/repository';
+import { createD1ReviewRepository } from '../src/lib/review/repository';
+import { D1KnowledgeRepository } from '../src/lib/knowledge/repository';
 const env = {
   AUTH_SECRET: 'deterministic-test-secret-at-least-32-characters',
   AUTH_BASE_URL: 'https://hibiki.example',
@@ -257,6 +260,55 @@ test('entitlements default Free, expose Pro from D1, and guard paid server route
     403,
   );
   assert.equal(await requirePro(request('/api/quiz', undefined, cookieA), auth, access), null);
+});
+
+test('downgrade denies paid reads and writes without deleting D1 data; personal export and resubscription restore it', async () => {
+  const dictionary = createD1DictionaryRepository(db);
+  const review = createD1ReviewRepository(db);
+  const knowledge = new D1KnowledgeRepository(db);
+  const handler = accountHandler({
+    auth,
+    progress: repo,
+    env,
+    db,
+    access,
+    dictionary,
+    review,
+    knowledge,
+  });
+  await repo.push(userA, data);
+  await knowledge.apply(userA, [
+    { lemma: '日本語', reading: 'にほんご', state: 'known', updatedAt: new Date().toISOString() },
+  ]);
+  const before = await repo.bootstrap(userA);
+  const words = await knowledge.page(userA);
+  await db.prepare("UPDATE user_access SET plan='free' WHERE user_id=?").bind(userA).run();
+  try {
+    for (const path of ['/api/dictionary', '/api/review', '/api/knowledge']) {
+      assert.equal((await handler(request(path, undefined, cookieA))).status, 403);
+      assert.equal(
+        (await handler(request(path, { action: 'delete', id: 'anything' }, cookieA))).status,
+        403,
+      );
+    }
+    assert.equal((await handler(request('/api/sync/push', data, cookieA))).status, 403);
+    const free = await (await handler(request('/api/sync/bootstrap', undefined, cookieA))).json();
+    assert.deepEqual(free.data.sessions, []);
+    assert.deepEqual(free.data.attempts, []);
+    assert.equal((await handler(request('/api/account/me', undefined, cookieA))).status, 200);
+    const exported = await (
+      await handler(request('/api/account/export', undefined, cookieA))
+    ).json();
+    assert.deepEqual(exported.learning.sessions, before.data.sessions);
+    assert.deepEqual(exported.wordStates, words.records);
+    assert.deepEqual(await repo.bootstrap(userA), before);
+    assert.deepEqual(await knowledge.page(userA).then((p) => p.records), words.records);
+  } finally {
+    await db.prepare("UPDATE user_access SET plan='pro' WHERE user_id=?").bind(userA).run();
+  }
+  assert.equal((await handler(request('/api/knowledge', undefined, cookieA))).status, 200);
+  const restored = await (await handler(request('/api/sync/bootstrap', undefined, cookieA))).json();
+  assert.deepEqual(restored.data, before.data);
 });
 
 test('native D1 retains bounded review limits across preference writes from two client versions', async () => {

@@ -10,13 +10,20 @@ import { lessonIdentity } from '../../src/lib/learner/constants';
 import type { Lesson } from '../../src/lib/types';
 import { mockProAccount } from '../helpers/pro-account';
 
+test.beforeEach(async ({ context }) => {
+  await mockProAccount(context);
+});
+
 async function openDemo(page: Page) {
   await page.goto('/practice/demo');
   await expect(page.getByRole('button', { name: 'Listen', exact: true })).toBeEnabled();
 }
 async function history(page: Page) {
   return page.evaluate(() =>
-    JSON.parse(localStorage.getItem('hibiki:v1:learner-history') ?? '{"sessions":[]}'),
+    JSON.parse(
+      localStorage.getItem('hibiki:v1:account:e2e-pro-account:learner-history') ??
+        '{"sessions":[]}',
+    ),
   );
 }
 async function progress(page: Page) {
@@ -50,9 +57,12 @@ test('progress observes the latest bookmark state after a burst of writes in ano
   await peer.evaluate(
     (ids) => {
       for (let n = 0; n < 30; n++) {
-        localStorage.setItem('hibiki:v1:favorites:demo', JSON.stringify(n % 2 ? [] : [ids[0]]));
+        localStorage.setItem(
+          'hibiki:v1:account:e2e-pro-account:favorites:demo',
+          JSON.stringify(n % 2 ? [] : [ids[0]]),
+        );
       }
-      localStorage.setItem('hibiki:v1:favorites:demo', JSON.stringify(ids));
+      localStorage.setItem('hibiki:v1:account:e2e-pro-account:favorites:demo', JSON.stringify(ids));
     },
     demo.segments.slice(0, 2).map((s) => s.id),
   );
@@ -63,7 +73,7 @@ test('empty progress is calm, mobile and does not fabricate lesson activity', as
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/progress');
   await expect(page.getByRole('heading', { name: 'A little practice starts here.' })).toBeVisible();
-  await expect(page.locator('.progress-intro')).toContainText('Saved on this device');
+  await expect(page.locator('.progress-intro')).toContainText('Synced with your account');
   expect((await history(page)).sessions).toHaveLength(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
@@ -194,7 +204,9 @@ test('later visits create independent sessions and metadata survives missing les
   await page.getByRole('button', { name: 'Replay R' }).click();
   await progress(page);
   await page.evaluate(() => {
-    const h = JSON.parse(localStorage.getItem('hibiki:v1:learner-history')!);
+    const h = JSON.parse(
+      localStorage.getItem('hibiki:v1:account:e2e-pro-account:learner-history')!,
+    );
     for (const s of h.sessions) {
       if (s.origin === 'practice') {
         s.startedAt = '2026-01-01T00:00:00.000Z';
@@ -202,7 +214,7 @@ test('later visits create independent sessions and metadata survives missing les
         s.endedAt = s.startedAt;
       }
     }
-    localStorage.setItem('hibiki:v1:learner-history', JSON.stringify(h));
+    localStorage.setItem('hibiki:v1:account:e2e-pro-account:learner-history', JSON.stringify(h));
   });
   await page.goto('/practice/demo');
   await page.getByRole('button', { name: 'Replay R' }).click();
@@ -217,9 +229,11 @@ test('later visits create independent sessions and metadata survives missing les
   );
   s.completed = true;
   await page.evaluate((s) => {
-    const h = JSON.parse(localStorage.getItem('hibiki:v1:learner-history')!);
+    const h = JSON.parse(
+      localStorage.getItem('hibiki:v1:account:e2e-pro-account:learner-history')!,
+    );
     h.sessions.push(s);
-    localStorage.setItem('hibiki:v1:learner-history', JSON.stringify(h));
+    localStorage.setItem('hibiki:v1:account:e2e-pro-account:learner-history', JSON.stringify(h));
   }, s);
   await page.reload();
   await expect(page.locator('.progress-list')).toContainText(['Earlier practice']);
@@ -247,7 +261,7 @@ test('five practised unique analyzed lessons produce typical content and later a
       if (localStorage.getItem('seeded')) return;
       localStorage.setItem('seeded', 'yes');
       localStorage.setItem(
-        'hibiki:v1:learner-history',
+        'hibiki:v1:account:e2e-pro-account:learner-history',
         JSON.stringify({
           schemaVersion: 1,
           migrationVersion: 1,
@@ -285,7 +299,7 @@ test('checkpointing is incremental, bounded and excludes a quiz/analysis wait', 
     let count = 0;
     Object.defineProperty(window, '__progressWrites', { get: () => count });
     Storage.prototype.setItem = function (k, v) {
-      if (k === 'hibiki:v1:learner-history') count++;
+      if (k === 'hibiki:v1:account:e2e-pro-account:learner-history') count++;
       return original.call(this, k, v);
     };
   });

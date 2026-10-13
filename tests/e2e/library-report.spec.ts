@@ -135,6 +135,7 @@ test('anonymous queue and goals stay separate from the signed-in account', async
 test('weekly report uses genuine local evidence and a calm goal survives reload on mobile', async ({
   page,
 }) => {
+  await mockProAccount(page);
   const now = new Date().toISOString();
   const session = createSession(
     lessonIdentity(demo as Lesson, await transcriptKey(demo as Lesson)),
@@ -149,7 +150,7 @@ test('weekly report uses genuine local evidence and a calm goal survives reload 
       localStorage.setItem('report-seeded', 'yes');
       session.localActiveByDay = { [new Date().toLocaleDateString('en-CA')]: 360 };
       localStorage.setItem(
-        'hibiki:v1:learner-history',
+        'hibiki:v1:account:e2e-pro-account:learner-history',
         JSON.stringify({
           schemaVersion: 1,
           migrationVersion: 1,
@@ -159,14 +160,14 @@ test('weekly report uses genuine local evidence and a calm goal survives reload 
         }),
       );
       localStorage.setItem(
-        'hibiki:v1:review:history',
+        'hibiki:v1:account:e2e-pro-account:review:history',
         JSON.stringify([
           { operationId: 'report-a', entryId: 'word-a', grade: 'good', reviewedAt: now },
           { operationId: 'report-b', entryId: 'word-b', grade: 'again', reviewedAt: now },
         ]),
       );
       localStorage.setItem(
-        'hibiki:v1:knowledge:records',
+        'hibiki:v1:account:e2e-pro-account:knowledge:records',
         JSON.stringify([{ lemma: '朝', reading: 'アサ', state: 'known', updatedAt: now }]),
       );
     },

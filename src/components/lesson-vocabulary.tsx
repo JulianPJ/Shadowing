@@ -1,4 +1,5 @@
 'use client';
+import { ProFeatureNotice, useProAccess } from './pro-feature';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import type { Lesson } from '@/lib/types';
@@ -19,9 +20,14 @@ export function LessonVocabulary({
   onFilter?: (segmentIds: string[] | null) => void;
   filterActive?: boolean;
 }) {
+  const { isPro } = useProAccess('knowledge');
   // Essential vocabulary analyses the whole transcript, so it starts when the tab is first opened.
   const [opened, setOpened] = useState(active);
   if (active && !opened) setOpened(true);
+  if (!isPro)
+    return (
+      <ProFeatureNotice feature="Essential vocabulary, word coverage and practice recommendations" />
+    );
   return (
     <>
       {opened ? (

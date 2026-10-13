@@ -1,4 +1,5 @@
 'use client';
+import { ProFeatureNotice, useProAccess } from './pro-feature';
 import { useLearnerProfile } from './use-learner-profile';
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
@@ -41,6 +42,20 @@ const sourceNames = {
 
 /** Profile: this week, recent lessons and moments to revisit, then account settings. */
 export function LearnerProgress() {
+  const { isPro } = useProAccess('progress');
+  return isPro ? (
+    <LearnerProgressContent />
+  ) : (
+    <main className="progress-main">
+      <TaskReturn />
+      <h1>Your progress</h1>
+      <SubscriptionOffer />
+      <ProFeatureNotice feature="Detailed learning progress, weekly reports and daily goals" />
+      <AccountSettings />
+    </main>
+  );
+}
+function LearnerProgressContent() {
   const account = useAccount();
   const { profile, available, warning } = useLearnerProfile();
   const resumable = profile?.lessons.find((l) => available.includes(identityKey(l.lesson)));

@@ -61,6 +61,11 @@ and audio.
   signature-verified subscription/refund webhooks, and paid expiry projected into the existing
   account/access row. Manual/test Pro grants remain independent. Sandbox is the default and
   checkout is disabled pending configuration; no live billing activation ([setup](docs/paddle-billing.md)).
+- **Access:** Free is the immersion viewer (Discover, Watch Later, imports/captions, transcript,
+  dictionary lookup and manual replay); Pro adds all existing active learning, recording/drills,
+  generated translations/analysis, vocabulary/review, detailed progress and learning sync.
+  Free accounts retain viewer/Watch Later sync, billing and raw personal-data export. Downgrades
+  preserve records; price amounts still come from Paddle ([entitlements](docs/entitlements.md)).
 
 ## Architecture
 

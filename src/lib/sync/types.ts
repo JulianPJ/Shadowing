@@ -86,7 +86,7 @@ export const emptySync = (): SyncData => ({
 export type SyncPage = { data: SyncData; nextCursor: string | null };
 export interface UserProgressRepository {
   lesson(userId: string, id: string): Promise<SyncedLesson | null>;
-  bootstrap(userId: string, cursor?: string | null): Promise<SyncPage>;
+  bootstrap(userId: string, cursor?: string | null, viewerOnly?: boolean): Promise<SyncPage>;
   push(userId: string, data: SyncData): Promise<void>;
 }
 export type AccountUser = {

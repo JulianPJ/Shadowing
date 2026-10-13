@@ -169,8 +169,9 @@ export function BillingSettings({
             </span>
             <h2 id="billing-title">Your subscription</h2>
             <p>
-              You’re on Hibiki Free. Upgrade for comprehension checks, essential vocabulary,
-              auto-generated subtitles and Shadowing Match.
+              You’re on Hibiki Free. Upgrade for recording, advanced drills, saved vocabulary and
+              review, learning progress, translations, comprehension checks, essential vocabulary,
+              detailed difficulty, auto-generated subtitles and Shadowing Match.
             </p>
           </div>
           <button className="button primary billing-offer-button" onClick={() => setOpen(true)}>

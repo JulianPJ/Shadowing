@@ -12,7 +12,7 @@ const user = (id: string, emailVerified = true): AccountUser => ({
   name: 'Learner',
   email: `${id}@example.com`,
   emailVerified,
-  plan: 'free',
+  plan: 'pro',
 });
 function deferred<T = void>() {
   let resolve!: (value: T) => void;

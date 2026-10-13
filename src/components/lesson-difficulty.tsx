@@ -1,4 +1,5 @@
 'use client';
+import { ProFeatureNotice, useProAccess } from './pro-feature';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import {
   calculateSpeechSpeed,
@@ -18,6 +19,8 @@ export const LessonDifficulty = memo(function LessonDifficulty({
   lesson: Lesson;
   onWaitingChange?: (waiting: boolean) => void;
 }) {
+  const { isPro } = useProAccess('difficulty');
+  if (!isPro) return <ProFeatureNotice feature="Detailed lesson difficulty analysis" />;
   return (
     <DifficultyCard
       key={`${lesson.id}:${transcriptRevision(lesson)}`}

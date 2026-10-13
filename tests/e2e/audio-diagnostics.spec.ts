@@ -1,4 +1,9 @@
+import { mockProAccount } from '../helpers/pro-account';
 import { expect, test, type Page } from '@playwright/test';
+
+test.beforeEach(async ({ context }) => {
+  await mockProAccount(context);
+});
 
 async function recordDemo(page: Page) {
   await page.goto('/');

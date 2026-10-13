@@ -6,6 +6,7 @@ import { loadKnowledge, knowledgePending } from '@/lib/knowledge/client';
 import { lessonTokens } from '@/lib/knowledge/lesson';
 import { analyzeVocabulary } from '@/lib/knowledge/analysis';
 import type { KnowledgeStates } from '@/lib/knowledge/types';
+import { useProAccess } from './pro-feature';
 
 const empty = { states: {} as KnowledgeStates, pending: 0 };
 const emptyTokens: Record<string, readonly MorphologicalToken[]> = {};
@@ -46,9 +47,10 @@ function currentKnowledge() {
 }
 const disabledSubscribe = () => () => {};
 export function useWordKnowledge(enabled = true) {
+  const { isPro } = useProAccess('knowledge');
   return useSyncExternalStore(
-    enabled ? subscribeKnowledge : disabledSubscribe,
-    enabled ? currentKnowledge : () => empty,
+    enabled && isPro ? subscribeKnowledge : disabledSubscribe,
+    enabled && isPro ? currentKnowledge : () => empty,
     () => empty,
   );
 }

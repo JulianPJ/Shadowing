@@ -1,3 +1,4 @@
+import { mockProAccount } from '../helpers/pro-account';
 import { expect, test, type Page } from '@playwright/test';
 import demo from '../../src/data/demo.json' with { type: 'json' };
 
@@ -87,6 +88,7 @@ for (const offset of [0, 0.4]) {
 test('timed continuation plays the gap instead of seeking to the next subtitle', async ({
   page,
 }) => {
+  await mockProAccount(page);
   await openLesson(page);
   await page.getByText('Advanced settings', { exact: true }).click();
   await page.getByLabel('Section pause behavior').selectOption('timed');

@@ -7,7 +7,16 @@ import { verifyAttempt } from './quiz-verification';
 import { restorePublicLesson } from './restore-lesson';
 import type { DictionaryRepository } from '../dictionary/types';
 import { handleDictionaryRequest } from '../dictionary/server';
-import { freeAccess, type AccessRepository } from '../access';
+import {
+  accountRouteFeature,
+  canUseFeature,
+  freeAccess,
+  proRequiredResponse,
+  type AccessRepository,
+} from '../access';
+import { emptySync } from './types';
+import { basicSyncData, hasLearningData } from './access';
+import { mergeSync } from './merge';
 import type { ReviewRepository } from '../review/types';
 import { handleReviewRequest } from '../review/server';
 import type { KnowledgeRepository } from '../knowledge/types';
@@ -87,6 +96,32 @@ export function accountHandler({
           discoverDb,
         );
       }
+      // Account/export and basic library sync remain Free. Never trust a browser's plan.
+      const feature = accountRouteFeature(url.pathname);
+      const plan =
+        feature || url.pathname.startsWith('/api/sync/') ? await access.plan(userId) : 'free';
+      if (feature && !canUseFeature(plan, feature)) return proRequiredResponse();
+      if (url.pathname === '/api/account/export' && request.method === 'GET') {
+        let cursor: string | null = null;
+        let learning = emptySync();
+        do {
+          const page = await repository.bootstrap(userId, cursor);
+          learning = mergeSync(learning, page.data);
+          cursor = page.nextCursor;
+        } while (cursor);
+        const wordStates = [];
+        do {
+          const page = await knowledge?.page(userId, cursor);
+          wordStates.push(...(page?.records ?? []));
+          cursor = page?.nextCursor ?? null;
+        } while (cursor);
+        return respond({
+          learning,
+          vocabulary: (await dictionary?.list(userId)) ?? [],
+          review: (await review?.snapshot(userId)) ?? null,
+          wordStates,
+        });
+      }
       if (url.pathname === '/api/dictionary') {
         if (!dictionary) return respond({ error: 'Dictionary storage unavailable' }, 503);
         return handleDictionaryRequest(request, userId, session.user.emailVerified, dictionary);
@@ -109,11 +144,20 @@ export function accountHandler({
           : respond({ error: 'Reattach media and transcript on this device to resume.' }, 404);
       }
       if (url.pathname === '/api/sync/bootstrap' && request.method === 'GET') {
-        return respond(await repository.bootstrap(userId, url.searchParams.get('cursor')));
+        const page = await repository.bootstrap(
+          userId,
+          url.searchParams.get('cursor'),
+          !canUseFeature(plan, 'learning-sync'),
+        );
+        if (!canUseFeature(plan, 'learning-sync')) page.data = basicSyncData(page.data);
+        return respond(page);
       }
       if (url.pathname === '/api/sync/push' && request.method === 'POST') {
         if (!session.user.emailVerified) return respond({ error: 'Verify your email first' }, 403);
         const data = validateSync(JSON.parse(await readBoundedText(request, 512_000)));
+        if (!canUseFeature(plan, 'learning-sync') && hasLearningData(data))
+          return proRequiredResponse();
+        // Repository merges keep stored completion monotonic; Free position writes cannot erase it.
         for (let i = 0; i < data.attempts.length; i++)
           data.attempts[i] = await verifyAttempt({ ...data.attempts[i], verified: false }, db);
         await repository.push(userId, data);

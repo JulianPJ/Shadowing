@@ -64,7 +64,10 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
   const [returnPosition] = useState(() => loadPracticeReturn(session.lesson));
   const openingIndex = returnPosition?.index ?? session.index;
   const [index, setIndex] = useState(openingIndex);
-  const [drill, setDrill] = useState(() => loadDrillSettings(session.preferences.mode));
+  const [savedDrill, setDrill] = useState(() => loadDrillSettings(session.preferences.mode));
+  const drill = isPro
+    ? savedDrill
+    : practicePreset(savedDrill.preset === 'continuous' ? 'continuous' : 'focus');
   // The preset is the single source of truth; normalizeDrillSettings keeps it consistent with
   // the synced preference mode.
   const mode: Mode = drill.preset === 'continuous' ? 'continuous' : 'shadowing';
@@ -188,7 +191,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
     setTranslationError,
   } = useSectionTranslation(lesson, index, openingIndex, recordSignal);
   const recordCompletion = progress.complete;
-  const isFavorite = favorites.includes(segment.id);
+  const isFavorite = isPro && favorites.includes(segment.id);
 
   const duration = lesson.segments.at(-1)!.end;
   const stateLabel = recording
@@ -200,6 +203,17 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
         'your-turn': 'YOUR TURN',
         complete: 'SESSION FINISHED',
       }[status];
+  useEffect(() => {
+    if (!isPro) {
+      scoreAbort.current?.abort();
+      summaryAbort.current?.abort();
+      queueMicrotask(() => {
+        stopAutomation();
+        setQuizOpen(false);
+        setDifficultyWaiting(false);
+      });
+    }
+  }, [isPro, stopAutomation]);
   useEffect(() => {
     const hydrate = () => {
       const prefs = loadPreferences();
@@ -259,8 +273,8 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
     });
   }, [mode, speed, playbackOffsetMs, studioMode, furigana, subtitleOverlay]);
   useEffect(() => {
-    writeStorage('drill:settings', drill);
-  }, [drill]);
+    if (isPro) writeStorage('drill:settings', savedDrill);
+  }, [savedDrill, isPro]);
   useEffect(() => {
     const generation = automationId;
     const interrupt = () => {
@@ -519,12 +533,14 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
   ]);
 
   function selectPreset(preset: PracticePreset) {
+    if (!isPro && (preset === 'support' || preset === 'drill')) return;
     stopAutomation();
     setDrill(practicePreset(preset));
     resetTranslation();
   }
 
   async function startHandsFree() {
+    if (!isPro) return;
     stopAutomation();
     const generation = automationId.current;
     setDrillPreparing(true);
@@ -706,6 +722,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
     setStatus('your-turn');
   }, []);
   const toggleFavorite = () => {
+    if (!isPro) return;
     recordSignal(segment, 'bookmark');
     setFavorites((current) =>
       isFavorite ? current.filter((id) => id !== segment.id) : [...current, segment.id],
@@ -1100,14 +1117,14 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
           hidden={activeTool !== 'transcript' && studioMode}
           lesson={lesson}
           index={index}
-          favorites={favorites}
+          favorites={isPro ? favorites : []}
           recording={recording}
           ready={ready}
           furigana={furigana}
           mode={mode}
           practiceCount={practiceCount}
           navigate={navigate}
-          recommendedSegmentIds={recommendedSegmentIds}
+          recommendedSegmentIds={isPro ? recommendedSegmentIds : null}
           onClearRecommendations={clearRecommendations}
         />
       </div>

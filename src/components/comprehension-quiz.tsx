@@ -65,13 +65,14 @@ export function ComprehensionQuiz({
   }, [open, loading, questionIndex, attempt?.completedAt]);
 
   function persist(next: QuizAttempt, currentQuiz: LessonQuiz) {
+    if (!isPro) return;
     setAttempt(next);
     onAttemptChange?.(next);
     const saved = saveQuizAttempt(next, currentQuiz, lesson);
     setStorageWarning((current) => current || !saved);
   }
   async function start(retake = false) {
-    if (loading) return;
+    if (!isPro || loading) return;
     setOpen(true);
     onOpenChange(true);
     setLoading(true);

@@ -3,7 +3,7 @@ import demo from '../../src/data/demo.json' with { type: 'json' };
 import { applyLocalReview } from '../../src/lib/review/local';
 import { connect, seed } from '../helpers/retention-account';
 for (const plan of ['free', 'pro'] as const)
-  test(`${plan}: save and study during practice, reveal, context replay and grade`, async ({
+  test(`${plan}: vocabulary lookup and entitlement-appropriate review workflow`, async ({
     page,
     context,
   }) => {
@@ -14,6 +14,24 @@ for (const plan of ['free', 'pro'] as const)
     await page.goto('/practice/demo');
     await expect(page.getByRole('button', { name: 'Listen', exact: true })).toBeEnabled();
     await page.locator('#current-japanese .lookup-token').first().click();
+    if (plan === 'free') {
+      const lookup = page.getByRole('complementary', { name: 'Save vocabulary', exact: true });
+      await expect(lookup.locator('.lexicon-definitions')).toBeVisible();
+      await expect(lookup.getByRole('button', { name: 'Add to review', exact: true })).toHaveCount(
+        0,
+      );
+      await expect(lookup).toContainText(
+        'Saving words and sentences, review and word statuses is a Hibiki Pro feature.',
+      );
+      expect(remote.entries).toEqual([]);
+      expect(remote.review.cards).toEqual([]);
+      await page.goto('/review');
+      await expect(
+        page.getByText('Spaced repetition reviews is a Hibiki Pro feature.'),
+      ).toBeVisible();
+      expect(errors).toEqual([]);
+      return;
+    }
     const meaning = 'good morning';
     await page.getByText('Edit before saving', { exact: true }).click();
     await expect(page.getByLabel('Vocabulary meaning')).not.toHaveValue('');
@@ -96,9 +114,8 @@ test('offline grading survives reload and retries without duplicating reviews', 
     .poll(() =>
       page.evaluate(
         () =>
-          JSON.parse(
-            localStorage.getItem('hibiki:v1:account:retention-free:review:pending') || '[]',
-          ).length,
+          JSON.parse(localStorage.getItem('hibiki:v1:account:retention-pro:review:pending') || '[]')
+            .length,
       ),
     )
     .toBeGreaterThan(0);
@@ -170,9 +187,8 @@ test('an account-cookie mismatch preserves the old account review outbox', async
     .poll(() =>
       page.evaluate(
         () =>
-          JSON.parse(
-            localStorage.getItem('hibiki:v1:account:retention-free:review:pending') || '[]',
-          ).length,
+          JSON.parse(localStorage.getItem('hibiki:v1:account:retention-pro:review:pending') || '[]')
+            .length,
       ),
     )
     .toBeGreaterThan(0);
@@ -180,9 +196,8 @@ test('an account-cookie mismatch preserves the old account review outbox', async
     .poll(() =>
       page.evaluate(
         () =>
-          JSON.parse(
-            localStorage.getItem('hibiki:v1:account:retention-free:review:pending') || '[]',
-          ).length,
+          JSON.parse(localStorage.getItem('hibiki:v1:account:retention-pro:review:pending') || '[]')
+            .length,
       ),
     )
     .toBe(1);
@@ -222,16 +237,15 @@ test('a competing device grade restores its schedule and reports a review confli
     .poll(() =>
       page.evaluate(
         () =>
-          JSON.parse(
-            localStorage.getItem('hibiki:v1:account:retention-free:review:pending') || '[]',
-          ).length,
+          JSON.parse(localStorage.getItem('hibiki:v1:account:retention-pro:review:pending') || '[]')
+            .length,
       ),
     )
     .toBe(0);
   expect(
     await page.evaluate(
       () =>
-        JSON.parse(localStorage.getItem('hibiki:v1:account:retention-free:review:data')!).cards[0]
+        JSON.parse(localStorage.getItem('hibiki:v1:account:retention-pro:review:data')!).cards[0]
           .intervalDays,
     ),
   ).toBe(4);

@@ -14,7 +14,7 @@ type Remote = {
   offline: boolean;
   writes: ReviewOperation[];
 };
-export async function connect(context: BrowserContext, plan: AccountUser['plan'] = 'free') {
+export async function connect(context: BrowserContext, plan: AccountUser['plan'] = 'pro') {
   const user: AccountUser = {
     id: 'retention-' + plan,
     email: plan + '@example.com',

@@ -1,4 +1,5 @@
 'use client';
+import { useProAccess } from '../pro-feature';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Lesson } from '@/lib/types';
 import { readStorage, writeStorage } from '@/lib/storage/browser';
@@ -11,6 +12,7 @@ export function useSectionTranslation(
   initialIndex: number,
   recordSignal: (segment: Segment, signal: PracticeSignal) => void,
 ) {
+  const { isPro } = useProAccess('translation');
   const segment = lesson.segments[index];
   const [revealed, setRevealed] = useState(
     () =>
@@ -24,7 +26,7 @@ export function useSectionTranslation(
   const [translationError, setTranslationError] = useState('');
   const [translationProvider, setTranslationProvider] = useState('');
   const translationAbort = useRef<AbortController | null>(null);
-  const translation = segment.translation || translations[segment.id];
+  const translation = segment.translation || (isPro ? translations[segment.id] : undefined);
   const resetTranslation = useCallback(() => {
     translationAbort.current?.abort();
     setTranslating(false);
@@ -42,6 +44,10 @@ export function useSectionTranslation(
     setTranslationError('');
     if (translation) {
       setRevealed(true);
+      return;
+    }
+    if (!isPro) {
+      setTranslationError('On-demand translations require Hibiki Pro.');
       return;
     }
     const controller = new AbortController();
@@ -79,7 +85,7 @@ export function useSectionTranslation(
     } finally {
       if (!controller.signal.aborted) setTranslating(false);
     }
-  }, [revealed, translation, segment, recordSignal, lesson.segments, index]);
+  }, [isPro, revealed, translation, segment, recordSignal, lesson.segments, index]);
   useEffect(() => {
     writeStorage(`reveal:${lesson.id}:${segment.id}`, revealed);
   }, [lesson.id, segment.id, revealed]);
