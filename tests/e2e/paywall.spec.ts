@@ -73,7 +73,6 @@ for (const signedIn of [false, true]) {
     await page.getByRole('button', { name: 'Replay R' }).click();
     await expect(page.getByTestId('playback-state')).toContainText('LISTEN CLOSELY');
     await page.getByRole('button', { name: 'Next section', exact: true }).click();
-    await page.getByText('About this lesson’s difficulty', { exact: true }).click();
     await expect(
       page.getByText('Detailed lesson difficulty analysis is a Hibiki Pro feature.'),
     ).toBeVisible();

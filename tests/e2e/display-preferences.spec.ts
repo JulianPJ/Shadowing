@@ -176,7 +176,6 @@ test('Studio and Furigana preserve quiz answers, difficulty, identity and bounde
     .getByRole('navigation', { name: 'Lesson tools' })
     .getByRole('button', { name: 'Lesson review', exact: true })
     .click();
-  await page.getByText('About this lesson’s difficulty', { exact: true }).click();
   await expect(page.locator('.difficulty-summary')).toBeVisible();
   await page.getByRole('button', { name: 'Take comprehension check' }).click();
   await page.getByRole('group', { name: 'Answer options' }).getByRole('button').nth(0).click();
@@ -410,9 +409,10 @@ test('Studio tool panes keep the player mounted and transcript lookup never seek
     await row.locator('[data-lookup]').first().click();
     const lookup = row.getByRole('complementary', { name: 'Save vocabulary' });
     await expect(lookup).toBeVisible();
-    await expect(lookup.locator('.dictionary-context [lang="ja"]')).toHaveText(
-      demo.segments[4].japanese,
-    );
+    await expect(lookup).not.toContainText(demo.segments[4].japanese);
+    for (const element of [lookup, lookup.locator('.lexicon-definitions')]) {
+      expect(await element.evaluate((node) => node.scrollWidth - node.clientWidth)).toBe(0);
+    }
     await expect(page.getByTestId('current-japanese')).toHaveText(demo.segments[0].japanese);
     expect(await page.locator('video').evaluate((video: HTMLVideoElement) => video.paused)).toBe(
       true,

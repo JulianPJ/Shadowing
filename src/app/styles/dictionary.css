@@ -89,19 +89,6 @@
   line-height: 1.55;
   resize: vertical;
 }
-.dictionary-context {
-  padding-top: 10px;
-  border-top: 1px solid var(--line);
-}
-.dictionary-context > span {
-  font-size: 8px;
-  color: #a0a796;
-}
-.dictionary-context > p {
-  margin: 6px 0 10px;
-  font-size: 12px;
-  line-height: 1.8;
-}
 .dictionary-error {
   font-size: 8px;
   line-height: 1.6;

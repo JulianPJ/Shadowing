@@ -193,10 +193,9 @@ export function LessonCompletionSummary({
           onAttemptChange={(attempt) => setResult({ owner, attempt, key: attempt.transcriptKey })}
         />
       ) : null}
-      <details className="completion-details difficulty-disclosure">
-        <summary>About this lesson’s difficulty</summary>
+      <div className="completion-difficulty">
         <LessonDifficulty lesson={lesson} onWaitingChange={onDifficultyWaiting} />
-      </details>
+      </div>
     </section>
   );
 }

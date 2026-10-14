@@ -294,10 +294,6 @@ function DictionarySaveContent({
           </button>
         </div>
       ) : null}
-      <div className="dictionary-context">
-        <p lang="ja">{segment.japanese}</p>
-        {sentenceMeaning ? <p>{sentenceMeaning}</p> : null}
-      </div>
       {isPro ? (
         <div className="word-actions" role="group" aria-label={`Status for ${lemma}`}>
           {verified ? (

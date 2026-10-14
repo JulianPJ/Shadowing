@@ -284,7 +284,6 @@ test('five practised unique analyzed lessons produce typical content and later a
     route.fulfill({ json: { analysis: analyses[4] } }),
   );
   await page.goto(`/practice/${lessons[4].id}`);
-  await page.getByText('About this lesson’s difficulty', { exact: true }).click();
   await expect(page.locator('.difficulty-summary')).toBeVisible();
   await progress(page);
   await expect(page.locator('.progress-summary')).toContainText(
@@ -333,7 +332,6 @@ test('checkpointing is incremental, bounded and excludes a quiz/analysis wait', 
     (s: { origin: string }) => s.origin === 'practice',
   ).activeSeconds;
   await page.reload();
-  await page.getByText('About this lesson’s difficulty', { exact: true }).click();
   await expect(page.getByRole('button', { name: 'Retry difficulty analysis' })).toBeVisible();
   await progress(page);
   const final = (await history(page)).sessions.find(

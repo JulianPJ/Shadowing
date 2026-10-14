@@ -122,12 +122,8 @@
   min-height: 44px;
   font-size: 13px;
 }
-.dictionary-save-panel .dictionary-error,
-.dictionary-save-panel .dictionary-context > span {
+.dictionary-save-panel .dictionary-error {
   font-size: 13px;
-}
-.dictionary-save-panel .dictionary-context > span {
-  color: var(--muted);
 }
 .dictionary-save-panel .dictionary-fields input,
 .dictionary-save-panel .dictionary-fields textarea {
@@ -156,7 +152,6 @@
   align-items: baseline;
   gap: 8px;
   padding: 6px 8px;
-  margin: 0 -8px;
   border-radius: 8px;
   cursor: pointer;
 }

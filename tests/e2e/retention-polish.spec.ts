@@ -42,13 +42,11 @@ test('uncached practice difficulty runs once at opening; completion starts no ad
     );
   });
   await page.goto('/practice/demo');
-  await page.getByText('About this lesson’s difficulty', { exact: true }).click();
   await expect(page.getByTestId('lesson-difficulty').locator('dl')).toContainText('N5–N4');
   expect(requests).toHaveLength(1);
   await page.getByTestId('transcript-13').click();
   await page.getByRole('button', { name: 'Finish practice', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Lesson complete', exact: true })).toBeVisible();
-  await page.getByText('About this lesson’s difficulty', { exact: true }).click();
   await expect(
     page
       .getByRole('region', { name: 'Lesson completion summary' })

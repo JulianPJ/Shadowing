@@ -88,7 +88,10 @@
   margin-top: 16px;
   border-top: 1px solid var(--line);
 }
-.difficulty-disclosure > .difficulty-card {
+.completion-difficulty {
+  margin-top: 16px;
+}
+.completion-difficulty > .difficulty-card {
   margin-top: 0;
 }
 .recording-retention {
@@ -438,7 +441,6 @@ main.practice-main.studio-mode textarea::placeholder {
 }
 .studio-mode .dictionary-fields label,
 .studio-mode .dictionary-loading,
-.studio-mode .dictionary-context > span,
 .studio-mode .dictionary-signin p,
 .studio-mode .dictionary-lookup-hint,
 .studio-mode .section-time,

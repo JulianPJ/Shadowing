@@ -15,7 +15,6 @@ test.beforeEach(async ({ context }) => {
 
 async function openDemo(page: Page) {
   await page.goto('/practice/demo');
-  await page.getByText('About this lesson’s difficulty', { exact: true }).click();
   await expect(page.getByRole('button', { name: 'Listen', exact: true })).toBeEnabled();
 }
 test('automatic analysis shows compact classifications for all five dimensions and reuses reload cache', async ({
@@ -39,7 +38,6 @@ test('automatic analysis shows compact classifications for all five dimensions a
   await card.getByText('How this estimate works', { exact: true }).click();
   await expect(card).toContainText('whole Japanese transcript');
   await page.reload();
-  await page.getByText('About this lesson’s difficulty', { exact: true }).click();
   await expect(card.locator('dl')).toContainText('N5–N4');
   expect(calls).toBe(1);
   expect(errors).toEqual([]);
@@ -122,7 +120,6 @@ test('editing the same stored lesson invalidates cached analysis and generates f
     return route.fulfill({ json: { analysis: await createDifficultyAnalysis(authored, input) } });
   });
   await page.goto('/practice/difficulty-custom');
-  await page.getByText('About this lesson’s difficulty', { exact: true }).click();
   await expect(page.getByTestId('lesson-difficulty').locator('dl')).toContainText('N5–N4');
   expect(calls).toBe(0);
   await page.evaluate(() => {
@@ -131,7 +128,6 @@ test('editing the same stored lesson invalidates cached analysis and generates f
     localStorage.setItem('hibiki:v1:lesson:difficulty-custom', JSON.stringify(value));
   });
   await page.reload();
-  await page.getByText('About this lesson’s difficulty', { exact: true }).click();
   await expect(page.getByTestId('lesson-difficulty').locator('dl')).toContainText('N5–N4');
   expect(calls).toBe(1);
   const next = await page.evaluate(() =>
@@ -185,7 +181,6 @@ test('a short transcript exposes no fabricated pace and does not request AI', as
     short,
   );
   await page.goto('/practice/difficulty-short');
-  await page.getByText('About this lesson’s difficulty', { exact: true }).click();
   const card = page.getByTestId('lesson-difficulty');
   await expect(card).toContainText('Not enough timing data');
   await expect(
@@ -217,7 +212,6 @@ test('reattaching local media preserves a pending analysis for the unchanged tra
     await route.fulfill({ json: { analysis } });
   });
   await page.goto('/practice/difficulty-reattach');
-  await page.getByText('About this lesson’s difficulty', { exact: true }).click();
   await expect(page.getByTestId('lesson-difficulty').getByRole('status')).toContainText(
     'keep practicing',
   );
