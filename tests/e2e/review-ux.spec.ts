@@ -117,7 +117,7 @@ test('reading and bounded inline context preserve the answer and session', async
   await page.getByRole('button', { name: 'Start review', exact: true }).click();
   await expect(page.locator('.review-card button')).toHaveCount(3);
   await expect(page.locator('.review-card a')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Play this section', exact: true })).toHaveCount(0);
+  await expect(page.locator('.review-context')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'End review session', exact: true })).toBeVisible();
   await expect(page.getByText('あさ', { exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: /^Show reading/ }).click();
@@ -126,9 +126,32 @@ test('reading and bounded inline context preserve the answer and session', async
   await page.getByRole('button', { name: /Show answer/ }).click();
   await expect(page.getByRole('link', { name: 'Open full lesson ↗', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'End review session', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Play this section', exact: true }).click();
-  await page.getByRole('button', { name: 'Play section', exact: true }).click();
   const video = page.locator('.review-context video');
+  const play = page.getByRole('button', { name: 'Play in context', exact: true });
+  await expect(play).toBeEnabled();
+  await expect
+    .poll(() => video.evaluate((node) => (node as HTMLVideoElement).readyState))
+    .toBeGreaterThanOrEqual(1);
+  expect(await video.evaluate((node) => (node as HTMLVideoElement).paused)).toBe(true);
+  expect(await video.evaluate((node) => (node as HTMLVideoElement).currentTime)).toBeCloseTo(
+    remote.entries[0].source.start,
+    1,
+  );
+  await expect(page.getByRole('link', { name: 'Open full lesson ↗', exact: true })).toHaveCount(1);
+  await expect(
+    page.getByRole('link', { name: /Open on YouTube|Open on Vimeo|Open source website/ }),
+  ).toHaveCount(0);
+  await expect(page.getByText(remote.entries[0].source.lessonTitle, { exact: true })).toHaveCount(
+    1,
+  );
+  for (const width of [1440, 320]) {
+    await page.setViewportSize({ width, height: 1000 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    await page.screenshot({ path: test.info().outputPath(`review-${width}.png`), fullPage: true });
+  }
+  await play.click();
   const end = remote.entries[0].source.end;
   await expect.poll(() => video.evaluate((node) => !(node as HTMLVideoElement).paused)).toBe(true);
   await video.evaluate((node, start) => {
@@ -144,10 +167,21 @@ test('reading and bounded inline context preserve the answer and session', async
   expect(await video.evaluate((node) => (node as HTMLVideoElement).currentTime)).toBeLessThan(
     end + 0.4,
   );
-  await page.getByRole('button', { name: 'Hide context player', exact: true }).click();
-  await expect(page.locator('.review-context video')).toHaveCount(0);
   await expect(page.getByText('Meaning 0', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: /^Good/ })).toBeVisible();
+  // Leaving the revealed answer must release the preloaded player and stop its audio.
+  await play.click();
+  await expect.poll(() => video.evaluate((node) => !(node as HTMLVideoElement).paused)).toBe(true);
+  await video.evaluate((node) => {
+    (window as unknown as { reviewVideo: HTMLVideoElement }).reviewVideo = node as HTMLVideoElement;
+  });
+  await page.getByRole('button', { name: /^Easy/ }).click();
+  await expect(page.locator('.review-context video')).toHaveCount(0);
+  expect(
+    await page.evaluate(
+      () => (window as unknown as { reviewVideo: HTMLVideoElement }).reviewVideo.paused,
+    ),
+  ).toBe(true);
 });
 
 test('cold material hydration shows loading and input-focused shortcuts leave study alone', async ({

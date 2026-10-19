@@ -106,7 +106,9 @@
   border-top: 1px solid var(--line);
   padding-top: 1.5rem;
 }
-.review-context,
+.review-context {
+  margin: 1.5rem 0;
+}
 .review-notice {
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -121,6 +123,33 @@
   min-height: 0;
   margin: 1rem 0;
 }
+.review-context-toolbar {
+  align-items: baseline;
+  gap: 0.25rem 1rem;
+  margin: 0;
+}
+.review-context-toolbar strong {
+  flex: 1 1 16rem;
+}
+.review-context-toolbar > span {
+  white-space: nowrap;
+}
+.review-context-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+}
+.review-context-controls p {
+  margin: 0;
+}
+.review-sentence-tools {
+  margin-top: 0.5rem;
+}
+.review-lesson-link {
+  margin-top: 1rem;
+  text-align: right;
+}
 .review-undo {
   display: block;
   margin: 1rem auto;
@@ -128,9 +157,6 @@
 @media (max-width: 600px) {
   .review-screen select {
     width: 100%;
-  }
-  .review-context {
-    padding: 0.75rem;
   }
   .review-card h2 {
     font-size: 2rem;

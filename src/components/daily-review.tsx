@@ -17,7 +17,7 @@ import {
 } from '@/lib/review/client';
 import { dueReviews, previewReview, scheduleReview } from '@/lib/review-scheduler';
 import { dictionaryByIds } from '@/lib/dictionary/client';
-import { reviewContextHref, externalReplay } from '@/lib/dictionary/replay';
+import { reviewContextHref } from '@/lib/dictionary/replay';
 import { readStorage, writeStorage } from '@/lib/storage/browser';
 import { studyDay } from '@/lib/study-day';
 import { reviewHistory } from '@/lib/review/history';
@@ -30,7 +30,6 @@ import {
 import { syncStatusAfterGrade } from '@/lib/vocabulary';
 import type { DictionaryEntry } from '@/lib/dictionary/types';
 import type { ReviewGrade, ReviewState } from '@/lib/review/types';
-import { timestamp } from '@/lib/youtube';
 const ContextPlayer = dynamic(
   () => import('./review-context-player').then((mod) => mod.ReviewContextPlayer),
   { loading: () => <p role="status">Opening context player…</p> },
@@ -89,7 +88,6 @@ function DailyReviewContent() {
   const [reading, setReading] = useState(false);
   const [sentenceReading, setSentenceReading] = useState(false);
   const [readingsDefault, setReadingsDefault] = useState(false);
-  const [contextOpen, setContextOpen] = useState(false);
   const [error, setError] = useState('');
   const [clock, setClock] = useState(() => Date.now());
   const [retry, setRetry] = useState(0);
@@ -170,7 +168,6 @@ function DailyReviewContent() {
     setRevealed(false);
     setReading(readingsDefault);
     setSentenceReading(false);
-    setContextOpen(false);
     gradeLock.current = '';
     heading.current?.focus({ preventScroll: true });
   }, [id, readingsDefault]);
@@ -219,7 +216,6 @@ function DailyReviewContent() {
     saveStudyLimits(value);
   }
   function pause() {
-    setContextOpen(false);
     setSession(null);
     if (owner) writeStorage('review:session', null);
   }
@@ -247,7 +243,6 @@ function DailyReviewContent() {
         lastRating: { previous: card, operationId },
       });
       setRevealed(false);
-      setContextOpen(false);
     } catch (e) {
       gradeLock.current = '';
       setError((e as Error).message);
@@ -278,7 +273,6 @@ function DailyReviewContent() {
         lastRating: undefined,
       });
       setRevealed(false);
-      setContextOpen(false);
       gradeLock.current = '';
     } catch (e) {
       setError((e as Error).message);
@@ -472,14 +466,7 @@ function DailyReviewContent() {
                 <JapaneseText text={entry.sourceSentence} furigana={sentenceReading} />
               </p>
               {entry.sourceSentenceTranslation ? <p>{entry.sourceSentenceTranslation}</p> : null}
-              <div className="review-actions">
-                <button
-                  className="button"
-                  aria-expanded={contextOpen}
-                  onClick={() => setContextOpen(!contextOpen)}
-                >
-                  {contextOpen ? 'Hide context player' : 'Play this section'}
-                </button>
+              <div className="review-sentence-tools">
                 <button
                   className="text-button"
                   aria-pressed={sentenceReading}
@@ -487,38 +474,8 @@ function DailyReviewContent() {
                 >
                   {sentenceReading ? 'Hide sentence readings' : 'Show sentence readings'}
                 </button>
-                <Link
-                  className="text-button"
-                  href={reviewContextHref(entry)}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Open full lesson ↗
-                </Link>
-                {externalReplay(entry) ? (
-                  <a
-                    className="text-button"
-                    href={externalReplay(entry)!}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Open{' '}
-                    {entry.source.mediaType === 'youtube'
-                      ? 'on YouTube'
-                      : entry.source.mediaType === 'vimeo'
-                        ? 'on Vimeo'
-                        : 'source website'}{' '}
-                    ↗
-                  </a>
-                ) : null}
               </div>
-              {contextOpen ? (
-                <ContextPlayer key={entry.id} entry={entry} onClose={() => setContextOpen(false)} />
-              ) : null}
-              <p className="small muted">
-                {entry.source.lessonTitle} · {timestamp(entry.source.start)}–
-                {timestamp(entry.source.end)}
-              </p>
+              <ContextPlayer key={entry.id} entry={entry} />
               <div className="review-grades">
                 {GRADES.map((g, i) => {
                   const preview = previewReview(
@@ -540,6 +497,16 @@ function DailyReviewContent() {
                     </button>
                   );
                 })}
+              </div>
+              <div className="review-lesson-link">
+                <Link
+                  className="text-button"
+                  href={reviewContextHref(entry)}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Open full lesson ↗
+                </Link>
               </div>
             </div>
           )}

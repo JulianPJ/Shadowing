@@ -1,24 +1,17 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
 import demoData from '@/data/demo.json';
 import { loadLesson, getLiveMedia } from '@/lib/storage/lessons';
 import { lessonMedia, migrateLesson } from '@/lib/media';
 import { transcriptKey } from '@/lib/transcript';
 import { restoreAccountLesson } from '@/lib/sync/client';
-import { reviewContextHref } from '@/lib/dictionary/replay';
+import { timestamp } from '@/lib/youtube';
 import type { DictionaryEntry } from '@/lib/dictionary/types';
 import type { Lesson } from '@/lib/types';
 import { MediaPlayer, type MediaHandle } from './media-player';
 
 /** Uses the same authorized adapters as practice without mounting a second study session. */
-export function ReviewContextPlayer({
-  entry,
-  onClose,
-}: {
-  entry: DictionaryEntry;
-  onClose: () => void;
-}) {
+export function ReviewContextPlayer({ entry }: { entry: DictionaryEntry }) {
   const [loaded, setLoaded] = useState<Lesson | null>(null);
   const [error, setError] = useState('');
   const [ready, setReady] = useState(false);
@@ -92,22 +85,16 @@ export function ReviewContextPlayer({
       await media.current.play();
       setError('');
     } catch {
-      setError('Press Play section again, or use the player controls to start audio.');
+      setError('Press Play in context again, or use the player controls to start audio.');
     }
   }
   return (
     <section className="review-context" aria-label="Saved section playback">
       <div className="review-context-toolbar">
         <strong>{entry.source.lessonTitle}</strong>
-        <button
-          className="text-button"
-          onClick={() => {
-            media.current?.pause();
-            onClose();
-          }}
-        >
-          Minimise context
-        </button>
+        <span className="small muted">
+          {timestamp(start)}–{timestamp(end)}
+        </span>
       </div>
       {loaded ? (
         <MediaPlayer
@@ -132,22 +119,14 @@ export function ReviewContextPlayer({
         <p role="status">Opening this saved section…</p>
       ) : null}
       {loaded ? (
-        <button className="button" disabled={!ready} onClick={() => void replay()}>
-          Play section
-        </button>
+        <div className="review-context-controls">
+          <button className="button" disabled={!ready} onClick={() => void replay()}>
+            Play in context
+          </button>
+          <p className="small muted">Pauses at the end of the saved section.</p>
+        </div>
       ) : null}
-      <p className="small muted">
-        Playback pauses at the end of the saved section. Minimising pauses audio.
-      </p>
       {error ? <p role="status">{error}</p> : null}
-      <Link
-        className="text-button"
-        href={reviewContextHref(entry)}
-        target="_blank"
-        rel="noreferrer"
-      >
-        Open full lesson ↗
-      </Link>
     </section>
   );
 }
