@@ -42,22 +42,25 @@ export default function CookiesPage() {
       <section>
         <h2>Third-party players and checkout</h2>
         <p>
-          Loading a YouTube or Vimeo player, using Google sign-in or opening Paddle checkout may
-          cause those providers to use their own cookies or similar technologies under their own
-          policies. These are distinct from the Hibiki theme and account session cookies. Playback
-          of third-party media may also involve direct connections from your browser to the media
-          provider.
+          When you open a practice session with an embedded YouTube or Vimeo video, Hibiki connects
+          your browser to that provider to load the player. YouTube uses privacy-enhanced embedding
+          (youtube-nocookie.com) and Vimeo is requested with its Do Not Track player parameter
+          (dnt=1), but these settings do not guarantee that providers avoid all cookies or similar
+          technologies. Google sign-in and Paddle checkout connect to their respective providers
+          when you choose those functions. These providers may use their own storage under their
+          policies, separately from Hibiki's session and theme cookies.
         </p>
       </section>
       <section>
         <h2>Choice and consent</h2>
         <p>
           Strictly necessary cookies can be used to provide authentication and security.
-          Non-essential storage may require your consent under applicable law. The current Hibiki
-          application has no separately configured advertising tracker in its source; the operator
-          must audit the final deployed scripts and embedded providers before publication. If
-          non-essential analytics or advertising technologies are introduced, an appropriate consent
-          choice must be implemented before enabling them.
+          Hibiki does not configure advertising pixels or analytics trackers in its application
+          source. However, embedded providers may set non-essential storage, and the operator must
+          audit their actual browser behaviour and the applicable exemptions before publishing.
+          If any non-essential storage requires prior consent, the relevant integration must be
+          withheld until valid consent or another legally compliant approach is in place. A privacy
+          notice alone does not replace a required consent mechanism.
         </p>
         <p>
           You can clear cookies and local storage in your browser settings, or remove selected
