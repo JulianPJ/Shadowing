@@ -107,9 +107,9 @@ export default function PrivacyPage() {
         <h2>5. International processing and retention</h2>
         <p>
           Some service providers may process information outside your country. Where data protection
-          law requires safeguards for international transfers, the operator must use an applicable
-          lawful transfer mechanism. Contact the privacy address above for further information about
-          relevant providers and safeguards.
+          law requires safeguards for international transfers, we assess and apply the applicable
+          transfer requirements. Contact the privacy address above for further information about
+          relevant providers and transfer arrangements.
         </p>
         <p>
           Account and synced learning records are generally retained while your account is active,
@@ -117,8 +117,8 @@ export default function PrivacyPage() {
           logs and cache entries are retained based on operational need and security requirements.
           Paddle and other suppliers may independently keep financial and statutory records for
           longer where required by law. Local-browser data stays until cleared through Hibiki or
-          your browser. Specific retention periods and deletion procedures must be reviewed before
-          publication.
+          your browser. To ask about the retention or deletion of particular records, contact our
+          privacy address above.
         </p>
       </section>
       <section>
