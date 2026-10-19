@@ -17,7 +17,7 @@ export default function RefundsPage() {
         <h2>Prices, renewal and confirmation</h2>
         <p>
           The exact subscription price, currency, taxes, billing interval and renewal
-          conditions appear before you confirm payment in Paddle's secure checkout.
+          conditions appear before you confirm payment in Paddle&apos;s secure checkout.
           Monthly subscriptions renew monthly and annual subscriptions renew annually
           unless cancelled. Prices shown by Hibiki are previews; the final amount
           presented at checkout takes precedence. There is currently no automatic
@@ -31,7 +31,7 @@ export default function RefundsPage() {
           <strong> Manage billing</strong> and follow the Paddle customer portal
           instructions. You can also use the subscription link in your Paddle
           confirmation email or contact <a href="https://paddle.net/">Paddle Buyer Support</a>.
-          For a normal end-of-period cancellation, Paddle's current buyer terms
+          For a normal end-of-period cancellation, Paddle&apos;s current buyer terms
           provide that the subscription ends at the end of the paid billing period
           and no further renewal payments are taken. Cancellation does not
           automatically refund the current billing period.
@@ -44,7 +44,7 @@ export default function RefundsPage() {
       <section>
         <h2>Refunds, withdrawals and consumer rights</h2>
         <p>
-          Refund eligibility depends on Paddle's{' '}
+          Refund eligibility depends on Paddle&apos;s{' '}
           <a href="https://www.paddle.com/legal/refund-policy">Refund Policy</a>,
           its <a href="https://www.paddle.com/legal/buyer-terms">Buyer Terms</a>,
           and any applicable mandatory consumer rights. Some consumers may have
@@ -52,7 +52,7 @@ export default function RefundsPage() {
           services. The conditions depend on the purchase, whether provision has
           started and any legally required express consent and acknowledgements.
           We do not assert that opening or using Hibiki automatically removes those
-          rights. Neither these pages nor Paddle's standard terms override
+          rights. Neither these pages nor Paddle&apos;s standard terms override
           non-excludable statutory rights.
         </p>
         <p>
