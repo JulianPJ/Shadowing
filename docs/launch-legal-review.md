@@ -1,6 +1,6 @@
-# Hibiki launch legal policy review — must complete before merging
+# Hibiki launch compliance review — outstanding checks before production launch
 
-**Status:** first draft, not legal approval. **Do not merge this PR or activate real-money subscriptions until the owner completes these checks.** The pages are product-specific drafts, not professional legal advice. Verify governing law and served markets with a qualified adviser if appropriate.
+**Status:** the operator has authorised a code merge to main, but this document is **not legal approval or permission to deploy/enable real-money subscriptions**. Outstanding checks below remain production release gates. The policies are product-specific and should be reviewed against applicable law and served markets by a qualified adviser as appropriate.
 
 ## Public routes
 
@@ -52,7 +52,8 @@ Before release:
 - [ ] Decide whether existing subscribers who never confirm should be contacted (renewals continue in Paddle while their account is restricted) and how long unconfirmed accounts are retained.
 - [ ] Check whether Paddle's buyer terms/age requirements align with the 18+ policy and whether Paddle should be informed.
 - [ ] Re-confirm on material policy changes: the timestamp records *that* a confirmation happened, not which policy version; add a version field if re-confirmation is ever required.
-- [ ] Resolve remaining VAT placeholder, set approved effective date, and ensure Paddle lists the right business details.
+- [x] The earlier VAT placeholder is resolved to “Not VAT registered” and the public legal pages state an effective date of 19 October 2026.
+- [ ] Confirm Paddle merchant-of-record account details match the public operator information before enabling live billing.
 
 ## Data protection and cookie audit
 
@@ -63,7 +64,8 @@ Before release:
 - [x] Code inventory reviewed (19 October 2026): Better Auth session/security cookies (14-day sessions; Secure on HTTPS), a one-year `hibiki-theme` preference cookie, Hibiki-prefixed localStorage for lessons and study state, sessionStorage for short-lived playback state, and extension Chrome local/session storage. No separately integrated analytics tag, advertising pixel, or tag manager found in the reviewed application source.
 - [x] Third-party code path inventory: YouTube IFrame API loads when a YouTube lesson mounts (embedded player uses `youtube-nocookie.com`); Vimeo iframe uses `dnt=1` when a Vimeo lesson mounts; Discover thumbnails request remote YouTube images; Google sign-in is invoked by user action; Paddle JavaScript is imported and initialized only when starting checkout. Third parties may independently set cookies or use other tracking technologies; privacy-enhanced mode/`dnt=1` are not proofs of exemption.
 - [x] Cookie notice updated to describe automatic external video-player connections and distinguish operator-controlled versus third-party storage. The standard playback flow is preserved without an added video-loading confirmation.
-- [ ] **Cookie release blocker:** inspect actual browser network traffic, storage and Set-Cookie headers in a fresh browser on the deployed build, for landing page, Discover, YouTube/Vimeo lessons, Google sign-in and Paddle checkout. Classify purpose and any legally applicable strictly-necessary exemption for each provider cookie. If non-essential tracking requires consent, implement and test a consent-compliant solution that avoids unnecessary playback friction; code review alone cannot clear this check.
+- [x] Fresh production browser sampling (Cloudflare Browser Rendering, 19 October 2026): homepage showed no cookies, localStorage keys or third-party resource hosts; Discover showed no cookies and requested thumbnails from `i.ytimg.com`, while storing `hibiki:v1:discover:seen` in localStorage. These are observations from isolated signed-out browser sessions, not an exhaustive cookie inventory.
+- [ ] **Cookie production release blocker:** complete fresh-browser request, storage and `Set-Cookie` inspections for YouTube/Vimeo playback, Google sign-in and Paddle checkout on the deployed build. Subsequent browser checks were blocked by the Browser Rendering API rate limit. Classify each cookie's purpose and applicable strictly-necessary exemption; obtain legally required consent for any non-essential storage without adding unnecessary playback friction. The source audit and two sampled pages do not clear this check.
 - [ ] Check cookie and storage behaviour under UK PECR and each relevant customer market and validate that third-party integrations are not activated contrary to any required prior consent.
 - [ ] Align the Chrome Web Store privacy declaration with extension-privacy.html and /privacy.
 - [ ] Check ICO registration/data protection fee applicability: https://ico.org.uk/for-organisations/data-protection-fee/
@@ -87,4 +89,4 @@ Before release:
 - Paddle refund policy: https://www.paddle.com/legal/refund-policy
 - Paddle buyer support: https://paddle.net/
 
-**Release gate:** keep PR as a draft until all public operator details are supplied, content is reviewed, and applicable policy/consent requirements are confirmed. Passing CI does not establish legal compliance.
+**Production release gate:** merging code does not authorise deploying it or enabling live billing. Complete the outstanding privacy, embedded-provider cookies, existing-account migration, subscription/consumer and legal checks first. Passing CI does not establish legal compliance.
