@@ -200,6 +200,12 @@ export function AuthForm({ screen = 'sign-in' }: { screen?: 'sign-in' | 'registe
                   : 'Sign in'}
           </button>
         </form>
+        {screen === 'register' ? (
+          <p className="muted">
+            Before registering, please read our <Link href="/terms">Terms of Service</Link> and{' '}
+            <Link href="/privacy">Privacy Policy</Link>.
+          </p>
+        ) : null}
         {account.loaded && emailActionUnavailable ? (
           <p role="status">
             Email {screen === 'register' ? 'registration' : 'password recovery'} is temporarily
