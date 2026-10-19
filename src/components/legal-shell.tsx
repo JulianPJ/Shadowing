@@ -1,17 +1,13 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 
-export function LegalShell({
-  title,
-  children,
-}: {
-  title: string;
-  children: ReactNode;
-}) {
+export function LegalShell({ title, children }: { title: string; children: ReactNode }) {
   return (
     <main className="notices-main">
       <h1>{title}</h1>
-      <p className="muted">Drafted 19 October 2026. Final effective date to be confirmed before publication.</p>
+      <p className="muted">
+        Drafted 19 October 2026. Final effective date to be confirmed before publication.
+      </p>
       {children}
       <p>
         Questions about these policies? See <Link href="/contact">Contact Hibiki</Link>.
