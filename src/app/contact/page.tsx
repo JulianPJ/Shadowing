@@ -15,13 +15,17 @@ export default function ContactPage() {
       <section>
         <h2>Service operator</h2>
         <dl>
-          <dt>Legal or trading name</dt>
+          <dt>Legal operator</dt>
           <dd>{LEGAL_OPERATOR.name}</dd>
+          <dt>Trading name</dt>
+          <dd>{LEGAL_OPERATOR.tradingName}</dd>
+          <dt>Business structure</dt>
+          <dd>{LEGAL_OPERATOR.legalForm}</dd>
           <dt>Country of establishment</dt>
           <dd>{LEGAL_OPERATOR.establishedIn}</dd>
           <dt>Geographic business address</dt>
           <dd>{LEGAL_OPERATOR.address}</dd>
-          <dt>Company or business registration</dt>
+          <dt>Company registration</dt>
           <dd>{LEGAL_OPERATOR.registration}</dd>
           <dt>VAT registration</dt>
           <dd>{LEGAL_OPERATOR.vat}</dd>
