@@ -25,6 +25,8 @@ import { useTaskReturn } from './task-return';
 import { BillingSettings } from './billing-settings';
 import { canUseFeature } from '@/lib/access';
 import { readStorage, storageKeys } from '@/lib/storage/browser';
+import { MINIMUM_ACCOUNT_AGE } from '@/lib/auth/eligibility';
+import { LEGAL_OPERATOR } from '@/lib/legal/operator';
 const initial: SyncStatus = {
   user: null,
   state: 'local',
@@ -56,6 +58,7 @@ export function AccountBridge() {
   useEffect(() => startSync(), []);
   useEffect(() => startChannels([reviewSync, knowledgeSync, discoverSync]), []);
   useEffect(() => startDiscoverEvents(), []);
+  if (account.user && !account.user.adultConfirmed) return <AdultConfirmation />;
   if (account.user && expired)
     return (
       <aside className="account-import" aria-label="Session expired" role="status">
@@ -100,6 +103,74 @@ export function AccountBridge() {
       </div>
     </aside>
   ) : null;
+}
+
+/**
+ * Accounts created before the 18+ policy (or by any path that missed it) confirm here. Nothing is
+ * deleted: until the learner confirms, the server keeps their data but only allows export.
+ */
+function AdultConfirmation() {
+  const [busy, setBusy] = useState(false),
+    [error, setError] = useState('');
+  async function run(operation: () => Promise<void>) {
+    if (busy) return;
+    setBusy(true);
+    setError('');
+    try {
+      await operation();
+      await refreshAccount();
+    } catch {
+      setError('Could not reach the account service. Please try again.');
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <aside className="account-import" aria-labelledby="adult-confirmation-title" role="region">
+      <strong id="adult-confirmation-title">
+        Hibiki accounts are for adults aged {MINIMUM_ACCOUNT_AGE} or older
+      </strong>
+      <p>
+        Confirm that you are {MINIMUM_ACCOUNT_AGE} or older to keep using your account. Your saved
+        progress has not been removed. If you are under {MINIMUM_ACCOUNT_AGE}, please sign out and
+        contact {LEGAL_OPERATOR.privacyEmail} to delete your account data. See our{' '}
+        <Link href="/terms">Terms</Link>.
+      </p>
+      <div>
+        <button
+          className="button primary"
+          disabled={busy}
+          onClick={() =>
+            void run(async () => {
+              const response = await fetch('/api/account/eligibility', {
+                method: 'POST',
+                credentials: 'same-origin',
+                cache: 'no-store',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ adultConfirmed: true }),
+              });
+              if (!response.ok) throw new Error('Confirmation failed');
+            })
+          }
+        >
+          {busy ? 'Please wait…' : `I am ${MINIMUM_ACCOUNT_AGE} or older`}
+        </button>
+        <button
+          className="button"
+          disabled={busy}
+          onClick={() =>
+            void run(async () => {
+              const result = await authClient.signOut();
+              if (result.error) throw new Error('Sign out failed');
+            })
+          }
+        >
+          I am under {MINIMUM_ACCOUNT_AGE} — sign out
+        </button>
+      </div>
+      {error ? <p role="alert">{error}</p> : null}
+    </aside>
+  );
 }
 
 export function PlanComparison() {

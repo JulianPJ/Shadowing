@@ -89,6 +89,34 @@ async function billingPage(
   };
 }
 
+test('checkout explains the server 18+ requirement and never opens Paddle when it is refused', async ({
+  page,
+}) => {
+  await billingPage(page);
+  await page.route('**/api/billing/checkout', (route) =>
+    route.fulfill({
+      status: 403,
+      json: {
+        code: 'adult-confirmation-required',
+        error: 'Subscriptions are only available to adults aged 18 or older.',
+      },
+    }),
+  );
+  await page.goto('/profile');
+  await page.getByRole('button', { name: 'View subscription options' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Hear more. Understand more.' });
+  await expect(dialog.getByText('For adults aged 18 or older.', { exact: false })).toBeVisible();
+  await dialog.getByRole('button', { name: /Continue with Annual/ }).click();
+  await expect(
+    dialog.getByText('Subscriptions are only available to adults aged 18 or older.'),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => (window as Window & { testBillingCheckout?: unknown }).testBillingCheckout,
+    ),
+  ).toBeUndefined();
+});
+
 test('monthly/annual upgrade opens sandbox Paddle overlay with an authenticated server transaction', async ({
   page,
 }) => {

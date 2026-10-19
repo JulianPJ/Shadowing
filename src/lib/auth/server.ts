@@ -1,5 +1,16 @@
 import { betterAuth } from 'better-auth';
 import type { BetterAuthOptions } from 'better-auth';
+import {
+  APIError,
+  addOAuthServerContext,
+  createAuthMiddleware,
+  getOAuthState,
+} from 'better-auth/api';
+import {
+  ADULT_CONFIRMATION_MESSAGE,
+  ADULT_CONFIRMATION_REQUIRED,
+  adultConfirmed,
+} from './eligibility';
 import { safeReturnPath } from './return-path';
 
 export type AuthEnvironment = {
@@ -43,6 +54,38 @@ export function createAuth(
     baseURL: origin,
     trustedOrigins: [origin],
     logger: { disabled: true },
+    user: {
+      // Set only by the hooks below or the account confirmation route, never by request bodies or
+      // provider profiles (`input: false`).
+      additionalFields: {
+        adultSelfDeclaredAt: { type: 'date', required: false, input: false },
+      },
+    },
+    hooks: {
+      before: createAuthMiddleware(async (ctx) => {
+        const signUp =
+          ctx.path === '/sign-up/email' ||
+          (ctx.path === '/sign-in/social' && ctx.body?.requestSignUp === true);
+        if (!signUp) return;
+        const confirmation = ctx.path === '/sign-up/email' ? ctx.body : ctx.body?.additionalData;
+        if (!adultConfirmed(confirmation)) throw adultConfirmationError();
+        // Client `additionalData` is untrusted on the callback; server context is not.
+        if (ctx.path === '/sign-in/social')
+          await addOAuthServerContext({ adultSelfDeclaredAt: Date.now() });
+      }),
+    },
+    databaseHooks: {
+      user: {
+        create: {
+          // Backstop for every user-creation path: no record of a confirmation, no account.
+          before: async (user, ctx) => {
+            const declaredAt = await adultDeclarationFor(ctx);
+            if (!declaredAt) throw adultConfirmationError();
+            return { data: { ...user, adultSelfDeclaredAt: declaredAt } };
+          },
+        },
+      },
+    },
     emailAndPassword: {
       enabled: true,
       minPasswordLength: 12,
@@ -75,6 +118,8 @@ export function createAuth(
               clientId: env.GOOGLE_CLIENT_ID,
               clientSecret: env.GOOGLE_CLIENT_SECRET,
               accessType: 'online',
+              // Google may only create an account from registration, after the 18+ confirmation.
+              disableImplicitSignUp: true,
             },
           }
         : {},
@@ -129,6 +174,25 @@ export function createAuth(
   return auth;
 }
 export type HibikiAuth = ReturnType<typeof createAuth>;
+
+function adultConfirmationError() {
+  return new APIError('FORBIDDEN', {
+    code: ADULT_CONFIRMATION_REQUIRED,
+    message: ADULT_CONFIRMATION_MESSAGE,
+  });
+}
+
+async function adultDeclarationFor(
+  ctx: { path?: string; body?: unknown } | null | undefined,
+): Promise<Date | null> {
+  if (ctx?.path === '/sign-up/email') return adultConfirmed(ctx.body) ? new Date() : null;
+  try {
+    const declared = (await getOAuthState())?.serverContext?.adultSelfDeclaredAt;
+    return typeof declared === 'number' && Number.isFinite(declared) ? new Date(declared) : null;
+  } catch {
+    return null;
+  }
+}
 
 // The application only allows these return paths, including email action redirects.
 export function allowedAuthRedirect(value: unknown, origin: string) {

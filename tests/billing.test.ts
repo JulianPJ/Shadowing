@@ -178,6 +178,7 @@ before(async () => {
         name: 'Billing learner',
         email: 'billing@example.com',
         password: 'billing-test-password-1234',
+        adultConfirmed: true,
       }),
     }),
   );
@@ -286,6 +287,37 @@ test('checkout requires a real verified Better Auth session, same origin and cur
     403,
   );
   assert.equal(apiCalls.length, 0);
+});
+
+test('checkout requires the 18+ self-declaration; status and the cancellation portal stay available', async () => {
+  const handler = billingHandler(db, auth, settings, api, now);
+  const declared = await db
+    .prepare('SELECT adultSelfDeclaredAt FROM "user" WHERE id=?')
+    .bind(userId)
+    .first<{ adultSelfDeclaredAt: string | number | null }>();
+  assert.ok(declared?.adultSelfDeclaredAt, 'registration records the self-declaration');
+  await db.prepare('UPDATE "user" SET adultSelfDeclaredAt=NULL WHERE id=?').bind(userId).run();
+  try {
+    const blocked = await handler(request('/api/billing/checkout', { interval: 'monthly' }));
+    assert.equal(blocked.status, 403);
+    assert.equal((await blocked.json()).code, 'adult-confirmation-required');
+    assert.equal((await handler(request(`/api/billing?transactionId=${id('txn')}`))).status, 403);
+    assert.equal((await handler(request('/api/billing'))).status, 200);
+    // No customer yet: the portal answers normally rather than with the eligibility gate.
+    assert.equal((await handler(request('/api/billing/portal', {}))).status, 404);
+    assert.equal(apiCalls.length, 0);
+    const intents = await db
+      .prepare('SELECT COUNT(*) n FROM billing_checkouts WHERE user_id=?')
+      .bind(userId)
+      .first<{ n: number }>();
+    assert.equal(intents?.n, 0);
+  } finally {
+    await db
+      .prepare('UPDATE "user" SET adultSelfDeclaredAt=? WHERE id=?')
+      .bind(declared!.adultSelfDeclaredAt, userId)
+      .run();
+  }
+  assert.equal((await checkout()).status, 200);
 });
 
 test('monthly and annual prices are server-owned; checkout response has no secrets or Pro grant', async () => {

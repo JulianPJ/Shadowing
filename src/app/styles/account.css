@@ -28,6 +28,20 @@
   background: var(--paper, #fff);
   font: inherit;
 }
+.auth-eligibility {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0 0 20px;
+  line-height: 1.5;
+  font-weight: 500;
+}
+.auth-eligibility input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-top: 3px;
+}
 .auth-divider {
   margin: 22px 0;
   text-align: center;

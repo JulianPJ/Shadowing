@@ -4,6 +4,7 @@ import { Eye, EyeOff } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { authClient } from '@/lib/auth/client';
+import { MINIMUM_ACCOUNT_AGE } from '@/lib/auth/eligibility';
 import { authPath, safeReturnPath } from '@/lib/auth/return-path';
 import { refreshAccount } from '@/lib/sync/client';
 import { useAccount } from './account';
@@ -13,7 +14,8 @@ export function AuthForm({ screen = 'sign-in' }: { screen?: 'sign-in' | 'registe
     account = useAccount();
   const [email, setEmail] = useState(''),
     [password, setPassword] = useState(''),
-    [name, setName] = useState('');
+    [name, setName] = useState(''),
+    [adult, setAdult] = useState(false);
   const [message, setMessage] = useState(''),
     [failed, setFailed] = useState(false),
     [busy, setBusy] = useState(false);
@@ -27,8 +29,13 @@ export function AuthForm({ screen = 'sign-in' }: { screen?: 'sign-in' | 'registe
     const params = new URLSearchParams(window.location.search);
     setToken(params.get('token'));
     setReturnTo(safeReturnPath(params.get('returnTo')));
-    if (params.get('error')) {
-      setMessage('This sign-in or email link could not be completed. Try again.');
+    const error = params.get('error');
+    if (error) {
+      setMessage(
+        error === 'signup_disabled'
+          ? 'No Hibiki account uses this Google account yet. Create an account to continue with Google.'
+          : 'This sign-in or email link could not be completed. Try again.',
+      );
       setFailed(true);
     }
   }, []);
@@ -49,13 +56,21 @@ export function AuthForm({ screen = 'sign-in' }: { screen?: 'sign-in' | 'registe
       setBusy(false);
     }
   }
+  // Better Auth forwards extra sign-up fields to its server hooks but does not type them.
+  const signUpBody = () => ({
+    email,
+    password,
+    name,
+    callbackURL: returnTo,
+    adultConfirmed: adult,
+  });
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     await run(async () => {
       setVerificationNeeded(false);
       const result =
         screen === 'register'
-          ? await authClient.signUp.email({ email, password, name, callbackURL: returnTo })
+          ? await authClient.signUp.email(signUpBody())
           : screen === 'reset'
             ? token
               ? await authClient.resetPassword({ token, newPassword: password })
@@ -103,17 +118,41 @@ export function AuthForm({ screen = 'sign-in' }: { screen?: 'sign-in' | 'registe
           Save your practice across devices. You can always practise without an account.
         </p>
         {!account.loaded ? <p role="status">Checking available sign-in methods…</p> : null}
+        {screen === 'register' ? (
+          <label className="auth-eligibility">
+            <input
+              type="checkbox"
+              name="adultConfirmed"
+              form="auth-form"
+              required
+              checked={adult}
+              onChange={(event) => setAdult(event.target.checked)}
+            />
+            <span>
+              I confirm that I am {MINIMUM_ACCOUNT_AGE} or older. Hibiki accounts and subscriptions
+              are for adults only.
+            </span>
+          </label>
+        ) : null}
         {screen !== 'reset' && account.googleEnabled ? (
           <>
             <button
               className="button full-width"
-              disabled={busy}
+              disabled={busy || (screen === 'register' && !adult)}
               onClick={() =>
                 void run(async () => {
+                  // Only registration may create an account through Google; the server requires
+                  // the same confirmation before it allows the sign-up request.
                   const result = await authClient.signIn.social({
                     provider: 'google',
                     callbackURL: returnTo,
-                    errorCallbackURL: authPath('/sign-in', returnTo),
+                    errorCallbackURL: authPath(
+                      screen === 'register' ? '/register' : '/sign-in',
+                      returnTo,
+                    ),
+                    ...(screen === 'register'
+                      ? { requestSignUp: true, additionalData: { adultConfirmed: adult } }
+                      : {}),
                   });
                   if (result.error) {
                     setMessage(result.error.message ?? 'Google sign-in could not start.');
@@ -127,7 +166,12 @@ export function AuthForm({ screen = 'sign-in' }: { screen?: 'sign-in' | 'registe
             <div className="auth-divider">or use email</div>
           </>
         ) : null}
-        <form onSubmit={(event) => void submit(event)} className="auth-form" aria-busy={busy}>
+        <form
+          id="auth-form"
+          onSubmit={(event) => void submit(event)}
+          className="auth-form"
+          aria-busy={busy}
+        >
           {screen === 'register' ? (
             <label>
               Name
@@ -203,10 +247,9 @@ export function AuthForm({ screen = 'sign-in' }: { screen?: 'sign-in' | 'registe
         {screen === 'register' ? (
           <p className="muted">
             Before registering, please read our <Link href="/terms">Terms of Service</Link> and{' '}
-            <Link href="/privacy">Privacy Policy</Link>. If you are a minor, obtain any legally
-            required parent or guardian permission and complete any required age or consent checks
-            before registering. Some regions require additional verification that Hibiki does not
-            yet provide.
+            <Link href="/privacy">Privacy Policy</Link>. Hibiki does not verify your age: we rely on
+            your confirmation and do not ask for your date of birth. If you are under{' '}
+            {MINIMUM_ACCOUNT_AGE}, please don’t create an account.
           </p>
         ) : null}
         {account.loaded && emailActionUnavailable ? (

@@ -118,7 +118,7 @@ function hasData(data: SyncData) {
   return !!data.preferences || syncCollections.some((k) => data[k].length > 0);
 }
 export function scheduleSync() {
-  if (!status.user || applying) return;
+  if (!status.user?.adultConfirmed || applying) return;
   writeStorage('sync:pending', true);
   publish({ state: 'syncing', error: '' });
   clearTimeout(timer);
@@ -161,7 +161,8 @@ export async function refreshAccount() {
       applying = false;
     }
     const saved = readStorage<string | null>('sync:last', null);
-    const skip = !!info.user && fresh(info.user.id);
+    const syncing = !!info.user?.adultConfirmed;
+    const skip = syncing && fresh(info.user!.id);
     publish({
       user: info.user,
       loaded: true,
@@ -169,14 +170,14 @@ export async function refreshAccount() {
       googleEnabled: info.googleEnabled,
       emailEnabled: info.emailEnabled,
       lastSync: saved,
-      state: info.user ? (skip ? status.state : 'syncing') : 'local',
+      state: syncing ? (skip ? status.state : 'syncing') : 'local',
       importPending:
         canUseFeature(info.user?.plan, 'learning-sync') &&
         !!info.user &&
         !!readStorage('sync:import-candidate', null) &&
         !readStorage('sync:import-decision', null),
     });
-    if (info.user) {
+    if (syncing) {
       if (!skip) await synchronize();
     } else window.dispatchEvent(new Event('hibiki:sync-hydrated'));
   } catch (error) {
@@ -211,7 +212,7 @@ export async function chooseImport(accept: boolean) {
 }
 
 export async function synchronize() {
-  if (!status.user) return;
+  if (!status.user?.adultConfirmed) return;
   if (running) {
     rerun = true;
     return;

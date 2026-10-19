@@ -225,6 +225,7 @@ test('a new account opens its own schedule while the previous account fetch is s
           email: 'learner@example.com',
           name: 'Learner',
           emailVerified: true,
+          adultConfirmed: true,
           plan: 'pro',
         },
         googleEnabled: false,

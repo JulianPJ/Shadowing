@@ -94,5 +94,7 @@ export type AccountUser = {
   email: string;
   name: string;
   emailVerified: boolean;
+  /** Self-declared 18+ eligibility; accounts without it sync nothing until the learner confirms. */
+  adultConfirmed: boolean;
   plan: 'free' | 'pro';
 };

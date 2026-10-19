@@ -8,6 +8,7 @@ const user: AccountUser = {
   email: 'learner@example.com',
   name: 'Learner',
   emailVerified: true,
+  adultConfirmed: true,
   plan: 'free',
 };
 async function services(

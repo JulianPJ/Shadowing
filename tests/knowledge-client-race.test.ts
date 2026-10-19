@@ -17,6 +17,7 @@ const user = (id: string): AccountUser => ({
   name: 'Learner',
   email: `${id}@example.com`,
   emailVerified: true,
+  adultConfirmed: true,
   plan: 'pro',
 });
 const word = (

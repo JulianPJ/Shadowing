@@ -20,6 +20,7 @@ const user: AccountUser = {
   email: 'learner@example.com',
   name: 'Learner',
   emailVerified: true,
+  adultConfirmed: true,
   plan: 'pro',
 };
 const freeUser: AccountUser = {
@@ -368,6 +369,9 @@ test('auth screens expose configured providers without offering unavailable emai
   );
 
   await page.goto('/register');
+  // Google sign-up stays disabled until the learner confirms they are 18 or older.
+  await expect(page.getByRole('button', { name: 'Continue with Google' })).toBeDisabled();
+  await page.getByRole('checkbox', { name: /I confirm that I am 18 or older/ }).check();
   await expect(page.getByRole('button', { name: 'Continue with Google' })).toBeEnabled();
   await expect(page.getByText('Google sign-in is awaiting configuration.')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Create account' })).toBeDisabled();

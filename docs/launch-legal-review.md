@@ -12,7 +12,7 @@
 - /extension-privacy.html — existing extension notice, now linked to the main policies.
 - /notices — existing open-source/dictionary attribution; unchanged.
 
-Footer links, registration references and subscription modal disclosures are included.
+Footer links, registration references, the 18+ eligibility confirmation and subscription modal disclosures are included.
 
 ## Required owner details — never invent
 
@@ -27,10 +27,31 @@ Edit src/lib/legal/operator.ts and remove the draft warning from src/components/
 - [x] Operator confirmed **never VAT registered** and **£0 gross self-employment revenue in the previous 12 months**. Public wording: **Not VAT registered**. No mandatory UK VAT registration is indicated on these facts under the current £90,000 threshold, assuming no expected >£90,000 turnover in the next 30 days.
 - [ ] Review UK VAT place-of-supply/turnover treatment for the Hibiki-to-Paddle reseller relationship and re-assess if turnover or business establishment changes (including the planned Japan move). This is not a claim that Paddle removes Hibiki's own tax obligations.
 - [x] Intended customer market: **worldwide**, wherever service and payments are legally supported; this is product intent, not a finding of global legal compliance.
-- [x] Owner's intended age policy: **minors may use the service with appropriate parent/guardian permission**, subject to applicable country-specific requirements.
+- [x] ~~Owner's earlier intended age policy: minors may use the service with parent/guardian permission.~~ **Superseded** by the initial 18+ account and subscription policy below.
 - [ ] Confirm governing law, specific countries served, and region-specific consumer and privacy requirements. Assess UK/EU representatives and DPO obligations as applicable.
-- [ ] **Worldwide minors launch gate:** assess UK Age Appropriate Design Code, UK GDPR, EU GDPR and relevant member-state digital-consent ages, US COPPA and other served markets. Determine required age assurance, verifiable guardian consent, records, content/feature restrictions, deletion and support procedures. A legal notice or guardian permission alone is not a substitute for required technical and operational protections.
-- [ ] Audit email registration, Google sign-in, checkout and account processing for under-age access. The current registration UI does not collect an age or verify guardian permission. Prevent minors who require additional legal safeguards from registering or subscribing until compliant controls exist.
+- [ ] Confirm with a qualified adviser that self-declared 18+ eligibility (below) is a proportionate initial control for each served market, or whether stronger age assurance is required anywhere.
+
+## 18+ eligibility policy (initial implementation)
+
+**What it is:** a *self-declared* eligibility check. Hibiki asks the learner to confirm they are 18 or older and stores only the time of that confirmation (`user.adultSelfDeclaredAt`). **It is not age verification or age assurance**: no date of birth, ID document, age estimation or third-party check is used, and a learner who ticks the box falsely is not detected. It does not by itself establish compliance with any law.
+
+Implemented:
+
+- [x] Email registration requires `adultConfirmed: true`; the server refuses the request otherwise (Better Auth `before` hook) and a `user.create.before` database hook refuses any user row created without a recorded confirmation.
+- [x] Google sign-in cannot create accounts implicitly (`disableImplicitSignUp`). Google sign-up is only possible from registration with `requestSignUp` plus the confirmation; the confirmation is carried in server-trusted OAuth state, not client `additionalData`.
+- [x] The stored timestamp is server-owned (`input: false`); request bodies and Google profiles cannot set it.
+- [x] Checkout (`POST /api/billing/checkout`) and opening a pending checkout require the confirmation server-side. Paddle only grants Pro through server-created checkout intents, so client-side Paddle checkouts cannot bypass it. The billing portal stays available so existing subscribers can cancel.
+- [x] Existing accounts (migration `0017` leaves them unconfirmed) keep all data. Until confirmed, account APIs (sync, vocabulary, review, word states, Watch Later/Discover) and Pro routes return `adult-confirmation-required`; `/api/account/me`, personal data export, the confirmation endpoint, billing status/portal and sign-out remain available. The app shows a confirmation prompt with an "I am under 18 — sign out" option. Nothing is deleted automatically.
+- [x] Terms, Privacy Policy, refunds notice, registration and subscription messaging updated; all state that the check is self-declared.
+
+Before release:
+
+- [ ] Run `npm run db:migrate:production` for `0017_adult_self_declaration.sql` as part of the normal deploy (it only adds a nullable column) and confirm existing users see the prompt rather than losing data.
+- [ ] Decide whether signed-out use (no account) is offered to under-18s. The UK Age Appropriate Design Code and similar laws can apply to services *likely to be accessed* by children regardless of account status; the 18+ policy currently covers accounts and subscriptions only.
+- [ ] Define the operational procedure when an under-18 account is reported or self-identified: restriction, deletion timing, refund/cancellation handling with Paddle, and records kept.
+- [ ] Decide whether existing subscribers who never confirm should be contacted (renewals continue in Paddle while their account is restricted) and how long unconfirmed accounts are retained.
+- [ ] Check whether Paddle's buyer terms/age requirements align with the 18+ policy and whether Paddle should be informed.
+- [ ] Re-confirm on material policy changes: the timestamp records *that* a confirmation happened, not which policy version; add a version field if re-confirmation is ever required.
 - [ ] Resolve remaining VAT placeholder, set approved effective date, and ensure Paddle lists the right business details.
 
 ## Data protection and cookie audit

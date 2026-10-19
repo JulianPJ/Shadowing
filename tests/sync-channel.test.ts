@@ -12,6 +12,7 @@ const user = (id: string, emailVerified = true): AccountUser => ({
   name: 'Learner',
   email: `${id}@example.com`,
   emailVerified,
+  adultConfirmed: true,
   plan: 'pro',
 });
 function deferred<T = void>() {

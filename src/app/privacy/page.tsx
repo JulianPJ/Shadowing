@@ -26,6 +26,10 @@ export default function PrivacyPage() {
             sessions and security/rate-limit information. Google sign-in is optional.
           </li>
           <li>
+            <strong>Age eligibility:</strong> the date and time you confirmed that you are 18 or
+            older. We do not collect your date of birth, identity documents or age estimates.
+          </li>
+          <li>
             <strong>Learning activity:</strong> if signed in, eligible study metadata such as video
             identifiers, titles, selected page URLs for Bridge lessons, Watch Later, timestamps,
             practice duration, quiz answers and scores, saved words and contexts, flashcard state,
@@ -66,8 +70,9 @@ export default function PrivacyPage() {
         <h2>3. Why we process data and our legal bases</h2>
         <ul>
           <li>
-            <strong>Contract:</strong> to register and authenticate accounts, provide the features
-            and sync you request, administer Pro entitlements and respond to service requests.
+            <strong>Contract:</strong> to register and authenticate accounts, record your 18+
+            eligibility confirmation, provide the features and sync you request, administer Pro
+            entitlements and respond to service requests.
           </li>
           <li>
             <strong>Legitimate interests:</strong> to prevent abuse, protect account security,
@@ -137,17 +142,22 @@ export default function PrivacyPage() {
         </p>
       </section>
       <section>
-        <h2>7. Younger learners</h2>
+        <h2>7. Age eligibility and children</h2>
         <p>
-          Hibiki may be used by minors with appropriate parent or guardian permission, where local
-          law permits. The categories of information described above may also be processed for
-          younger learners, including account identifiers and saved learning progress, as well as
-          content or audio submitted for optional features. Permission alone does not replace any
-          legally required age assurance or verifiable parental consent. We have not yet completed
-          the country-by-country checks or implemented all possible safeguards for worldwide minor
-          registration. Until required safeguards are available, affected minors must not register
-          or subscribe. Parents and guardians can contact {LEGAL_OPERATOR.privacyEmail} about
-          applicable privacy rights or a younger learner&apos;s data.
+          Hibiki accounts and subscriptions are only for people aged 18 or older. Registration by
+          email or Google requires you to confirm that you are 18 or older, and we store only the
+          time of that confirmation alongside your account. This is a self-declaration that we rely
+          on; we do not verify it, ask for a date of birth or use age-estimation technology, so it
+          is not age verification or age assurance.
+        </p>
+        <p>
+          Accounts created before this requirement keep their saved data. Until the account holder
+          confirms, we do not sync or use that data for new account features, but it can still be
+          downloaded, an existing subscription can still be managed, and deletion can be requested.
+          If you believe someone under 18 has a Hibiki account, or you are a parent or guardian with
+          a question about a child&apos;s data, contact {LEGAL_OPERATOR.privacyEmail}. We will
+          restrict the account and delete its personal data on request or where appropriate, subject
+          to any legal retention duties (for example, Paddle&apos;s transaction records).
         </p>
       </section>
       <section>

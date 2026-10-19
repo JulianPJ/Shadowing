@@ -14,6 +14,7 @@ const user: AccountUser = {
   email: 'words@example.com',
   name: 'Word learner',
   emailVerified: true,
+  adultConfirmed: true,
   plan: 'pro',
 };
 const anonymousWord: WordKnowledgeRecord = {

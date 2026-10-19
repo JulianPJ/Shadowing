@@ -20,7 +20,9 @@ export default function RefundsPage() {
           appear before you confirm payment in Paddle&apos;s secure checkout. Monthly subscriptions
           renew monthly and annual subscriptions renew annually unless cancelled. Prices shown by
           Hibiki are previews; the final amount presented at checkout takes precedence. There is
-          currently no automatic free trial in the standard plan configuration.
+          currently no automatic free trial in the standard plan configuration. Subscriptions are
+          only available to account holders who have confirmed that they are 18 or older; this
+          confirmation is self-declared and is not age verification.
         </p>
       </section>
       <section>

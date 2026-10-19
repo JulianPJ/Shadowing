@@ -37,13 +37,18 @@ export default function TermsPage() {
           Contact us promptly if you suspect unauthorised account access.
         </p>
         <p>
-          Younger learners may use Hibiki with appropriate parent or legal guardian permission,
-          subject to local law. If you cannot legally agree to these terms or consent to the
-          necessary processing yourself, a parent or guardian must review and approve your use
-          before you register or subscribe. Some places also require age checks or verifiable
-          parental consent; permission alone does not replace those requirements. Until required
-          safeguards are available, minors subject to those requirements must not register or
-          subscribe.
+          <strong>Age eligibility.</strong> You must be 18 or older to create a Hibiki account or
+          buy a Pro subscription, and you must not register or subscribe on behalf of someone under
+          18. When you register by email or with Google, and when an account created before this
+          requirement is next used, you are asked to confirm that you are 18 or older. This is a
+          self-declaration: Hibiki does not ask for your date of birth or verify your age, and the
+          confirmation is not age verification or age assurance. Until an existing account is
+          confirmed, its saved data is kept but the account can only be used to confirm, download
+          personal data, manage an existing subscription or sign out. If we have reason to believe
+          an account holder is under 18, we may restrict or close the account and will handle its
+          data and any active subscription as described in our{' '}
+          <Link href="/privacy">Privacy Policy</Link> and{' '}
+          <Link href="/refunds">subscriptions notice</Link>.
         </p>
       </section>
       <section>
