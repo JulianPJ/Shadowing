@@ -337,6 +337,42 @@
 .notices-main a {
   text-decoration: underline;
 }
+.pricing-plans {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+  margin: 24px 0;
+}
+.pricing-plan {
+  border: 1px solid var(--line, currentColor);
+  border-radius: 12px;
+  padding: 4px 16px 12px;
+}
+.pricing-plan h2 {
+  margin-top: 12px;
+}
+.pricing-price strong {
+  font-size: 28px;
+}
+.pricing-features {
+  width: 100%;
+  border-collapse: collapse;
+}
+.pricing-features th,
+.pricing-features td {
+  text-align: left;
+  padding: 8px 6px;
+  border-bottom: 1px solid var(--line, rgba(128, 128, 128, 0.3));
+  vertical-align: top;
+}
+.pricing-features th[scope='row'] {
+  font-weight: 600;
+}
+.pricing-features th span {
+  display: block;
+  font-weight: 400;
+  color: var(--muted);
+}
 .site-footer a {
   color: inherit;
   text-decoration: underline;

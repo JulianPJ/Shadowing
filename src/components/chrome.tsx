@@ -180,6 +180,7 @@ export function Footer() {
     <footer className="site-footer">
       <span>Made for a little progress, every day.</span>
       <span className="site-footer-links">
+        <Link href="/pricing">Pricing</Link>
         <Link href="/terms">Terms</Link>
         <Link href="/privacy">Privacy</Link>
         <Link href="/refunds">Subscriptions &amp; refunds</Link>

@@ -4,34 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Check, Minus, Sparkles, X } from 'lucide-react';
 import { MINIMUM_ACCOUNT_AGE } from '@/lib/auth/eligibility';
 import { billingRequest, type BillingInterval, type BillingPrices } from '@/lib/billing/client';
-
-const features: [name: string, detail: string, free: boolean][] = [
-  ['Comprehension checks', 'Questions on every lesson, with the evidence replayed', false],
-  ['Essential vocabulary', 'The topic words that matter most, with meanings', false],
-  ['Auto-generated subtitles', 'Accurate subtitles for media without captions', false],
-  ['Shadowing Match', 'See how closely your recording follows the speaker', false],
-  ['Immersion viewer', 'Discover, imports, captions, transcripts and manual replay', true],
-  ['Dictionary lookup', 'Definitions, readings and furigana', true],
-  ['Watch Later sync', 'Your watch list and basic viewer preferences across devices', true],
-  [
-    'Sentence translations',
-    'On-demand translations; subtitle-supplied translations stay Free',
-    false,
-  ],
-  ['Detailed difficulty', 'Lesson language demands and breakdowns', false],
-  [
-    'Recording and advanced drills',
-    'Recorded attempts, local diagnostics and hands-free practice',
-    false,
-  ],
-  ['Saved words and sentences', 'Word statuses, vocabulary management and Anki/CSV export', false],
-  ['Daily word review', 'Spaced review of the words you save', false],
-  [
-    'Progress and learning sync',
-    'Detailed analytics, weekly reports, daily goals and learning data across devices',
-    false,
-  ],
-];
+import { features } from '@/lib/billing/features';
 
 /** Savings and per-month figures derived from Paddle's minor-unit totals. */
 function priceDetails(prices: BillingPrices) {
