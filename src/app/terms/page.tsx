@@ -22,8 +22,9 @@ export default function TermsPage() {
           Hibiki offers a Japanese-language immersion player, interactive captions and dictionary
           lookup, and optional Pro practice features such as recording, vocabulary review, generated
           subtitles and study feedback. Features depend on account status, source availability,
-          browser compatibility and the subscription selected. We do not guarantee the availability
-          of any particular video or provider caption track.
+          browser compatibility and the subscription selected. We intend to serve learners worldwide,
+          subject to local legal requirements and any location-based restrictions. We do not guarantee
+          the availability of any particular video or provider caption track.
         </p>
       </section>
       <section>
@@ -36,8 +37,12 @@ export default function TermsPage() {
           Contact us promptly if you suspect unauthorised account access.
         </p>
         <p>
-          If you are not legally able to agree to these terms yourself, obtain any consent that is
-          required from your parent or guardian before registering or subscribing.
+          Younger learners may use Hibiki with appropriate parent or legal guardian permission,
+          subject to local law. If you cannot legally agree to these terms or consent to the necessary
+          processing yourself, a parent or guardian must review and approve your use before you
+          register or subscribe. Some places also require age checks or verifiable parental consent;
+          permission alone does not replace those requirements. Until required safeguards are
+          available, minors subject to those requirements must not register or subscribe.
         </p>
       </section>
       <section>
