@@ -29,3 +29,21 @@ test('registration links to the public legal policies', async ({ page }) => {
     page.getByRole('main').getByRole('link', { name: 'Privacy Policy' }),
   ).toHaveAttribute('href', '/privacy');
 });
+
+test('public pages do not initialize advertising, analytics or payment scripts', async ({ page }) => {
+  const unexpected: string[] = [];
+  page.on('request', (request) => {
+    const hostname = new URL(request.url()).hostname;
+    if (
+      /(?:^|\\.)(?:google-analytics\\.com|googletagmanager\\.com|doubleclick\\.net|facebook\\.net|paddle\\.com)$/.test(
+        hostname,
+      )
+    )
+      unexpected.push(hostname);
+  });
+  for (const route of ['/', '/cookies', '/privacy', '/terms']) {
+    await page.goto(route);
+    await expect(page.locator('main')).toBeVisible();
+  }
+  expect(unexpected).toEqual([]);
+});
