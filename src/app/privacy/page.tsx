@@ -137,7 +137,21 @@ export default function PrivacyPage() {
         </p>
       </section>
       <section>
-        <h2>7. Cookies and changes</h2>
+        <h2>7. Younger learners</h2>
+        <p>
+          Hibiki may be used by minors with appropriate parent or guardian permission, where local
+          law permits. The categories of information described above may also be processed for
+          younger learners, including account identifiers and saved learning progress, as well as
+          content or audio submitted for optional features. Permission alone does not replace any
+          legally required age assurance or verifiable parental consent. We have not yet completed
+          the country-by-country checks or implemented all possible safeguards for worldwide minor
+          registration. Until required safeguards are available, affected minors must not register
+          or subscribe. Parents and guardians can contact {LEGAL_OPERATOR.privacyEmail} about
+          applicable privacy rights or a younger learner&apos;s data.
+        </p>
+      </section>
+      <section>
+        <h2>8. Cookies and changes</h2>
         <p>
           Read our <Link href="/cookies">Cookie &amp; Local Storage Policy</Link> for
           authentication, theme and browser learning storage. We may update this notice as features
