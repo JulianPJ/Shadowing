@@ -50,13 +50,14 @@ export const worker = defineWorker({
     GOOGLE_CLIENT_SECRET: bindings.secret(),
     RESEND_API_KEY: bindings.secret(),
     AUTH_EMAIL_FROM: bindings.text('Hibiki <accounts@hibikiapp.net>'),
-    // Production-hosted sandbox checkout only: no live payments or charges.
+    // Live Paddle billing. Checkout stays disabled until the domain is approved and the default
+    // payment link is set; then set PADDLE_ENABLED to 'true'.
     // The two price IDs are stored as Cloudflare secrets to match existing bindings.
-    PADDLE_ENVIRONMENT: bindings.text('sandbox'),
-    PADDLE_ENABLED: bindings.text('true'),
+    PADDLE_ENVIRONMENT: bindings.text('live'),
+    PADDLE_ENABLED: bindings.text('false'),
     PADDLE_PRO_MONTHLY_PRICE_ID: bindings.secret(),
     PADDLE_PRO_ANNUAL_PRICE_ID: bindings.secret(),
-    PADDLE_CLIENT_TOKEN: bindings.text('test_8ee319c806849e54fd3431691e2'),
+    PADDLE_CLIENT_TOKEN: bindings.text('live_f3601b3b80cdb98e4263bb3b246'),
     PADDLE_API_KEY: bindings.secret(),
     PADDLE_WEBHOOK_SECRET: bindings.secret(),
     BILLING_RATE_LIMIT: bindings.rateLimit({
