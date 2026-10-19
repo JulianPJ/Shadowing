@@ -3,7 +3,15 @@ import { CurrentSection } from './current-section';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, ArrowRight, Keyboard, Upload } from 'lucide-react';
+import {
+  ArrowLeft,
+  ArrowRight,
+  Captions,
+  Languages,
+  Keyboard,
+  Upload,
+  PanelTop,
+} from 'lucide-react';
 import type { Lesson, Mode, PlaybackState, QuizEvidence } from '@/lib/types';
 import { writeStorage } from '@/lib/storage/browser';
 import { saveLesson, saveLessonPosition } from '@/lib/storage/lessons';
@@ -12,7 +20,6 @@ import { loadFavorites, loadPreferences, type Preferences } from '@/lib/storage/
 import { createElapsedStore } from './elapsed-store';
 import { transcriptLabel, whisperUpgradePath } from '@/lib/caption-labels';
 import { PracticeSettings } from './practice-settings';
-import { PracticeSidePanel } from './practice-side-panel';
 import { lessonMedia, sourceLabel, MEDIA_ACCEPT, validateMediaFile } from '@/lib/media';
 import { localMediaFile, localMediaUrl } from '@/lib/local-media-file';
 import { timestamp } from '@/lib/youtube';
@@ -847,6 +854,34 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
         <span>/</span>
         <span>{sourceLabel(lesson)}</span>
         <span className="studio-lesson-identity">{lesson.title}</span>
+        <div className="practice-view-controls" aria-label="Practice display">
+          <button
+            className="button"
+            aria-pressed={studioMode}
+            onClick={() => setStudioMode((value) => !value)}
+          >
+            <PanelTop size={16} />
+            Studio Mode
+          </button>
+          {studioMode ? (
+            <button
+              className="button"
+              aria-pressed={subtitleOverlay}
+              onClick={() => setSubtitleOverlay((value) => !value)}
+            >
+              <Captions size={16} />
+              Subtitles on video
+            </button>
+          ) : null}
+          <button
+            className="button"
+            aria-pressed={furigana}
+            onClick={() => setFurigana((value) => !value)}
+          >
+            <Languages size={16} />
+            Furigana
+          </button>
+        </div>
       </div>
       <div className="practice-title">
         <div>
@@ -862,17 +897,54 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
           </p>
         </div>
       </div>
-      <div className="practice-layout">
-        <PracticeSidePanel
-          preset={drill.preset}
-          speed={speed}
-          studioMode={studioMode}
-          setStudioMode={setStudioMode}
-          subtitleOverlay={subtitleOverlay}
-          setSubtitleOverlay={setSubtitleOverlay}
-          furigana={furigana}
-          setFurigana={setFurigana}
-        >
+      <div className="practice-grid" ref={practiceArea}>
+        <div className="player-column">
+          <MediaPlayer
+            ref={media}
+            lesson={lesson}
+            initialTime={
+              returnPosition?.mediaTime ?? mediaTimeFor(lesson.segments[openingIndex].start)
+            }
+            speed={speed}
+            onReady={onReady}
+            onPlaying={onPlaying}
+            onEnded={onEnded}
+            onError={onMediaError}
+            caption={segment.japanese}
+            overlay={
+              studioMode && subtitleOverlay ? (
+                // The current-section card carries the same text for assistive technology.
+                <div className="subtitle-overlay" aria-hidden="true">
+                  <JapaneseText text={segment.japanese} furigana={furigana} />
+                </div>
+              ) : undefined
+            }
+          />
+          {replayRange ? (
+            <div className="evidence-banner" role="status">
+              <span>
+                {evidenceQuestion} · Replay {timestamp(replayRange.start)} –{' '}
+                {timestamp(replayRange.end)}
+                <small>Your answer is kept. Playback stops at the end of this excerpt.</small>
+              </span>
+              <button className="button" onClick={returnToQuiz}>
+                Return to question
+                <ArrowRight size={16} />
+              </button>
+            </div>
+          ) : null}
+          {lessonMedia(lesson).type === 'local' && !lesson.mediaUrl ? (
+            <label className="reattach button">
+              <Upload size={16} />
+              Reattach {lesson.mediaName || 'your media'}
+              <input
+                aria-label="Reattach media"
+                type="file"
+                accept={MEDIA_ACCEPT}
+                onChange={(event) => reattach(event.target.files?.[0])}
+              />
+            </label>
+          ) : null}
           <PracticeSettings
             mode={mode}
             drill={drill}
@@ -901,210 +973,160 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
               setStatus('paused');
             }}
           />
-        </PracticeSidePanel>
-        <div className="practice-grid" ref={practiceArea}>
-          <div className="player-column">
-            <MediaPlayer
-              ref={media}
+          <div className="practice-current-stack">
+            <CurrentSection
               lesson={lesson}
-              initialTime={
-                returnPosition?.mediaTime ?? mediaTimeFor(lesson.segments[openingIndex].start)
-              }
-              speed={speed}
-              onReady={onReady}
-              onPlaying={onPlaying}
-              onEnded={onEnded}
-              onError={onMediaError}
-              caption={segment.japanese}
-              overlay={
-                studioMode && subtitleOverlay ? (
-                  // The current-section card carries the same text for assistive technology.
-                  <div className="subtitle-overlay" aria-hidden="true">
-                    <JapaneseText text={segment.japanese} furigana={furigana} />
-                  </div>
-                ) : undefined
-              }
+              recording={recording}
+              status={status}
+              stateLabel={stateLabel}
+              segment={segment}
+              furigana={furigana}
+              revealed={revealed}
+              translating={translating}
+              revealTranslation={revealTranslation}
+              isFavorite={isFavorite}
+              toggleFavorite={toggleFavorite}
+              translation={translation}
+              translationProvider={translationProvider}
+              translationError={translationError}
+              setTranslationError={setTranslationError}
+              elapsed={elapsed}
+              ready={ready}
+              index={index}
+              navigate={navigate}
+              replaySection={replaySection}
+              mode={mode}
+              isPlaying={isPlaying}
+              togglePlayback={togglePlayback}
+              continuePractice={continuePractice}
+              lastIndex={lesson.segments.length - 1}
             />
-            {replayRange ? (
-              <div className="evidence-banner" role="status">
-                <span>
-                  {evidenceQuestion} · Replay {timestamp(replayRange.start)} –{' '}
-                  {timestamp(replayRange.end)}
-                  <small>Your answer is kept. Playback stops at the end of this excerpt.</small>
-                </span>
-                <button className="button" onClick={returnToQuiz}>
-                  Return to question
-                  <ArrowRight size={16} />
-                </button>
-              </div>
-            ) : null}
-            {lessonMedia(lesson).type === 'local' && !lesson.mediaUrl ? (
-              <label className="reattach button">
-                <Upload size={16} />
-                Reattach {lesson.mediaName || 'your media'}
-                <input
-                  aria-label="Reattach media"
-                  type="file"
-                  accept={MEDIA_ACCEPT}
-                  onChange={(event) => reattach(event.target.files?.[0])}
-                />
-              </label>
-            ) : null}
-            <div className="practice-current-stack">
-              <CurrentSection
-                lesson={lesson}
-                recording={recording}
-                status={status}
-                stateLabel={stateLabel}
-                segment={segment}
-                furigana={furigana}
-                revealed={revealed}
-                translating={translating}
-                revealTranslation={revealTranslation}
-                isFavorite={isFavorite}
-                toggleFavorite={toggleFavorite}
-                translation={translation}
-                translationProvider={translationProvider}
-                translationError={translationError}
-                setTranslationError={setTranslationError}
-                elapsed={elapsed}
-                ready={ready}
-                index={index}
-                navigate={navigate}
-                replaySection={replaySection}
-                mode={mode}
-                isPlaying={isPlaying}
-                togglePlayback={togglePlayback}
-                continuePractice={continuePractice}
-                lastIndex={lesson.segments.length - 1}
-              />
 
-              <VoiceRecorder
-                ref={recorder}
-                key={segment.id}
-                enabled={ready && !isPlaying}
-                nativePlaying={isPlaying}
-                onBeforeRecord={pauseForRecording}
-                onRecording={setRecording}
-                onAttempt={() => recordSignal(segment, 'recording-attempt')}
-                analysis={currentShadowingResult}
-                analyzing={scoringSection === segment.id}
-                analysisError={scoringError}
-                onAnalyze={analyzeShadowing}
-                onNewRecording={() => setScoringError('')}
-                recentAttempts={shadowingScores.recentAttempts?.[segment.id]}
-                onManualStop={stopAutomation}
-                referenceAudio={accessibleReference ? referenceAudio : undefined}
-              />
-            </div>
-            <nav className="practice-tool-navigation" aria-label="Lesson tools">
-              {(
-                [
-                  ['transcript', 'Transcript', 'practice-transcript'],
-                  ['vocabulary', 'Vocabulary', 'practice-vocabulary'],
-                  ['review', 'Lesson review', 'practice-review'],
-                ] as const
-              )
-                .filter(([tool]) => studioMode || tool !== 'transcript')
-                .map(([tool, label, target]) => (
-                  <button
-                    key={tool}
-                    className="button"
-                    aria-pressed={activeTool === tool}
-                    aria-controls={target}
-                    onClick={() => setSecondaryTool(tool)}
-                  >
-                    {label}
-                  </button>
-                ))}
-            </nav>
-            <div
-              id="practice-vocabulary"
-              className="practice-secondary-pane"
-              hidden={activeTool !== 'vocabulary'}
-            >
-              <LessonVocabulary
-                active={activeTool === 'vocabulary'}
-                lesson={lesson}
-                onPractice={(sectionId) => {
-                  const targetIndex = lesson.segments.findIndex((s) => s.id === sectionId);
-                  if (targetIndex >= 0) navigate(targetIndex, ready);
-                }}
-                onFilter={filterRecommendations}
-                filterActive={recommendedSegmentIds !== null}
-              />
-            </div>
-            <div
-              id="practice-review"
-              className="practice-secondary-pane"
-              hidden={activeTool !== 'review'}
-            >
-              <LessonCompletionSummary
-                lesson={lesson}
-                finished={finished}
-                scores={shadowingScores}
-                aggregate={shadowingAggregate}
-                summary={currentShadowingSummary}
-                summaryLoading={summaryLoading}
-                onSummarize={isPro ? summarizeShadowing : undefined}
-                onPracticeAgain={() => navigate(0, false)}
-                onReview={(segmentIndex) => navigate(segmentIndex)}
-                favorites={favorites}
-                onDifficultyWaiting={setDifficultyWaiting}
-                quiz={{
-                  furigana,
-                  ready,
-                  recording,
-                  replaying: !!replayRange,
-                  onReplay: replayEvidence,
-                  onReturn: returnToQuiz,
-                  onOpenChange: (open) => {
-                    if (open) setSecondaryTool('review');
-                    stopAutomation();
-                    setQuizOpen(open);
-                    if (!open && replayRange) returnToQuiz();
-                    else if (open) {
-                      media.current?.pause();
-                      setStatus('paused');
-                    }
-                  },
-                  available: completed,
-                }}
-              />
-            </div>
-            {playbackError ? (
-              <p role="alert" className="error-message">
-                {playbackError}
-              </p>
-            ) : null}
-            <div className="player-footnote">
-              <span>{transcriptLabel(lesson)}</span>
-              {whisperUpgradePath(lesson) ? (
-                <Link className="text-button" href={whisperUpgradePath(lesson)!}>
-                  Improve with Whisper
-                </Link>
-              ) : null}
-              <button className="text-button" onClick={onHelp}>
-                <Keyboard size={14} />
-                Shortcuts
-              </button>
-            </div>
+            <VoiceRecorder
+              ref={recorder}
+              key={segment.id}
+              enabled={ready && !isPlaying}
+              nativePlaying={isPlaying}
+              onBeforeRecord={pauseForRecording}
+              onRecording={setRecording}
+              onAttempt={() => recordSignal(segment, 'recording-attempt')}
+              analysis={currentShadowingResult}
+              analyzing={scoringSection === segment.id}
+              analysisError={scoringError}
+              onAnalyze={analyzeShadowing}
+              onNewRecording={() => setScoringError('')}
+              recentAttempts={shadowingScores.recentAttempts?.[segment.id]}
+              onManualStop={stopAutomation}
+              referenceAudio={accessibleReference ? referenceAudio : undefined}
+            />
           </div>
-          <TranscriptPanel
-            hidden={activeTool !== 'transcript' && studioMode}
-            lesson={lesson}
-            index={index}
-            favorites={isPro ? favorites : []}
-            recording={recording}
-            ready={ready}
-            furigana={furigana}
-            mode={mode}
-            practiceCount={practiceCount}
-            navigate={navigate}
-            recommendedSegmentIds={isPro ? recommendedSegmentIds : null}
-            onClearRecommendations={clearRecommendations}
-          />
+          <nav className="practice-tool-navigation" aria-label="Lesson tools">
+            {(
+              [
+                ['transcript', 'Transcript', 'practice-transcript'],
+                ['vocabulary', 'Vocabulary', 'practice-vocabulary'],
+                ['review', 'Lesson review', 'practice-review'],
+              ] as const
+            )
+              .filter(([tool]) => studioMode || tool !== 'transcript')
+              .map(([tool, label, target]) => (
+                <button
+                  key={tool}
+                  className="button"
+                  aria-pressed={activeTool === tool}
+                  aria-controls={target}
+                  onClick={() => setSecondaryTool(tool)}
+                >
+                  {label}
+                </button>
+              ))}
+          </nav>
+          <div
+            id="practice-vocabulary"
+            className="practice-secondary-pane"
+            hidden={activeTool !== 'vocabulary'}
+          >
+            <LessonVocabulary
+              active={activeTool === 'vocabulary'}
+              lesson={lesson}
+              onPractice={(sectionId) => {
+                const targetIndex = lesson.segments.findIndex((s) => s.id === sectionId);
+                if (targetIndex >= 0) navigate(targetIndex, ready);
+              }}
+              onFilter={filterRecommendations}
+              filterActive={recommendedSegmentIds !== null}
+            />
+          </div>
+          <div
+            id="practice-review"
+            className="practice-secondary-pane"
+            hidden={activeTool !== 'review'}
+          >
+            <LessonCompletionSummary
+              lesson={lesson}
+              finished={finished}
+              scores={shadowingScores}
+              aggregate={shadowingAggregate}
+              summary={currentShadowingSummary}
+              summaryLoading={summaryLoading}
+              onSummarize={isPro ? summarizeShadowing : undefined}
+              onPracticeAgain={() => navigate(0, false)}
+              onReview={(segmentIndex) => navigate(segmentIndex)}
+              favorites={favorites}
+              onDifficultyWaiting={setDifficultyWaiting}
+              quiz={{
+                furigana,
+                ready,
+                recording,
+                replaying: !!replayRange,
+                onReplay: replayEvidence,
+                onReturn: returnToQuiz,
+                onOpenChange: (open) => {
+                  if (open) setSecondaryTool('review');
+                  stopAutomation();
+                  setQuizOpen(open);
+                  if (!open && replayRange) returnToQuiz();
+                  else if (open) {
+                    media.current?.pause();
+                    setStatus('paused');
+                  }
+                },
+                available: completed,
+              }}
+            />
+          </div>
+          {playbackError ? (
+            <p role="alert" className="error-message">
+              {playbackError}
+            </p>
+          ) : null}
+          <div className="player-footnote">
+            <span>{transcriptLabel(lesson)}</span>
+            {whisperUpgradePath(lesson) ? (
+              <Link className="text-button" href={whisperUpgradePath(lesson)!}>
+                Improve with Whisper
+              </Link>
+            ) : null}
+            <button className="text-button" onClick={onHelp}>
+              <Keyboard size={14} />
+              Shortcuts
+            </button>
+          </div>
         </div>
+        <TranscriptPanel
+          hidden={activeTool !== 'transcript' && studioMode}
+          lesson={lesson}
+          index={index}
+          favorites={isPro ? favorites : []}
+          recording={recording}
+          ready={ready}
+          furigana={furigana}
+          mode={mode}
+          practiceCount={practiceCount}
+          navigate={navigate}
+          recommendedSegmentIds={isPro ? recommendedSegmentIds : null}
+          onClearRecommendations={clearRecommendations}
+        />
       </div>
     </main>
   );

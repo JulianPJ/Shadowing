@@ -7,7 +7,6 @@ import { createQuiz } from '../../src/lib/quiz/document';
 import { transcriptRevision } from '../../src/lib/transcript';
 import type { Lesson } from '../../src/lib/types';
 import { mockProAccount, proStorageKey } from '../helpers/pro-account';
-import { openPracticeOptions } from '../helpers/practice-options';
 
 async function open(page: Page) {
   await page.goto('/practice/demo');
@@ -61,8 +60,6 @@ test('display defaults, lazy assets, Studio playback continuity, navigation and 
   });
   await studio(page).click();
   await expect(page.locator('.practice-main')).toHaveClass(/studio-mode/);
-  // Studio opens on the options rail; the settings tree stays mounted behind it.
-  await openPracticeOptions(page);
   await expect(offset).toBeVisible();
   await expect(offset).toHaveText('+350 ms');
   const after = await page.locator('video').evaluate((v: HTMLVideoElement) => ({
@@ -108,7 +105,6 @@ test('display defaults, lazy assets, Studio playback continuity, navigation and 
   await expect(studio(page)).toHaveAttribute('aria-pressed', 'true');
   await page.reload();
   await expect(studio(page)).toHaveAttribute('aria-pressed', 'true');
-  await openPracticeOptions(page);
   await expect(page.getByRole('combobox', { name: 'Playback speed' })).toHaveValue('0.75');
   await page.getByText('Advanced settings', { exact: true }).click();
   await expect(page.getByRole('button', { name: 'Reset playback timing offset' })).toHaveText(

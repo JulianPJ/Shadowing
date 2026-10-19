@@ -5,16 +5,13 @@ import { createQuiz } from '../../src/lib/quiz/document';
 import { transcriptRevision } from '../../src/lib/transcript';
 import type { Lesson } from '../../src/lib/types';
 import { mockProAccount, proStorageKey } from '../helpers/pro-account';
-import { openPracticeOptions } from '../helpers/practice-options';
 
 async function finishLesson(page: Page, continuous = false) {
   await page.goto('/practice/demo');
   await expect(page.getByRole('button', { name: 'Listen', exact: true })).toBeEnabled();
   await expect(page.getByRole('button', { name: 'Take comprehension check' })).toHaveCount(0);
-  if (continuous) {
-    await openPracticeOptions(page);
+  if (continuous)
     await page.getByLabel('Practice preset', { exact: true }).selectOption('continuous');
-  }
   await page.getByTestId(`transcript-${demo.segments.length - 1}`).click();
   // Let the final short section end naturally: seeking while play() is pending
   // aborts native playback in Chromium and tests a different recovery path.
