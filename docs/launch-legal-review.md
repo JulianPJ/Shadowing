@@ -20,9 +20,9 @@ Edit src/lib/legal/operator.ts and remove the draft warning from src/components/
 
 - [x] Business structure confirmed by operator: **sole trader** (not a limited company).
 - [x] Hibiki identified as the trading name.
-- [ ] Full legal name of the individual trading as Hibiki; verify country of establishment (UK is expected, not yet explicitly confirmed).
-- [ ] Geographic business address that can lawfully be published; use an appropriate genuine business/service address if needed.
-- [ ] Monitored public support email and monitored privacy/data-rights contact email. Test inbound receipt; the configured outbound Resend sender is not evidence of an inbox.
+- [x] Operator-provided full legal name: Julian Popovski-Jones; UK establishment details recorded based on UK sole-trader operation.
+- [x] Operator supplied a London business address and explicitly authorised its publication. Confirm ability to use it for legal notices before final release.
+- [x] Operator supplied a shared public support and privacy email address: hibiki.dev.shadowing@gmail.com. [ ] Test inbound receipt and response workflow before release.
 - [x] No Companies House company registration number is required merely for operating as a sole trader. Do not publish a private UTR, National Insurance number or other tax identifier.
 - [ ] VAT registration status and VAT number if registered; confirm the correct public wording.
 - [ ] Confirm governing law, primary customer markets and under-age account/consent approach; check whether a DPO or UK/EU representative is needed.
