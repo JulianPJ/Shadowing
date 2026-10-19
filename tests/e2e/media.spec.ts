@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import fs from 'node:fs';
 import demo from '../../src/data/demo.json' with { type: 'json' };
 import { mockProAccount } from '../helpers/pro-account';
+import { openPracticeOptions } from '../helpers/practice-options';
 
 const id = 'IJ6R4u05ppw';
 const videoUrl = `https://www.youtube.com/watch?v=${id}`;
@@ -312,6 +313,7 @@ for (const extension of ['ass', 'ssa'])
     await page.screenshot({ path: `artifacts/import-${extension}-mobile.png`, fullPage: true });
     await page.getByRole('button', { name: 'Start practicing', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Listen', exact: true })).toBeEnabled();
+    await openPracticeOptions(page);
     await page.getByRole('combobox', { name: 'Playback speed' }).selectOption('1.25');
     await page.getByRole('button', { name: 'Listen', exact: true }).click();
     await expect(page.getByTestId('playback-state')).toContainText('YOUR TURN');
