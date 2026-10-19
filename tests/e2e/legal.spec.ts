@@ -8,7 +8,9 @@ const policies = [
   ['/contact', 'Contact & business details'],
 ] as const;
 
-test('public legal pages render and footer links are available without signing in', async ({ page }) => {
+test('public legal pages render and footer links are available without signing in', async ({
+  page,
+}) => {
   for (const [route, heading] of policies) {
     await page.goto(route);
     await expect(page.getByRole('main').getByRole('heading', { name: heading })).toBeVisible();
@@ -20,12 +22,10 @@ test('public legal pages render and footer links are available without signing i
 
 test('registration links to the public legal policies', async ({ page }) => {
   await page.goto('/register');
-  await expect(page.getByRole('main').getByRole('link', { name: 'Terms of Service' })).toHaveAttribute(
-    'href',
-    '/terms',
-  );
-  await expect(page.getByRole('main').getByRole('link', { name: 'Privacy Policy' })).toHaveAttribute(
-    'href',
-    '/privacy',
-  );
+  await expect(
+    page.getByRole('main').getByRole('link', { name: 'Terms of Service' }),
+  ).toHaveAttribute('href', '/terms');
+  await expect(
+    page.getByRole('main').getByRole('link', { name: 'Privacy Policy' }),
+  ).toHaveAttribute('href', '/privacy');
 });
