@@ -21,12 +21,16 @@ Edit src/lib/legal/operator.ts and remove the draft warning from src/components/
 - [x] Business structure confirmed by operator: **sole trader** (not a limited company).
 - [x] Hibiki identified as the trading name.
 - [x] Operator-provided full legal name: Julian Popovski-Jones; UK establishment details recorded based on UK sole-trader operation.
-- [x] Operator supplied a London business address and explicitly authorised its publication. Confirm ability to use it for legal notices before final release.
-- [x] Operator supplied a shared public support and privacy email address: hibiki.dev.shadowing@gmail.com. [ ] Test inbound receipt and response workflow before release.
+- [x] Operator supplied a London business address, authorised its publication, and confirmed it can receive official business/legal correspondence. Independently confirm it meets relevant geographic establishment and other legal-notice requirements before final release.
+- [x] Operator supplied a shared public support and privacy email address: hibiki.dev.shadowing@gmail.com, and confirmed the inbox can receive and reply. Independently test support and privacy handling before release.
 - [x] No Companies House company registration number is required merely for operating as a sole trader. Do not publish a private UTR, National Insurance number or other tax identifier.
-- [ ] VAT registration status and VAT number if registered; confirm the correct public wording.
-- [ ] Confirm governing law, primary customer markets and under-age account/consent approach; check whether a DPO or UK/EU representative is needed.
-- [ ] Replace all placeholders, set approved effective date, and ensure Paddle lists the right business details.
+- [ ] VAT status is **unknown** (operator explicitly answered unsure). Do not claim unregistered, remove the placeholder, or invent a VAT number; establish the correct status and public wording before release.
+- [x] Intended customer market: **worldwide**, wherever service and payments are legally supported; this is product intent, not a finding of global legal compliance.
+- [x] Owner's intended age policy: **minors may use the service with appropriate parent/guardian permission**, subject to applicable country-specific requirements.
+- [ ] Confirm governing law, specific countries served, and region-specific consumer and privacy requirements. Assess UK/EU representatives and DPO obligations as applicable.
+- [ ] **Worldwide minors launch gate:** assess UK Age Appropriate Design Code, UK GDPR, EU GDPR and relevant member-state digital-consent ages, US COPPA and other served markets. Determine required age assurance, verifiable guardian consent, records, content/feature restrictions, deletion and support procedures. A legal notice or guardian permission alone is not a substitute for required technical and operational protections.
+- [ ] Audit email registration, Google sign-in, checkout and account processing for under-age access. The current registration UI does not collect an age or verify guardian permission. Prevent minors who require additional legal safeguards from registering or subscribing until compliant controls exist.
+- [ ] Resolve remaining VAT placeholder, set approved effective date, and ensure Paddle lists the right business details.
 
 ## Data protection and cookie audit
 
