@@ -6,7 +6,7 @@ export function LegalShell({ title, children }: { title: string; children: React
     <main className="notices-main">
       <h1>{title}</h1>
       <p className="muted">
-        Drafted 19 October 2026. Final effective date to be confirmed before publication.
+        Effective date: 19 October 2026.
       </p>
       {children}
       <p>
