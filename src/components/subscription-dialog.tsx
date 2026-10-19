@@ -244,7 +244,7 @@ export function SubscriptionDialog({
           Renewing subscription. Cancels at the end of your paid billing period. See our{' '}
           <Link href="/terms">Terms</Link>,{' '}
           <Link href="/refunds">cancellation and refund information</Link> and{' '}
-          <Link href="/privacy">Privacy Policy</Link>. Paddle's{' '}
+          <Link href="/privacy">Privacy Policy</Link>. Paddle&apos;s{' '}
           <a href="https://www.paddle.com/legal/buyer-terms">Buyer Terms</a> also apply.
         </p>
       </footer>
