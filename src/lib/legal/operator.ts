@@ -1,6 +1,5 @@
 /**
- * LAUNCH BLOCKER: replace each bracketed value with verified public trader details before merging.
- * Do not infer these from the GitHub account, domain registration or payment provider.
+ * Public UK sole-trader details supplied and authorised for publication by the operator.
  * Keep one source of truth across every public legal page.
  */
 export const LEGAL_OPERATOR = {
