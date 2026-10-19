@@ -11,7 +11,7 @@ export default function TermsPage() {
       <p>
         These terms apply to your use of Hibiki at <a href="https://hibikiapp.net">hibikiapp.net</a>{' '}
         and its companion browser extension, Hibiki Bridge. The service is operated by{' '}
-        <strong>{LEGAL_OPERATOR.name}</strong>, established in {LEGAL_OPERATOR.establishedIn}, with
+        <strong>{LEGAL_OPERATOR.name}</strong>, a sole trader trading as {LEGAL_OPERATOR.tradingName}, established in {LEGAL_OPERATOR.establishedIn}, with
         business address {LEGAL_OPERATOR.address}. The operator&apos;s contact details are on our{' '}
         <Link href="/contact">Contact page</Link>.
       </p>
