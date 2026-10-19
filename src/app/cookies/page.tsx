@@ -56,11 +56,10 @@ export default function CookiesPage() {
         <p>
           Strictly necessary cookies can be used to provide authentication and security.
           Hibiki does not configure advertising pixels or analytics trackers in its application
-          source. However, embedded providers may set non-essential storage, and the operator must
-          audit their actual browser behaviour and the applicable exemptions before publishing.
-          If any non-essential storage requires prior consent, the relevant integration must be
-          withheld until valid consent or another legally compliant approach is in place. A privacy
-          notice alone does not replace a required consent mechanism.
+          source. Embedded media providers may still use storage for playback, security or other
+          purposes. We explain when their players connect and use privacy-enhanced player settings
+          where supported. Storage that is not necessary for a service you request may require
+          consent; publishing this notice alone does not replace that requirement.
         </p>
         <p>
           You can clear cookies and local storage in your browser settings, or remove selected
