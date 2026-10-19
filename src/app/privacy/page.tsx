@@ -11,7 +11,8 @@ export default function PrivacyPage() {
       <p>
         This policy explains how Hibiki handles personal information when you use the website, a
         Hibiki account and the Hibiki Bridge extension. The operator and data controller for Hibiki
-        account and learning information is <strong>{LEGAL_OPERATOR.name}</strong>, a sole trader trading as {LEGAL_OPERATOR.tradingName}, established in{' '}
+        account and learning information is <strong>{LEGAL_OPERATOR.name}</strong>, a sole
+        trader trading as {LEGAL_OPERATOR.tradingName}, established in{' '}
         {LEGAL_OPERATOR.establishedIn}, with business address {LEGAL_OPERATOR.address} and privacy
         contact {LEGAL_OPERATOR.privacyEmail}. Paddle separately handles transaction data as
         merchant of record under its own privacy notice.
