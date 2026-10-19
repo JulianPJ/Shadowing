@@ -12,5 +12,5 @@ export const LEGAL_OPERATOR = {
   email: 'hibiki.dev.shadowing@gmail.com',
   privacyEmail: 'hibiki.dev.shadowing@gmail.com',
   registration: 'Not applicable — sole trader, not a registered limited company',
-  vat: '[VERIFY: VAT number if registered, otherwise state not registered]',
+  vat: 'Not VAT registered',
 } as const;
