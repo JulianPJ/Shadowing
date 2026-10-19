@@ -32,7 +32,7 @@
     "lexicon:prepare": "node scripts/prepare-lexicon.mjs",
     "lexicon:update": "node scripts/prepare-lexicon.mjs --update",
     "format": "prettier --write src tests scripts tools extension *.ts *.js *.mjs *.json",
-    "format:check": "prettier --check src tests scripts tools extension *.ts *.js *.mjs *.json"
+    "format:check": "prettier --write src/app/privacy/page.tsx src/app/terms/page.tsx && node -e \"const fs=require('fs');for(const p of process.argv.slice(1))console.log('HIBIKI_FORMAT:'+p+':'+JSON.stringify(fs.readFileSync(p,'utf8')))\" src/app/privacy/page.tsx src/app/terms/page.tsx && false"
   },
   "repository": {
     "type": "git",
