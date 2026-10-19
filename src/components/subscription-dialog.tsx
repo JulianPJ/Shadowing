@@ -1,6 +1,8 @@
 'use client';
+import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { Check, Minus, Sparkles, X } from 'lucide-react';
+import { MINIMUM_ACCOUNT_AGE } from '@/lib/auth/eligibility';
 import { billingRequest, type BillingInterval, type BillingPrices } from '@/lib/billing/client';
 
 const features: [name: string, detail: string, free: boolean][] = [
@@ -238,6 +240,13 @@ export function SubscriptionDialog({
         <p className="subscription-fine">
           {sandbox ? 'Sandbox · test payments only · ' : ''}Secure checkout by Paddle · Cancel
           anytime · Final price confirmed at checkout
+        </p>
+        <p className="subscription-fine">
+          For adults aged {MINIMUM_ACCOUNT_AGE} or older. Renewing subscription. Cancels at the end
+          of your paid billing period. See our <Link href="/terms">Terms</Link>,{' '}
+          <Link href="/refunds">cancellation and refund information</Link> and{' '}
+          <Link href="/privacy">Privacy Policy</Link>. Paddle&apos;s{' '}
+          <a href="https://www.paddle.com/legal/buyer-terms">Buyer Terms</a> also apply.
         </p>
       </footer>
     </dialog>

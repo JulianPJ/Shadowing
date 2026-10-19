@@ -1,4 +1,5 @@
 import type { HibikiAuth } from './auth/server';
+import { adultConfirmationRequiredResponse, hasAdultSelfDeclaration } from './auth/eligibility';
 import type { BillingEnvironment } from './billing/config';
 
 export type AccessPlan = 'free' | 'pro';
@@ -93,6 +94,7 @@ export async function requirePro(
       { code: 'sign-in-required', error: 'Sign in to use Hibiki Pro features.' },
       { status: 401, headers: { 'Cache-Control': 'no-store', Vary: 'Cookie' } },
     );
+  if (!hasAdultSelfDeclaration(session.user)) return adultConfirmationRequiredResponse();
   if ((await access.plan(session.user.id)) !== 'pro') return proRequiredResponse();
   return null;
 }

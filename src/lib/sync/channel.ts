@@ -82,9 +82,10 @@ export function createSyncChannel(options: {
   function sync({ force = false }: { force?: boolean } = {}): Promise<void> {
     const owner = storageAccount(),
       user = syncStatus().user;
-    // Signed-out data stays on this device. Unverified accounts cannot sync until they verify,
-    // and asking anyway would surface a 403 as an expired session.
-    if (!owner || user?.id !== owner || !user.emailVerified) return Promise.resolve();
+    // Signed-out data stays on this device. Unverified or unconfirmed (18+) accounts cannot sync
+    // until they verify/confirm, and asking anyway would surface a 403 as an expired session.
+    if (!owner || user?.id !== owner || !user.emailVerified || !user.adultConfirmed)
+      return Promise.resolve();
     if (options.channel !== 'discovery' && !canUseFeature(user.plan, 'learning-sync'))
       return Promise.resolve();
     const active = running.get(owner);
@@ -144,7 +145,7 @@ export function startChannels(channels: SyncChannelHandle[], pollMs = 60_000) {
   };
   const identityChanged = () => {
     const user = syncStatus().user;
-    const next = `${storageAccount() ?? ''}:${user?.id ?? ''}:${user?.emailVerified ?? false}:${user?.plan ?? 'free'}`;
+    const next = `${storageAccount() ?? ''}:${user?.id ?? ''}:${user?.emailVerified ?? false}:${user?.adultConfirmed ?? false}:${user?.plan ?? 'free'}`;
     if (next === identity) return;
     identity = next;
     each(true);

@@ -1,4 +1,5 @@
 import type { HibikiAuth } from '../auth/server';
+import { hasAdultSelfDeclaration, MINIMUM_ACCOUNT_AGE } from '../auth/eligibility';
 import { BodyLimitError, readBoundedText } from '../http-body';
 import { billingConfigured, billingEnvironment, paddleId, type BillingSettings } from './config';
 import { object, paddleApi, type PaddleRequest } from './paddle';
@@ -31,12 +32,22 @@ export function billingHandler(
       const session = await auth.api.getSession({ headers: request.headers });
       if (!session) return respond({ error: 'Sign in to manage your subscription.' }, 401);
       const userId = session.user.id;
+      const adult = hasAdultSelfDeclaration(session.user);
+      const adultRequired = () =>
+        respond(
+          {
+            code: 'adult-confirmation-required',
+            error: `Subscriptions are only available to adults aged ${MINIMUM_ACCOUNT_AGE} or older.`,
+          },
+          403,
+        );
       if (request.headers.get('X-Hibiki-Account') !== userId)
         return respond({ error: 'Account changed. Refresh your session.' }, 409);
       const repo = new BillingRepository(db, billingEnvironment(settings));
       if (request.method === 'GET' && url.pathname === '/api/billing') {
         const subscriptions = await repo.subscriptions(userId);
         const transactionId = url.searchParams.get('transactionId');
+        if (transactionId && !adult) return adultRequired();
         if (
           transactionId &&
           (!session.user.emailVerified ||
@@ -109,6 +120,7 @@ export function billingHandler(
         return respond({ error: 'Verify your email before subscribing.' }, 403);
       const body = object(JSON.parse(await readBoundedText(request, 1024)));
       if (url.pathname === '/api/billing/checkout') {
+        if (!adult) return adultRequired();
         if (!billingConfigured(settings))
           return respond({ error: 'Subscriptions are awaiting setup.' }, 503);
         if (

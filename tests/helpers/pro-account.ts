@@ -7,6 +7,7 @@ export const proTestUser: AccountUser = {
   email: 'pro@example.com',
   name: 'Pro learner',
   emailVerified: true,
+  adultConfirmed: true,
   plan: 'pro',
 };
 

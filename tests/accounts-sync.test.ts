@@ -138,6 +138,7 @@ test('email delivery endpoints fail clearly before account creation when mail is
         password: 'a long test password',
         name: 'Learner',
         callbackURL: '/account',
+        adultConfirmed: true,
       },
       '',
       '192.0.2.99',
@@ -169,7 +170,13 @@ test('framework email registration, verification, persistent session and sign in
     const registered = await handleAuthRequest(
       request(
         '/api/auth/sign-up/email',
-        { email, password: 'a long test password', name: 'Learner', callbackURL: '/account' },
+        {
+          email,
+          password: 'a long test password',
+          name: 'Learner',
+          callbackURL: '/account',
+          adultConfirmed: true,
+        },
         '',
         ip,
       ),

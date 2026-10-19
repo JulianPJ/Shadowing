@@ -154,6 +154,7 @@ try {
       password: 'runtime test password',
       name: 'Runtime learner',
       callbackURL: '/account',
+      adultConfirmed: true,
     }),
   });
   assert.equal(register.status, 200, `Worker registration failed (status ${register.status})`);

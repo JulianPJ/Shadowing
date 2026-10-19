@@ -188,7 +188,8 @@ export async function recordDiscoveryEvents(
   events: { videoId: string; action: 'impression' | 'open' | 'prepared' | 'complete' | 'save' }[],
 ) {
   const owner = storageAccount();
-  if (!owner || syncStatus().user?.id !== owner || !syncStatus().user?.emailVerified) return;
+  const user = syncStatus().user;
+  if (!owner || user?.id !== owner || !user.emailVerified || !user.adultConfirmed) return;
   const day = new Date().toISOString().slice(0, 10);
   const key = (e: (typeof events)[number]) => `${owner}:${day}:${e.videoId}:${e.action}`;
   const fresh = events.filter((e) => !recordedEvents.has(key(e))).slice(0, 24);

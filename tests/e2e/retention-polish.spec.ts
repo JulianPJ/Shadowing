@@ -256,6 +256,7 @@ test('account switching clears word search while retaining isolated caches', asy
           email: 'another@example.com',
           name: 'Another learner',
           emailVerified: true,
+          adultConfirmed: true,
           plan: 'pro',
         },
         googleEnabled: false,

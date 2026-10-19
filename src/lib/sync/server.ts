@@ -1,4 +1,9 @@
 import type { AuthEnvironment, HibikiAuth } from '../auth/server';
+import {
+  adultConfirmationRequiredResponse,
+  adultConfirmed,
+  hasAdultSelfDeclaration,
+} from '../auth/eligibility';
 import { readBoundedText, BodyLimitError } from '../http-body';
 import type { D1Database } from '../d1';
 import type { UserProgressRepository } from './types';
@@ -71,6 +76,7 @@ export function accountHandler({
                 email: session.user.email,
                 name: session.user.name,
                 emailVerified: session.user.emailVerified,
+                adultConfirmed: hasAdultSelfDeclaration(session.user),
                 plan: await access.plan(session.user.id),
               }
             : null,
@@ -84,6 +90,23 @@ export function accountHandler({
       const expectedAccount = request.headers.get('X-Hibiki-Account');
       if (expectedAccount && expectedAccount !== userId)
         return respond({ error: 'Account changed. Refresh your session.' }, 409);
+      // Accounts created before the 18+ policy keep their data but can only confirm, export it or
+      // sign out until the learner confirms eligibility.
+      if (url.pathname === '/api/account/eligibility' && request.method === 'POST') {
+        const body: unknown = JSON.parse(await readBoundedText(request, 256));
+        if (!adultConfirmed(body) || Object.keys(body as object).length !== 1)
+          return respond({ error: 'Confirm that you are 18 or older.' }, 400);
+        if (!hasAdultSelfDeclaration(session.user))
+          await (
+            await auth.$context
+          ).internalAdapter.updateUser(userId, { adultSelfDeclaredAt: new Date() });
+        return respond({ ok: true });
+      }
+      if (
+        !hasAdultSelfDeclaration(session.user) &&
+        !(url.pathname === '/api/account/export' && request.method === 'GET')
+      )
+        return adultConfirmationRequiredResponse();
       if (
         url.pathname.startsWith('/api/discover/') ||
         url.pathname.startsWith('/api/watch-later')

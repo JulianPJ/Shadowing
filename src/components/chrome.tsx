@@ -180,6 +180,11 @@ export function Footer() {
     <footer className="site-footer">
       <span>Made for a little progress, every day.</span>
       <span className="site-footer-links">
+        <Link href="/terms">Terms</Link>
+        <Link href="/privacy">Privacy</Link>
+        <Link href="/refunds">Subscriptions &amp; refunds</Link>
+        <Link href="/cookies">Cookies</Link>
+        <Link href="/contact">Contact</Link>
         <Link href="/notices">Notices</Link>
         <span lang="ja">聞く。まねる。身につく。</span>
       </span>

@@ -20,6 +20,7 @@ export async function connect(context: BrowserContext, plan: AccountUser['plan']
     email: plan + '@example.com',
     name: 'Learner',
     emailVerified: true,
+    adultConfirmed: true,
     plan,
   };
   await context.addInitScript(

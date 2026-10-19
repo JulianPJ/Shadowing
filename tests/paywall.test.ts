@@ -70,7 +70,11 @@ test('account gates preserve shared viewer sync and reject direct learning reque
   let reads = 0,
     writes = 0;
   const auth = {
-    api: { getSession: async () => ({ user: { id: 'learner', emailVerified: true } }) },
+    api: {
+      getSession: async () => ({
+        user: { id: 'learner', emailVerified: true, adultSelfDeclaredAt: new Date() },
+      }),
+    },
   } as unknown as HibikiAuth;
   let stored = emptySync();
   const handler = accountHandler({
@@ -173,6 +177,7 @@ test('Free skips learning channels but still runs Watch Later on the shared engi
     email: 'free@example.com',
     name: 'Learner',
     emailVerified: true,
+    adultConfirmed: true,
     plan: 'free',
   };
   let learning = 0,
