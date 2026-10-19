@@ -54,12 +54,12 @@ export default function CookiesPage() {
       <section>
         <h2>Choice and consent</h2>
         <p>
-          Strictly necessary cookies can be used to provide authentication and security.
-          Hibiki does not configure advertising pixels or analytics trackers in its application
-          source. Embedded media providers may still use storage for playback, security or other
-          purposes. We explain when their players connect and use privacy-enhanced player settings
-          where supported. Storage that is not necessary for a service you request may require
-          consent; publishing this notice alone does not replace that requirement.
+          Strictly necessary cookies can be used to provide authentication and security. Hibiki does
+          not configure advertising pixels or analytics trackers in its application source. Embedded
+          media providers may still use storage for playback, security or other purposes. We explain
+          when their players connect and use privacy-enhanced player settings where supported.
+          Storage that is not necessary for a service you request may require consent; publishing
+          this notice alone does not replace that requirement.
         </p>
         <p>
           You can clear cookies and local storage in your browser settings, or remove selected
