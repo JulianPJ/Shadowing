@@ -48,7 +48,7 @@ export default function CookiesPage() {
           (dnt=1), but these settings do not guarantee that providers avoid all cookies or similar
           technologies. Google sign-in and Paddle checkout connect to their respective providers
           when you choose those functions. These providers may use their own storage under their
-          policies, separately from Hibiki's session and theme cookies.
+          policies, separately from Hibiki&apos;s session and theme cookies.
         </p>
       </section>
       <section>
