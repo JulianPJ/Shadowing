@@ -12,7 +12,7 @@ export default function TermsPage() {
         These terms apply to your use of Hibiki at <a href="https://hibikiapp.net">hibikiapp.net</a>
         {' '}and its companion browser extension, Hibiki Bridge. The service is operated by{' '}
         <strong>{LEGAL_OPERATOR.name}</strong>, established in {LEGAL_OPERATOR.establishedIn},
-        with business address {LEGAL_OPERATOR.address}. The operator's contact details are on our{' '}
+        with business address {LEGAL_OPERATOR.address}. The operator&apos;s contact details are on our{' '}
         <Link href="/contact">Contact page</Link>.
       </p>
       <section>
@@ -29,7 +29,7 @@ export default function TermsPage() {
         <h2>2. Accounts and acceptable use</h2>
         <p>
           Some functions can be used without an account. For an account, provide accurate details,
-          protect your credentials and do not share access or misuse another person's account.
+          protect your credentials and do not share access or misuse another person&apos;s account.
           Do not attempt to bypass Pro access controls, inference limits or security controls,
           disrupt the service, use it unlawfully or submit material you have no right to use.
           Contact us promptly if you suspect unauthorised account access.
@@ -64,10 +64,10 @@ export default function TermsPage() {
       <section>
         <h2>5. Free and Pro; payment contracts</h2>
         <p>
-          Free and Pro capabilities are described in Hibiki's subscription comparison.
+          Free and Pro capabilities are described in Hibiki&apos;s subscription comparison.
           For paid subscriptions, Paddle acts as merchant of record and seller for the purchase:
           checkout, tax calculation, payment collection, invoices and payment-related customer
-          support are handled by Paddle. Paddle's{' '}
+          support are handled by Paddle. Paddle&apos;s{' '}
           <a href="https://www.paddle.com/legal/buyer-terms">Buyer Terms</a> apply to those
           transactions alongside applicable consumer law. Hibiki continues to provide the
           software and support the learning service. See our{' '}
