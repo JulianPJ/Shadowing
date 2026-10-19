@@ -343,5 +343,6 @@
 }
 .site-footer-links {
   display: flex;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 10px 16px;
 }
