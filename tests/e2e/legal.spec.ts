@@ -30,7 +30,9 @@ test('registration links to the public legal policies', async ({ page }) => {
   ).toHaveAttribute('href', '/privacy');
 });
 
-test('public pages do not initialize advertising, analytics or payment scripts', async ({ page }) => {
+test('public pages do not initialize advertising, analytics or payment scripts', async ({
+  page,
+}) => {
   const unexpected: string[] = [];
   page.on('request', (request) => {
     const hostname = new URL(request.url()).hostname;
