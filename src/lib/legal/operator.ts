@@ -4,11 +4,13 @@
  * Keep one source of truth across every public legal page.
  */
 export const LEGAL_OPERATOR = {
-  name: '[VERIFY: legal trading name]',
-  establishedIn: '[VERIFY: country of establishment]',
+  name: '[VERIFY: your full legal name]',
+  tradingName: 'Hibiki',
+  legalForm: 'Sole trader',
+  establishedIn: '[VERIFY: country of establishment — UK if confirmed]',
   address: '[VERIFY: geographic business address]',
   email: '[VERIFY: monitored support email]',
   privacyEmail: '[VERIFY: monitored privacy contact email]',
-  registration: '[VERIFY: registration number if applicable, otherwise state not applicable]',
+  registration: 'Not applicable — sole trader, not a registered limited company',
   vat: '[VERIFY: VAT number if registered, otherwise state not registered]',
 } as const;
