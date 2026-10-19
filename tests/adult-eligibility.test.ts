@@ -317,3 +317,21 @@ test('existing accounts keep their data, can export it, and regain access only a
     null,
   );
 });
+
+test('every path and method served by the account handler is wired to an App Router route', async () => {
+  // accountHandler unit tests call the handler directly, so a missing route file only shows up as
+  // a 404 in the deployed app (the 18+ confirmation button once failed this way).
+  const source = await readFile('src/lib/sync/server.ts', 'utf8');
+  const served = [
+    ...source.matchAll(/url\.pathname === '(\/api\/[a-z/-]+)' && request\.method === '([A-Z]+)'/g),
+  ];
+  assert.ok(served.some(([, path]) => path === '/api/account/eligibility'));
+  for (const [, path, method] of served) {
+    const route = await readFile(`src/app${path}/route.ts`, 'utf8').catch(() => '');
+    assert.match(
+      route,
+      new RegExp(`export (const ${method} = accountRoute|\{ accountRoute as ${method} \})`),
+      `${method} ${path}`,
+    );
+  }
+});

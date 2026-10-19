@@ -175,6 +175,33 @@ try {
   const identity = await me.json();
   assert.equal(identity.user.email, 'runtime@example.com');
   assert.equal(identity.user.plan, 'free');
+  assert.equal(identity.user.adultConfirmed, true);
+
+  // An account from before the 18+ policy is restricted until it confirms through the built route.
+  await db
+    .prepare('UPDATE "user" SET adultSelfDeclaredAt=NULL WHERE id=?')
+    .bind(identity.user.id)
+    .run();
+  const restricted = await mf.dispatchFetch('https://example.com/api/sync/bootstrap', {
+    headers: { Cookie: cookie },
+  });
+  assert.equal(restricted.status, 403, await restricted.clone().text());
+  const confirmed = await mf.dispatchFetch('https://example.com/api/account/eligibility', {
+    method: 'POST',
+    headers: { Cookie: cookie, Origin: 'https://example.com', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ adultConfirmed: true }),
+  });
+  assert.equal(confirmed.status, 200, await confirmed.clone().text());
+  assert.equal(
+    (
+      await (
+        await mf.dispatchFetch('https://example.com/api/account/me', {
+          headers: { Cookie: cookie },
+        })
+      ).json()
+    ).user.adultConfirmed,
+    true,
+  );
 
   // Exercise the built route handlers, egress, Web Crypto verification and D1 projection together.
   const billingHeaders = {
