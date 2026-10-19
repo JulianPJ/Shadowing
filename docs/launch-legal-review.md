@@ -18,10 +18,13 @@ Footer links, registration references and subscription modal disclosures are inc
 
 Edit src/lib/legal/operator.ts and remove the draft warning from src/components/legal-shell.tsx before merging:
 
-- [ ] Exact legal service provider name, whether sole trader or company, any trading name and country of establishment.
+- [x] Business structure confirmed by operator: **sole trader** (not a limited company).
+- [x] Hibiki identified as the trading name.
+- [ ] Full legal name of the individual trading as Hibiki; verify country of establishment (UK is expected, not yet explicitly confirmed).
 - [ ] Geographic business address that can lawfully be published; use an appropriate genuine business/service address if needed.
 - [ ] Monitored public support email and monitored privacy/data-rights contact email. Test inbound receipt; the configured outbound Resend sender is not evidence of an inbox.
-- [ ] Company or other registration and number where applicable; VAT number if registered. State not applicable accurately where relevant.
+- [x] No Companies House company registration number is required merely for operating as a sole trader. Do not publish a private UTR, National Insurance number or other tax identifier.
+- [ ] VAT registration status and VAT number if registered; confirm the correct public wording.
 - [ ] Confirm governing law, primary customer markets and under-age account/consent approach; check whether a DPO or UK/EU representative is needed.
 - [ ] Replace all placeholders, set approved effective date, and ensure Paddle lists the right business details.
 
