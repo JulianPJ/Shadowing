@@ -67,32 +67,6 @@
   isolation: isolate;
   border: 1px solid #dde1d3;
 }
-.external-media-gate {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 18px;
-}
-.external-media-choice {
-  max-width: 470px;
-  text-align: center;
-  color: #f2f3ea;
-  font-size: 12px;
-  line-height: 1.6;
-}
-.external-media-title {
-  font-size: 16px;
-  font-weight: 600;
-  margin-bottom: 8px;
-}
-.external-media-choice a {
-  color: #f3d4bb;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-.external-media-choice .button {
-  margin-top: 12px;
-}
 .media-frame video,
 .youtube-host,
 .youtube-host iframe {
