@@ -134,7 +134,7 @@ export default function PrivacyPage() {
         </p>
         <p>
           If UK data protection law applies, you can complain to the{' '}
-          <a href="https://ico.org.uk/make-a-complaint/">Information Commissioner's Office</a>.
+          <a href="https://ico.org.uk/make-a-complaint/">Information Commissioner&apos;s Office</a>.
         </p>
       </section>
       <section>
