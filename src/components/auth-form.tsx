@@ -203,7 +203,10 @@ export function AuthForm({ screen = 'sign-in' }: { screen?: 'sign-in' | 'registe
         {screen === 'register' ? (
           <p className="muted">
             Before registering, please read our <Link href="/terms">Terms of Service</Link> and{' '}
-            <Link href="/privacy">Privacy Policy</Link>.
+            <Link href="/privacy">Privacy Policy</Link>. If you are a minor, obtain any legally
+            required parent or guardian permission and complete any required age or consent checks
+            before registering. Some regions require additional verification that Hibiki does not
+            yet provide.
           </p>
         ) : null}
         {account.loaded && emailActionUnavailable ? (
