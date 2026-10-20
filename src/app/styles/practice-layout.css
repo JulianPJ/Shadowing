@@ -52,7 +52,6 @@
 }
 .record-button {
   font-size: 13px;
-  color: #667c4f;
 }
 .row-content > [lang='ja'] {
   font-size: 13px;
@@ -97,24 +96,21 @@
   font-size: 13px;
 }
 .hero-description {
-  color: #72786c;
+  color: var(--muted);
 }
 .demo-copy p {
-  color: #737e65;
+  color: var(--muted);
 }
 .input-meta,
 .input-meta .text-button {
-  color: #7c856d;
+  color: var(--muted);
 }
 .hero-tag {
-  color: #6c795f;
+  color: var(--green);
 }
 .translation-source {
   color: var(--muted);
   font-size: 12px;
-}
-.current-translation {
-  color: #657750;
 }
 .transcript-scroll {
   content-visibility: auto;

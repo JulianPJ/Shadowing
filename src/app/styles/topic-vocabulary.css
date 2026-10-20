@@ -22,7 +22,7 @@
 .topic-vocabulary-heading p {
   max-width: 640px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.7;
 }
 .topic-vocabulary-local {
@@ -31,7 +31,7 @@
   border: 1px solid var(--line);
   border-radius: 999px;
   color: var(--muted);
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.4px;
 }
 .topic-vocabulary-loading {
@@ -40,7 +40,7 @@
   gap: 9px;
   padding: 20px 0 2px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
 }
 .topic-vocabulary-list {
   list-style: none;
@@ -73,11 +73,11 @@
 }
 .topic-vocabulary-term > div > span {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
 }
 .topic-vocabulary-term > span {
   color: var(--muted);
-  font-size: 9px;
+  font-size: 12px;
   white-space: nowrap;
 }
 .topic-vocabulary-example {
@@ -92,7 +92,7 @@
 .topic-vocabulary-example p + p {
   margin-top: 3px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
 }
 .topic-vocabulary-actions {
   display: flex;
@@ -101,7 +101,7 @@
   margin-top: 10px;
 }
 .topic-vocabulary-actions .text-button {
-  font-size: 10px;
+  font-size: 12px;
 }
 .topic-vocabulary-item .dictionary-save-panel {
   margin-top: 14px;
@@ -109,7 +109,7 @@
 .topic-vocabulary-note {
   margin-top: 14px;
   color: var(--muted);
-  font-size: 9px;
+  font-size: 12px;
   line-height: 1.7;
 }
 @media (max-width: 700px) {
@@ -135,7 +135,7 @@
   font-size: 14px;
 }
 .topic-vocabulary-term .word-status {
-  font-size: 11px;
+  font-size: 12px;
 }
 .practice-secondary-pane .topic-vocabulary-card {
   margin-top: 0;

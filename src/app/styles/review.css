@@ -71,7 +71,7 @@
   margin: 0;
 }
 .review-card h2:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 3px solid var(--focus);
   outline-offset: 8px;
 }
 .review-card p,
@@ -94,11 +94,11 @@
 .review-card > .primary kbd {
   margin-left: 0.75rem;
 }
-/* The base kbd chip is paper-coloured, which hides white text on a primary button. */
+/* The base kbd chip is paper-coloured, which hides the action text on a primary button. */
 .review-screen .button.primary kbd {
   color: inherit;
-  background: rgb(255 255 255 / 0.16);
-  border-color: rgb(255 255 255 / 0.45);
+  background: color-mix(in srgb, currentColor 14%, transparent);
+  border-color: color-mix(in srgb, currentColor 40%, transparent);
   box-shadow: none;
 }
 .review-answer {

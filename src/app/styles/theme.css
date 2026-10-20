@@ -15,24 +15,28 @@
   --line: #343a33;
   --accent: #dc8068;
   --accent-hover: #ed9279;
+  --accent-text: #dc8068;
+  --action: #dc8068;
+  --action-hover: #ed9279;
+  --on-action: #121512;
   --pale: #2b201c;
   --green: #a9c0a8;
   --green-pale: #202a22;
+  --on-forest: #121512;
+  --control-border: #747c73;
+  --focus: #a9c0a8;
+  --danger: #e2a08a;
 }
 :root[data-theme='dark'] body {
   background: var(--bg);
-}
-:root[data-theme='dark'] input::placeholder,
-:root[data-theme='dark'] textarea::placeholder {
-  color: #747c73;
 }
 :root[data-theme='dark'] .button:hover {
   background: #252a25;
   border-color: #4a5149;
 }
 :root[data-theme='dark'] .button.primary:hover {
-  background: var(--accent-hover);
-  border-color: var(--accent-hover);
+  background: var(--action-hover);
+  border-color: var(--action-hover);
 }
 :root[data-theme='dark'] .icon-button:hover {
   background: #252a25;
@@ -43,12 +47,6 @@
 :root[data-theme='dark'] .brand-japanese {
   color: #a9afa4;
   border-color: var(--line);
-}
-:root[data-theme='dark'] .nav-link {
-  color: #aeb4aa;
-}
-:root[data-theme='dark'] .site-footer {
-  color: #8e968c;
 }
 :root[data-theme='dark'] .hero-tag {
   color: #b2b9ae;
@@ -134,7 +132,7 @@
   color: var(--muted);
 }
 :root[data-theme='dark'] .practice-title p > span {
-  color: #697168;
+  color: var(--muted);
 }
 :root[data-theme='dark'] .media-frame {
   border-color: #343c34;
@@ -160,29 +158,6 @@
 :root[data-theme='dark'] .speed-control select {
   border-color: var(--line);
 }
-:root[data-theme='dark'] .current-card.state-your-turn {
-  border-color: #536550;
-  background: #1b241d;
-}
-:root[data-theme='dark'] .current-card.state-recording {
-  border-color: #744b3e;
-  background: #251c18;
-}
-:root[data-theme='dark'] .state-badge {
-  background: #252a25;
-  color: #aeb6aa;
-}
-:root[data-theme='dark'] .state-listening .state-badge {
-  background: #2b211d;
-}
-:root[data-theme='dark'] .state-your-turn .state-badge {
-  background: #253025;
-  color: #b0c9a5;
-}
-:root[data-theme='dark'] .state-recording .state-badge {
-  background: #30211b;
-  color: #e18b70;
-}
 :root[data-theme='dark'] .section-time,
 :root[data-theme='dark'] .translation-button,
 :root[data-theme='dark'] .translation-source,
@@ -196,32 +171,10 @@
 }
 :root[data-theme='dark'] .translation-button > span,
 :root[data-theme='dark'] .practice-controls .icon-button,
-:root[data-theme='dark'] .key-hint,
-:root[data-theme='dark'] .record-button,
 :root[data-theme='dark'] .transcript-card,
 :root[data-theme='dark'] .transcript-count,
 :root[data-theme='dark'] .transcript-tools .icon-button {
   border-color: var(--line);
-}
-:root[data-theme='dark'] .favorite-button {
-  color: #747d72;
-}
-:root[data-theme='dark'] .current-translation {
-  border-color: #465044;
-  color: #b7c7b0;
-}
-:root[data-theme='dark'] .section-track {
-  background: #2a302a;
-}
-:root[data-theme='dark'] .practice-controls .icon-button:hover {
-  background: #252c25;
-}
-:root[data-theme='dark'] .record-button {
-  color: #b5c7a8;
-}
-:root[data-theme='dark'] .record-button.recording {
-  background: #30211b;
-  border-color: #744b3e;
 }
 :root[data-theme='dark'] .recording-audio audio {
   color-scheme: dark;
