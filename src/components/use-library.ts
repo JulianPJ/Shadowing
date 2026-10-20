@@ -1,9 +1,8 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { libraryLessons, loadLibrary } from '@/lib/library/client';
+import { libraryAccountLessons, libraryLessons, loadLibrary } from '@/lib/library/client';
 import { emptyLibrary, type LibraryState } from '@/lib/library/model';
 import type { StudyRecord } from '@/lib/storage/lessons';
-import { accountLessons } from '@/lib/sync/client';
 import type { SyncedLesson } from '@/lib/sync/types';
 export function useLibrary() {
   const [state, setState] = useState<LibraryState>(emptyLibrary);
@@ -14,7 +13,7 @@ export function useLibrary() {
     const refresh = () => {
       setState(loadLibrary());
       setLessons(libraryLessons());
-      setRemote(accountLessons());
+      setRemote(libraryAccountLessons());
       setReady(true);
     };
     refresh();

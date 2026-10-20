@@ -3,19 +3,6 @@
   outline: 3px solid var(--focus);
   outline-offset: 3px;
 }
-.returning-home .hero-intro {
-  display: none;
-}
-.returning-home .hero {
-  display: block;
-  margin-top: 28px;
-}
-.returning-home .start-card {
-  max-width: none;
-}
-.returning-home .demo-section {
-  display: none;
-}
 .progress-next-actions {
   display: flex;
   flex-wrap: wrap;

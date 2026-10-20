@@ -4,6 +4,7 @@ import {
   contentFit,
   emptyLibrary,
   enqueue,
+  isHiddenLesson,
   normalizeQueueUrl,
   validateLibrary,
 } from '../src/lib/library/model';
@@ -51,6 +52,25 @@ test('queue keeps credential-free navigation, canonical duplicates, order and st
     1,
   );
   assert.deepEqual(validateLibrary({ version: 2 }), emptyLibrary());
+});
+
+test('removed lessons are validated and stay hidden only until they are practised again', () => {
+  const state = validateLibrary({
+    version: 1,
+    pinned: [],
+    queue: [],
+    hidden: [
+      { id: 'a', hiddenAt: 100 },
+      { id: 'a', hiddenAt: 50 },
+      { id: '', hiddenAt: 1 },
+      { id: 'b', hiddenAt: 'soon' },
+    ],
+  });
+  assert.deepEqual(state.hidden, [{ id: 'a', hiddenAt: 100 }]);
+  assert.equal(isHiddenLesson(state, 'a', 90), true);
+  assert.equal(isHiddenLesson(state, 'a', 100), true);
+  assert.equal(isHiddenLesson(state, 'a', 101), false);
+  assert.equal(isHiddenLesson(state, 'b', 0), false);
 });
 
 test('personal fit abstains for cold start and uses explicit vocabulary with content context', () => {

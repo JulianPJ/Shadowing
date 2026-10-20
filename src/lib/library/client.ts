@@ -3,7 +3,15 @@ import { loadLesson, recentLessons, type StudyRecord } from '../storage/lessons'
 import { readStorage, writeStorage, readDeviceStorage, storageAccount } from '../storage/browser';
 import { loadLearnerHistory } from '../learner/persistence';
 import { accountLessons } from '../sync/client';
-import { emptyLibrary, enqueue, validateLibrary, type LibraryState } from './model';
+import { lessonMedia } from '../media';
+import {
+  emptyLibrary,
+  enqueue,
+  HIDDEN_LIMIT,
+  isHiddenLesson,
+  validateLibrary,
+  type LibraryState,
+} from './model';
 import { queueEdited } from '../discover/client';
 
 export const loadLibrary = () => validateLibrary(readStorage('library:data', emptyLibrary()));
@@ -49,7 +57,43 @@ export function pinLesson(id: string, pinned: boolean) {
   });
 }
 
-/** References only; existing transcript storage and account visibility remain authoritative. */
+/** Hides a lesson from Library and Home until it is next practised; progress data is kept. */
+export function removeLessonFromLibrary(id: string) {
+  const state = loadLibrary();
+  return saveLibrary({
+    ...state,
+    pinned: state.pinned.filter((item) => item !== id),
+    hidden: [
+      { id, hiddenAt: Date.now() },
+      ...(state.hidden ?? []).filter((item) => item.id !== id),
+    ].slice(0, HIDDEN_LIMIT),
+  });
+}
+
+/** Undo for removeLessonFromLibrary, restoring the saved (pinned) mark it cleared. */
+export function restoreLessonToLibrary(id: string, pinned: boolean) {
+  const state = loadLibrary();
+  return saveLibrary({
+    ...state,
+    pinned: pinned ? [...new Set([...state.pinned, id])] : state.pinned,
+    hidden: (state.hidden ?? []).filter((item) => item.id !== id),
+  });
+}
+
+/** Account lessons shown in Library: not removed, and never uploaded files (they cannot replay). */
+export function libraryAccountLessons() {
+  const state = loadLibrary();
+  return accountLessons().filter(
+    (item) =>
+      item.lesson.source !== 'upload' &&
+      !isHiddenLesson(state, item.lesson.lessonId, Date.parse(item.updatedAt)),
+  );
+}
+
+/**
+ * References only; existing transcript storage and account visibility remain authoritative.
+ * Uploaded media is left out: its object URL never survives a reload, so it could not resume.
+ */
 export function libraryLessons(): StudyRecord[] {
   const recent = recentLessons();
   const history = loadLearnerHistory();
@@ -76,5 +120,13 @@ export function libraryLessons(): StudyRecord[] {
         updatedAt: reference.updatedAt,
       });
   }
-  return [...records.values()].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 60);
+  const state = loadLibrary();
+  return [...records.values()]
+    .filter(
+      (item) =>
+        lessonMedia(item.lesson).type !== 'local' &&
+        !isHiddenLesson(state, item.lesson.id, item.updatedAt),
+    )
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+    .slice(0, 60);
 }
