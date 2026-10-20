@@ -6,7 +6,7 @@ A consistent place for design proposals, mockups and decisions from the Work Mod
 
 [Open the visual identity proposal](./01-visual-identity/README.md)
 
-- [Desktop identity board](./01-visual-identity/identity-desktop.png)
+- [Identity presentation board — not a desktop viewport](./01-visual-identity/identity-desktop.png)
 - [Light and dark mobile board](./01-visual-identity/identity-mobile-themes.png)
 - [Proposed exact tokens](./01-visual-identity/identity-tokens.json)
 - [Calculated contrast pairs](./01-visual-identity/contrast.json)
@@ -17,7 +17,9 @@ Status: proposed for discussion, 20 October 2026. No live app changes. Generated
 
 [Open the destination proposal and implementation handoff](./02-destinations/README.md)
 
-- [Home, Discover and Library desktop concepts](./02-destinations/destinations-desktop.png)
+- [Revised full-page desktop layouts and rationale](./02-destinations/desktop-revision.md)
+- [Desktop Home](./02-destinations/home-desktop.png) · [Desktop Discover](./02-destinations/discover-desktop.png) · [Desktop Library](./02-destinations/library-desktop.png)
+- [Original narrow-frame composite — superseded for desktop layout](./02-destinations/destinations-desktop.png)
 - [Vocabulary, Profile and mobile navigation concepts](./02-destinations/destinations-mobile.png)
 
 Five proposed destinations: **Home · Discover · Library · Vocabulary · Profile**. Home resumes, Discover finds new content, Library revisits kept content. Existing routes, JLPT bands, Review/Words and Library filter meanings are retained. The guide covers mobile/Practice navigation, aliases, handoffs, empty states and current Free/Pro boundaries.

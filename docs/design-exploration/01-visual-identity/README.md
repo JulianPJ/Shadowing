@@ -2,6 +2,8 @@
 
 Status: **proposed for discussion**, 20 October 2026. This package establishes a visual guideline; it does not change the running application.
 
+For full-page desktop layouts, see the [stage 02 desktop revision](../02-destinations/desktop-revision.md). The boards here present identity; they do not establish measured desktop responsiveness.
+
 ## Start with the boards
 
 ![Desktop visual identity concept](./identity-desktop.png)

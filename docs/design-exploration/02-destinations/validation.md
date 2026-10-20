@@ -14,3 +14,9 @@
 ## Feedback status
 
 Proposed for discussion. Continuing the exploration is not approval to implement or deploy. Suggested next stage: personalised Home.
+
+## Desktop revision, 20 October 2026
+
+The original desktop composite used three narrow portrait-shaped frames and was insufficient to assess desktop composition. It is retained as history and superseded for desktop layout review by three separate 1536 × 1024 Home, Discover and Library concepts. See [desktop revision](./desktop-revision.md) for the visual assessment, adaptation contract, corrections and remaining limits. The index, stage guide and stage 01 cross-reference now lead readers to those assets. Mobile images and the exact token specification are retained.
+
+A generated Discover edit that replaced the existing JLPT bands was rejected. The final asset restores N5+, N5–N4, N4–N3, N3–N2, N2–N1, N1+, All levels, along with all named secondary controls. Final assets were visually inspected; PNG dimensions, repository paths and linked files were verified. This revision changes no runtime code and implies no approval to implement, merge or deploy.

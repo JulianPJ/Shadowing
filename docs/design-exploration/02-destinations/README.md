@@ -4,7 +4,15 @@ Status: **proposed for discussion**, 20 October 2026. Continues [stage 01](../01
 
 ## Start with the mockups
 
-![Home, Discover and Library desktop concepts](./destinations-desktop.png)
+The original composite did not demonstrate full desktop proportions. Use the [desktop revision and layout contract](./desktop-revision.md) for the current desktop proposal.
+
+![Full-page desktop Home](./home-desktop.png)
+
+![Full-page desktop Discover](./discover-desktop.png)
+
+![Full-page desktop Library](./library-desktop.png)
+
+[Original narrow-frame desktop composite — superseded for layout review](./destinations-desktop.png)
 
 ![Vocabulary, Profile and mobile navigation concepts](./destinations-mobile.png)
 
@@ -12,12 +20,14 @@ Generated concept images, not screenshots or measured responsive layouts. Titles
 
 ## Image corrections and fidelity limits
 
+The corrections below describe the original composites. The revised desktop pages have their own [fidelity notes and validation](./desktop-revision.md#visual-authority-and-fidelity).
+
 - The desktop image gives Discover and Library serif titles; keep those page titles in DM Sans as specified in stage 01. Georgia remains reserved for the Home editorial greeting.
 - The desktop cooking card accidentally displays “N5–N3”; that is not an existing band. Use the actual **N5–N4** band for that illustrative card. All real filter bands remain unchanged.
 - The mobile Watch later card accidentally shows “Section 3 of 18”; an unprepared queued video must show source/duration or preparation status, never a practice position. Its Prepare action is the intended behaviour.
 - Profile's Learning / Account & plan labels illustrate possible in-page anchors, not a new tab implementation or a committed reorganisation. Existing sections and access remain authoritative.
 - Mockup colours, button shading, icons and sizes are approximate. Use the exact stage 01 flat-fill tokens and existing Lucide icons. Desktop utilities are omitted for space; sign-in and theme controls remain required.
-- These boards are 1536 × 1024 presentation composites. The phone is a conceptual viewport, not a measured 390px capture. Touch sizes, label fit, safe areas, keyboard focus, dark mode and zoom still need implementation verification.
+- The original boards are 1536 × 1024 presentation composites; each revised desktop image is a separate 1536 × 1024 landscape page. The phone is a conceptual viewport, not a measured 390px capture. Touch sizes, label fit, safe areas, keyboard focus, dark mode and zoom still need implementation verification.
 
 ## The decision
 
