@@ -1,0 +1,60 @@
+{
+  "status": "proposal",
+  "version": 1,
+  "sourceCommit": "b8457dbe92ea82581771a730ddd2bb2ad1f041de",
+  "light": {
+    "canvas": "#F8F7F2",
+    "paper": "#FFFEFA",
+    "ink": "#303A33",
+    "muted": "#626B60",
+    "brand": "#B65D48",
+    "action": "#AD5743",
+    "onAction": "#FFFFFF",
+    "actionHover": "#9F4E3B",
+    "accentTint": "#F7ECE5",
+    "forest": "#506C59",
+    "forestTint": "#EEF2E9",
+    "onForest": "#FFFEFA",
+    "divider": "#E6E6DD",
+    "controlBorder": "#7A8377",
+    "focus": "#506C59"
+  },
+  "dark": {
+    "canvas": "#121512",
+    "paper": "#1A1E1A",
+    "ink": "#EEEAE1",
+    "muted": "#A7AEA3",
+    "brand": "#DC8068",
+    "action": "#DC8068",
+    "onAction": "#121512",
+    "actionHover": "#ED9279",
+    "accentTint": "#2B201C",
+    "forest": "#A9C0A8",
+    "forestTint": "#202A22",
+    "onForest": "#121512",
+    "divider": "#343A33",
+    "controlBorder": "#747C73",
+    "focus": "#A9C0A8"
+  },
+  "fonts": {
+    "brand": "DM Sans Variable",
+    "display": "Georgia",
+    "ui": "DM Sans Variable",
+    "japanese": "Noto Sans JP"
+  },
+  "radiusPx": {
+    "control": 8,
+    "panel": 12
+  },
+  "spacingPx": [
+    4,
+    8,
+    12,
+    16,
+    24,
+    32,
+    48,
+    64
+  ],
+  "minimumTargetPx": 44
+}
