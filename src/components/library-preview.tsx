@@ -3,8 +3,7 @@ import Link from 'next/link';
 import { ArrowRight, Play } from 'lucide-react';
 import type { useLibrary } from './use-library';
 import { lessonCompleted } from '@/lib/storage/learning';
-import { getLiveMedia } from '@/lib/storage/lessons';
-import { lessonMedia, sourceLabel } from '@/lib/media';
+import { sourceLabel } from '@/lib/media';
 import { LessonThumbnail, lessonDuration } from './lesson-thumbnail';
 import type { Lesson } from '@/lib/types';
 
@@ -39,7 +38,7 @@ function resumable(library: ReturnType<typeof useLibrary>): Resumable[] {
       total: lesson.segments.length,
       label: sourceLabel(lesson),
       next: lesson.segments[index]?.japanese,
-      reattach: lessonMedia(lesson).type === 'local' && !getLiveMedia(lesson.id),
+      reattach: false,
     }));
   const synced = remote
     .filter((item) => !item.completed && !lessons.some((l) => l.lesson.id === item.lesson.lessonId))

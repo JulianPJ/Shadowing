@@ -4,7 +4,15 @@ import { parseYouTubeUrl } from '../youtube';
 export const LIBRARY_LIMIT = 60;
 export const QUEUE_LIMIT = 40;
 export type QueueItem = { id: string; url: string; title: string; addedAt: string };
-export type LibraryState = { version: 1; pinned: string[]; queue: QueueItem[] };
+/** A lesson removed from Library; it returns when the lesson has activity after `hiddenAt`. */
+export type HiddenLesson = { id: string; hiddenAt: number };
+export type LibraryState = {
+  version: 1;
+  pinned: string[];
+  queue: QueueItem[];
+  hidden?: HiddenLesson[];
+};
+export const HIDDEN_LIMIT = 200;
 export const emptyLibrary = (): LibraryState => ({ version: 1, pinned: [], queue: [] });
 
 export function normalizeQueueUrl(input: string) {
@@ -47,7 +55,27 @@ export function validateLibrary(value: unknown): LibraryState {
         /* Invalid stored URLs never become navigation links. */
       }
     }
-  return { version: 1, pinned, queue };
+  const hidden: HiddenLesson[] = [];
+  if (Array.isArray(raw.hidden))
+    for (const item of raw.hidden) {
+      if (
+        item &&
+        typeof item.id === 'string' &&
+        item.id.trim() &&
+        item.id.length <= 200 &&
+        Number.isFinite(item.hiddenAt) &&
+        !hidden.some((old) => old.id === item.id)
+      )
+        hidden.push({ id: item.id, hiddenAt: item.hiddenAt });
+      if (hidden.length >= HIDDEN_LIMIT) break;
+    }
+  return { version: 1, pinned, queue, hidden };
+}
+
+/** Removed lessons stay out of Library until they are practised again. */
+export function isHiddenLesson(state: LibraryState, id: string, updatedAt: number) {
+  const entry = state.hidden?.find((item) => item.id === id);
+  return Boolean(entry && !(updatedAt > entry.hiddenAt));
 }
 
 export function enqueue(state: LibraryState, input: QueueItem): LibraryState {

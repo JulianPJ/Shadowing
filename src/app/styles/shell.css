@@ -918,6 +918,48 @@
   width: 44px;
   height: 44px;
 }
+.library-card-menu {
+  position: relative;
+}
+.library-card-menu > summary {
+  cursor: pointer;
+  list-style: none;
+  color: var(--muted);
+  letter-spacing: 1px;
+}
+.library-card-menu > summary::-webkit-details-marker {
+  display: none;
+}
+.library-card-menu > div {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  z-index: 3;
+  display: grid;
+  width: 220px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+  box-shadow: 0 8px 24px #0002;
+}
+.library-card-menu button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  text-align: left;
+}
+.library-card-menu button:hover {
+  background: var(--green-pale);
+}
+.library-notice .text-button {
+  margin-left: 8px;
+}
 .library-queue {
   display: grid;
   gap: 12px;

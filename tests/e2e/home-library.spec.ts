@@ -12,13 +12,20 @@ function youtubeLesson(id: string, title: string, videoId: string): Lesson {
 const walk = youtubeLesson('home-walk', 'A slow morning walk', 'aaaaaaaaaaa');
 const cafe = youtubeLesson('home-cafe', 'At a neighbourhood café', 'bbbbbbbbbbb');
 const done = { ...(demo as Lesson), id: 'home-done', title: 'A finished morning' };
+// An uploaded file cannot replay after a reload, so it never appears in Library or Home.
+const upload: Lesson = {
+  ...youtubeLesson('home-upload', 'My uploaded clip', ''),
+  source: 'upload',
+  videoId: undefined,
+  mediaName: 'clip.mp4',
+};
 
 async function seed(page: Page) {
   await page.addInitScript(
     ({ lessons, revision }) => {
       if (localStorage.getItem('home-seeded')) return;
       localStorage.setItem('home-seeded', 'yes');
-      const positions = [4, 1, 0];
+      const positions = [4, 1, 0, 2];
       lessons.forEach((lesson, i) => {
         localStorage.setItem(`hibiki:v1:lesson:${lesson.id}`, JSON.stringify(lesson));
         localStorage.setItem(`hibiki:v1:position:${lesson.id}`, String(positions[i]));
@@ -53,7 +60,7 @@ async function seed(page: Page) {
         }),
       );
     },
-    { lessons: [walk, cafe, done], revision: transcriptRevision(done) },
+    { lessons: [walk, cafe, done, upload], revision: transcriptRevision(done) },
   );
 }
 
@@ -92,6 +99,7 @@ test('returning Home resumes the latest unfinished lesson at its next sentence',
   await expect(resume.getByText(walk.segments[4].japanese, { exact: true })).toBeVisible();
   await expect(resume).toContainText(cafe.title);
   await expect(resume).not.toContainText(done.title);
+  await expect(resume).not.toContainText(upload.title);
   // Review is Pro, so a signed-out learner sees no review card.
   await expect(page.getByRole('heading', { name: 'Vocabulary review' })).toHaveCount(0);
   const button = page.getByRole('link', { name: 'Resume practice', exact: true });
@@ -107,6 +115,7 @@ test('Library shows lesson and Watch later preview cards with state-specific act
   await page.goto('/library');
   const lessons = page.locator('.library-lesson-list > li');
   await expect(lessons).toHaveCount(3);
+  await expect(page.getByText(upload.title)).toHaveCount(0);
   const walkCard = lessons.filter({ hasText: walk.title });
   await expect(walkCard.locator('img')).toHaveAttribute(
     'src',
@@ -151,4 +160,48 @@ test('Library shows lesson and Watch later preview cards with state-specific act
       true,
     );
   }
+});
+
+test('lesson cards can be marked complete, or removed from Library with undo', async ({ page }) => {
+  await seed(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/library');
+  const lessons = page.locator('.library-lesson-list > li');
+  await expect(lessons).toHaveCount(3);
+  const menu = (title: string) => page.getByLabel(`More actions for ${title}`);
+
+  const cafeCard = lessons.filter({ hasText: cafe.title });
+  await menu(cafe.title).click();
+  await cafeCard.getByRole('button', { name: 'Mark complete' }).click();
+  await expect(page.getByRole('status')).toContainText(`Marked “${cafe.title}” complete.`);
+  await expect(cafeCard).toContainText('Completed');
+  await expect(cafeCard.getByRole('link', { name: 'Revisit', exact: true })).toBeVisible();
+  // A finished lesson has nothing left to mark.
+  await menu(cafe.title).click();
+  await expect(cafeCard.getByRole('button', { name: 'Remove from library' })).toBeVisible();
+  await expect(cafeCard.getByRole('button', { name: 'Mark complete' })).toHaveCount(0);
+  await menu(cafe.title).click();
+
+  const walkCard = lessons.filter({ hasText: walk.title });
+  const save = page.getByRole('button', { name: `Save ${walk.title} to library` });
+  await save.click();
+  await expect(save).toHaveAttribute('aria-pressed', 'true');
+  await menu(walk.title).click();
+  await walkCard.getByRole('button', { name: 'Remove from library' }).click();
+  await expect(page.getByRole('status')).toContainText(
+    `Removed “${walk.title}” from your Library.`,
+  );
+  await expect(lessons).toHaveCount(2);
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(lessons).toHaveCount(3);
+  // Undo restores the saved mark that removing cleared.
+  await expect(save).toHaveAttribute('aria-pressed', 'true');
+
+  await menu(walk.title).click();
+  await walkCard.getByRole('button', { name: 'Remove from library' }).click();
+  await expect(lessons).toHaveCount(2);
+  await page.goto('/');
+  await expect(page.locator('.library-preview')).not.toContainText(walk.title);
+  await page.goto('/library');
+  await expect(lessons).toHaveCount(2);
 });

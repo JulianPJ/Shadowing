@@ -6,6 +6,7 @@ import {
   ArrowUp,
   Bookmark,
   CircleCheck,
+  EyeOff,
   Paperclip,
   Play,
   Plus,
@@ -14,12 +15,18 @@ import {
 } from 'lucide-react';
 import { useLibrary } from './use-library';
 import { useAccount } from './account';
-import { addQueueLink, pinLesson, saveLibrary, importDeviceQueue } from '@/lib/library/client';
+import {
+  addQueueLink,
+  importDeviceQueue,
+  pinLesson,
+  removeLessonFromLibrary,
+  restoreLessonToLibrary,
+  saveLibrary,
+} from '@/lib/library/client';
 import { hiddenAccountSaveCount } from '@/lib/discover/client';
 import { cachedDictionary } from '@/lib/dictionary/cache';
-import { lessonCompleted } from '@/lib/storage/learning';
-import { lessonMedia, sourceLabel } from '@/lib/media';
-import { getLiveMedia } from '@/lib/storage/lessons';
+import { completeLesson, lessonCompleted } from '@/lib/storage/learning';
+import { sourceLabel } from '@/lib/media';
 import { parseYouTubeUrl } from '@/lib/youtube';
 import { LessonThumbnail, lessonDuration } from './lesson-thumbnail';
 
@@ -53,6 +60,7 @@ export function LibraryTab({ library }: { library: ReturnType<typeof useLibrary>
   const [title, setTitle] = useState('');
   const [notice, setNotice] = useState('');
   const [noticeKind, setNoticeKind] = useState<'success' | 'error' | 'info'>('info');
+  const [undo, setUndo] = useState<{ id: string; pinned: boolean } | null>(null);
   const [savedCounts, setSavedCounts] = useState<Record<string, number>>({});
   const hiddenSaves = account.user ? hiddenAccountSaveCount() : 0;
   useEffect(() => {
@@ -75,6 +83,13 @@ export function LibraryTab({ library }: { library: ReturnType<typeof useLibrary>
   function report(kind: 'success' | 'error', message: string) {
     setNoticeKind(kind);
     setNotice(message);
+    setUndo(null);
+  }
+  function remove(id: string, title: string) {
+    const pinned = state.pinned.includes(id);
+    removeLessonFromLibrary(id);
+    report('success', `Removed “${title}” from your Library. Your progress is kept.`);
+    setUndo({ id, pinned });
   }
   function queue(inputUrl: string, inputTitle: string) {
     try {
@@ -118,6 +133,17 @@ export function LibraryTab({ library }: { library: ReturnType<typeof useLibrary>
           role={noticeKind === 'error' ? 'alert' : 'status'}
         >
           {notice}
+          {undo ? (
+            <button
+              className="text-button"
+              onClick={() => {
+                restoreLessonToLibrary(undo.id, undo.pinned);
+                report('success', 'Restored to your Library.');
+              }}
+            >
+              Undo
+            </button>
+          ) : null}
         </p>
       ) : null}
       <section className="library-panel library-lessons" aria-labelledby="library-lessons-title">
@@ -155,7 +181,6 @@ export function LibraryTab({ library }: { library: ReturnType<typeof useLibrary>
             {displayed.map(({ lesson, index }) => {
               const pinned = state.pinned.includes(lesson.id);
               const completed = lessonCompleted(lesson);
-              const reattach = lessonMedia(lesson).type === 'local' && !getLiveMedia(lesson.id);
               const href = `/practice/${encodeURIComponent(lesson.id)}${completed ? `?section=${encodeURIComponent(lesson.segments[0].id)}` : ''}`;
               const words = savedCounts[lesson.id];
               return (
@@ -186,18 +211,13 @@ export function LibraryTab({ library }: { library: ReturnType<typeof useLibrary>
                       ) : (
                         `Section ${index + 1} of ${lesson.segments.length}`
                       )}
-                      {reattach ? <span> · Reattach your file to play</span> : null}
                     </p>
                     <div className="library-card-actions">
                       <Link
-                        className={`button${lesson.id === nextUp && !reattach ? ' primary' : ''}`}
+                        className={`button${lesson.id === nextUp ? ' primary' : ''}`}
                         href={href}
                       >
-                        {reattach ? (
-                          <>
-                            <Paperclip size={16} /> Reattach file
-                          </>
-                        ) : completed ? (
+                        {completed ? (
                           <>
                             <RotateCcw size={16} /> Revisit
                           </>
@@ -209,7 +229,7 @@ export function LibraryTab({ library }: { library: ReturnType<typeof useLibrary>
                       </Link>
                       <button
                         className="icon-button"
-                        aria-label={`${pinned ? 'Remove' : 'Save'} ${lesson.title} ${pinned ? 'from' : 'to'} library`}
+                        aria-label={`Save ${lesson.title} to library`}
                         aria-pressed={pinned}
                         onClick={() => {
                           try {
@@ -221,6 +241,19 @@ export function LibraryTab({ library }: { library: ReturnType<typeof useLibrary>
                       >
                         <Bookmark size={18} fill={pinned ? 'currentColor' : 'none'} />
                       </button>
+                      <LessonMenu
+                        title={lesson.title}
+                        onComplete={
+                          completed
+                            ? undefined
+                            : () => {
+                                completeLesson(lesson);
+                                window.dispatchEvent(new Event('hibiki:library-change'));
+                                report('success', `Marked “${lesson.title}” complete.`);
+                              }
+                        }
+                        onRemove={() => remove(lesson.id, lesson.title)}
+                      />
                     </div>
                   </div>
                 </li>
@@ -267,6 +300,10 @@ export function LibraryTab({ library }: { library: ReturnType<typeof useLibrary>
                           </>
                         )}
                       </Link>
+                      <LessonMenu
+                        title={item.lesson.title}
+                        onRemove={() => remove(item.lesson.lessonId, item.lesson.title)}
+                      />
                     </div>
                   </div>
                 </li>
@@ -389,6 +426,39 @@ export function LibraryTab({ library }: { library: ReturnType<typeof useLibrary>
         ) : null}
       </section>
     </div>
+  );
+}
+
+/** Less frequent lesson actions, behind one ••• button so each card keeps a single main action. */
+function LessonMenu({
+  title,
+  onComplete,
+  onRemove,
+}: {
+  title: string;
+  onComplete?: () => void;
+  onRemove: () => void;
+}) {
+  const run = (action: () => void) => (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.currentTarget.closest('details')?.removeAttribute('open');
+    action();
+  };
+  return (
+    <details className="library-card-menu">
+      <summary className="icon-button" aria-label={`More actions for ${title}`}>
+        •••
+      </summary>
+      <div>
+        {onComplete ? (
+          <button onClick={run(onComplete)}>
+            <CircleCheck size={16} /> Mark complete
+          </button>
+        ) : null}
+        <button onClick={run(onRemove)}>
+          <EyeOff size={16} /> Remove from library
+        </button>
+      </div>
+    </details>
   );
 }
 
