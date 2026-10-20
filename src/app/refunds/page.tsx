@@ -42,7 +42,22 @@ export default function RefundsPage() {
         </p>
       </section>
       <section>
-        <h2>Refunds, withdrawals and consumer rights</h2>
+        <h2>No refunds, except where required by law</h2>
+        <p>
+          Hibiki Pro payments are non-refundable. We do not offer refunds or credits for change of
+          mind, unused time, partially used billing periods, monthly or annual renewals you forgot
+          to cancel, or periods in which you did not use Hibiki. Cancelling stops future renewals;
+          Pro stays active until the end of the period you have already paid for. Hibiki Free is
+          available without payment, so you can try the app before subscribing.
+        </p>
+        <p>
+          This does not affect your statutory rights. Where the law gives you a right to cancel or
+          to a refund, for example a cooling-off right for digital services, or where Paddle as
+          merchant of record is required to or chooses to issue a refund, that right applies.
+        </p>
+      </section>
+      <section>
+        <h2>Withdrawals and consumer rights</h2>
         <p>
           Refund eligibility depends on Paddle&apos;s{' '}
           <a href="https://www.paddle.com/legal/refund-policy">Refund Policy</a>, its{' '}

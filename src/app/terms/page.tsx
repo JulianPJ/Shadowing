@@ -81,7 +81,8 @@ export default function TermsPage() {
           handled by Paddle. Paddle&apos;s{' '}
           <a href="https://www.paddle.com/legal/buyer-terms">Buyer Terms</a> apply to those
           transactions alongside applicable consumer law. Hibiki continues to provide the software
-          and support the learning service. See our{' '}
+          and support the learning service. Pro payments are non-refundable except where applicable
+          law requires a refund or Paddle issues one; cancelling stops future renewals. See our{' '}
           <Link href="/refunds">Subscriptions, cancellations and refunds</Link> notice.
         </p>
       </section>

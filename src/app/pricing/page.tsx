@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { Check, Minus } from 'lucide-react';
 import { MINIMUM_ACCOUNT_AGE } from '@/lib/auth/eligibility';
 import { features, publicPrices } from '@/lib/billing/features';
 
@@ -8,6 +9,18 @@ export const metadata: Metadata = {
   description:
     'Hibiki is free to use. Hibiki Pro adds comprehension checks, recording, vocabulary review and progress tracking for £3.99 a month or £29.99 a year.',
 };
+
+function Included({ value }: { value: boolean }) {
+  return value ? (
+    <span className="subscription-yes" role="img" aria-label="Included">
+      <Check size={14} strokeWidth={3} />
+    </span>
+  ) : (
+    <span className="subscription-no" role="img" aria-label="Not included">
+      <Minus size={14} strokeWidth={3} />
+    </span>
+  );
+}
 
 export default function PricingPage() {
   return (
@@ -33,7 +46,7 @@ export default function PricingPage() {
           </p>
           <p>Everything in Free plus Pro features. Cancel anytime.</p>
         </section>
-        <section className="pricing-plan">
+        <section className="pricing-plan pricing-plan-featured">
           <h2>Pro · Annual</h2>
           <p className="pricing-price">
             <strong>{publicPrices.annual}</strong> / year
@@ -66,8 +79,12 @@ export default function PricingPage() {
                 {name}
                 <span>{detail}</span>
               </th>
-              <td>{free ? 'Included' : '—'}</td>
-              <td>Included</td>
+              <td>
+                <Included value={free} />
+              </td>
+              <td>
+                <Included value />
+              </td>
             </tr>
           ))}
         </tbody>
@@ -75,7 +92,9 @@ export default function PricingPage() {
       <h2>Cancelling and refunds</h2>
       <p>
         You can cancel at any time from <Link href="/account">Account</Link>; Pro then stays active
-        until the end of the period you have paid for. See{' '}
+        until the end of the period you have paid for. Payments are non-refundable, including for
+        unused time or partial periods, except where the law requires a refund. Your statutory
+        rights are not affected. See{' '}
         <Link href="/refunds">subscriptions, cancellations and refunds</Link>, our{' '}
         <Link href="/terms">Terms</Link> and <Link href="/privacy">Privacy Policy</Link>. Questions?{' '}
         <Link href="/contact">Contact Hibiki</Link>.

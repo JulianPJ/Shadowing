@@ -216,7 +216,8 @@ export function SubscriptionDialog({
         </p>
         <p className="subscription-fine">
           For adults aged {MINIMUM_ACCOUNT_AGE} or older. Renewing subscription. Cancels at the end
-          of your paid billing period. See our <Link href="/terms">Terms</Link>,{' '}
+          of your paid billing period. Payments are non-refundable except where required by law. See
+          our <Link href="/terms">Terms</Link>,{' '}
           <Link href="/refunds">cancellation and refund information</Link> and{' '}
           <Link href="/privacy">Privacy Policy</Link>. Paddle&apos;s{' '}
           <a href="https://www.paddle.com/legal/buyer-terms">Buyer Terms</a> also apply.
