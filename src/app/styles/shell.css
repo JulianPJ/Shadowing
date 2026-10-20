@@ -287,6 +287,127 @@
   max-width: none;
   padding: 0 0 48px;
 }
+
+/* Home points to the destinations that own each task instead of embedding their feeds. */
+.home-destinations {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+  margin: 40px 0 64px;
+}
+.home-destination {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 72px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+  color: var(--green);
+  transition: border-color 0.15s;
+}
+.home-destination:hover {
+  border-color: color-mix(in srgb, var(--green) 45%, var(--line));
+}
+.home-destination > span {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+.home-destination strong {
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 600;
+}
+.home-destination > span > span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* Discover and Library page headings: DM Sans titles, not the Home editorial serif. */
+.destination-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px 24px;
+  padding: 40px 0 24px;
+}
+.destination-heading h1 {
+  margin: 0 0 4px;
+  font-family: var(--font);
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+.destination-heading p {
+  max-width: 60ch;
+  color: var(--muted);
+  font-size: 15px;
+}
+.prepare-page {
+  padding-top: 24px;
+}
+.prepare-page .hero {
+  padding: 24px 0 64px;
+}
+
+/* Compact widths: one labelled bottom bar for the five destinations, never over Practice. */
+.site-header .bottom-navigation {
+  display: none;
+}
+@media (max-width: 1050px) {
+  .site-header .bottom-navigation {
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 20;
+    display: grid;
+    grid-auto-columns: minmax(0, 1fr);
+    grid-auto-flow: column;
+    gap: 0;
+    padding: 4px 4px calc(4px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--line);
+    background: var(--paper);
+  }
+  .site-header .bottom-navigation a {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    min-height: 52px;
+    padding: 4px 2px;
+    border-radius: 10px;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.2;
+    text-align: center;
+  }
+  .site-header .bottom-navigation a[aria-current='page'] {
+    color: var(--green);
+    background: var(--green-pale);
+    font-weight: 600;
+  }
+  .site-header .bottom-navigation a[aria-current='page'] .nav-label {
+    text-decoration: underline 2px;
+    text-underline-offset: 3px;
+  }
+  .site-header .bottom-navigation .nav-badge {
+    position: absolute;
+    top: 2px;
+    left: calc(50% + 6px);
+  }
+  /* Keep the footer and focused controls clear of the fixed bar. */
+  body:has(.bottom-navigation) {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom));
+  }
+  html:has(.bottom-navigation) {
+    scroll-padding-bottom: calc(76px + env(safe-area-inset-bottom));
+  }
+}
 .practice-toolbar .speed-control {
   display: grid;
   gap: 4px;

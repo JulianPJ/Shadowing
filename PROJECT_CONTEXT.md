@@ -26,12 +26,17 @@ and audio.
 
 ## Information architecture
 
-| Section | Routes | Contents |
+Five destinations, in the header on desktop and a labelled bottom bar at compact widths (never over Practice):
+
+| Destination | Routes | Contents |
 | --- | --- | --- |
-| Home | `/`, `/discover`, `/library`, `/prepare` | Paste a link or import; Continue watching; tabs **Discover** (catalogue feed) and **Library** (lessons + Watch later) |
+| Home | `/` | Paste a link or import; Continue watching (or the demo on first use); links to Discover, Library and due reviews |
+| Discover | `/discover` | Catalogue feed, search, JLPT bands and filters, Watch later actions. Omitted when `NEXT_PUBLIC_DISCOVER_ENABLED=false` (the route then shows Library) |
+| Library | `/library` | Lessons (All / Continue watching / Completed / Saved), Watch later queue, Add a video |
 | Vocabulary | `/review`, `/words` (`/dictionary` alias) | Tabs **Review** (daily SRS) and **Words** (saved words + other marked words) |
 | Profile | `/profile` (`/progress`, `/account` aliases) | This week + daily goal, summary, moments to revisit, recent lessons, account and plan |
-| Practice | `/practice/[id]` | The player |
+| Practice | `/practice/[id]` | The player; marks no destination as current |
+| Prepare | `/prepare` | Transient preparation of a queued link; returns to its origin (`from=discover` or `from=library`, default Home) |
 
 ## Current implementation
 

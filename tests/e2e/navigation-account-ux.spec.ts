@@ -55,7 +55,7 @@ test('mobile menu is complete, restores focus and keeps learning-page return pat
     await trigger.click();
     const menu = page.getByRole('dialog', { name: 'Navigate Hibiki' });
     await expect(menu).toBeVisible();
-    for (const name of ['Home', 'Vocabulary', 'Profile', 'Sign in'])
+    for (const name of ['Home', 'Discover', 'Library', 'Vocabulary', 'Profile', 'Sign in'])
       await expect(menu.getByRole('link', { name, exact: true })).toBeVisible();
     await expect(trigger).toHaveAttribute('aria-expanded', 'true');
     await page.keyboard.press('Escape');
@@ -113,16 +113,18 @@ test('email sign-in returns to the chosen word and section, with password visibi
   expect(callback).toBe('/account');
 });
 
-test('three desktop sections and profile aliases keep account and plan information accessible', async ({
+test('five desktop destinations and profile aliases keep account and plan information accessible', async ({
   context,
   page,
 }) => {
   await services(context, { user });
   await page.goto('/');
   const nav = page.getByRole('navigation', { name: 'Main navigation' });
-  await expect(nav.getByRole('link')).toHaveCount(3);
+  await expect(nav.getByRole('link')).toHaveCount(5);
   for (const [name, href] of [
     ['Home', '/'],
+    ['Discover', '/discover'],
+    ['Library', '/library'],
     ['Vocabulary', '/review'],
     ['Profile', '/profile'],
   ])
@@ -138,4 +140,58 @@ test('three desktop sections and profile aliases keep account and plan informati
     await expect(page.getByRole('heading', { name: 'Your subscription' })).toBeVisible();
     await expect(page.getByText('Subscriptions are awaiting setup.').first()).toBeVisible();
   }
+});
+
+test('each destination owns its page, marks itself current and the bottom bar stays off Practice', async ({
+  context,
+  page,
+}) => {
+  await services(context, { user: null });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const nav = page.getByRole('navigation', { name: 'Main navigation' });
+  for (const [route, current, heading] of [
+    ['/', 'Home', /Find your rhythm/],
+    ['/discover', 'Discover', 'Discover'],
+    ['/library', 'Library', 'Library'],
+    ['/review', 'Vocabulary', null],
+    ['/profile', 'Profile', null],
+  ] as const) {
+    await page.goto(route);
+    await expect(nav.getByRole('link', { name: current, exact: true })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    await expect(nav.locator('[aria-current="page"]')).toHaveCount(1);
+    if (heading) await expect(page.getByRole('heading', { level: 1, name: heading })).toBeVisible();
+  }
+  await page.goto('/');
+  await expect(page.locator('.discover-card')).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Your lessons' })).toHaveCount(0);
+  await page.goto('/library');
+  await expect(page.getByRole('button', { name: 'Add a video' })).toBeVisible();
+  for (const route of ['/practice/demo', '/prepare']) {
+    await page.goto(route);
+    await expect(nav.locator('[aria-current="page"]')).toHaveCount(0);
+  }
+  await expect(page.getByRole('link', { name: 'Back to Home', exact: true })).toHaveAttribute(
+    'href',
+    '/',
+  );
+
+  await page.setViewportSize({ width: 320, height: 700 });
+  await page.goto('/library');
+  const bar = page.getByRole('navigation', { name: 'Destinations' });
+  for (const name of ['Home', 'Discover', 'Library', 'Vocabulary', 'Profile']) {
+    const link = bar.getByRole('link', { name, exact: true });
+    await expect(link).toBeVisible();
+    expect((await link.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+  }
+  await expect(bar.getByRole('link', { name: 'Library', exact: true })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.goto('/practice/demo');
+  await expect(bar).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Open navigation menu' })).toBeVisible();
 });

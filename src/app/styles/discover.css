@@ -28,8 +28,9 @@
   font-weight: 500;
   opacity: 0.8;
 }
+/* A section under the Discover page title, so it uses the section-heading size. */
 .discover-feed-heading h2 {
-  font-size: 27px;
+  font-size: 20px;
   letter-spacing: -0.02em;
   margin: 0;
 }

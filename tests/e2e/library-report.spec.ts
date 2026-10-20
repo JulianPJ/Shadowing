@@ -46,11 +46,8 @@ test('queue persists, reorders, removes and carries a validated link into prepar
   );
   await expect(page.getByRole('dialog')).toBeVisible();
   await page.getByRole('button', { name: 'Close import', exact: true }).click();
-  await page.getByRole('link', { name: 'Back to Discover', exact: false }).click();
-  await page
-    .getByRole('navigation', { name: 'Browse' })
-    .getByRole('link', { name: 'Library', exact: true })
-    .click();
+  await page.getByRole('link', { name: 'Back to Library', exact: true }).click();
+  await expect(page).toHaveURL(/\/library$/);
   await page.getByRole('button', { name: 'Remove Evening video from queue' }).click();
   await expect(page.locator('.library-queue li')).toHaveCount(1);
 });

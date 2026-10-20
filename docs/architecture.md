@@ -6,8 +6,9 @@ Hibiki is one Cloudflare Worker built with vinext (Next.js App Router on Vite). 
 
 | Concern | Implementation |
 | --- | --- |
-| Header, section tabs, help, task return | `src/components/chrome.tsx`, `src/components/task-return.ts` |
-| Home: start a lesson, continue, Discover / Library tabs | `src/components/home.tsx`, `src/components/discover/`, `src/components/my-library.tsx`, `src/components/library-preview.tsx` |
+| Header, five destinations, bottom bar, section tabs, help, task return | `src/components/chrome.tsx`, `src/components/task-return.ts` |
+| Destination pages: Home, Discover, Library, Prepare | `src/components/home.tsx`, `src/components/discover/`, `src/components/my-library.tsx`, `src/components/library-preview.tsx` |
+| Bring your own video: link, import, Bridge and queued-link hand-offs | `src/components/video-start.tsx`, `src/components/import-dialog.tsx` |
 | Vocabulary: Daily Review and Words | `src/components/daily-review.tsx`, `src/components/vocabulary-words.tsx`, `src/components/vocabulary-header.tsx` |
 | Profile: progress, weekly report, account settings | `src/components/learner-progress.tsx`, `src/components/weekly-report.tsx`, `src/components/account.tsx` |
 | Practice hydration / missing lesson | `src/components/practice.tsx` |

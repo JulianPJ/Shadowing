@@ -4,6 +4,11 @@ import {
   AudioLines,
   ArrowUpRight,
   ArrowLeft,
+  BookOpenText,
+  CircleUser,
+  Compass,
+  House,
+  Library,
   Menu,
   X,
   Headphones,
@@ -17,14 +22,38 @@ import { useAccount } from './account';
 import { useReview } from './use-review';
 import { dueReviews } from '@/lib/review-scheduler';
 import { authPath } from '@/lib/auth/return-path';
+import { discoverEnabled } from '@/lib/discover/enabled';
 import { useTaskReturn } from './task-return';
 
-/** Three sections: Home (practice, Discover, Library), Vocabulary and Profile. */
+/**
+ * Five destinations. Home resumes, Discover finds new videos, Library keeps what you have.
+ * Practice and /prepare are working surfaces reached from content, so neither marks a section.
+ */
 const sections = [
-  { label: 'Home', href: '/', paths: ['/', '/discover', '/library', '/prepare'] },
-  { label: 'Vocabulary', href: '/review', paths: ['/review', '/words', '/dictionary'] },
-  { label: 'Profile', href: '/profile', paths: ['/profile', '/progress', '/account'] },
+  { label: 'Home', href: '/', paths: ['/'], icon: House },
+  ...(discoverEnabled
+    ? [{ label: 'Discover', href: '/discover', paths: ['/discover'], icon: Compass }]
+    : []),
+  { label: 'Library', href: '/library', paths: ['/library'], icon: Library },
+  {
+    label: 'Vocabulary',
+    href: '/review',
+    paths: ['/review', '/words', '/dictionary'],
+    icon: BookOpenText,
+  },
+  {
+    label: 'Profile',
+    href: '/profile',
+    paths: ['/profile', '/progress', '/account'],
+    icon: CircleUser,
+  },
 ] as const;
+
+function isCurrent(section: (typeof sections)[number], pathname: string) {
+  return (section.paths as readonly string[]).some(
+    (path) => pathname === path || (path !== '/' && pathname.startsWith(`${path}/`)),
+  );
+}
 
 function DueCount() {
   const account = useAccount();
@@ -66,13 +95,7 @@ export function Header() {
           key={section.href}
           className="nav-link"
           href={section.href}
-          aria-current={
-            (section.paths as readonly string[]).some(
-              (path) => pathname === path || (path !== '/' && pathname.startsWith(`${path}/`)),
-            )
-              ? 'page'
-              : undefined
-          }
+          aria-current={isCurrent(section, pathname) ? 'page' : undefined}
         >
           <span className="nav-label">{section.label}</span>
           {section.label === 'Vocabulary' ? <DueCount /> : null}
@@ -139,11 +162,26 @@ export function Header() {
           {links}
         </nav>
       </dialog>
+      {pathname.startsWith('/practice/') ? null : (
+        <nav className="bottom-navigation" aria-label="Destinations">
+          {sections.map((section) => (
+            <Link
+              key={section.href}
+              href={section.href}
+              aria-current={isCurrent(section, pathname) ? 'page' : undefined}
+            >
+              <section.icon size={20} strokeWidth={1.8} aria-hidden="true" />
+              <span className="nav-label">{section.label}</span>
+              {section.label === 'Vocabulary' ? <DueCount /> : null}
+            </Link>
+          ))}
+        </nav>
+      )}
     </header>
   );
 }
 
-/** Sub-navigation inside a section, e.g. Discover/Library or Review/Words. */
+/** Sub-navigation inside a destination, e.g. Review/Words in Vocabulary. */
 export function SectionTabs({
   label,
   tabs,
