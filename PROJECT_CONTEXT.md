@@ -30,9 +30,9 @@ Five destinations, in the header on desktop and a labelled bottom bar at compact
 
 | Destination | Routes | Contents |
 | --- | --- | --- |
-| Home | `/` | Paste a link or import; Continue watching (or the demo on first use); links to Discover, Library and due reviews |
+| Home | `/` | First use: Try the demo and Use my own video in the first viewport. Returning: one lesson to resume at its next Japanese sentence (plus two more in progress), a Pro review card, the bring-your-own-video form, links to Discover and Library |
 | Discover | `/discover` | Catalogue feed, search, JLPT bands and filters, Watch later actions. Omitted when `NEXT_PUBLIC_DISCOVER_ENABLED=false` (the route then shows Library) |
-| Library | `/library` | Lessons (All / Continue watching / Completed / Saved), Watch later queue, Add a video |
+| Library | `/library` | Lesson preview cards (All / Continue watching / Completed / Saved, kept in `?filter=`) with Resume / Revisit / Reattach file, Watch later cards with Prepare, Add a video |
 | Vocabulary | `/review`, `/words` (`/dictionary` alias) | Tabs **Review** (daily SRS) and **Words** (saved words + other marked words) |
 | Profile | `/profile` (`/progress`, `/account` aliases) | This week + daily goal, summary, moments to revisit, recent lessons, account and plan |
 | Practice | `/practice/[id]` | The player; marks no destination as current |
