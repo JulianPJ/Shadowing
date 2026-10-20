@@ -1,6 +1,6 @@
 # Hibiki — visual identity, stage 01
 
-Status: **proposed for discussion**, 20 October 2026. This package establishes a visual guideline; it does not change the running application.
+Status: **implemented**, 20 October 2026. See the [design exploration index](../README.md) for what shipped and how it was verified.
 
 For full-page desktop layouts, see the [stage 02 desktop revision](../02-destinations/desktop-revision.md). The boards here present identity; they do not establish measured desktop responsiveness.
 
@@ -136,8 +136,8 @@ No application code has been modified or deployed here. The repository's runtime
 
 | Stage | Focus | Status |
 | --- | --- | --- |
-| 01 | Visual identity, themes and component language | Proposed here |
-| 02 | Personalised Home and separation of destinations | Suggested next |
+| 01 | Visual identity, themes and component language | Implemented 20 October 2026 |
+| 02 | Personalised Home and separation of destinations | Five destinations accepted; not yet implemented |
 | 03 | Rewarding progress and tracking | Pending |
 | 04 | Practice hierarchy with current/proposed comparison | Pending; exploratory because the user is unconvinced |
 | 05 | Discover refinements retaining JLPT | Pending |
