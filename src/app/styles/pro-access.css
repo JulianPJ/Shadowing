@@ -23,7 +23,7 @@
 .pro-feature-notice p {
   margin-top: 2px;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 12px;
 }
 .pro-feature-notice.compact {
   margin: 8px 0 0;
@@ -37,7 +37,7 @@
   padding: 5px 9px;
   border: 1px solid var(--line);
   border-radius: 999px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.4px;
 }

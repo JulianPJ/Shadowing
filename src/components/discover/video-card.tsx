@@ -94,7 +94,7 @@ export function VideoCard({
         <button
           className="text-button"
           aria-pressed={saved}
-          aria-label={`${saved ? 'Remove' : 'Save'} ${video.title} ${saved ? 'from' : 'to'} Watch Later`}
+          aria-label={`${saved ? 'Saved' : 'Save for later'}: ${video.title}`}
           onClick={onSave}
         >
           {saved ? <BookmarkCheck size={17} /> : <Bookmark size={17} />}{' '}

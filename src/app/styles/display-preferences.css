@@ -9,7 +9,7 @@
   margin-left: auto;
 }
 .practice-view-controls .button {
-  font-size: 11px;
+  font-size: 12px;
   padding: 8px 12px;
   min-height: 44px;
   gap: 7px;
@@ -136,7 +136,7 @@
   color: inherit;
 }
 .transcript-play .row-time {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
 }
 .transcript-row .row-content {
@@ -207,6 +207,14 @@ body.studio-active .site-footer {
   --pale: #35241f;
   --green: #c0d9bf;
   --green-pale: #27392c;
+  --accent-text: #d9846f;
+  --action: #d9846f;
+  --action-hover: #eda08d;
+  --on-action: #101310;
+  --on-forest: #101310;
+  --control-border: #7d887f;
+  --focus: #c0d9bf;
+  --danger: #ffc3b3;
   width: 100%;
   max-width: none;
   min-height: 100vh;
@@ -418,13 +426,13 @@ body.studio-active .site-footer {
   border-color: var(--green);
 }
 main.practice-main.studio-mode .button.primary {
-  background: #ac503d;
-  border-color: #ac503d;
-  color: #fff;
+  background: var(--action);
+  border-color: var(--action);
+  color: var(--on-action);
 }
 main.practice-main.studio-mode .button.primary:hover {
-  background: #934230;
-  border-color: #934230;
+  background: var(--action-hover);
+  border-color: var(--action-hover);
 }
 .studio-mode .button:disabled,
 .studio-mode .icon-button:disabled {
@@ -475,7 +483,7 @@ main.practice-main.studio-mode textarea::placeholder {
 }
 .studio-mode .current-translation,
 .studio-mode .translation-button,
-.studio-mode .record-button,
+.studio-mode .record-button:not(.recording),
 .studio-mode .shadowing-comparison dd,
 .studio-mode .shadowing-completion-heading h2 {
   color: var(--green);
@@ -486,6 +494,13 @@ main.practice-main.studio-mode textarea::placeholder {
   background: var(--green-pale);
   color: var(--ink);
   border-color: var(--line);
+}
+/* Recording keeps its filled treatment inside Studio Mode. */
+.studio-mode .state-recording .state-badge,
+.studio-mode .record-button.recording {
+  background: var(--action);
+  color: var(--on-action);
+  border-color: var(--action);
 }
 .studio-mode .transcript-search {
   background: var(--bg);

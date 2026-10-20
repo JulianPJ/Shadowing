@@ -2,13 +2,24 @@
   --bg: #f8f7f2;
   --paper: #fffefa;
   --ink: #303a33;
-  --muted: #81867d;
+  --muted: #626b60;
   --line: #e6e6dd;
+  /* Brand terracotta: marks, links and saved context. Filled buttons use the darker --action. */
   --accent: #b65d48;
   --accent-hover: #9f4e3b;
+  /* Terracotta for small text on paper or the terracotta tint. */
+  --accent-text: #9f4e3b;
+  --action: #ad5743;
+  --action-hover: #9f4e3b;
+  --on-action: #ffffff;
   --pale: #f7ece5;
+  /* Forest: progress, completed practice, selected filters and current location. */
   --green: #506c59;
   --green-pale: #eef2e9;
+  --on-forest: #fffefa;
+  --control-border: #7a8377;
+  --focus: #506c59;
+  --danger: #a84636;
   --font: 'DM Sans Variable', sans-serif;
   --jp: 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', Meiryo, sans-serif;
 }
@@ -57,8 +68,8 @@ input:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
 [tabindex]:focus-visible {
-  outline: 3px solid #c6866c;
-  outline-offset: 4px;
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
 }
 input,
 textarea {
@@ -66,7 +77,7 @@ textarea {
 }
 input::placeholder,
 textarea::placeholder {
-  color: #a4a69f;
+  color: var(--control-border);
 }
 button svg,
 a svg {
@@ -98,7 +109,7 @@ svg {
   font-size: 12px;
 }
 .eyebrow {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 1.75px;
   color: var(--muted);
@@ -137,13 +148,13 @@ svg {
   border-color: #cbd0c5;
 }
 .button.primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff9f4;
+  background: var(--action);
+  border-color: var(--action);
+  color: var(--on-action);
 }
 .button.primary:hover {
-  background: var(--accent-hover);
-  border-color: var(--accent-hover);
+  background: var(--action-hover);
+  border-color: var(--action-hover);
 }
 .button:active {
   transform: translateY(1px);
@@ -157,7 +168,7 @@ svg {
   justify-content: center;
   gap: 7px;
   padding: 0;
-  color: var(--accent);
+  color: var(--accent-text);
   font-size: 12px;
   background: none;
   line-height: 1.6;
@@ -225,7 +236,7 @@ svg {
 .brand-japanese {
   font-size: 14px;
   font-weight: 400;
-  color: #95988b;
+  color: var(--muted);
   margin-left: 12px;
   border-left: 1px solid #ddded4;
   padding-left: 12px;
@@ -241,7 +252,7 @@ svg {
   gap: 8px;
   align-items: center;
   padding: 8px 0;
-  color: #747b6e;
+  color: var(--muted);
 }
 .nav-link:hover {
   color: var(--ink);
@@ -253,11 +264,11 @@ svg {
   padding: 25px 0 31px;
   display: flex;
   justify-content: space-between;
-  font-size: 11px;
-  color: #96998e;
+  font-size: 12px;
+  color: var(--muted);
 }
 .site-footer [lang='ja'] {
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 2px;
 }
 

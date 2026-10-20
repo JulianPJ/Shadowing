@@ -63,10 +63,10 @@
   }
   .record-button {
     padding: 8px;
-    font-size: 9px;
+    font-size: 12px;
   }
   .recording-hint {
-    font-size: 9px;
+    font-size: 12px;
   }
   .transcript-card {
     min-height: 540px;
@@ -103,11 +103,11 @@
     padding: 25px;
   }
   .demo-copy p {
-    font-size: 11px;
+    font-size: 12px;
   }
   .lesson-tags {
     gap: 9px;
-    font-size: 9px;
+    font-size: 12px;
   }
   .lesson-tags span + span {
     padding-left: 9px;
@@ -128,7 +128,7 @@
   }
   .practice-controls .button {
     padding: 10px;
-    font-size: 10px;
+    font-size: 12px;
   }
   .practice-controls .icon-button {
     width: 29px;
@@ -138,42 +138,42 @@
   }
   .segmented-control button {
     padding: 6px 9px;
-    font-size: 9px;
+    font-size: 12px;
   }
   .speed-control {
     gap: 5px;
-    font-size: 9px;
+    font-size: 12px;
   }
   .speed-control select {
     padding: 7px;
-    font-size: 10px;
+    font-size: 12px;
   }
   .current-heading {
     gap: 8px;
   }
   .state-badge {
-    font-size: 7px;
+    font-size: 11px;
     letter-spacing: 0.6px;
     padding: 5px;
   }
   .section-time {
-    font-size: 8px;
+    font-size: 12px;
   }
   .recording-top {
     align-items: flex-start;
     flex-direction: column;
   }
   .recording-hint {
-    font-size: 10px;
+    font-size: 12px;
   }
   .record-button {
-    font-size: 10px;
+    font-size: 12px;
   }
   .transcript-heading {
     padding: 19px 17px 13px;
   }
   .transcript-heading .eyebrow {
-    font-size: 7px;
+    font-size: 11px;
   }
   .transcript-tools {
     margin: 0 16px 13px;
@@ -182,11 +182,11 @@
     padding: 0 7px;
   }
   .row-content > [lang='ja'] {
-    font-size: 11px;
+    font-size: 12px;
   }
   .transcript-bottom {
     padding: 14px;
-    font-size: 7px;
+    font-size: 12px;
   }
   .transcript-row {
     gap: 8px;
@@ -202,7 +202,7 @@
     font-size: 30px;
   }
   .practice-title p {
-    font-size: 10px;
+    font-size: 12px;
   }
 }
 @media (max-width: 700px) {
@@ -230,10 +230,10 @@
   }
   .site-header nav {
     gap: 18px;
-    font-size: 10px;
+    font-size: 12px;
   }
   .nav-link {
-    font-size: 10px;
+    font-size: 12px;
   }
   .home-main,
   .practice-main {
@@ -243,7 +243,7 @@
     padding: 42px 0 35px;
   }
   .hero-tag {
-    font-size: 9px;
+    font-size: 12px;
   }
   .hero h1 {
     font-size: 39px;
@@ -260,7 +260,7 @@
     border-radius: 10px;
   }
   .input-label {
-    font-size: 10px;
+    font-size: 12px;
     margin-bottom: 10px;
   }
   .url-input-wrap {
@@ -269,7 +269,7 @@
     gap: 9px;
   }
   .url-input-wrap input {
-    font-size: 11px;
+    font-size: 12px;
     height: 31px;
     width: calc(100% - 36px);
     flex: auto;
@@ -281,15 +281,15 @@
     width: 100%;
     min-height: 40px;
     margin-top: 3px;
-    font-size: 11px;
+    font-size: 12px;
   }
   .input-meta {
-    font-size: 8px;
+    font-size: 12px;
     flex-wrap: wrap;
     gap: 8px;
   }
   .input-meta .text-button {
-    font-size: 9px;
+    font-size: 12px;
   }
   .input-meta > span svg {
     width: 11px;
@@ -322,7 +322,7 @@
     max-width: 100%;
   }
   .lesson-tags {
-    font-size: 10px;
+    font-size: 12px;
     gap: 12px;
   }
   .lesson-tags span + span {
@@ -337,12 +337,12 @@
     display: none;
   }
   .site-footer {
-    font-size: 9px;
+    font-size: 12px;
     margin: 0 22px;
     padding: 21px 0;
   }
   .site-footer [lang='ja'] {
-    font-size: 8px;
+    font-size: 11px;
     letter-spacing: 1px;
   }
   .recent-section {
@@ -362,13 +362,13 @@
     font-size: 12px;
   }
   .recent-card div span {
-    font-size: 9px;
+    font-size: 12px;
   }
   .recent-grid .recent-card:last-child:nth-child(3) {
     display: flex;
   }
   .prepare-stages {
-    font-size: 8px;
+    font-size: 12px;
     gap: 5px;
   }
   .prepare-stages > span {
@@ -377,16 +377,16 @@
   .prepare-stages > span > span {
     width: 15px;
     height: 15px;
-    font-size: 8px;
+    font-size: 12px;
   }
   .prepare-top {
-    font-size: 10px;
+    font-size: 12px;
   }
   .practice-main {
     padding-top: 21px;
   }
   .practice-breadcrumb {
-    font-size: 9px;
+    font-size: 12px;
     gap: 8px;
   }
   .practice-title {
@@ -395,7 +395,7 @@
     align-items: flex-end;
   }
   .practice-title .eyebrow {
-    font-size: 8px;
+    font-size: 11px;
     letter-spacing: 1.1px;
   }
   .practice-title h1 {
@@ -404,7 +404,7 @@
     line-height: 1.2;
   }
   .practice-title p {
-    font-size: 9px;
+    font-size: 12px;
     gap: 7px;
     flex-wrap: wrap;
   }
@@ -425,27 +425,27 @@
     min-height: 80px;
   }
   .segmented-control button {
-    font-size: 10px;
+    font-size: 12px;
     padding: 7px 12px;
   }
   .speed-control {
-    font-size: 10px;
+    font-size: 12px;
     gap: 8px;
   }
   .speed-control select {
-    font-size: 11px;
+    font-size: 12px;
     padding: 7px 9px;
   }
   .state-badge {
-    font-size: 8px;
+    font-size: 11px;
     letter-spacing: 0.9px;
     padding: 5px 7px;
   }
   .section-time {
-    font-size: 9px;
+    font-size: 12px;
   }
   .translation-button {
-    font-size: 11px;
+    font-size: 12px;
     min-height: 36px;
   }
   .practice-controls {
@@ -461,7 +461,7 @@
     width: 33px;
   }
   .turn-instruction {
-    font-size: 10px;
+    font-size: 12px;
     line-height: 1.9;
     margin-top: 13px;
   }
@@ -476,31 +476,31 @@
     max-width: 55%;
   }
   .recording-hint {
-    font-size: 10px;
+    font-size: 12px;
     line-height: 1.7;
   }
   .recording-top .small-label {
-    font-size: 8px;
+    font-size: 12px;
   }
   .record-button {
-    font-size: 10px;
+    font-size: 12px;
     padding: 10px;
     min-height: 39px;
   }
   .recording-privacy {
-    font-size: 9px;
+    font-size: 12px;
     margin-top: 9px;
   }
   .recording-audio audio {
     height: 40px;
   }
   .player-footnote {
-    font-size: 8px;
+    font-size: 12px;
     padding: 12px 0;
     margin-top: 12px;
   }
   .player-footnote .text-button {
-    font-size: 9px;
+    font-size: 12px;
   }
   .transcript-card {
     position: static;
@@ -513,7 +513,7 @@
     padding: 22px 22px 15px;
   }
   .transcript-heading .eyebrow {
-    font-size: 8px;
+    font-size: 11px;
   }
   .transcript-heading h2 {
     font-size: 18px;
@@ -525,7 +525,7 @@
     padding: 9px 10px;
   }
   .transcript-search input {
-    font-size: 11px;
+    font-size: 12px;
   }
   .transcript-tools .icon-button {
     height: 34px;
@@ -543,13 +543,13 @@
     line-height: 1.95;
   }
   .row-time {
-    font-size: 9px;
+    font-size: 12px;
   }
   .row-number {
-    font-size: 10px;
+    font-size: 12px;
   }
   .transcript-bottom {
-    font-size: 9px;
+    font-size: 12px;
     padding: 17px 20px;
   }
   .help-dialog,
@@ -565,13 +565,13 @@
     gap: 15px;
   }
   .help-steps strong {
-    font-size: 11px;
+    font-size: 12px;
   }
   .help-steps span {
-    font-size: 10px;
+    font-size: 12px;
   }
   .shortcut-grid {
-    font-size: 10px;
+    font-size: 12px;
     padding: 14px;
     gap: 13px;
   }
@@ -579,7 +579,7 @@
     gap: 9px;
   }
   .import-tabs button {
-    font-size: 10px;
+    font-size: 12px;
     padding: 8px 11px;
   }
   .media-error {
@@ -587,10 +587,10 @@
     left: 10px;
     right: 10px;
     bottom: 10px;
-    font-size: 10px;
+    font-size: 12px;
   }
   .media-error .button {
-    font-size: 9px;
+    font-size: 12px;
     padding: 6px 8px;
   }
   .empty-screen {
@@ -618,13 +618,13 @@
     font-size: 34px;
   }
   .hero-tag {
-    font-size: 8px;
+    font-size: 12px;
   }
   .demo-copy {
     padding: 23px;
   }
   .lesson-tags {
-    font-size: 9px;
+    font-size: 12px;
     gap: 8px;
   }
   .lesson-tags span + span {
@@ -658,14 +658,14 @@
     font-size: 31px;
   }
   .practice-controls .button {
-    font-size: 11px;
+    font-size: 12px;
     padding: 10px;
   }
   .practice-title h1 {
     font-size: 26px;
   }
   .practice-title .eyebrow {
-    font-size: 7px;
+    font-size: 11px;
   }
   .site-footer {
     margin: 0 16px;
@@ -686,7 +686,7 @@
     grid-template-columns: 1fr;
   }
   .import-tabs button {
-    font-size: 9px;
+    font-size: 12px;
     padding: 7px 8px;
   }
 }

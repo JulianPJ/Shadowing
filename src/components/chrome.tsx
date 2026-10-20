@@ -74,7 +74,7 @@ export function Header() {
               : undefined
           }
         >
-          {section.label}
+          <span className="nav-label">{section.label}</span>
           {section.label === 'Vocabulary' ? <DueCount /> : null}
         </Link>
       ))}

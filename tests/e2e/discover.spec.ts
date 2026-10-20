@@ -99,14 +99,14 @@ test('save and undo persist through Library and trigger no preparation', async (
   await page.goto('/discover?band=all');
   const card = page.locator('.discover-card').first(),
     title = await card.locator('h3').innerText();
-  await card.getByRole('button', { name: /^Save .* to Watch Later$/ }).click();
-  await expect(card.getByRole('button', { name: /^Remove .* from Watch Later$/ })).toHaveAttribute(
+  await card.getByRole('button', { name: /^Save for later: / }).click();
+  await expect(card.getByRole('button', { name: /^Saved: / })).toHaveAttribute(
     'aria-pressed',
     'true',
   );
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  await expect(card.getByRole('button', { name: /^Save .* to Watch Later$/ })).toBeVisible();
-  await card.getByRole('button', { name: /^Save .* to Watch Later$/ }).click();
+  await expect(card.getByRole('button', { name: /^Save for later: / })).toBeVisible();
+  await card.getByRole('button', { name: /^Save for later: / }).click();
   await page.getByRole('link', { name: 'Library', exact: true }).click();
   await expect(page.locator('.library-queue')).toContainText(title);
   await page.reload();
@@ -286,7 +286,7 @@ test('error recovery, empty filters, mobile and blocked storage stay usable', as
   await page
     .locator('.discover-card')
     .first()
-    .getByRole('button', { name: /^Save .* to Watch Later$/ })
+    .getByRole('button', { name: /^Save for later: / })
     .click();
   await expect(page.getByRole('status').filter({ hasText: 'Saved for this visit' })).toBeVisible();
   await page.getByText('More ways to explore', { exact: true }).click();
@@ -369,7 +369,7 @@ test('signed-in queue merges remote records, saves offline and syncs on reconnec
   await page.getByRole('link', { name: 'Discover', exact: true }).click();
   const card = page.locator('.discover-card').first();
   const title = await card.locator('h3').innerText();
-  await card.getByRole('button', { name: /^Save .* to Watch Later$/ }).click();
+  await card.getByRole('button', { name: /^Save for later: / }).click();
   await expect
     .poll(() =>
       page.evaluate(

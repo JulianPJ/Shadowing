@@ -1,6 +1,6 @@
 /* Final readability and focus rules cover surfaces after theme/mobile overrides. */
 :where(button, a, input, select, textarea):focus-visible {
-  outline: 3px solid var(--accent, #64765b);
+  outline: 3px solid var(--focus);
   outline-offset: 3px;
 }
 .returning-home .hero-intro {
@@ -63,11 +63,8 @@
     flex-wrap: wrap;
   }
 }
-:root:not([data-theme='dark']) {
-  --muted: #626b60;
-}
 .lookup-token:focus-visible {
-  outline: 3px solid var(--accent);
+  outline: 3px solid var(--focus);
   outline-offset: 3px;
 }
 .lookup-token.lookup-selected {
@@ -77,7 +74,7 @@
   display: block;
   min-height: 44px;
   margin-top: 10px;
-  color: var(--accent);
+  color: var(--accent-text);
   font: 13px var(--font);
 }
 .lexicon-definitions button[aria-pressed='true'] {
@@ -139,7 +136,7 @@
 }
 .dictionary-save-panel .dictionary-fields :is(input, select, textarea),
 .practice-main .speed-control select {
-  border-color: color-mix(in srgb, var(--muted) 75%, var(--paper));
+  border-color: var(--control-border);
 }
 /* Sense choice: a radio beside each numbered meaning. The whole row selects it. */
 .lexicon-senses.selectable {

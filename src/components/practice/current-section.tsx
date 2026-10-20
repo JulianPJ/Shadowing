@@ -298,7 +298,7 @@ function SectionTrack({
   const time = useElapsed(elapsed);
   const percent = Math.min(100, Math.max(0, ((time - start) / (end - start)) * 100));
   return (
-    <div className="section-track" aria-label="Section playback progress">
+    <div className="section-track" aria-hidden="true">
       <span style={{ width: `${percent}%` }} />
     </div>
   );

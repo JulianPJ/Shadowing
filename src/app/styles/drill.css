@@ -3,7 +3,7 @@
   margin-top: 12px;
   padding-top: 12px;
   border-top: 1px solid var(--line);
-  font-size: 11px;
+  font-size: 12px;
 }
 .shadowing-trend p {
   margin: 5px 0;
@@ -29,7 +29,7 @@
 }
 .alignment-chunks li > span:first-child {
   color: var(--muted);
-  font-size: 9px;
+  font-size: 12px;
 }
 .alignment-chunks .alignment-deletion,
 .alignment-chunks .alignment-substitution,

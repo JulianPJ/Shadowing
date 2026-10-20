@@ -60,7 +60,7 @@
   line-height: 1.8;
 }
 .quiz-option > span:first-child {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
   flex-shrink: 0;
 }
@@ -177,7 +177,7 @@
   }
   .evidence-banner {
     top: 8px;
-    font-size: 11px;
+    font-size: 12px;
   }
   .evidence-banner .button {
     padding: 10px 12px;
