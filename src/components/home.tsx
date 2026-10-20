@@ -1,181 +1,35 @@
 'use client';
-import { useEffect, useEffectEvent, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import {
+  ArrowLeft,
   ArrowRight,
   ArrowUpRight,
+  Compass,
   Headphones,
-  SquarePlay,
-  Upload,
+  Library,
   Play,
-  Check,
-  LoaderCircle,
-  X,
   Clock3,
+  BookOpenText,
 } from 'lucide-react';
-import { SectionTabs } from './chrome';
-import { ImportDialog, type PageImport } from './import-dialog';
-import { bridgeRequest } from '@/lib/extension/bridge';
-import {
-  japaneseTrack,
-  lessonFromPageTrack,
-  validatePendingImport,
-} from '@/lib/extension/page-import';
-import { pageMedia } from '@/lib/media';
-import { prepareLinkedVideo } from '@/lib/prepare-client';
-import { recordDiscoveryEvents } from '@/lib/discover/client';
-import { saveLesson } from '@/lib/storage/lessons';
-import type { Lesson, ResolvedMedia } from '@/lib/types';
 import { ContinueRow } from './library-preview';
-import { addQueueLink } from '@/lib/library/client';
 import { useLibrary } from './use-library';
 import { DiscoverFeed } from './discover/feed';
 import { LibraryTab } from './my-library';
+import { AddVideoButton, VideoStart } from './video-start';
+import { useAccount } from './account';
+import { useReview } from './use-review';
+import { dueReviews } from '@/lib/review-scheduler';
+import { discoverEnabled } from '@/lib/discover/enabled';
 
-export type HomeTab = 'discover' | 'library';
-export const discoverEnabled = process.env.NEXT_PUBLIC_DISCOVER_ENABLED !== 'false';
-
-/** Home: start a lesson now, continue one, then browse Discover or your Library. */
-export function Home({
-  tab = discoverEnabled ? 'discover' : 'library',
-  autoPrepare = false,
-}: {
-  tab?: HomeTab;
-  autoPrepare?: boolean;
-}) {
-  const router = useRouter();
+/** Home: pick up where you left off, or start something new. Feeds live on Discover and Library. */
+export function Home() {
   const library = useLibrary();
   const { lessons, remote, ready } = library;
   const returning = ready && (lessons.length > 0 || remote.length > 0);
-  const activeTab = discoverEnabled ? tab : 'library';
-  const [url, setUrl] = useState('');
-  const [importOpen, setImportOpen] = useState(false);
-  const [importChoice, setImportChoice] = useState<'generate' | null>(null);
-  const [page, setPage] = useState<PageImport | undefined>();
-  const [error, setError] = useState('');
-  const [resolved, setResolved] = useState<ResolvedMedia | undefined>();
-  const [needsTranscript, setNeedsTranscript] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [stage, setStage] = useState('identify');
-  const [message, setMessage] = useState('Finding your video…');
-  const [queueNotice, setQueueNotice] = useState('');
-  const abort = useRef<AbortController | null>(null);
-  function openLesson(lesson: Lesson) {
-    saveLesson(lesson, 0);
-    if (autoPrepare && lesson.videoId)
-      void recordDiscoveryEvents([{ videoId: lesson.videoId, action: 'prepared' }]);
-    const destination = `/practice/${encodeURIComponent(lesson.id)}`;
-    if (autoPrepare) router.replace(destination);
-    else router.push(destination);
-  }
-  async function prepare(event?: React.FormEvent, input = url) {
-    event?.preventDefault();
-    if ((abort.current && !abort.current.signal.aborted) || !input.trim()) return;
-    setError('');
-    setResolved(undefined);
-    setNeedsTranscript(false);
-    const controller = new AbortController();
-    abort.current = controller;
-    setBusy(true);
-    setStage('identify');
-    setMessage('Finding your video…');
-    try {
-      const result = await prepareLinkedVideo(
-        input,
-        controller.signal,
-        (nextStage, nextMessage, selected) => {
-          if (controller.signal.aborted) return;
-          setStage(nextStage);
-          setMessage(nextMessage);
-          if (selected) setResolved(selected);
-        },
-      );
-      if (controller.signal.aborted) return;
-      if (result.needsTranscript) {
-        setResolved(result.resolved);
-        setNeedsTranscript(true);
-        setMessage(result.needsTranscript);
-        setImportOpen(true);
-      } else if (result.lesson) openLesson(result.lesson);
-    } catch (error) {
-      if (!controller.signal.aborted)
-        setError(
-          error instanceof Error && error.name !== 'TimeoutError'
-            ? error.message
-            : 'The connection took too long. Try again, import subtitles, or use the demo.',
-        );
-    } finally {
-      if (abort.current === controller) {
-        abort.current = null;
-        setBusy(false);
-      }
-    }
-  }
-  /** A video handed over by Hibiki Bridge: its own Japanese subtitles start practice at once. */
-  async function importFromBridge() {
-    setError('');
-    setBusy(true);
-    setStage('identify');
-    setMessage('Receiving the video from Hibiki Bridge…');
-    try {
-      const pending = validatePendingImport(await bridgeRequest('pending-import'));
-      // A reload of this address should not ask the extension again.
-      window.history.replaceState(null, '', '/');
-      const track = japaneseTrack(pending.tracks);
-      if (track) {
-        setStage('segment');
-        openLesson(await lessonFromPageTrack(pending, track));
-        return;
-      }
-      setPage({
-        tabId: pending.tabId,
-        media: await pageMedia(pending.pageUrl),
-        title: pending.title,
-        duration: pending.duration,
-      });
-      setMessage('This video has no Japanese subtitles. Add your own or generate them.');
-      setNeedsTranscript(true);
-      setImportOpen(true);
-    } catch (error) {
-      setError(
-        error instanceof Error ? error.message : 'Hibiki Bridge could not hand over the video.',
-      );
-    } finally {
-      setBusy(false);
-    }
-  }
-  const startBridgeImport = useEffectEvent(() => void importFromBridge());
-  const autoStart = useEffectEvent((queuedUrl: string, generate: boolean) => {
-    setUrl(queuedUrl);
-    if (generate && !autoPrepare) {
-      // "Improve with Whisper": open the import with AI subtitles already chosen.
-      setImportChoice('generate');
-      setImportOpen(true);
-    } else if (autoPrepare) void prepare(undefined, queuedUrl);
-  });
-  useEffect(() => {
-    const params = new URL(window.location.href).searchParams;
-    const queuedUrl = params.get('video');
-    // Browser-only hand-offs (a queued link, or a video from Hibiki Bridge) start after hydration.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (params.get('bridge') === 'import' && !autoPrepare) startBridgeImport();
-    else if (queuedUrl && queuedUrl.length <= 2000)
-      autoStart(queuedUrl, params.get('subtitles') === 'generate');
-    return () => {
-      abort.current?.abort();
-      abort.current = null;
-    };
-  }, [autoPrepare]);
-  const stages = ['identify', 'captions', 'segment'];
   return (
     <main className={`home-main${returning ? ' returning-home' : ''}`}>
-      {autoPrepare ? (
-        <Link className="text-button" href="/">
-          ← Back to Discover
-        </Link>
-      ) : null}
       <section className="hero" aria-labelledby="home-title">
         {returning ? (
           <h1 id="home-title" className="returning-home-title">
@@ -197,130 +51,7 @@ export function Home({
             </p>
           </div>
         )}
-        <div className="start-card">
-          <form onSubmit={prepare}>
-            <label className="input-label" htmlFor="video-url">
-              Paste a Japanese video link
-            </label>
-            <div className="url-input-wrap">
-              <SquarePlay className="youtube-icon" size={23} strokeWidth={1.6} />
-              <input
-                id="video-url"
-                aria-describedby="url-hint"
-                type="text"
-                inputMode="url"
-                value={url}
-                onChange={(event) => {
-                  setUrl(event.target.value);
-                  setResolved(undefined);
-                  setNeedsTranscript(false);
-                }}
-                placeholder="https://..."
-                disabled={busy}
-                required
-                maxLength={2000}
-              />
-              <button className="button primary start-button" type="submit" disabled={busy}>
-                {busy ? (
-                  <LoaderCircle className="spin" size={17} />
-                ) : (
-                  <>
-                    Start shadowing
-                    <ArrowRight size={18} />
-                  </>
-                )}
-              </button>
-            </div>
-          </form>
-          <div className="input-meta">
-            <span id="url-hint">
-              <Check size={14} /> YouTube captions load automatically. Other links work with your
-              subtitles.
-            </span>
-            <button className="text-button" onClick={() => setImportOpen(true)}>
-              <Upload size={14} /> Import media or subtitles
-            </button>
-          </div>
-          {busy ? (
-            <div className="preparing" role="status">
-              <div className="prepare-top">
-                <span>
-                  <LoaderCircle className="spin" size={15} />
-                  {message}
-                </span>
-                <button
-                  className="icon-button"
-                  aria-label="Cancel preparation"
-                  onClick={() => {
-                    abort.current?.abort();
-                    setBusy(false);
-                  }}
-                >
-                  <X size={16} />
-                </button>
-              </div>
-              <div className="prepare-stages">
-                {['Find video', 'Read Japanese', 'Shape your practice'].map((label, index) => (
-                  <span className={stages.indexOf(stage) >= index ? 'active' : ''} key={label}>
-                    <span>{stages.indexOf(stage) > index ? <Check size={11} /> : index + 1}</span>
-                    {label}
-                  </span>
-                ))}
-              </div>
-            </div>
-          ) : null}
-          {!busy && url.trim() ? (
-            <button
-              className="text-button queue-current-link"
-              type="button"
-              onClick={() => {
-                try {
-                  const saved = addQueueLink(url, 'Queued video');
-                  setQueueNotice(
-                    saved
-                      ? 'Saved to Watch Later.'
-                      : 'Saved for this visit. Browser storage is unavailable.',
-                  );
-                } catch (error) {
-                  setQueueNotice(
-                    error instanceof Error ? error.message : 'This link could not be saved.',
-                  );
-                }
-              }}
-            >
-              Watch later <ArrowRight size={14} />
-            </button>
-          ) : null}
-          {queueNotice ? (
-            <p className="small muted" role="status">
-              {queueNotice}
-            </p>
-          ) : null}
-          {needsTranscript ? (
-            <div role="status" className="error-message">
-              <p>{message}</p>
-              <button className="text-button" onClick={() => setImportOpen(true)}>
-                Upload your own transcript <ArrowRight size={14} />
-              </button>
-            </div>
-          ) : null}
-          {error ? (
-            <div role="alert" className="error-message">
-              <p>{error}</p>
-              <div>
-                <button className="text-button" onClick={() => void prepare()}>
-                  Retry preparation <ArrowRight size={14} />
-                </button>
-                <button className="text-button" onClick={() => setImportOpen(true)}>
-                  Import a transcript <ArrowRight size={14} />
-                </button>
-                <Link className="text-button" href="/practice/demo">
-                  Try the demo <ArrowRight size={14} />
-                </Link>
-              </div>
-            </div>
-          ) : null}
-        </div>
+        <VideoStart />
       </section>
       {returning ? (
         <ContinueRow library={library} />
@@ -368,44 +99,127 @@ export function Home({
           </div>
         </section>
       )}
-      {autoPrepare ? null : (
-        <>
-          {discoverEnabled ? (
-            <SectionTabs
-              label="Browse"
-              active={activeTab}
-              tabs={[
-                ['discover', 'Discover', '/discover'],
-                ['library', 'Library', '/library'],
-              ]}
-            />
-          ) : null}
-          {activeTab === 'discover' ? (
-            <DiscoverFeed library={library} />
-          ) : (
-            <LibraryTab library={library} />
-          )}
-        </>
-      )}
-      <ImportDialog
-        key={
-          importOpen
-            ? `${url}:${resolved?.media.contentKey || page?.media.pageKey || ''}`
-            : 'closed'
-        }
-        open={importOpen}
-        initialUrl={url}
-        initialResolved={resolved}
-        transcriptUnavailable={needsTranscript}
-        initialSubtitleChoice={importChoice}
-        page={page}
-        onClose={() => {
-          setImportOpen(false);
-          setImportChoice(null);
-          setPage(undefined);
-        }}
-        onLesson={openLesson}
-      />
+      <HomeDestinations />
+    </main>
+  );
+}
+
+/** Small pointers to the destinations that own each task, rather than their full feeds. */
+function HomeDestinations() {
+  const account = useAccount();
+  const { data } = useReview();
+  const due = account.user ? dueReviews(data.cards, new Date().toISOString()).length : 0;
+  return (
+    <nav className="home-destinations" aria-label="More in Hibiki">
+      {discoverEnabled ? (
+        <Link className="home-destination" href="/discover">
+          <Compass size={20} />
+          <span>
+            <strong>Discover</strong>
+            <span>Find Japanese videos at your level</span>
+          </span>
+          <ArrowRight size={16} />
+        </Link>
+      ) : null}
+      <Link className="home-destination" href="/library">
+        <Library size={20} />
+        <span>
+          <strong>Library</strong>
+          <span>Your lessons and Watch later</span>
+        </span>
+        <ArrowRight size={16} />
+      </Link>
+      {due ? (
+        <Link className="home-destination" href="/review">
+          <BookOpenText size={20} />
+          <span>
+            <strong>
+              {due} {due === 1 ? 'word' : 'words'} due
+            </strong>
+            <span>Review in Vocabulary</span>
+          </span>
+          <ArrowRight size={16} />
+        </Link>
+      ) : null}
+    </nav>
+  );
+}
+
+function DestinationHeading({
+  title,
+  children,
+  action,
+}: {
+  title: string;
+  children: React.ReactNode;
+  action?: React.ReactNode;
+}) {
+  return (
+    <header className="destination-heading">
+      <div>
+        <h1>{title}</h1>
+        <p>{children}</p>
+      </div>
+      {action}
+    </header>
+  );
+}
+
+/** Discover: the catalogue, search and JLPT-band browsing. */
+export function DiscoverPage() {
+  const library = useLibrary();
+  if (!discoverEnabled) return <LibraryPage />;
+  return (
+    <main className="home-main destination-page">
+      <DestinationHeading title="Discover">
+        Japanese videos to watch next. Save one for later, or choose it to prepare for practice.
+      </DestinationHeading>
+      <DiscoverFeed library={library} />
+    </main>
+  );
+}
+
+/** Library: lessons you have practised or kept, and the Watch later queue. */
+export function LibraryPage() {
+  const library = useLibrary();
+  return (
+    <main className="home-main destination-page">
+      <DestinationHeading title="Library" action={<AddVideoButton />}>
+        Lessons you have started or saved, and videos waiting in Watch later.
+      </DestinationHeading>
+      <LibraryTab library={library} />
+    </main>
+  );
+}
+
+const origins = {
+  discover: ['/discover', 'Back to Discover'],
+  library: ['/library', 'Back to Library'],
+  home: ['/', 'Back to Home'],
+} as const;
+
+/** /prepare: a focused preparation step that returns to wherever it was started from. */
+export function PreparePage() {
+  const [origin, setOrigin] = useState<keyof typeof origins>('home');
+  useEffect(() => {
+    const from = new URL(window.location.href).searchParams.get('from');
+    // The origin is only known in the browser; direct entry keeps the Home default.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (from === 'discover' || from === 'library') setOrigin(from);
+  }, []);
+  const [href, label] = origins[origin];
+  return (
+    <main className="home-main prepare-page">
+      <Link className="task-return" href={href}>
+        <ArrowLeft size={18} />
+        {label}
+      </Link>
+      <section className="hero" aria-labelledby="prepare-title">
+        <h1 id="prepare-title" className="returning-home-title">
+          Prepare a video
+        </h1>
+        <VideoStart autoPrepare />
+      </section>
     </main>
   );
 }

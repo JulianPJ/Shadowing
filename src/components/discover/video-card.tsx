@@ -24,7 +24,7 @@ export function VideoCard({
     <article className="discover-card">
       <Link
         className="discover-card-link"
-        href={`/prepare?video=${encodeURIComponent(video.canonicalUrl)}`}
+        href={`/prepare?video=${encodeURIComponent(video.canonicalUrl)}&from=discover`}
         onClick={() => {
           onOpen();
           void recordDiscoveryEvents([{ videoId: video.videoId, action: 'open' }]);

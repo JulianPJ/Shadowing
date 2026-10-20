@@ -107,7 +107,7 @@ export function LibraryTab({ library }: { library: ReturnType<typeof useLibrary>
           <p className="muted">
             {filter === 'saved'
               ? 'Bookmark a lesson to keep it here.'
-              : 'No lessons here yet. Paste a link above or try the studio sample.'}{' '}
+              : 'No lessons here yet. Add a video, or start with the studio sample.'}{' '}
             <Link className="text-button" href="/practice/demo">
               Try the studio sample <ArrowRight size={14} />
             </Link>
@@ -218,7 +218,10 @@ export function LibraryTab({ library }: { library: ReturnType<typeof useLibrary>
                   <strong>{item.title}</strong>
                   <span className="small muted">{new URL(item.url).hostname}</span>
                 </div>
-                <Link className="button" href={`/prepare?video=${encodeURIComponent(item.url)}`}>
+                <Link
+                  className="button"
+                  href={`/prepare?video=${encodeURIComponent(item.url)}&from=library`}
+                >
                   Prepare <ArrowRight size={14} />
                 </Link>
                 <button
