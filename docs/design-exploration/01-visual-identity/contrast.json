@@ -1,0 +1,185 @@
+{
+  "method": "WCAG sRGB relative luminance for solid colours; not a rendered accessibility audit",
+  "pairs": [
+    {
+      "theme": "light",
+      "foregroundToken": "onAction",
+      "backgroundToken": "action",
+      "foreground": "#FFFFFF",
+      "background": "#AD5743",
+      "ratio": 4.975,
+      "minimum": 4.5,
+      "passes": true
+    },
+    {
+      "theme": "light",
+      "foregroundToken": "onAction",
+      "backgroundToken": "actionHover",
+      "foreground": "#FFFFFF",
+      "background": "#9F4E3B",
+      "ratio": 5.79,
+      "minimum": 4.5,
+      "passes": true
+    },
+    {
+      "theme": "light",
+      "foregroundToken": "ink",
+      "backgroundToken": "canvas",
+      "foreground": "#303A33",
+      "background": "#F8F7F2",
+      "ratio": 11.007,
+      "minimum": 4.5,
+      "passes": true
+    },
+    {
+      "theme": "light",
+      "foregroundToken": "muted",
+      "backgroundToken": "canvas",
+      "foreground": "#626B60",
+      "background": "#F8F7F2",
+      "ratio": 5.164,
+      "minimum": 4.5,
+      "passes": true
+    },
+    {
+      "theme": "light",
+      "foregroundToken": "muted",
+      "backgroundToken": "paper",
+      "foreground": "#626B60",
+      "background": "#FFFEFA",
+      "ratio": 5.489,
+      "minimum": 4.5,
+      "passes": true
+    },
+    {
+      "theme": "light",
+      "foregroundToken": "forest",
+      "backgroundToken": "forestTint",
+      "foreground": "#506C59",
+      "background": "#EEF2E9",
+      "ratio": 5.099,
+      "minimum": 4.5,
+      "passes": true
+    },
+    {
+      "theme": "light",
+      "foregroundToken": "onForest",
+      "backgroundToken": "forest",
+      "foreground": "#FFFEFA",
+      "background": "#506C59",
+      "ratio": 5.732,
+      "minimum": 4.5,
+      "passes": true
+    },
+    {
+      "theme": "light",
+      "foregroundToken": "focus",
+      "backgroundToken": "paper",
+      "foreground": "#506C59",
+      "background": "#FFFEFA",
+      "ratio": 5.732,
+      "minimum": 3,
+      "passes": true
+    },
+    {
+      "theme": "light",
+      "foregroundToken": "controlBorder",
+      "backgroundToken": "paper",
+      "foreground": "#7A8377",
+      "background": "#FFFEFA",
+      "ratio": 3.897,
+      "minimum": 3,
+      "passes": true
+    },
+    {
+      "theme": "dark",
+      "foregroundToken": "onAction",
+      "backgroundToken": "action",
+      "foreground": "#121512",
+      "background": "#DC8068",
+      "ratio": 6.421,
+      "minimum": 4.5,
+      "passes": true
+    },
+    {
+      "theme": "dark",
+      "foregroundToken": "onAction",
+      "backgroundToken": "actionHover",
+      "foreground": "#121512",
+      "background": "#ED9279",
+      "ratio": 7.873,
+      "minimum": 4.5,
+      "passes": true
+    },
+    {
+      "theme": "dark",
+      "foregroundToken": "ink",
+      "backgroundToken": "canvas",
+      "foreground": "#EEEAE1",
+      "background": "#121512",
+      "ratio": 15.321,
+      "minimum": 4.5,
+      "passes": true
+    },
+    {
+      "theme": "dark",
+      "foregroundToken": "muted",
+      "backgroundToken": "canvas",
+      "foreground": "#A7AEA3",
+      "background": "#121512",
+      "ratio": 8.081,
+      "minimum": 4.5,
+      "passes": true
+    },
+    {
+      "theme": "dark",
+      "foregroundToken": "muted",
+      "backgroundToken": "paper",
+      "foreground": "#A7AEA3",
+      "background": "#1A1E1A",
+      "ratio": 7.413,
+      "minimum": 4.5,
+      "passes": true
+    },
+    {
+      "theme": "dark",
+      "foregroundToken": "forest",
+      "backgroundToken": "forestTint",
+      "foreground": "#A9C0A8",
+      "background": "#202A22",
+      "ratio": 7.623,
+      "minimum": 4.5,
+      "passes": true
+    },
+    {
+      "theme": "dark",
+      "foregroundToken": "onForest",
+      "backgroundToken": "forest",
+      "foreground": "#121512",
+      "background": "#A9C0A8",
+      "ratio": 9.453,
+      "minimum": 4.5,
+      "passes": true
+    },
+    {
+      "theme": "dark",
+      "foregroundToken": "focus",
+      "backgroundToken": "paper",
+      "foreground": "#A9C0A8",
+      "background": "#1A1E1A",
+      "ratio": 8.672,
+      "minimum": 3,
+      "passes": true
+    },
+    {
+      "theme": "dark",
+      "foregroundToken": "controlBorder",
+      "backgroundToken": "paper",
+      "foreground": "#747C73",
+      "background": "#1A1E1A",
+      "ratio": 3.916,
+      "minimum": 3,
+      "passes": true
+    }
+  ]
+}
