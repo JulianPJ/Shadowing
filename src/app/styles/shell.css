@@ -1022,3 +1022,87 @@
     font-size: 16px;
   }
 }
+
+/* Subtitle sources: Profile settings and the Jimaku search in the import dialog. */
+.subtitle-methods {
+  flex-wrap: wrap;
+}
+.subtitle-methods button {
+  flex: 1 1 auto;
+}
+.subtitle-source {
+  display: grid;
+  gap: 12px;
+  margin: 16px 0;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.subtitle-source > p {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+}
+.subtitle-source .account-plan {
+  justify-self: start;
+}
+.subtitle-source .account-actions {
+  margin: 0;
+}
+.jimaku-connect,
+.jimaku-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.jimaku-connect .button {
+  align-self: flex-start;
+}
+.jimaku-panel p {
+  margin: 0;
+}
+.jimaku-search {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 76px auto;
+  align-items: end;
+  gap: 8px;
+}
+.jimaku-files {
+  display: grid;
+  gap: 2px;
+  max-height: 220px;
+  margin: 0;
+  padding: 8px 10px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+}
+.jimaku-files legend {
+  padding: 0 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.jimaku-files label {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 2px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.import-notice {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--green-pale);
+}
+@media (max-width: 520px) {
+  .jimaku-search {
+    grid-template-columns: minmax(0, 1fr) 76px;
+  }
+  .jimaku-search .button {
+    grid-column: 1 / -1;
+  }
+}

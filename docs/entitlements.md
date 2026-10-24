@@ -9,7 +9,7 @@ Paddle expiry projection, keeping sandbox/live separation and manual/test grants
 | ------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- | --- |
 | Discover, recommended videos, search and JLPT/basic filters                                             | Yes                                                  | Yes |
 | Watch Later, library, recently opened lessons                                                           | Yes; account Watch Later/viewer sync stays available | Yes |
-| Supported links and local media, provider Japanese captions, own subtitle uploads/paste                 | Yes, without new usage limits                        | Yes |
+| Supported links and local media, provider Japanese captions, own subtitle uploads/paste, Jimaku search  | Yes, without new usage limits                        | Yes |
 | Player/transcript, dictionary definitions/readings, furigana, speed, seeking, segment navigation/replay | Yes                                                  | Yes |
 | Focus/manual repetition, Continuous, Studio Mode and display/timing settings                            | Yes                                                  | Yes |
 | Subtitle-supplied translations                                                                          | Yes                                                  | Yes |

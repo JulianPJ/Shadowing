@@ -1,4 +1,5 @@
 import { canonicalYouTubeUrl } from './youtube.js';
+import { describeVideos } from './page-videos.js';
 
 // Lists the videos on the current page and hands the chosen one to Hibiki.
 const statusLine = document.getElementById('status');
@@ -22,21 +23,6 @@ async function targetTab() {
   if (requested) return chrome.tabs.get(Number(requested));
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   return tab;
-}
-
-// Runs inside each frame of the page: describe its videos, largest first.
-function describeVideos() {
-  return [...document.querySelectorAll('video')]
-    .filter((video) => video.isConnected)
-    .sort((a, b) => b.clientWidth * b.clientHeight - a.clientWidth * a.clientHeight)
-    .map((video, index) => ({
-      index,
-      width: video.clientWidth,
-      height: video.clientHeight,
-      duration: Number.isFinite(video.duration) ? video.duration : 0,
-      tracks: [...video.textTracks].filter((t) => ['subtitles', 'captions'].includes(t.kind))
-        .length,
-    }));
 }
 
 const clock = (seconds) => {
@@ -133,6 +119,9 @@ async function render() {
     button.textContent = status.waiting ? 'Connect to my Hibiki lesson' : 'Practise in Hibiki';
     button.addEventListener('click', async () => {
       button.disabled = true;
+      // Playing the video inside Hibiki needs access to the site serving it (asked once). If the
+      // learner declines, the video plays in this tab under Hibiki's control instead.
+      await chrome.permissions.request({ origins: ['<all_urls>'] }).catch(() => false);
       statusLine.textContent = status.waiting ? 'Connecting…' : 'Opening Hibiki…';
       try {
         await send({

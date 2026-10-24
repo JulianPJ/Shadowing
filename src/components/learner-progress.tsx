@@ -8,6 +8,7 @@ import { identityKey } from '@/lib/learner/constants';
 import { timestamp } from '@/lib/youtube';
 import { useAccount, AccountSettings, SubscriptionOffer } from './account';
 import { WeeklyReport } from './weekly-report';
+import { SubtitleSources } from './subtitle-sources';
 import { useEffect, useState } from 'react';
 import { BANDS, type Preferences } from '@/lib/discover/types';
 import {
@@ -40,7 +41,7 @@ const sourceNames = {
   page: 'Web page',
 } as const;
 
-/** Profile: this week, recent lessons and moments to revisit, then account settings. */
+/** Profile: this week, recent lessons and moments to revisit, then account settings and subtitle sources. */
 export function LearnerProgress() {
   const { isPro } = useProAccess('progress');
   return isPro ? (
@@ -52,6 +53,7 @@ export function LearnerProgress() {
       <SubscriptionOffer />
       <ProFeatureNotice feature="Detailed learning progress, weekly reports and daily goals" />
       <AccountSettings />
+      <SubtitleSources />
     </main>
   );
 }
@@ -285,6 +287,7 @@ function LearnerProgressContent() {
         </>
       )}
       <AccountSettings />
+      <SubtitleSources />
     </main>
   );
 }

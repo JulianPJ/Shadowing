@@ -9,8 +9,12 @@ import {
   SquarePlay,
   ExternalLink,
   Sparkles,
+  Search,
 } from 'lucide-react';
 import { parseSubtitles } from '@/lib/subtitles';
+import { JIMAKU_PROVENANCE } from '@/lib/caption-labels';
+import { downloadJimakuFile, jimakuKey } from '@/lib/subtitle-sources/jimaku';
+import { subtitleQuery } from '@/lib/subtitle-sources/match';
 import { MEDIA_ACCEPT, resolveMediaUrl, validateMediaFile } from '@/lib/media';
 import { createImportedLesson } from '@/lib/import-lesson';
 import { localMediaUrl } from '@/lib/local-media-file';
@@ -19,8 +23,9 @@ import { finishPageCapture, transcribePageAudio } from '@/lib/extension/capture'
 import { timestamp } from '@/lib/youtube';
 import type { Lesson, PageMediaSource, ResolvedMedia } from '@/lib/types';
 import { ProFeatureNotice, useProAccess } from './pro-feature';
+import { JimakuSearch, useJimakuKey, type JimakuChoice } from './subtitle-sources';
 
-type SubtitleChoice = 'manual' | 'generate' | null;
+type SubtitleChoice = 'manual' | 'online' | 'generate' | null;
 /** A video handed over by Hibiki Bridge that came without Japanese subtitles. */
 export type PageImport = {
   tabId: number;
@@ -56,7 +61,21 @@ export function ImportDialog({
   const [resolved, setResolved] = useState(initialResolved);
   const [file, setFile] = useState<File | null>(null);
   const [generationFile, setGenerationFile] = useState<File | null>(null);
-  const [subtitleChoice, setSubtitleChoice] = useState<SubtitleChoice>(initialSubtitleChoice);
+  // Subtitles missing from a page video are looked up on Jimaku straight away when connected.
+  const [subtitleChoice, setSubtitleChoice] = useState<SubtitleChoice>(
+    () =>
+      initialSubtitleChoice ?? (transcriptUnavailable && (page || jimakuKey()) ? 'online' : null),
+  );
+  const [jimaku, setJimaku] = useState<JimakuChoice | null>(null);
+  const jimakuConnected = !!useJimakuKey();
+  // What Jimaku is searched for, taken when the search opens so typing a link does not search.
+  const searchFor = (media = file) =>
+    page
+      ? subtitleQuery({ title: page.title, url: page.media.canonicalUrl })
+      : kind === 'upload'
+        ? subtitleQuery({ fileName: media?.name })
+        : subtitleQuery({ title: resolved?.title, url: resolved ? url : undefined });
+  const [searchQuery, setSearchQuery] = useState(() => searchFor());
   const [text, setText] = useState('');
   const [subtitleName, setSubtitleName] = useState('');
   const [error, setError] = useState('');
@@ -111,6 +130,7 @@ export function ImportDialog({
       setError('');
       return;
     }
+    if (choice === 'online' && subtitleChoice !== 'online') setSearchQuery(searchFor());
     setSubtitleChoice(choice);
     setError('');
   }
@@ -125,7 +145,7 @@ export function ImportDialog({
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     if (!subtitleChoice) {
-      setError('Choose whether to upload your own subtitles or auto-generate subtitles.');
+      setError('Choose how to add Japanese subtitles.');
       return;
     }
     if (subtitleChoice === 'generate' && !isPro) {
@@ -158,6 +178,18 @@ export function ImportDialog({
         cues = parseSubtitles(text);
         transcriptType = subtitleName ? 'user-upload' : 'user-paste';
         source = subtitleName ? 'Imported subtitles' : 'Pasted transcript';
+      } else if (subtitleChoice === 'online') {
+        if (!jimaku) throw new Error('Choose a subtitle file from Jimaku first.');
+        const text = await downloadJimakuFile(jimaku.file, controller.signal);
+        try {
+          cues = parseSubtitles(text);
+        } catch (error) {
+          throw new Error(
+            `This Jimaku file could not be read. ${error instanceof Error ? error.message : ''} Choose another file.`,
+          );
+        }
+        transcriptType = 'user-upload';
+        source = [JIMAKU_PROVENANCE, jimaku.entry.name, jimaku.file.name].join(' · ').slice(0, 300);
       } else if (page) {
         const result = await transcribePageAudio(
           page.tabId,
@@ -230,8 +262,13 @@ export function ImportDialog({
         Pair a video with Japanese subtitles. Imported transcripts stay in this browser.
       </p>
       {transcriptUnavailable ? (
-        <p className="small" role="status">
-          No Japanese subtitles were found automatically. Choose how you want to continue below.
+        <p className="small import-notice" role="status">
+          {page ? 'This video has no Japanese subtitles.' : 'No Japanese subtitles were found.'}{' '}
+          {subtitleChoice !== 'online'
+            ? 'Choose how to add them below.'
+            : jimakuConnected
+              ? 'Searching Jimaku for them, or choose another way below.'
+              : 'Connect Jimaku to find them, or choose another way below.'}
         </p>
       ) : null}
 
@@ -293,7 +330,11 @@ export function ImportDialog({
               type="file"
               accept={MEDIA_ACCEPT}
               disabled={busy}
-              onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+              onChange={(event) => {
+                const media = event.target.files?.[0] ?? null;
+                setFile(media);
+                if (subtitleChoice === 'online') setSearchQuery(searchFor(media));
+              }}
             />
           </label>
         )}
@@ -333,6 +374,15 @@ export function ImportDialog({
             onClick={() => chooseSubtitleMethod('manual')}
           >
             <FileText size={16} /> Upload own subtitles
+          </button>
+          <button
+            type="button"
+            aria-pressed={subtitleChoice === 'online'}
+            className={subtitleChoice === 'online' ? 'selected' : ''}
+            disabled={busy}
+            onClick={() => chooseSubtitleMethod('online')}
+          >
+            <Search size={16} /> Find on Jimaku
           </button>
           <button
             type="button"
@@ -380,6 +430,15 @@ export function ImportDialog({
               disabled={busy}
             />
           </>
+        ) : null}
+
+        {subtitleChoice === 'online' ? (
+          <JimakuSearch
+            key={`${searchQuery.query}:${searchQuery.episode}`}
+            initial={searchQuery}
+            disabled={busy}
+            onChoice={setJimaku}
+          />
         ) : null}
 
         {subtitleChoice === 'generate' ? (
@@ -451,7 +510,7 @@ export function ImportDialog({
 
         <button
           className="button primary full-width"
-          disabled={busy || !subtitleChoice}
+          disabled={busy || !subtitleChoice || (subtitleChoice === 'online' && !jimaku)}
           type="submit"
         >
           {busy ? (

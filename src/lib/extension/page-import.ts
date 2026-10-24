@@ -1,7 +1,7 @@
 import { createImportedLesson } from '../import-lesson';
 import { pageMedia, remoteUrl } from '../media';
 import { validateCues } from '../segmentation';
-import type { BridgeTrack, PendingPageImport } from './bridge';
+import type { BridgeTrack, PageStream, PendingPageImport } from './bridge';
 
 const MAX_PAGE_SECONDS = 4 * 3600;
 
@@ -48,13 +48,32 @@ export function validatePendingImport(value: unknown): PendingPageImport {
   };
 }
 
+/** The stream Hibiki Bridge offers for a page video; anything else plays in the page's tab. */
+export function validatePageStream(value: unknown): PageStream | null {
+  if (!value || typeof value !== 'object') return null;
+  const { url, type } = value as Record<string, unknown>;
+  if (typeof url !== 'string' || url.length > 8192 || (type !== 'hls' && type !== 'file'))
+    return null;
+  try {
+    const parsed = new URL(url);
+    if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password)
+      return null;
+  } catch {
+    return null;
+  }
+  return { url, type };
+}
+
 const JAPANESE = /[\u3040-\u30ff\u3400-\u9fff]/g;
-/** A track labelled Japanese, or an unlabelled one whose text is mostly Japanese. */
+/** A track labelled Japanese, or an unlabelled one whose text is mostly Japanese. Plain subtitles
+ * come before SDH / CC (speaker names, sound notes) and forced (signs only) tracks. */
 export function japaneseTrack(tracks: readonly BridgeTrack[]) {
+  const labelled = tracks.filter(
+    (track) => /^ja(-|$)/i.test(track.language) || /日本語|japanese/i.test(track.label),
+  );
   return (
-    tracks.find(
-      (track) => /^ja(-|$)/i.test(track.language) || /日本語|japanese/i.test(track.label),
-    ) ??
+    labelled.find((track) => !/\b(sdh|cc)\b|forced/i.test(track.label)) ??
+    labelled[0] ??
     tracks.find((track) => {
       if (track.language) return false;
       const text = track.cues.map((cue) => cue.text).join('');

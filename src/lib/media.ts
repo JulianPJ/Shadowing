@@ -13,7 +13,7 @@ export const MEDIA_ACCEPT =
   'video/*,audio/*,.mp4,.m4v,.webm,.mov,.mp3,.m4a,.aac,.wav,.ogg,.oga,.ogv,.flac';
 export const MEDIA_LIMIT = 1024 * 1024 * 1024;
 export const UNSUPPORTED_MEDIA =
-  'This page does not expose a supported player or an accessible direct media link. Paste a YouTube, Vimeo, or direct audio/video link, or import your own media.';
+  'This page does not expose a supported player or an accessible direct media link. Paste a YouTube, Vimeo, or direct audio/video link, import your own media, or install Hibiki Bridge to practise videos on other sites.';
 export class UnsupportedMediaError extends Error {}
 
 export function remoteUrl(input: string): URL {

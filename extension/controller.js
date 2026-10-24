@@ -59,7 +59,16 @@
       if (!['subtitles', 'captions'].includes(track.kind)) continue;
       const mode = track.mode;
       if (mode === 'disabled') track.mode = 'hidden';
-      for (let waited = 0; !(track.cues && track.cues.length) && waited < 3000; waited += 100)
+      // Stop once a <track> has loaded or failed: one without a file (its player loads one only
+      // on request) fails at once.
+      const element = [...video.querySelectorAll('track')].find((el) => el.track === track);
+      for (
+        let waited = 0;
+        !(track.cues && track.cues.length) &&
+        waited < 3000 &&
+        !(element?.readyState >= HTMLTrackElement.LOADED);
+        waited += 100
+      )
         await new Promise((resolve) => setTimeout(resolve, 100));
       const cues = [...(track.cues ?? [])]
         .slice(0, 15000)
@@ -69,6 +78,31 @@
       if (cues.length) tracks.push({ label: track.label, language: track.language, cues });
     }
     return tracks;
+  }
+
+  // Where the video's data comes from, so Hibiki can play the same stream itself. Read in the
+  // extension's isolated world, where the page cannot alter the answer.
+  function mediaContext() {
+    const hosts = new Set();
+    const playlists = [];
+    for (const entry of performance.getEntriesByType('resource')) {
+      if (!['xmlhttprequest', 'fetch', 'video'].includes(entry.initiatorType)) continue;
+      let url;
+      try {
+        url = new URL(entry.name);
+      } catch {
+        continue;
+      }
+      if (!/^https?:$/.test(url.protocol)) continue;
+      hosts.add(url.hostname);
+      if (/\.m3u8$/i.test(url.pathname)) playlists.push(url.href);
+    }
+    return {
+      origin: location.origin,
+      src: video.currentSrc,
+      playlists: playlists.slice(0, 5),
+      hosts: [...hosts].slice(0, 30),
+    };
   }
 
   // Hibiki's current line, drawn over the original video (including in fullscreen).
@@ -263,8 +297,10 @@
         title: document.title,
         duration: Number.isFinite(video.duration) ? video.duration : 0,
         tracks: await readTracks(),
+        media: mediaContext(),
       };
     },
+    context: async () => mediaContext(),
     state: async () => state(),
     play: async () => {
       await video.play();

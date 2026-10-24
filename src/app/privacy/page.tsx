@@ -96,11 +96,13 @@ export default function PrivacyPage() {
           Hibiki runs on Cloudflare Workers and D1; uses Resend for account emails; offers Google
           sign-in; and uses Paddle for subscription checkout and billing. Japanese-video
           integrations may connect your browser with YouTube, Vimeo or the website hosting the
-          original video. Optional content analysis and transcription can use Cloudflare Workers AI,
-          while translation requests may use an external translation provider (including DeepL or
-          MyMemory, according to configured provider). We send to a provider the information needed
-          for the operation you requested, not your entire learning library. Each external provider
-          may process information under its own applicable privacy policy.
+          original video. If you connect Jimaku as a subtitle source, your browser sends your Jimaku
+          API key and the titles you search for directly to Jimaku (jimaku.cc); Hibiki&apos;s
+          servers do not receive the key. Optional content analysis and transcription can use
+          Cloudflare Workers AI, while translation requests may use an external translation provider
+          (including DeepL or MyMemory, according to configured provider). We send to a provider the
+          information needed for the operation you requested, not your entire learning library. Each
+          external provider may process information under its own applicable privacy policy.
         </p>
       </section>
       <section>

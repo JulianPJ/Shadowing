@@ -84,6 +84,20 @@ export function parseAss(input: string): Cue[] {
     throw new Error('ASS/SSA needs an [Events] section with timestamped Dialogue lines.');
   return validateCues(cues);
 }
+/**
+ * Subtitle file bytes as text: UTF-8 and UTF-16 by their byte-order mark, otherwise UTF-8, falling
+ * back to Shift_JIS, which older Japanese subtitle files still use.
+ */
+export function decodeSubtitleBytes(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  if (bytes[0] === 0xff && bytes[1] === 0xfe) return new TextDecoder('utf-16le').decode(bytes);
+  if (bytes[0] === 0xfe && bytes[1] === 0xff) return new TextDecoder('utf-16be').decode(bytes);
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch {
+    return new TextDecoder('shift_jis').decode(bytes);
+  }
+}
 export function parseSubtitles(input: string): Cue[] {
   const text = input
     .replace(/^\uFEFF/, '')

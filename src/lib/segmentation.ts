@@ -1,5 +1,8 @@
 import type { Cue, Segment } from './types';
 
+// Invisible direction marks, common in subtitles taken from streaming services.
+const DIRECTION_MARKS = /&[lr]rm;|[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g;
+
 export function cleanText(text: string) {
   return text
     .replace(/<[^>]*>/g, '')
@@ -8,7 +11,9 @@ export function cleanText(text: string) {
     .replace(/&#39;|&apos;/g, "'")
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
+    .replace(/&nbsp;/g, ' ')
     .replace(/&#(\d+);/g, (_, n: string) => String.fromCodePoint(Math.min(Number(n), 0x10ffff)))
+    .replace(DIRECTION_MARKS, '')
     .replace(/\s+/g, ' ')
     .trim();
 }

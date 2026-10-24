@@ -13,6 +13,8 @@ FILES = (
     "background.js",
     "bridge.js",
     "controller.js",
+    "page-player.js",
+    "page-videos.js",
     "popup.html",
     "popup.css",
     "popup.js",
@@ -26,7 +28,14 @@ def main():
     args = parser.parse_args()
     manifest = json.loads((EXTENSION / "manifest.json").read_text("utf-8"))
     assert manifest["manifest_version"] == 3
-    assert manifest["permissions"] == ["activeTab", "scripting", "storage"]
+    assert manifest["permissions"] == [
+        "activeTab",
+        "scripting",
+        "storage",
+        "declarativeNetRequestWithHostAccess",
+    ]
+    assert manifest.get("host_permissions", []) == []
+    assert manifest["optional_host_permissions"] == ["<all_urls>"]
     assert len(manifest["description"]) <= 132
     assert manifest["background"]["service_worker"] == "background.js"
     names = list(FILES)

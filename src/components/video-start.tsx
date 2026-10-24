@@ -4,13 +4,13 @@ import { useRouter } from 'next/navigation';
 import { ArrowRight, SquarePlay, Upload, Check, LoaderCircle, Plus, X } from 'lucide-react';
 import Link from 'next/link';
 import { ImportDialog, type PageImport } from './import-dialog';
-import { bridgeRequest } from '@/lib/extension/bridge';
+import { bridgeRequest, bridgeVersion, type PendingPageImport } from '@/lib/extension/bridge';
 import {
   japaneseTrack,
   lessonFromPageTrack,
   validatePendingImport,
 } from '@/lib/extension/page-import';
-import { pageMedia } from '@/lib/media';
+import { pageMedia, remoteUrl, UnsupportedMediaError } from '@/lib/media';
 import { prepareLinkedVideo } from '@/lib/prepare-client';
 import { recordDiscoveryEvents } from '@/lib/discover/client';
 import { saveLesson } from '@/lib/storage/lessons';
@@ -78,6 +78,18 @@ export function VideoStart({ autoPrepare = false }: { autoPrepare?: boolean }) {
         setImportOpen(true);
       } else if (result.lesson) openLesson(result.lesson);
     } catch (error) {
+      // Any other web page: Hibiki Bridge opens it and hands over its video, as from its popup.
+      if (
+        error instanceof UnsupportedMediaError &&
+        !controller.signal.aborted &&
+        (await bridgeVersion())
+      ) {
+        await openPage(input, controller.signal).catch((pageError: unknown) => {
+          if (!controller.signal.aborted)
+            setError(pageError instanceof Error ? pageError.message : String(pageError));
+        });
+        return;
+      }
       if (!controller.signal.aborted)
         setError(
           error instanceof Error && error.name !== 'TimeoutError'
@@ -91,7 +103,40 @@ export function VideoStart({ autoPrepare = false }: { autoPrepare?: boolean }) {
       }
     }
   }
-  /** A video handed over by Hibiki Bridge: its own Japanese subtitles start practice at once. */
+  /** A page link: Hibiki Bridge opens the page in the background and finds its video. */
+  async function openPage(input: string, signal: AbortSignal) {
+    setMessage('Opening the page with Hibiki Bridge…');
+    const result = await bridgeRequest<unknown>(
+      'open-page',
+      { pageUrl: remoteUrl(input).href },
+      45000,
+    );
+    if (signal.aborted) return;
+    if (result && typeof result === 'object' && 'needsAccess' in result)
+      throw new Error(
+        'Hibiki Bridge needs your permission to open links. Open the page, click Hibiki Bridge and choose Practise in Hibiki once; after that, pasted links open here.',
+      );
+    await continueWithPage(validatePendingImport(result));
+  }
+  /** A video from Hibiki Bridge: its own Japanese subtitles start practice at once. */
+  async function continueWithPage(pending: PendingPageImport) {
+    const track = japaneseTrack(pending.tracks);
+    if (track) {
+      setStage('segment');
+      openLesson(await lessonFromPageTrack(pending, track));
+      return;
+    }
+    setPage({
+      tabId: pending.tabId,
+      media: await pageMedia(pending.pageUrl),
+      title: pending.title,
+      duration: pending.duration,
+    });
+    setMessage('This video has no Japanese subtitles. Add your own or generate them.');
+    setNeedsTranscript(true);
+    setImportOpen(true);
+  }
+  /** A video handed over from the Hibiki Bridge popup. */
   async function importFromBridge() {
     setError('');
     setBusy(true);
@@ -101,21 +146,7 @@ export function VideoStart({ autoPrepare = false }: { autoPrepare?: boolean }) {
       const pending = validatePendingImport(await bridgeRequest('pending-import'));
       // A reload of this address should not ask the extension again.
       window.history.replaceState(null, '', '/');
-      const track = japaneseTrack(pending.tracks);
-      if (track) {
-        setStage('segment');
-        openLesson(await lessonFromPageTrack(pending, track));
-        return;
-      }
-      setPage({
-        tabId: pending.tabId,
-        media: await pageMedia(pending.pageUrl),
-        title: pending.title,
-        duration: pending.duration,
-      });
-      setMessage('This video has no Japanese subtitles. Add your own or generate them.');
-      setNeedsTranscript(true);
-      setImportOpen(true);
+      await continueWithPage(pending);
     } catch (error) {
       setError(
         error instanceof Error ? error.message : 'Hibiki Bridge could not hand over the video.',

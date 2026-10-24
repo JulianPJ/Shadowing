@@ -2,34 +2,100 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { ExternalLink, LoaderCircle } from 'lucide-react';
 import type { PageMediaSource } from '@/lib/types';
+import { validatePageStream } from '@/lib/extension/page-import';
 import { lessonMedia } from '@/lib/media';
 import {
   bridgeRequest,
   bridgeVersion,
   onBridgeEvent,
   type PageMediaState,
+  type PageStream,
 } from '@/lib/extension/bridge';
 import type { MediaHandle, MediaPlayerProps } from './media-player';
+import { StreamMedia } from './media-stream';
 
 type Connection =
   { status: 'connecting' | 'no-extension' | 'waiting' } | { status: 'ready'; tabId: number };
 
 /**
- * A video on another web page, played in its own tab through Hibiki Bridge. Hibiki keeps time
- * from the page's reports and mirrors the current line onto the original video.
+ * A video on another web page, reached through Hibiki Bridge. When the extension offers the
+ * page's own stream it plays inside Hibiki; otherwise it plays in its own tab under Hibiki's
+ * control. A stream that fails to play falls back to the tab and is not offered again here.
  */
-export const PageMedia = forwardRef<MediaHandle, MediaPlayerProps & { caption?: string }>(
-  function PageMedia(
-    { lesson, speed, initialTime, onReady, onPlaying, onEnded, onError, overlay, caption },
+export const PageMedia = forwardRef<MediaHandle, MediaPlayerProps>(function PageMedia(props, ref) {
+  const pageUrl = (lessonMedia(props.lesson) as PageMediaSource).canonicalUrl;
+  const [stream, setStream] = useState<PageStream | null | undefined>(undefined);
+  const failed = useRef(new Set<string>());
+  const check = useCallback(async () => {
+    const offered = (await bridgeVersion())
+      ? validatePageStream(await bridgeRequest('stream', { pageUrl }).catch(() => null))
+      : null;
+    setStream(offered && !failed.current.has(offered.url) ? offered : null);
+  }, [pageUrl]);
+  useEffect(() => {
+    void check();
+  }, [check]);
+  const unavailable = useCallback(() => {
+    if (stream) failed.current.add(stream.url);
+    void bridgeRequest('stream-failed', { pageUrl }).catch(() => {});
+    setStream(null);
+  }, [stream, pageUrl]);
+
+  if (stream === undefined)
+    return (
+      <div className="media-frame page-frame">
+        <div className="page-media">
+          <p>
+            <LoaderCircle className="spin" size={18} /> Connecting to the video page…
+          </p>
+        </div>
+      </div>
+    );
+  if (stream)
+    return (
+      <StreamMedia
+        key={stream.url}
+        ref={ref}
+        {...props}
+        stream={stream}
+        onUnavailable={unavailable}
+        onReady={() => {
+          props.onReady();
+          // A tab Hibiki Bridge opened only for a pasted link is no longer needed.
+          void bridgeRequest('stream-ready', { pageUrl }).catch(() => {});
+        }}
+      />
+    );
+  return <PageRemote ref={ref} {...props} onConnected={check} />;
+});
+
+/**
+ * The page's video played in its own tab. Hibiki keeps time from the page's reports and mirrors
+ * the current line onto the original video.
+ */
+const PageRemote = forwardRef<MediaHandle, MediaPlayerProps & { onConnected: () => void }>(
+  function PageRemote(
+    {
+      lesson,
+      speed,
+      initialTime,
+      onReady,
+      onPlaying,
+      onEnded,
+      onError,
+      overlay,
+      caption,
+      onConnected,
+    },
     ref,
   ) {
     const source = lessonMedia(lesson) as PageMediaSource;
     const [connection, setConnection] = useState<Connection>({ status: 'connecting' });
     const tab = connection.status === 'ready' ? connection.tabId : null;
     const clock = useRef({ time: initialTime, at: 0, paused: true, rate: 1 });
-    const callbacks = useRef({ onReady, onPlaying, onEnded, onError });
+    const callbacks = useRef({ onReady, onPlaying, onEnded, onError, onConnected });
     useEffect(() => {
-      callbacks.current = { onReady, onPlaying, onEnded, onError };
+      callbacks.current = { onReady, onPlaying, onEnded, onError, onConnected };
     });
     const tabRef = useRef<number | null>(null);
     const speedRef = useRef(speed);
@@ -71,6 +137,8 @@ export const PageMedia = forwardRef<MediaHandle, MediaPlayerProps & { caption?: 
         if (Math.abs((state?.currentTime ?? 0) - startAt.current) > 0.5)
           await command('seek', startAt.current).catch(() => {});
         callbacks.current.onReady();
+        // A newly connected page may offer a stream Hibiki can play itself.
+        callbacks.current.onConnected();
       },
       [apply, command],
     );
