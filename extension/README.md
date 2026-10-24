@@ -4,4 +4,4 @@ Practise YouTube videos and other web page videos in Hibiki. YouTube watch pages
 
 Install for development: `chrome://extensions` → Developer mode → **Load unpacked** → this folder. Behaviour, permissions and limits: [docs/browser-extension.md](../docs/browser-extension.md).
 
-Store release: `python3 scripts/package-extension.py` generates `dist/hibiki-bridge-0.1.1.zip` with the manifest at its ZIP root. See [Chrome Web Store release instructions](../docs/chrome-web-store.md).
+Store release: `python3 scripts/package-extension.py` generates `dist/hibiki-bridge-0.2.0.zip` with the manifest at its ZIP root. See [Chrome Web Store release instructions](../docs/chrome-web-store.md).

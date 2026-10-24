@@ -19,8 +19,9 @@ export type LinkedMediaSource = { schemaVersion: 1; canonicalUrl: string; conten
   | { type: 'direct'; discoveredFrom?: string }
 );
 /**
- * A video on another web page, played in its own tab through the Hibiki Bridge extension. It has
- * no shared content identity: the page may need a login, and its media is not Hibiki's to fetch.
+ * A video on another web page, reached through the Hibiki Bridge extension: its stream plays inside
+ * Hibiki when the extension can hand it over, otherwise the video plays in its own tab. It has no
+ * shared content identity: the page may need a login, and only the extension can reach its media.
  */
 export type PageMediaSource = {
   schemaVersion: 1;

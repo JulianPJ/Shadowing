@@ -45,7 +45,7 @@ Works with compatible HTML5 video elements. Embedded players may need optional w
 
 ## Chrome Web Store privacy disclosures
 
-**Single purpose:** Connect a learner-selected webpage video to Hibiki for Japanese shadowing using playback control, readable subtitle tracks and optional user-initiated audio transcription.
+**Single purpose:** Connect a learner-selected webpage video to Hibiki for Japanese shadowing: play the video's stream inside Hibiki (or control it in its tab), read its subtitle tracks and optionally transcribe its audio on request.
 
 **activeTab:** Grants temporary access only to the page where the learner invokes the extension to locate and control a selected video.
 
@@ -53,13 +53,15 @@ Works with compatible HTML5 video elements. Embedded players may need optional w
 
 **storage:** Stores the user's chosen Hibiki origin locally and transient connection state (selected tab IDs, URLs and hand-off metadata) in session storage.
 
-**Optional `<all_urls>`:** When the learner chooses “Allow embedded players,” the extension requests broad optional host access to inspect cross-origin iframe videos. It is never requested automatically during installation.
+**Optional `<all_urls>`:** Requested when the learner chooses “Allow embedded players” (to inspect cross-origin iframe videos) or first chooses “Practise in Hibiki” (so the selected video's stream can play inside Hibiki). It is never requested automatically during installation; declining keeps the video playing in its own tab.
+
+**declarativeNetRequestWithHostAccess:** When the learner plays a selected page video inside Hibiki, the extension adds one temporary session rule for that Hibiki tab only: requests Hibiki itself makes to the video's stream hosts carry the page's origin and referrer, and their responses may be read by Hibiki. No other tab or request is affected, and the rule is removed when the tab closes.
 
 **Content script origins:** The production Hibiki site, the legacy production workers.dev origin and localhost development environments. The site bridge doesn't run on other ordinary websites; video controllers are injected only on demand.
 
 **Remote code:** No externally hosted script is executed by the extension; all extension JavaScript ships within the ZIP. The separate Hibiki website runs its own application code.
 
-**Data handling:** Page URL/title, selected video playback state, publicly exposed page subtitle cues and optionally user-selected audio are relayed to the Hibiki website. If the user explicitly chooses AI subtitle generation, captured audio goes through the Hibiki website to the Cloudflare-backed Hibiki transcription endpoint. Signed-in Hibiki accounts may separately sync learning metadata.
+**Data handling:** Page URL/title, the selected video's stream address, selected video playback state, publicly exposed page subtitle cues and optionally user-selected audio are relayed to the Hibiki website. If the user explicitly chooses AI subtitle generation, captured audio goes through the Hibiki website to the Cloudflare-backed Hibiki transcription endpoint. Signed-in Hibiki accounts may separately sync learning metadata.
 
 Choose the exact Google data-disclosure categories based on the language of the latest dashboard fields; do not tick “collects no user data” without considering video page URLs, website content, subtitle cues and optional audio. Confirm the privacy page matches the final release.
 

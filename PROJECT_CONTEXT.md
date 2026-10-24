@@ -51,8 +51,11 @@ Five destinations, in the header on desktop and a labelled bottom bar at compact
   tracks are labelled and offer "Improve with Whisper"), Vimeo and direct links with a user
   transcript, local media + SRT / VTT / ASS / SSA / JSON / timed TXT, Pro Whisper subtitles for
   local media (Workers AI; 116 s windows overlapping by 4 s, merged by matching text), videos on
-  other sites through the **Hibiki Bridge** Chrome extension ([details](docs/browser-extension.md)),
-  and the bundled demo.
+  other sites through the **Hibiki Bridge** Chrome extension, from its popup or by pasting the page
+  link ([details](docs/browser-extension.md)),
+  and the bundled demo. **Subtitle sources** (Profile): with the learner's own Jimaku API key,
+  saved on the device per account, a video without Japanese subtitles is searched on Jimaku by its
+  inferred title and episode and the best file loads directly (Free; see below).
 - **Learning:** Pro comprehension checks with evidence replay, content difficulty estimates, local
   learner profile, weekly report and daily goal, Discover catalogue with Watch later.
 - **Vocabulary:** one model — see [vocabulary](docs/vocabulary.md). The player's Vocabulary tab
@@ -93,9 +96,11 @@ Five destinations, in the header on desktop and a labelled bottom bar at compact
   (`src/lib/sync/channel.ts`): review operations, word states (incremental by server `synced_at`)
   and Watch later / Discover preferences. Routine triggers reuse a sync from the last 5 minutes
   unless there are local edits; signed-out and unverified accounts never sync.
-- **Hibiki Bridge:** a Manifest V3 extension (`extension/`) that plays a page's own `<video>` for
-  Hibiki, reads its subtitle tracks, mirrors the current line over it, and captures its audio for
-  Whisper. It acts only on tabs the learner connects from the popup.
+- **Hibiki Bridge:** a Manifest V3 extension (`extension/`) that hands Hibiki a page video's own
+  stream (a web file or HLS, played in Hibiki's player through a per-tab request rule) or else
+  plays the page's `<video>` for Hibiki and mirrors the current line over it. It reads the page's
+  subtitle tracks and captures its audio for Whisper. It acts only on tabs the learner connects
+  from the popup.
 
 See [architecture](docs/architecture.md) for module ownership and checks.
 
@@ -127,6 +132,11 @@ See [architecture](docs/architecture.md) for module ownership and checks.
   reattached.
 - Whisper subtitles need the media file, or Hibiki Bridge listening along in real time. DRM-protected
   and capture-blocking sites cannot be transcribed.
-- Hibiki Bridge lessons need the original page open; saved words from them replay through the
-  Hibiki lesson only.
+- Hibiki Bridge lessons play inside Hibiki when the page's stream is a web file or HLS; others
+  (script-fed players, DASH, DRM, streams needing the site's cookies) need the original page open.
+  A stream is kept for the browser session; after a restart or expiry the page must be reconnected.
+  Saved words from page lessons replay through the Hibiki lesson only.
+- Jimaku requests go from the browser with the learner's key (Jimaku rate-limits each address, about
+  25 requests per window); the key is not synced or exported. ZIP/RAR archives on Jimaku are not
+  opened: the learner downloads, extracts and uploads them.
 - Caption relay operations: [production captions](docs/production-captions.md).

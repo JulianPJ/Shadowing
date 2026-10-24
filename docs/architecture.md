@@ -9,6 +9,7 @@ Hibiki is one Cloudflare Worker built with vinext (Next.js App Router on Vite). 
 | Header, five destinations, bottom bar, section tabs, help, task return | `src/components/chrome.tsx`, `src/components/task-return.ts` |
 | Destination pages: Home (resume feature), Discover, Library cards, Prepare | `src/components/home.tsx`, `src/components/library-preview.tsx`, `src/components/discover/`, `src/components/my-library.tsx`, `src/components/lesson-thumbnail.tsx` |
 | Bring your own video: link, import, Bridge and queued-link hand-offs | `src/components/video-start.tsx`, `src/components/import-dialog.tsx` |
+| Subtitle sources: Jimaku key on Profile, search by inferred title and episode, file ranking | `src/components/subtitle-sources.tsx`, `src/lib/subtitle-sources/` |
 | Vocabulary: Daily Review and Words | `src/components/daily-review.tsx`, `src/components/vocabulary-words.tsx`, `src/components/vocabulary-header.tsx` |
 | Profile: progress, weekly report, account settings | `src/components/learner-progress.tsx`, `src/components/weekly-report.tsx`, `src/components/account.tsx` |
 | Practice hydration / missing lesson | `src/components/practice.tsx` |
@@ -16,7 +17,7 @@ Hibiki is one Cloudflare Worker built with vinext (Next.js App Router on Vite). 
 | Practice toolbar and advanced settings | `src/components/practice/practice-settings.tsx`, `src/lib/drill-presets.ts` |
 | Current section, transcript, elapsed-time store | `src/components/practice/current-section.tsx`, `transcript-panel.tsx`, `elapsed-store.ts` |
 | Playback boundaries, seek tolerance, evidence replay | `src/components/practice/use-playback-boundary.ts`, `src/lib/section-lookup.ts` |
-| Media adapters (YouTube, Vimeo, HTML media, web pages via Hibiki Bridge) | `src/components/media-player.tsx`, `media-youtube.tsx`, `media-vimeo.tsx`, `media-html.tsx`, `media-page.tsx` |
+| Media adapters (YouTube, Vimeo, HTML media, web pages via Hibiki Bridge: their stream inside Hibiki, or their tab) | `src/components/media-player.tsx`, `media-youtube.tsx`, `media-vimeo.tsx`, `media-html.tsx`, `media-page.tsx`, `media-stream.tsx` |
 | Hibiki Bridge extension and its app-side protocol | `extension/`, `src/lib/extension/` ([details](browser-extension.md)) |
 | Media identity, link resolution, lesson migration | `src/lib/media.ts`, `src/lib/import-lesson.ts` |
 | Caption retrieval, ASR detection and labels | `src/lib/providers/youtube-captions.ts`, `src/lib/caption-labels.ts` |

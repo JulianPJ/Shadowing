@@ -338,8 +338,11 @@ export function AccountSettings() {
               if (!response.ok) throw new Error('Export unavailable');
               const remote = await response.json();
               if (syncStatus().user?.id !== owner) return;
+              // Third-party API keys are credentials, not learning data.
               const device = Object.fromEntries(
-                storageKeys().map((key) => [key, readStorage(key, null)]),
+                storageKeys()
+                  .filter((key) => key !== 'subtitle-sources')
+                  .map((key) => [key, readStorage(key, null)]),
               );
               const url = URL.createObjectURL(
                 new Blob([JSON.stringify({ remote, device }, null, 2)], {

@@ -4,6 +4,7 @@ import { installMemoryStorage } from './helpers/memory-storage';
 import {
   japaneseTrack,
   lessonFromPageTrack,
+  validatePageStream,
   validatePendingImport,
 } from '../src/lib/extension/page-import';
 import { migrateLesson, pageMedia, sourceLabel } from '../src/lib/media';
@@ -48,6 +49,25 @@ test('the video Hibiki Bridge hands over is validated before it reaches a lesson
   assert.equal(mixed.tracks.length, 1);
 });
 
+test('only a web file or HLS stream from Hibiki Bridge is played inside Hibiki', () => {
+  const hls = { url: 'https://cdn.example/m/abc.m3u8', type: 'hls' };
+  assert.deepEqual(validatePageStream({ ...hls, origin: 'https://player.example' }), hls);
+  assert.deepEqual(validatePageStream({ url: 'http://cdn.example/a.mp4', type: 'file' }), {
+    url: 'http://cdn.example/a.mp4',
+    type: 'file',
+  });
+  for (const bad of [
+    null,
+    'https://cdn.example/a.mp4',
+    { url: 'blob:https://player.example/1234', type: 'file' },
+    { url: 'javascript:alert(1)', type: 'file' },
+    { url: 'https://user:secret@cdn.example/a.m3u8', type: 'hls' },
+    { url: 'https://cdn.example/a.mpd', type: 'dash' },
+    { url: `https://cdn.example/${'a'.repeat(9000)}.m3u8`, type: 'hls' },
+  ])
+    assert.equal(validatePageStream(bad), null);
+});
+
 test('the Japanese subtitle track is chosen by language, label, or content', () => {
   const english = { label: 'English', language: 'en', cues: [{ start: 0, end: 1, text: 'Hi' }] };
   const japanese = { label: 'Japanese', language: 'ja-JP', cues };
@@ -57,6 +77,12 @@ test('the Japanese subtitle track is chosen by language, label, or content', () 
   const unlabelled = { label: '', language: '', cues };
   assert.equal(japaneseTrack([english, unlabelled]), unlabelled);
   assert.equal(japaneseTrack([english]), null);
+  // Plain subtitles are preferred to SDH, CC and forced tracks, which remain a fallback.
+  const sdh = { label: 'Japanese SDH', language: 'ja', cues };
+  const forced = { label: 'Japanese Forced', language: 'ja', cues };
+  const cc = { label: '日本語 (CC)', language: 'ja', cues };
+  assert.equal(japaneseTrack([english, sdh, forced, cc, japanese]), japanese);
+  assert.equal(japaneseTrack([english, sdh]), sdh);
 });
 
 test('page lessons keep the page out of shared content and sync as media that needs its page', async () => {

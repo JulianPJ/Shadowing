@@ -17,6 +17,8 @@ export type PageMediaState = {
   playbackRate: number;
 };
 export type BridgeTrack = { label: string; language: string; cues: Cue[] };
+/** A page video's own stream, which Hibiki plays itself: a media file or an HLS playlist. */
+export type PageStream = { url: string; type: 'hls' | 'file' };
 export type PendingPageImport = {
   tabId: number;
   pageUrl: string;

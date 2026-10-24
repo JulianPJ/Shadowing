@@ -82,6 +82,12 @@ test('reads SRT, WebVTT, and JSON without losing Japanese or precision', () => {
   );
   assert.equal(json[0].translation, 'Hello.');
 });
+test('drops invisible direction marks from streaming-service subtitles', () => {
+  const [cue] = validateCues([
+    { start: 1, end: 2, text: '\u200eグロサリーの&lrm;前出し&#8207;&nbsp;終わりました' },
+  ]);
+  assert.equal(cue.text, 'グロサリーの前出し 終わりました');
+});
 test('URL parsing accepts watch, mobile, shorts, embed, live, shortlinks and rejects spoofed hosts', () => {
   for (const url of [
     'https://www.youtube.com/watch?v=IJ6R4u05ppw&list=test',
