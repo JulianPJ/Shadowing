@@ -24,6 +24,7 @@ import {
 import { discoveryNow as now, discoveryVideo as video, youtubeMetadata } from './helpers/discover';
 import { prepareLinkedVideo } from '../src/lib/prepare-client';
 import { rememberSeen } from '../src/lib/discover/client';
+import { uploadedAgo } from '../src/lib/discover/published';
 import { readStorage } from '../src/lib/storage/browser';
 import { installMemoryStorage } from './helpers/memory-storage';
 
@@ -355,4 +356,13 @@ test('reloading the same feed leaves the seen list untouched', () => {
   rememberSeen(['video000003', 'video000001']);
   assert.deepEqual(readStorage('discover:seen', []), ['video000003', 'video000001', 'video000002']);
   assert.equal(writes.length, 2);
+});
+test('upload dates read as how long ago YouTube says the video was published', () => {
+  const now = Date.parse('2026-10-25T12:00:00Z');
+  assert.equal(uploadedAgo('2026-10-25T09:00:00Z', now), '3 hours ago');
+  assert.equal(uploadedAgo('2026-10-24T09:00:00Z', now), 'yesterday');
+  assert.equal(uploadedAgo('2026-07-20T12:00:00Z', now), '3 months ago');
+  assert.equal(uploadedAgo('2024-01-01T00:00:00Z', now), '2 years ago');
+  assert.equal(uploadedAgo('2026-10-25T11:59:00Z', now), 'just now');
+  assert.equal(uploadedAgo('not a date', now), null);
 });

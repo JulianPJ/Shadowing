@@ -82,6 +82,57 @@ test('reads SRT, WebVTT, and JSON without losing Japanese or precision', () => {
   );
   assert.equal(json[0].translation, 'Hello.');
 });
+test('keeps each ASS speaker turn separate and groups people talking over each other', () => {
+  const ass = (lines: string[]) =>
+    parseSubtitles(
+      [
+        '[Events]',
+        'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text',
+        ...lines.map((line) => `Dialogue: 0,${line}`),
+      ].join('\n'),
+    );
+  const turns = segmentTranscript(
+    ass([
+      '0:10:03.92,0:10:06.72,JP,NTP,0,0,0,,千反田さんがこの部屋に閉じ込められていたことさ',
+      '0:10:06.88,0:10:08.32,JP,NTP,0,0,0,,あ そうでした',
+    ]),
+  );
+  assert.deepEqual(
+    turns.map((s) => s.japanese),
+    ['千反田さんがこの部屋に閉じ込められていたことさ', 'あ そうでした'],
+  );
+  const overlapping = segmentTranscript(
+    ass([
+      '0:17:16.02,0:17:16.82,JP,NTP,0,0,0,,折木さん',
+      '0:17:16.26,0:17:17.52,JP-ue,NTP,0,0,0,,いいところに来た',
+      '0:17:18.40,0:17:20.91,JP,NTP,0,0,0,,今里志から妙な噂を聞いたんだ',
+    ]),
+  );
+  assert.deepEqual(
+    overlapping.map((s) => [s.japanese, s.start, s.end]),
+    [
+      ['折木さん ／ いいところに来た', 1036.02, 1037.52],
+      ['今里志から妙な噂を聞いたんだ', 1038.4, 1040.91],
+    ],
+  );
+  const chained = segmentTranscript(
+    ass([
+      '0:14:22.97,0:14:24.80,JP,NTP,0,0,0,,姉貴よ 満足か',
+      '0:14:23.15,0:14:27.69,JP-ue,NTP,0,0,0,,（そうなんですか）',
+      '0:14:25.16,0:14:27.16,JP,NTP,0,0,0,,伝統ある古典部の復活',
+    ]),
+  );
+  assert.deepEqual(
+    chained.map((s) => s.japanese),
+    ['姉貴よ 満足か ／ （そうなんですか）', '伝統ある古典部の復活'],
+  );
+  // Captions without authored turns still join an unfinished clause to its continuation.
+  const captions = segmentTranscript([
+    { start: 0, end: 2, text: 'たとえば勉学にもスポーツにも' },
+    { start: 2.2, end: 5, text: '色恋沙汰にも興味を示さない' },
+  ]);
+  assert.equal(captions.length, 1);
+});
 test('drops invisible direction marks from streaming-service subtitles', () => {
   const [cue] = validateCues([
     { start: 1, end: 2, text: '\u200eグロサリーの&lrm;前出し&#8207;&nbsp;終わりました' },

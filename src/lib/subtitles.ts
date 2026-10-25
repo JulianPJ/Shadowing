@@ -77,6 +77,7 @@ export function parseAss(input: string): Cue[] {
         start: assTime(parts[fields.indexOf('start')], index + 1),
         end: assTime(parts[fields.indexOf('end')], index + 1),
         text: assText(text),
+        turn: true,
       });
     }
   }

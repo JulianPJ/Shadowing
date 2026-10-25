@@ -90,6 +90,25 @@ test('full forms, sense choice and keyboard/touch phrase lookup retain exact con
   await expect(panel.locator('.dictionary-save-heading')).not.toContainText('にほんご');
 });
 
+test('a phrase without a dictionary entry shows its translation without editing', async ({
+  context,
+  page,
+}) => {
+  await open(context, page);
+  await context.route('**/api/translate', (route) =>
+    route.fulfill({ json: { translation: 'I can speak Japanese.', provider: 'Test translator' } }),
+  );
+  const first = page.locator('#current-japanese [data-lookup="日本語"]');
+  await first.focus();
+  await page.keyboard.press('Shift+ArrowRight');
+  await page.keyboard.press('Shift+ArrowRight');
+  await page.keyboard.press('Enter');
+  const panel = page.getByRole('complementary', { name: 'Save vocabulary' });
+  await expect(panel.locator('.lexicon-phrase')).toContainText('I can speak Japanese.');
+  await expect(panel.locator('.lexicon-phrase')).toContainText('no dictionary entry');
+  await expect(panel.locator('details.dictionary-edit')).not.toHaveAttribute('open');
+});
+
 test('translation failure preserves Japanese context and add to review is duplicate safe', async ({
   context,
   page,
