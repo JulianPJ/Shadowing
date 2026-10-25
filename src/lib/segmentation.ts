@@ -60,6 +60,7 @@ export function validateCues(input: unknown): Cue[] {
       text: cleaned,
       translation: typeof row.translation === 'string' ? row.translation.slice(0, 2000) : undefined,
       estimated: row.estimated === true,
+      ...(row.turn === true ? { turn: true } : {}),
     });
   }
   if (!cues.length) throw new Error('The transcript contains no spoken text.');
@@ -71,11 +72,27 @@ export function validateCues(input: unknown): Cue[] {
  */
 export function segmentTranscript(input: Cue[]): Segment[] {
   const normalized: Cue[] = [];
+  const shared = new Set<Cue>();
   for (const original of validateCues(input)) {
     const cue = { ...original };
     const previous = normalized.at(-1);
     if (previous && cue.start < previous.end && cue.text === previous.text) {
       previous.end = Math.max(previous.end, cue.end);
+      continue;
+    }
+    // Authored lines on screen together are people talking over each other. Their audio cannot be
+    // shadowed apart, so they share one section and each speaker's line stays visibly separate.
+    // A section holds two lines at most; a third starts the next section.
+    if (
+      previous?.turn &&
+      !shared.has(previous) &&
+      cue.turn &&
+      cue.start < previous.end - 0.2 &&
+      Math.max(previous.end, cue.end) - previous.start <= 11
+    ) {
+      previous.text += ` ／ ${cue.text}`;
+      previous.end = Math.max(previous.end, cue.end);
+      shared.add(previous);
       continue;
     }
     // Remove repeated prefix from overlapping rolling auto-captions.
@@ -117,7 +134,7 @@ export function segmentTranscript(input: Cue[]): Segment[] {
     let start = cue.start;
     for (const text of parts) {
       const end = start + (length * text.length) / characters;
-      pieces.push({ start, end, text, estimated: true });
+      pieces.push({ start, end, text, estimated: true, turn: cue.turn });
       start = end;
     }
   }
@@ -138,6 +155,9 @@ export function segmentTranscript(input: Cue[]): Segment[] {
       previous &&
       !previous.translation &&
       !cue.translation &&
+      // Unpunctuated authored lines are usually speaker changes, not one sentence wrapped.
+      !previous.turn &&
+      !cue.turn &&
       gap >= -0.2 &&
       gap < 0.65 &&
       fits &&

@@ -4,6 +4,8 @@ export type Cue = {
   text: string;
   translation?: string;
   estimated?: boolean;
+  /** An authored subtitle line (ASS/SSA Dialogue): one speaker's turn, never joined to the next. */
+  turn?: boolean;
 };
 export type Segment = {
   id: string;

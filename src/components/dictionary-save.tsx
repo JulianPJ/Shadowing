@@ -75,6 +75,7 @@ function DictionarySaveContent({
   const review = useReview();
   const { states } = useWordKnowledge();
   const [translation, setTranslation] = useState('');
+  const [phraseMeaning, setPhraseMeaning] = useState('');
   const [reading, setReading] = useState(initialReading ?? '');
   const [lemma, setLemma] = useState(term.trim());
   const [sentenceMeaning, setSentenceMeaning] = useState(sourceTranslation ?? '');
@@ -137,7 +138,9 @@ function DictionarySaveContent({
             { nextJapanese: segment.japanese },
             controller.signal,
           );
-          if (active && !meaningTouched.current) setTranslation(fallback);
+          if (!active) return;
+          setPhraseMeaning(fallback);
+          if (!meaningTouched.current) setTranslation(fallback);
         }
       })
       .catch((reason) => {
@@ -265,6 +268,7 @@ function DictionarySaveContent({
         <LexiconDefinitions
           result={result}
           selectedSense={selectedSense}
+          phraseMeaning={phraseMeaning}
           onSense={(meaning, kana, dictionaryForm, senseId) => {
             if (saving) return;
             meaningTouched.current = true;

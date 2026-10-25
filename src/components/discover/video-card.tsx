@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { Bookmark, BookmarkCheck, ArrowUpRight, Captions, Heart, EyeOff } from 'lucide-react';
 import { BANDS, TOPICS, type Card } from '@/lib/discover/types';
 import { levelSource } from '@/lib/discover/declared-level';
+import { uploadedAgo } from '@/lib/discover/published';
 import { timestamp } from '@/lib/youtube';
 import { recordDiscoveryEvents } from '@/lib/discover/client';
 export function VideoCard({
@@ -20,6 +21,7 @@ export function VideoCard({
 }) {
   const label = video.band ? BANDS.find((b) => b[0] === video.band)![1] : 'Level not yet estimated';
   const source = levelSource(video);
+  const uploaded = uploadedAgo(video.publishedAt);
   return (
     <article className="discover-card">
       <Link
@@ -54,7 +56,20 @@ export function VideoCard({
         </div>
         <div className="discover-card-copy">
           <h3>{video.title}</h3>
-          <p className="discover-channel">{video.channelTitle}</p>
+          <p className="discover-channel">
+            {video.channelTitle}
+            {uploaded ? (
+              <>
+                {' · '}
+                <time
+                  dateTime={video.publishedAt}
+                  title={`Uploaded ${new Date(video.publishedAt).toLocaleDateString()}`}
+                >
+                  {uploaded}
+                </time>
+              </>
+            ) : null}
+          </p>
           <div className="discover-tags">
             <span
               className={video.band ? 'discover-band' : 'discover-band unknown'}

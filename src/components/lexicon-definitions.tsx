@@ -5,10 +5,13 @@ export function LexiconDefinitions({
   result,
   onSense,
   selectedSense,
+  phraseMeaning,
 }: {
   result: LexiconResult;
   onSense?: (meaning: string, reading: string, lemma: string, senseId: string) => void;
   selectedSense?: string;
+  /** A translation of a selection with no dictionary entry, shown in place of senses. */
+  phraseMeaning?: string;
 }) {
   // One radio group across every match: a lookup saves exactly one sense.
   const group = useId();
@@ -83,6 +86,11 @@ export function LexiconDefinitions({
             </ol>
           </article>
         ))
+      ) : phraseMeaning ? (
+        <article className="lexicon-match lexicon-phrase">
+          <p>{phraseMeaning}</p>
+          <small className="muted">Translated phrase · no dictionary entry</small>
+        </article>
       ) : (
         <p className="small muted">
           No exact lexical entry found. Proper names, new slang and longer phrases may need the

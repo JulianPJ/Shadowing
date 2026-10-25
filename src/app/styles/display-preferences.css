@@ -299,11 +299,14 @@ body.studio-active .site-footer {
   max-height: calc(100vh - 150px);
   overflow: auto;
   scrollbar-width: thin;
+  /* Reserve the scrollbar so opening a lookup never narrows and rewraps the sentence. */
+  scrollbar-gutter: stable;
 }
 .studio-mode .current-card {
   flex: 0 0 auto;
   max-height: min(500px, 56vh);
   overflow: auto;
+  scrollbar-gutter: stable;
   min-height: 0;
   margin: 0;
   padding: 18px;
