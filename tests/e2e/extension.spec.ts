@@ -369,3 +369,131 @@ test('YouTube has one popup choice and requests native captions', async () => {
   await context.unroute('https://www.youtube.com/watch**');
   await context.unroute('**/api/prepare');
 });
+
+test("YouTube captions come through Hibiki Bridge when YouTube limits Hibiki's servers", async () => {
+  test.setTimeout(120_000);
+  const id = 'jNQXAC9IVRw';
+  const requests: { url: string; method: string; cookie?: string }[] = [];
+  // allHeaders() includes the Cookie header that headers() leaves out.
+  const record = async (route: Parameters<Parameters<BrowserContext['route']>[1]>[0]) =>
+    requests.push({
+      url: route.request().url(),
+      method: route.request().method(),
+      cookie: (await route.request().allHeaders()).cookie,
+    });
+  await context.addCookies([
+    { name: 'SID', value: 'learner-session', domain: '.youtube.com', path: '/', secure: true },
+  ]);
+  await context.route('**/api/prepare', (route) =>
+    route.fulfill({
+      contentType: 'application/x-ndjson',
+      body:
+        JSON.stringify({
+          code: 'provider-blocked',
+          error: 'YouTube is limiting automatic caption access.',
+        }) + '\n',
+    }),
+  );
+  await context.route('https://www.youtube.com/watch**', async (route) => {
+    await record(route);
+    return route.fulfill({
+      contentType: 'text/html',
+      body: '<script>ytcfg.set({"INNERTUBE_API_KEY":"fixture-key"})</script>',
+    });
+  });
+  await context.route('https://www.youtube.com/youtubei/v1/player**', async (route) => {
+    await record(route);
+    return route.fulfill({
+      json: {
+        playabilityStatus: { status: 'OK' },
+        videoDetails: { videoId: id, title: '朝の散歩', author: 'Fixture channel' },
+        captions: {
+          playerCaptionsTracklistRenderer: {
+            captionTracks: [
+              {
+                languageCode: 'ja',
+                kind: 'asr',
+                baseUrl: `https://www.youtube.com/api/timedtext?v=${id}&lang=ja&kind=asr&fmt=srv3`,
+              },
+              {
+                languageCode: 'ja',
+                baseUrl: `https://www.youtube.com/api/timedtext?v=${id}&lang=ja&fmt=srv3`,
+              },
+            ],
+          },
+        },
+      },
+    });
+  });
+  await context.route('https://www.youtube.com/api/timedtext**', async (route) => {
+    await record(route);
+    return route.fulfill({
+      contentType: 'text/xml',
+      body: [
+        '<?xml version="1.0" encoding="utf-8" ?><transcript>',
+        '<text start="0.5" dur="2.5">毎朝、七時ごろに起きます。</text>',
+        '<text start="3.5" dur="2.5">それから、公園を散歩します。</text>',
+        '</transcript>',
+      ].join(''),
+    });
+  });
+  await context.route('https://www.youtube.com/iframe_api', (route) =>
+    route.fulfill({ contentType: 'text/javascript', body: '' }),
+  );
+
+  const page = await context.newPage();
+  await page.goto(`${hibiki}/prepare?video=${encodeURIComponent(`https://youtu.be/${id}`)}`);
+  await expect(page).toHaveURL(new RegExp(`/practice/youtube-${id}`), { timeout: 30_000 });
+  await expect(page.getByRole('heading', { level: 1, name: '朝の散歩' })).toBeVisible();
+  await expect(page.getByText('毎朝、七時ごろに起きます。').first()).toBeVisible();
+  // The human-made track is chosen over speech recognition, and the lesson stays on this device.
+  const lesson = await page.evaluate(
+    (key) => JSON.parse(localStorage.getItem(key)!),
+    `hibiki:v1:lesson:youtube-${id}`,
+  );
+  expect(lesson.transcript).toMatchObject({
+    type: 'provider-captions',
+    provenance: 'YouTube captions via Hibiki Bridge',
+  });
+  expect(requests.map(({ url, method }) => [new URL(url).pathname, method])).toEqual([
+    ['/watch', 'GET'],
+    ['/youtubei/v1/player', 'POST'],
+    ['/api/timedtext', 'GET'],
+  ]);
+  expect(requests.find(({ url }) => url.includes('/api/timedtext'))!.url).not.toContain('kind=asr');
+  // The learner's YouTube cookies are never sent.
+  expect(requests.every(({ cookie }) => !cookie)).toBe(true);
+
+  // Hibiki pages can reach no other YouTube address through the extension.
+  const refused = await page.evaluate(
+    () =>
+      new Promise((resolve) => {
+        const id = crypto.randomUUID();
+        window.addEventListener('message', (event) => {
+          if (event.data?.source === 'hibiki-bridge' && event.data.id === id)
+            resolve(event.data.error);
+        });
+        window.postMessage(
+          {
+            source: 'hibiki-page',
+            id,
+            command: 'youtube-fetch',
+            args: { url: 'https://www.youtube.com/feed/history' },
+          },
+          location.origin,
+        );
+      }),
+  );
+  expect(refused).toBe('Hibiki Bridge only fetches YouTube captions.');
+
+  await page.close();
+  await context.clearCookies();
+  for (const pattern of [
+    '**/api/prepare',
+    'https://www.youtube.com/watch**',
+    'https://www.youtube.com/youtubei/v1/player**',
+    'https://www.youtube.com/api/timedtext**',
+    'https://www.youtube.com/iframe_api',
+  ])
+    await context.unroute(pattern);
+});

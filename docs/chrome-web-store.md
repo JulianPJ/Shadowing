@@ -51,17 +51,19 @@ Works with compatible HTML5 video elements. Embedded players may need optional w
 
 **scripting:** Loads the packaged controller code into the selected page/frame to read media and subtitle tracks, synchronise playback and draw the selected subtitle line over the video.
 
-**storage:** Stores the user's chosen Hibiki origin locally and transient connection state (selected tab IDs, URLs and hand-off metadata) in session storage.
+**storage:** Stores transient connection state (selected tab IDs, URLs and hand-off metadata) in session storage. Local storage holds only a developer override of the Hibiki address, which the extension does not expose to users.
+
+**Host permission `https://www.youtube.com/*`:** When Hibiki cannot load a YouTube video's Japanese captions from its servers, the extension requests that video's public watch page, YouTube's player API and the selected caption file from the user's browser, without YouTube cookies, and returns them to the Hibiki website to build the lesson. No other YouTube path can be requested. A session rule removes the extension's own `Origin` header from these requests, which YouTube's player API otherwise rejects; requests made by web pages are unaffected.
 
 **Optional `<all_urls>`:** Requested when the learner chooses “Allow embedded players” (to inspect cross-origin iframe videos) or first chooses “Practise in Hibiki” (so the selected video's stream can play inside Hibiki). It is never requested automatically during installation; declining keeps the video playing in its own tab.
 
-**declarativeNetRequestWithHostAccess:** When the learner plays a selected page video inside Hibiki, the extension adds one temporary session rule for that Hibiki tab only: requests Hibiki itself makes to the video's stream hosts carry the page's origin and referrer, and their responses may be read by Hibiki. No other tab or request is affected, and the rule is removed when the tab closes.
+**declarativeNetRequestWithHostAccess:** When the learner plays a selected page video inside Hibiki, the extension adds one temporary session rule for that Hibiki tab only: requests Hibiki itself makes to the video's stream hosts carry the page's origin and referrer, and their responses may be read by Hibiki. No other tab or request is affected, and the rule is removed when the tab closes. A second session rule removes the `Origin` header from the extension's own caption requests to www.youtube.com.
 
 **Content script origins:** The production Hibiki site, the legacy production workers.dev origin and localhost development environments. The site bridge doesn't run on other ordinary websites; video controllers are injected only on demand.
 
 **Remote code:** No externally hosted script is executed by the extension; all extension JavaScript ships within the ZIP. The separate Hibiki website runs its own application code.
 
-**Data handling:** Page URL/title, the selected video's stream address, selected video playback state, publicly exposed page subtitle cues and optionally user-selected audio are relayed to the Hibiki website. If the user explicitly chooses AI subtitle generation, captured audio goes through the Hibiki website to the Cloudflare-backed Hibiki transcription endpoint. Signed-in Hibiki accounts may separately sync learning metadata.
+**Data handling:** Page URL/title, the selected video's stream address, selected video playback state, publicly exposed page subtitle cues, public YouTube caption data for videos the user prepares, and optionally user-selected audio are relayed to the Hibiki website. If the user explicitly chooses AI subtitle generation, captured audio goes through the Hibiki website to the Cloudflare-backed Hibiki transcription endpoint. Signed-in Hibiki accounts may separately sync learning metadata.
 
 Choose the exact Google data-disclosure categories based on the language of the latest dashboard fields; do not tick “collects no user data” without considering video page URLs, website content, subtitle cues and optional audio. Confirm the privacy page matches the final release.
 

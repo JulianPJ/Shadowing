@@ -7,6 +7,8 @@ import { describeVideos } from './page-videos.js';
 const VERSION = chrome.runtime.getManifest().version;
 const DEFAULT_ORIGIN = 'https://hibikiapp.net';
 // bridge.js only runs on these origins (see manifest.json), so Hibiki must be one of them.
+// Development and tests point the extension at another Hibiki from the service worker:
+// chrome.storage.local.set({ origin: 'http://localhost:3000' }). Learners never change it.
 const ALLOWED_ORIGIN =
   /^(https:\/\/hibikiapp\.net|https:\/\/shadowing\.julianpopovskijones\.workers\.dev|http:\/\/(localhost|127\.0\.0\.1)(:\d{1,5})?)$/;
 const bridges = new Set();
@@ -33,7 +35,7 @@ async function state() {
 const save = (values) => chrome.storage.session.set(values);
 async function hibikiOrigin() {
   const { origin } = await chrome.storage.local.get('origin');
-  return typeof origin === 'string' ? origin : DEFAULT_ORIGIN;
+  return typeof origin === 'string' && ALLOWED_ORIGIN.test(origin) ? origin : DEFAULT_ORIGIN;
 }
 const pageKey = (url) => {
   try {
@@ -219,6 +221,58 @@ async function allowStream(tabId, hibiki, stream) {
   });
 }
 
+// YouTube caption requests Hibiki makes through the learner's browser (see youtube-fetch). YouTube's
+// player API refuses requests carrying an extension's Origin, so it is removed for this
+// extension's own requests to YouTube. The rule ID sits above any tab ID used by stream rules.
+const YOUTUBE_RULE = 2 ** 31 - 1;
+const YOUTUBE_PATH = /^\/(watch|youtubei\/v1\/player|api\/timedtext)$/;
+const YOUTUBE_LIMIT = 4_000_000;
+let youtubeRule = null;
+function allowYouTube() {
+  youtubeRule ??= chrome.declarativeNetRequest
+    .updateSessionRules({
+      removeRuleIds: [YOUTUBE_RULE],
+      addRules: [
+        {
+          id: YOUTUBE_RULE,
+          priority: 1,
+          condition: {
+            initiatorDomains: [chrome.runtime.id],
+            requestDomains: ['www.youtube.com'],
+            resourceTypes: ['xmlhttprequest', 'other'],
+          },
+          action: {
+            type: 'modifyHeaders',
+            requestHeaders: [{ header: 'origin', operation: 'remove' }],
+          },
+        },
+      ],
+    })
+    .catch((error) => {
+      youtubeRule = null;
+      throw error;
+    });
+  return youtubeRule;
+}
+
+async function boundedText(response, limit) {
+  const reader = response.body?.getReader();
+  if (!reader) return '';
+  const decoder = new TextDecoder();
+  let text = '';
+  let bytes = 0;
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) return text + decoder.decode();
+    bytes += value.byteLength;
+    if (bytes > limit) {
+      await reader.cancel();
+      throw new Error('YouTube sent more than Hibiki expects.');
+    }
+    text += decoder.decode(value, { stream: true });
+  }
+}
+
 const commands = {
   hello: async () => ({ version: VERSION }),
   'pending-import': async () => {
@@ -316,6 +370,38 @@ const commands = {
     await save({ streams });
     return true;
   },
+  // Hibiki reads a YouTube video's captions from the learner's own connection when YouTube limits
+  // Hibiki's servers. Only the watch page, the player API and caption files can be requested, and
+  // never with the learner's YouTube cookies.
+  'youtube-fetch': async ({ url, method, headers, body }) => {
+    const target = new URL(String(url));
+    const post = target.pathname === '/youtubei/v1/player';
+    if (
+      target.origin !== 'https://www.youtube.com' ||
+      !YOUTUBE_PATH.test(target.pathname) ||
+      (method ?? 'GET') !== (post ? 'POST' : 'GET') ||
+      (post && (typeof body !== 'string' || body.length > 10_000))
+    )
+      throw new Error('Hibiki Bridge only fetches YouTube captions.');
+    const language = headers?.['Accept-Language'];
+    await allowYouTube();
+    const response = await fetch(target, {
+      method: post ? 'POST' : 'GET',
+      headers: {
+        'Accept-Language': typeof language === 'string' ? language.slice(0, 100) : 'ja',
+        ...(post ? { 'Content-Type': 'application/json' } : {}),
+      },
+      body: post ? body : undefined,
+      credentials: 'omit',
+      redirect: 'error',
+      signal: AbortSignal.timeout(20_000),
+    });
+    return {
+      status: response.status,
+      contentType: response.headers.get('content-type'),
+      body: await boundedText(response, YOUTUBE_LIMIT),
+    };
+  },
   focus: async ({ tabId }) => {
     const { connected } = await state();
     if (!connected[tabId]) throw new Error('That video tab is no longer connected.');
@@ -411,12 +497,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const tab = await chrome.tabs.update(lessonTab, { active: true }).catch(() => null);
         if (tab) await chrome.windows.update(tab.windowId, { focused: true });
       }
-      return { ok: true };
-    }
-    if (message.action === 'origin') {
-      if (!ALLOWED_ORIGIN.test(message.origin))
-        throw new Error('Use the Hibiki site or a localhost address.');
-      await chrome.storage.local.set({ origin: message.origin });
       return { ok: true };
     }
     throw new Error('Unknown action');

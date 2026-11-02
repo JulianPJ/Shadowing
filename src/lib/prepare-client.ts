@@ -1,8 +1,32 @@
 'use client';
 import { resolveMediaUrl } from './media';
 import { needsUserTranscript } from './linked-transcripts';
+import { bridgeReadsYouTube, lessonFromBridgeCaptions } from './extension/youtube-captions';
 import type { Lesson, ResolvedMedia } from './types';
 type Preparation = { resolved: ResolvedMedia; lesson?: Lesson; needsTranscript?: string };
+
+/** A failed server preparation and its error code, when the server sent one. */
+export class PreparationError extends Error {
+  constructor(
+    message: string,
+    readonly code?: string,
+  ) {
+    super(message);
+    this.name = 'PreparationError';
+  }
+}
+// Failures where the learner's own connection may still reach YouTube's captions.
+const BRIDGE_RECOVERABLE = new Set([
+  'provider-blocked',
+  'provider-incompatible',
+  'network',
+  'network-timeout',
+]);
+const bridgeMayHelp = (error: unknown) =>
+  error instanceof PreparationError
+    ? BRIDGE_RECOVERABLE.has(error.code ?? '')
+    : error instanceof TypeError || (error instanceof Error && error.name === 'TimeoutError');
+
 /** Shared URL preparation transport; pages own progress, import continuation and navigation. */
 export async function prepareLinkedVideo(
   url: string,
@@ -18,6 +42,30 @@ export async function prepareLinkedVideo(
       needsTranscript:
         'No Japanese subtitles were found automatically. Add your own transcript to continue.',
     };
+  try {
+    return await prepareOnServer(resolved, signal, onProgress, (next) => (resolved = next));
+  } catch (error) {
+    // When YouTube limits Hibiki's servers, Hibiki Bridge reads the captions from this browser.
+    if (signal.aborted || !bridgeMayHelp(error) || !(await bridgeReadsYouTube())) throw error;
+    onProgress('captions', 'Reading captions through Hibiki Bridge…', resolved);
+    try {
+      return { resolved, lesson: await lessonFromBridgeCaptions(resolved, signal) };
+    } catch (bridgeError) {
+      if (signal.aborted) throw bridgeError;
+      const { normalizePreparationError } = await import('./providers/errors');
+      const failure = normalizePreparationError(bridgeError);
+      if (needsUserTranscript(failure.code)) return { resolved, needsTranscript: failure.error };
+      throw error;
+    }
+  }
+}
+
+async function prepareOnServer(
+  resolved: ResolvedMedia,
+  signal: AbortSignal,
+  onProgress: (stage: string, message: string, resolved?: ResolvedMedia) => void,
+  onResolved: (resolved: ResolvedMedia) => void,
+): Promise<Preparation> {
   const response = await fetch('/api/prepare', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -25,8 +73,11 @@ export async function prepareLinkedVideo(
     signal: AbortSignal.any([signal, AbortSignal.timeout(35000)]),
   });
   if (!response.ok) {
-    const body = await response.json();
-    throw new Error(body.error || 'We couldn’t prepare this video. Try again.');
+    const body = await response.json().catch(() => ({}));
+    throw new PreparationError(
+      body.error || 'We couldn’t prepare this video. Try again.',
+      response.status === 429 || response.status >= 500 ? 'network' : undefined,
+    );
   }
   if (!response.body) throw new Error('The connection ended unexpectedly. Please try again.');
   const reader = response.body.getReader(),
@@ -49,10 +100,13 @@ export async function prepareLinkedVideo(
         if (!line.trim()) continue;
         const data = JSON.parse(line);
         if (signal.aborted) throw new DOMException('Cancelled', 'AbortError');
-        if (data.resolved) resolved = { ...data.resolved, originalUrl: resolved.originalUrl };
+        if (data.resolved) {
+          resolved = { ...data.resolved, originalUrl: resolved.originalUrl };
+          onResolved(resolved);
+        }
         if (data.error) {
           if (needsUserTranscript(data.code)) return { resolved, needsTranscript: data.error };
-          throw new Error(data.error);
+          throw new PreparationError(data.error, data.code);
         }
         if (data.stage) stage = data.stage;
         if (data.message) message = data.message;
@@ -61,7 +115,10 @@ export async function prepareLinkedVideo(
       }
       if (done) break;
     }
-    throw new Error('The connection ended before the transcript was ready. Please try again.');
+    throw new PreparationError(
+      'The connection ended before the transcript was ready. Please try again.',
+      'network',
+    );
   } finally {
     await reader.cancel().catch(() => {});
     reader.releaseLock();
