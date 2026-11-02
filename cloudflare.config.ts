@@ -52,11 +52,11 @@ export const worker = defineWorker({
     GOOGLE_CLIENT_SECRET: bindings.secret(),
     RESEND_API_KEY: bindings.secret(),
     AUTH_EMAIL_FROM: bindings.text('Hibiki <accounts@hibikiapp.net>'),
-    // Live Paddle billing. Checkout stays disabled until the domain is approved and the default
-    // payment link is set; then set PADDLE_ENABLED to 'true'.
+    // Live Paddle billing. Set PADDLE_ENABLED to 'false' to stop new sales; the portal, webhooks
+    // and already-paid access keep working.
     // The two price IDs are stored as Cloudflare secrets to match existing bindings.
     PADDLE_ENVIRONMENT: bindings.text('live'),
-    PADDLE_ENABLED: bindings.text('false'),
+    PADDLE_ENABLED: bindings.text('true'),
     PADDLE_PRO_MONTHLY_PRICE_ID: bindings.secret(),
     PADDLE_PRO_ANNUAL_PRICE_ID: bindings.secret(),
     PADDLE_CLIENT_TOKEN: bindings.text('live_f3601b3b80cdb98e4263bb3b246'),

@@ -1,6 +1,19 @@
 # Paddle Billing
 
-Hibiki uses Paddle Billing as merchant of record, with a Paddle-hosted overlay for monthly and annual Pro and Paddle's hosted customer portal for invoices, payment details and cancellation. This implementation defaults to **sandbox, disabled**. Sandbox configuration may be deployed on the existing production Hibiki Worker at the owner's direction; this does not activate real payments.
+Hibiki uses Paddle Billing as merchant of record, with a Paddle-hosted overlay for monthly and annual Pro and Paddle's hosted customer portal for invoices, payment details and cancellation. Production runs **live and enabled** on the `shadowing` Worker at `https://hibikiapp.net`; the code's own defaults remain sandbox and disabled for local and test environments.
+
+## Live configuration
+
+| Setting                        | Value                                                                             |
+| ------------------------------ | --------------------------------------------------------------------------------- |
+| Product                        | Hibiki Pro `pro_01m5b4n09dpw7v2twnx6a5yazy` (SaaS tax category)                   |
+| Monthly price                  | `pri_01m5b4n0hw5dec34zzzc4g6b4h`, £3.99, tax by location                          |
+| Annual price                   | `pri_01m5b4n0ptw94x4137yyd3hf3r`, £29.99, tax by location                         |
+| Client token                   | `live_f3601b3b80cdb98e4263bb3b246` (public, in `cloudflare.config.ts`)            |
+| Notification destination       | `ntfset_01m5b51hg9s93jcdbv9gfwk65a` → `https://hibikiapp.net/api/billing/webhook` |
+| Checkout domain / payment link | `hibikiapp.net` approved; default payment link `https://hibikiapp.net/profile`    |
+
+The API key, webhook signing secret and both price IDs are Worker secrets. A simulated live notification on 2026-11-02 passed signature verification, confirming the deployed signing secret.
 
 ## Configuration
 

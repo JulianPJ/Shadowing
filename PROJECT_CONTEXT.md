@@ -68,8 +68,9 @@ Five destinations, in the header on desktop and a labelled bottom bar at compact
   local-first; signing in offers a one-time import of device progress.
 - **Billing:** Paddle merchant-of-record monthly/annual Pro checkout and customer portal,
   signature-verified subscription/refund webhooks, and paid expiry projected into the existing
-  account/access row. Manual/test Pro grants remain independent. Sandbox is the default and
-  checkout is disabled pending configuration; no live billing activation ([setup](docs/paddle-billing.md)).
+  account/access row. Manual/test Pro grants remain independent. Live billing is enabled on
+  `hibikiapp.net` (£3.99/month, £29.99/year in Paddle); `PADDLE_ENABLED=false` stops new sales
+  ([setup](docs/paddle-billing.md)).
 - **Access:** Free is the immersion viewer (Discover, Watch Later, imports/captions, transcript,
   dictionary lookup and manual replay); Pro adds all existing active learning, recording/drills,
   generated translations/analysis, vocabulary/review, detailed progress and learning sync.
@@ -111,8 +112,8 @@ See [architecture](docs/architecture.md) for module ownership and checks.
 2. Content difficulty analysis — done.
 3. Progress and learner modelling — done.
 4. Polish / monetisation — in progress. Done: navigation and vocabulary simplification, single
-   runtime, rate limits, one sync engine. Remaining: analytics, sensible Free/Pro limits,
-   sandbox billing configuration and verification, then an explicitly approved live billing release.
+   runtime, rate limits, one sync engine, sandbox billing verification and the live billing
+   release. Remaining: analytics, sensible Free/Pro limits.
 5. Broaden content sources — Hibiki Bridge v1 done (Chrome). Chrome Web Store release packaging prepared; developer-account submission pending. Next:
    Firefox, `chrome.tabCapture` for sites that block element capture, and using the extension to
    capture YouTube audio for "Improve with Whisper".
