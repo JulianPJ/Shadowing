@@ -17,6 +17,7 @@ import { handleDiscoverAccountRequest } from '../src/lib/discover/account-server
 import { readWatchLater, writeWatchLater, type WatchRecord } from '../src/lib/discover/watch-later';
 import { discoveryVideo, youtubeMetadata } from './helpers/discover';
 import { catalogueHealth } from '../src/lib/discover/health';
+import { readCatalogSnapshot } from '../src/lib/discover/snapshot';
 import { recordPreparationState } from '../src/lib/discover/preparation-state';
 import { analyseUnplacedVideos, ANALYSIS_PER_NIGHT } from '../src/lib/discover/analysis';
 import { CaptionError } from '../src/lib/providers/errors';
@@ -78,6 +79,8 @@ beforeEach(async () => {
     'discovery_aggregate_metrics',
     'discovery_jobs',
     'discovery_quota',
+    'discovery_job_state',
+    'discovery_metric_dirty',
     'user_watch_later',
     'user_discovery_preferences',
     'user_practice_sessions',
@@ -260,6 +263,8 @@ test('scheduled refresh budgets and batches official API calls, releases lease a
   assert.equal(searches, 2);
   assert.equal(metadata, 2);
   assert.equal((await readCatalog(db)).length, 1);
+  // Seed choice reuses an hourly coverage tally instead of reading the catalogue every run.
+  assert.ok(await db.prepare("SELECT 1 FROM discovery_job_state WHERE key='coverage'").first());
   assert.equal((await db.prepare('SELECT * FROM discovery_jobs').all()).results.length, 0);
   await db.prepare('UPDATE discovery_seed_queries SET enabled=0 WHERE last_run_at IS NULL').run();
   await refreshCatalog(db, 'key', fetchImpl, time);
@@ -352,7 +357,7 @@ test('searches reserve metadata headroom while stale metadata can use the last p
     .prepare('INSERT INTO discovery_quota(day,units) VALUES(?,?)')
     .bind(youtubeQuotaWindow(time).day, DISCOVER_DAILY_BUDGET - 1)
     .run();
-  await saveVideos(db, [{ ...video(), fetchedAt: new Date(time - 2 * 86400000).toISOString() }]);
+  await saveVideos(db, [{ ...video(), fetchedAt: new Date(time - 4 * 86400000).toISOString() }]);
   let searches = 0;
   let metadata = 0;
   await refreshCatalog(
@@ -566,7 +571,6 @@ test('completion metrics use the real practice day and reject expired or missing
 });
 test('popularity remains private below ten learners and raw events expire', async () => {
   await saveVideos(db, [video()]);
-  const day = new Date().toISOString().slice(0, 10);
   await handleDiscoverAccountRequest(
     request('/api/discover/events', 'POST', {
       events: [
@@ -592,14 +596,20 @@ test('popularity remains private below ten learners and raw events expire', asyn
       )
       .bind(id, id, `${id}@test.example`, Date.now(), Date.now())
       .run();
-    await db
-      .prepare('INSERT INTO discovery_metric_events(user_id,day,video_id,action) VALUES(?,?,?,?)')
-      .bind(id, day, 'video000000', 'open')
-      .run();
+    await handleDiscoverAccountRequest(
+      request('/api/discover/events', 'POST', {
+        events: [{ videoId: 'video000000', action: 'open' }],
+      }),
+      id,
+      true,
+      db,
+    );
   }
   await refreshCatalog(db);
   const popularity = (await readCatalog(db))[0].popularity;
   assert.equal(popularity, 10);
+  // Each roll-up recomputes only the queued pairs and empties the queue.
+  assert.equal((await db.prepare('SELECT * FROM discovery_metric_dirty').all()).results.length, 0);
   await db
     .prepare(
       "INSERT INTO discovery_metric_events(user_id,day,video_id,action) VALUES('one','2020-01-01','video000000','open')",
@@ -611,6 +621,57 @@ test('popularity remains private below ten learners and raw events expire', asyn
       .length,
     0,
   );
+});
+test('impressions alone never queue a metrics roll-up', async () => {
+  await saveVideos(db, [video()]);
+  const send = (action: string) =>
+    handleDiscoverAccountRequest(
+      request('/api/discover/events', 'POST', { events: [{ videoId: 'video000000', action }] }),
+      'one',
+      true,
+      db,
+    );
+  await send('impression');
+  assert.equal((await db.prepare('SELECT * FROM discovery_metric_dirty').all()).results.length, 0);
+  await send('open');
+  assert.deepEqual(
+    (await db.prepare('SELECT video_id FROM discovery_metric_dirty').all()).results,
+    [{ video_id: 'video000000' }],
+  );
+});
+const memoryStore = () => {
+  const values = new Map<string, string>();
+  return {
+    puts: 0,
+    async get(key: string) {
+      const value = values.get(key);
+      return value === undefined ? null : JSON.parse(value);
+    },
+    async put(key: string, value: string) {
+      this.puts++;
+      values.set(key, value);
+    },
+  };
+};
+test('the refresh publishes the feed snapshot after changes or hourly, and readers apply cooldowns', async () => {
+  await saveVideos(db, [video()]);
+  const store = memoryStore();
+  // Scheduled times before the real clock, so preparation outcomes are recorded after the build.
+  const hour = Math.floor(Date.now() / 3600000) * 3600000 - 2 * 3600000;
+  await refreshCatalog(db, undefined, fetch, hour + 20 * 60000, store);
+  assert.equal(store.puts, 1);
+  assert.equal((await readCatalogSnapshot(store, hour + 20 * 60000))?.length, 1);
+  await refreshCatalog(db, undefined, fetch, hour + 35 * 60000, store);
+  assert.equal(store.puts, 1, 'an unchanged catalogue is not republished within the hour');
+  await recordPreparationState(db, 'video000000', 'video-unavailable');
+  await refreshCatalog(db, undefined, fetch, hour + 50 * 60000, store);
+  assert.equal(store.puts, 2, 'a preparation outcome rebuilds at the next run');
+  assert.equal((await readCatalogSnapshot(store))?.length, 0, 'cooldown applies at read time');
+  assert.equal((await readCatalogSnapshot(store, Date.now() + 16 * 60000))?.length, 1);
+  await refreshCatalog(db, undefined, fetch, hour + 111 * 60000, store);
+  assert.equal(store.puts, 3, 'rebuilt hourly');
+  assert.equal(await readCatalogSnapshot(store, hour + 111 * 60000 + 7 * 3600000), null);
+  assert.equal(await readCatalogSnapshot(memoryStore()), null);
 });
 
 const providerSnippet = (

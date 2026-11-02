@@ -40,7 +40,7 @@ Hibiki is one Cloudflare Worker built with vinext (Next.js App Router on Vite). 
 | Completion recap and revisit evidence | `src/components/lesson-completion-summary.tsx`, `src/lib/lesson-completion.ts` |
 | Quiz documents, attempts, prompts and providers | `src/lib/quiz/`, `src/lib/providers/quiz/` |
 | Worker runtime: bindings, rate limits, account route wiring | `src/lib/server/runtime.ts`, `src/lib/server/rate-limit.ts`, `src/types/cloudflare-env.d.ts` |
-| Worker entry: demo asset, Discover flag, scheduled refresh and nightly analysis | `cloudflare-worker.js`, `cloudflare.config.ts`, `src/lib/discover/schedule.ts` |
+| Worker entry: demo asset, Discover flag, scheduled refresh (and feed snapshot) and nightly analysis | `cloudflare-worker.js`, `cloudflare.config.ts`, `src/lib/discover/schedule.ts`, `src/lib/discover/snapshot.ts` |
 | Styles (imported in order; `shell.css` last) | `src/app/globals.css`, `src/app/styles/` |
 
 Import the module you need directly; there are no compatibility facades. Keep server providers out of client components.
@@ -55,6 +55,8 @@ Import the module you need directly; there are no compatibility facades. Keep se
   deleted on downgrade. See [entitlements](entitlements.md) for the full allocation.
 - **Sync is silent.** The only visible sync state is "Your session expired". Channels never sync for signed-out or unverified accounts. Routine triggers (focus, reconnect, a slow poll) reuse a sync from the last five minutes unless local changes are pending.
 - **Word-state pulls are incremental** (`synced_at` watermark plus a 60-second overlap). Uploads return the stored value for each lemma so a device that lost last-writer-wins adopts the winner.
+- **Learner pulls are incremental** the same way: `/api/sync/bootstrap?since=` returns records stamped after the watermark, and pushes return the stored records. The device keeps a fingerprint per server record (`sync:remote`) to find what to push, and pulls in full daily, after a plan change, or when its cache no longer holds what it has fingerprinted. A server without `serverTime` keeps the full pull, push, full pull. Position-only changes wait up to 30 seconds (or until the page is hidden).
+- **The Discover feed reads a KV snapshot** that the catalogue refresh publishes ([discover](discover.md#feed-and-recommendation-contracts)); D1 is read only when no recent snapshot exists. Bump `SNAPSHOT_KEY` when `catalogRows` changes its columns.
 - **Media playback**: keep the same mounted media player when display preferences change; recordings, object URLs and the adapter belong to the active practice tree. `section-lookup.ts` reproduces the original boundary predicate, including gaps. Subtitle timing is never stretched.
 - **Storage**: keep the `hibiki:v1:` keys. `history` holds `{ lesson: { id }, index, updatedAt }` references (legacy embedded lessons migrate on the next save); section moves write only `position:{id}`. Writes skip unchanged values and notify `hibiki:local-write` once per real change.
 - **Transcript identity**: hashes include section IDs, timing and trimmed Japanese; media URLs are excluded.

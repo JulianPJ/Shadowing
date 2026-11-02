@@ -56,6 +56,52 @@ function parseCursor(cursor?: string | null): Partial<Record<SyncCollection, str
     throw new Error('Invalid cursor');
   return Object.fromEntries(entries);
 }
+function preferences(row: Record<string, unknown> | undefined, viewerOnly = false) {
+  if (!row) return null;
+  return {
+    schemaVersion: 1 as const,
+    mode: row.mode as 'shadowing' | 'continuous',
+    speed: row.speed as number,
+    studioMode: row.studio_mode === 1,
+    furigana: row.furigana === 1,
+    ...(!viewerOnly && typeof row.review_limits_json === 'string'
+      ? { reviewLimits: validateReviewLimits(JSON.parse(row.review_limits_json)) }
+      : {}),
+    updatedAt: row.updated_at as string,
+  };
+}
+// Worker clocks can differ slightly between requests; re-reading a minute of writes is harmless
+// because merges are idempotent.
+const CLOCK_OVERLAP_MS = 60_000;
+/** The last (synced_at, ID) read from each unfinished collection of a pull since a watermark. */
+function parseChangeCursor(
+  cursor: string | null | undefined,
+  since: string,
+): Partial<Record<SyncCollection, [string, string]>> {
+  const time = Date.parse(since);
+  if (since.length > 40 || !Number.isFinite(time)) throw new Error('Invalid cursor');
+  if (!cursor) {
+    const start = new Date(time - CLOCK_OVERLAP_MS).toISOString();
+    return Object.fromEntries(syncCollections.map((kind) => [kind, [start, '']]));
+  }
+  const parsed: unknown = JSON.parse(cursor);
+  const entries = parsed && typeof parsed === 'object' ? Object.entries(parsed) : [];
+  if (
+    !entries.length ||
+    entries.some(
+      ([kind, position]) =>
+        !(syncCollections as readonly string[]).includes(kind) ||
+        !Array.isArray(position) ||
+        position.length !== 2 ||
+        typeof position[0] !== 'string' ||
+        position[0].length > 40 ||
+        typeof position[1] !== 'string' ||
+        position[1].length > 1000,
+    )
+  )
+    throw new Error('Invalid cursor');
+  return Object.fromEntries(entries) as Partial<Record<SyncCollection, [string, string]>>;
+}
 export function createD1UserProgressRepository(db: ProgressDatabase): UserProgressRepository {
   return {
     async lesson(userId, id) {
@@ -67,44 +113,47 @@ export function createD1UserProgressRepository(db: ProgressDatabase): UserProgre
     },
     // One page holds up to 50 records of every unfinished collection, read in one D1 round trip,
     // so a typical pull is a single request (and session check) rather than one per collection.
-    async bootstrap(userId, cursor, viewerOnly = false) {
-      const pending = parseCursor(cursor);
+    // A full pull pages by ID; a pull `since` a watermark pages by (synced_at, ID).
+    async bootstrap(userId, cursor, viewerOnly = false, since = null) {
+      // Taken before reading, so a write that lands during this pull is in the next one.
+      const serverTime = new Date().toISOString();
+      const pending = since ? parseChangeCursor(cursor, since) : parseCursor(cursor);
       const kinds = syncCollections.filter(
         (kind) => pending[kind] !== undefined && (!viewerOnly || kind === 'lessons'),
       );
       const [prefsResult, ...pages] = (await db.batch([
         db.prepare('SELECT * FROM user_preferences WHERE user_id=?').bind(userId),
-        // Composite primary key supplies the user-scoped keyset index, never OFFSET.
-        ...kinds.map((kind) =>
-          db
-            .prepare(
-              `SELECT id,payload_json FROM ${tables[kind]} WHERE user_id=? AND id>? ORDER BY id LIMIT 51`,
-            )
-            .bind(userId, pending[kind]!),
-        ),
+        // Composite keys supply the user-scoped keyset indexes, never OFFSET.
+        ...kinds.map((kind) => {
+          const position = pending[kind]!;
+          return Array.isArray(position)
+            ? db
+                .prepare(
+                  `SELECT id,payload_json,synced_at FROM ${tables[kind]} WHERE user_id=? AND (synced_at,id)>(?,?) ORDER BY synced_at,id LIMIT 51`,
+                )
+                .bind(userId, position[0], position[1])
+            : db
+                .prepare(
+                  `SELECT id,payload_json FROM ${tables[kind]} WHERE user_id=? AND id>? ORDER BY id LIMIT 51`,
+                )
+                .bind(userId, position);
+        }),
       ])) as { results: Record<string, unknown>[] }[];
       const data = emptySync();
-      const next: Partial<Record<SyncCollection, string>> = {};
+      const next: Partial<Record<SyncCollection, string | [string, string]>> = {};
       kinds.forEach((kind, i) => {
-        const rows = pages[i].results as { id: string; payload_json: string }[];
+        const rows = pages[i].results as { id: string; payload_json: string; synced_at?: string }[];
         const page = rows.slice(0, 50);
         Object.assign(data, { [kind]: page.map((r) => JSON.parse(r.payload_json)) });
-        if (rows.length > 50) next[kind] = page.at(-1)!.id;
+        const last = page.at(-1)!;
+        if (rows.length > 50) next[kind] = since ? [last.synced_at!, last.id] : last.id;
       });
-      const prefs = prefsResult.results[0];
-      if (prefs)
-        data.preferences = {
-          schemaVersion: 1,
-          mode: prefs.mode as 'shadowing' | 'continuous',
-          speed: prefs.speed as number,
-          studioMode: prefs.studio_mode === 1,
-          furigana: prefs.furigana === 1,
-          ...(!viewerOnly && typeof prefs.review_limits_json === 'string'
-            ? { reviewLimits: validateReviewLimits(JSON.parse(prefs.review_limits_json)) }
-            : {}),
-          updatedAt: prefs.updated_at as string,
-        };
-      return { data, nextCursor: Object.keys(next).length ? JSON.stringify(next) : null };
+      data.preferences = preferences(prefsResult.results[0], viewerOnly);
+      return {
+        data,
+        nextCursor: Object.keys(next).length ? JSON.stringify(next) : null,
+        serverTime,
+      };
     },
     async push(userId, input) {
       const data = validateSync(input);
@@ -146,6 +195,8 @@ export function createD1UserProgressRepository(db: ProgressDatabase): UserProgre
             ),
         );
       }
+      // Every accepted write is stamped for incremental pulls; a rejected stale write keeps its stamp.
+      const syncedAt = new Date().toISOString();
       for (const kind of syncCollections)
         for (const item of data[kind]) {
           const lesson =
@@ -153,12 +204,13 @@ export function createD1UserProgressRepository(db: ProgressDatabase): UserProgre
           const updated = 'generatedAt' in item ? item.generatedAt : item.updatedAt,
             table = tables[kind];
           const payload = JSON.stringify(item);
-          let conflict = `DO UPDATE SET updated_at=excluded.updated_at,payload_json=excluded.payload_json WHERE excluded.updated_at>${table}.updated_at AND ${table}.lesson_id=excluded.lesson_id AND ${table}.transcript_key=excluded.transcript_key`;
+          let conflict = `DO UPDATE SET updated_at=excluded.updated_at,payload_json=excluded.payload_json,synced_at=excluded.synced_at WHERE excluded.updated_at>${table}.updated_at AND ${table}.lesson_id=excluded.lesson_id AND ${table}.transcript_key=excluded.transcript_key`;
           if (kind === 'archives') conflict = 'DO NOTHING';
           if (kind === 'bookmarks')
-            conflict = `DO UPDATE SET updated_at=excluded.updated_at,payload_json=excluded.payload_json WHERE excluded.updated_at>${table}.updated_at OR (excluded.updated_at=${table}.updated_at AND json_extract(excluded.payload_json,'$.deleted')=1)`;
+            conflict = `DO UPDATE SET updated_at=excluded.updated_at,payload_json=excluded.payload_json,synced_at=excluded.synced_at WHERE excluded.updated_at>${table}.updated_at OR (excluded.updated_at=${table}.updated_at AND json_extract(excluded.payload_json,'$.deleted')=1)`;
           if (kind === 'lessons')
             conflict = `DO UPDATE SET
+          synced_at=excluded.synced_at,
           updated_at=MAX(updated_at,excluded.updated_at),
           payload_json=json_set(CASE WHEN excluded.updated_at>${table}.updated_at THEN excluded.payload_json ELSE ${table}.payload_json END,
           '$.completed',json(CASE WHEN json_extract(${table}.payload_json,'$.completed') OR json_extract(excluded.payload_json,'$.completed') THEN 'true' ELSE 'false' END),
@@ -166,13 +218,52 @@ export function createD1UserProgressRepository(db: ProgressDatabase): UserProgre
           statements.push(
             db
               .prepare(
-                `INSERT INTO ${table}(user_id,id,lesson_id,transcript_key,updated_at,payload_json) VALUES (?,?,?,?,?,?) ON CONFLICT(user_id,id) ${conflict}`,
+                `INSERT INTO ${table}(user_id,id,lesson_id,transcript_key,updated_at,payload_json,synced_at) VALUES (?,?,?,?,?,?,?) ON CONFLICT(user_id,id) ${conflict}`,
               )
-              .bind(userId, item.id, lesson.lessonId, lesson.transcriptKey, updated, payload),
+              .bind(
+                userId,
+                item.id,
+                lesson.lessonId,
+                lesson.transcriptKey,
+                updated,
+                payload,
+                syncedAt,
+              ),
           );
         }
       // D1 batches are atomic; the client sends bounded batches and retries idempotently.
       if (statements.length) await db.batch(statements);
+      // Read back what was stored (merged lessons, newer server records), replacing the device's
+      // second full pull. D1 binds at most 100 parameters per statement.
+      const reads: { kind: SyncCollection; statement: ProgressStatement }[] = [];
+      for (const kind of syncCollections) {
+        const ids = data[kind].map((item) => item.id);
+        for (let i = 0; i < ids.length; i += 90) {
+          const chunk = ids.slice(i, i + 90);
+          reads.push({
+            kind,
+            statement: db
+              .prepare(
+                `SELECT payload_json FROM ${tables[kind]} WHERE user_id=? AND id IN (${chunk.map(() => '?').join(',')})`,
+              )
+              .bind(userId, ...chunk),
+          });
+        }
+      }
+      const lookups = reads.map((r) => r.statement);
+      if (data.preferences)
+        lookups.push(db.prepare('SELECT * FROM user_preferences WHERE user_id=?').bind(userId));
+      const results = lookups.length
+        ? ((await db.batch(lookups)) as { results: Record<string, unknown>[] }[])
+        : [];
+      const stored = emptySync();
+      reads.forEach(({ kind }, i) =>
+        (stored[kind] as unknown[]).push(
+          ...results[i].results.map((r) => JSON.parse(String(r.payload_json))),
+        ),
+      );
+      if (data.preferences) stored.preferences = preferences(results[reads.length].results[0]);
+      return stored;
     },
   };
 }

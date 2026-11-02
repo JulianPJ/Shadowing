@@ -9,6 +9,7 @@ export * from 'vinext/server/fetch-handler';
 
 // API routes live in src/app/api and read bindings from `cloudflare:workers`.
 // This entry only adds what a route handler cannot: byte-range assets and the cron triggers.
+// The catalogue refresh also publishes the Discover feed snapshot to DISCOVER_KV.
 // Preserve vinext's response-stage exports above.
 /** @typedef {import('cf/config').InferEnv<typeof import('./cloudflare.config').worker>} WorkerEnv */
 
@@ -61,7 +62,13 @@ const worker = {
       );
     else
       ctx.waitUntil(
-        refreshCatalog(env.HIBIKI_DB, env.YOUTUBE_DATA_API_KEY, fetch, controller.scheduledTime),
+        refreshCatalog(
+          env.HIBIKI_DB,
+          env.YOUTUBE_DATA_API_KEY,
+          fetch,
+          controller.scheduledTime,
+          env.DISCOVER_KV,
+        ),
       );
   },
 };

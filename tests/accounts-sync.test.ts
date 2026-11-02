@@ -10,7 +10,7 @@ import {
 } from '../src/lib/auth/server';
 import { createD1UserProgressRepository } from '../src/lib/sync/repository';
 import { accountHandler } from '../src/lib/sync/server';
-import { emptySync, type SyncData } from '../src/lib/sync/types';
+import { emptySync, syncCollections, type SyncData } from '../src/lib/sync/types';
 import { mergeSync } from '../src/lib/sync/merge';
 import { validateSync } from '../src/lib/sync/validation';
 import { sanitizeDeviceData } from '../src/lib/sync/sanitize';
@@ -308,7 +308,7 @@ test('downgrade denies paid reads and writes without deleting D1 data; personal 
     ).json();
     assert.deepEqual(exported.learning.sessions, before.data.sessions);
     assert.deepEqual(exported.wordStates, words.records);
-    assert.deepEqual(await repo.bootstrap(userA), before);
+    assert.deepEqual((await repo.bootstrap(userA)).data, before.data);
     assert.deepEqual(await knowledge.page(userA).then((p) => p.records), words.records);
   } finally {
     await db.prepare("UPDATE user_access SET plan='pro' WHERE user_id=?").bind(userA).run();
@@ -525,6 +525,62 @@ test('user-scoped keyset pagination and indexed queries', async () => {
     .bind(userA, '')
     .all<{ detail: string }>();
   assert.ok(plan.results.every((r) => !r.detail.includes('SCAN')));
+});
+test('pulls since a watermark read only later writes, and pushes return the stored records', async () => {
+  for (const table of [
+    'user_lessons',
+    'user_practice_sessions',
+    'user_quiz_attempts',
+    'user_bookmarks',
+    'user_difficulty_refs',
+    'user_practice_archives',
+  ])
+    await db
+      .prepare(`UPDATE ${table} SET synced_at='2026-01-01T00:00:00.000Z' WHERE user_id=?`)
+      .bind(userA)
+      .run();
+  const since = (await repo.bootstrap(userA)).serverTime!;
+  const quiet = await repo.bootstrap(userA, null, false, since);
+  assert.ok(quiet.data.preferences, 'preferences are always returned');
+  for (const kind of syncCollections) assert.equal(quiet.data[kind].length, 0, kind);
+  const base = data.lessons[0],
+    many = emptySync();
+  for (let i = 0; i < 60; i++)
+    many.lessons.push({
+      ...base,
+      id: JSON.stringify([`since-${i}`, base.lesson.transcriptKey]),
+      lesson: { ...base.lesson, lessonId: `since-${i}` },
+    });
+  for (const lessons of [many.lessons.slice(0, 30), many.lessons.slice(30)]) {
+    const stored = await repo.push(userA, { ...emptySync(), lessons });
+    assert.deepEqual(stored?.lessons.map((l) => l.id).sort(), lessons.map((l) => l.id).sort());
+  }
+  const first = await repo.bootstrap(userA, null, false, since);
+  assert.equal(first.data.lessons.length, 50);
+  assert.deepEqual(Object.keys(JSON.parse(first.nextCursor!)), ['lessons']);
+  const rest = await repo.bootstrap(userA, first.nextCursor, false, since);
+  assert.equal(rest.data.lessons.length, 10);
+  assert.equal(rest.nextCursor, null);
+  // A stale write keeps the newer stored record, and the push returns it for the device to adopt.
+  const newer = { ...many.lessons[0], updatedAt: new Date().toISOString(), position: 3 };
+  await repo.push(userA, { ...emptySync(), lessons: [newer] });
+  const back = await repo.push(userA, {
+    ...emptySync(),
+    lessons: [{ ...newer, updatedAt: base.updatedAt, position: 1 }],
+  });
+  assert.equal(back?.lessons[0].position, 3);
+  for (const bad of ['yesterday', 'x'.repeat(41)])
+    await assert.rejects(repo.bootstrap(userA, null, false, bad), /Invalid cursor/);
+  const plan = await db
+    .prepare(
+      'EXPLAIN QUERY PLAN SELECT id FROM user_lessons WHERE user_id=? AND (synced_at,id)>(?,?) ORDER BY synced_at,id LIMIT 51',
+    )
+    .bind(userA, since, '')
+    .all<{ detail: string }>();
+  assert.ok(
+    plan.results.every((r) => !r.detail.includes('SCAN') && !r.detail.includes('TEMP')),
+    JSON.stringify(plan.results),
+  );
 });
 test('mocked Google OAuth uses framework state and PKCE, requires explicit linking and keeps one user', async () => {
   const context = await auth.$context;

@@ -24,6 +24,8 @@ const options = convertV4MiniflareOptions({
       compatibilityDate: '2026-10-03',
       compatibilityFlags: ['nodejs_compat', 'global_fetch_strictly_public'],
       d1Databases: { HIBIKI_DB: 'runtime-test' },
+      // Empty until a scheduled refresh publishes the feed snapshot, so the feed reads D1.
+      kvNamespaces: { DISCOVER_KV: 'runtime-discover' },
       ratelimits: {
         SHADOWING_AI_RATE_LIMIT: { namespace_id: '19001', simple: { limit: 6, period: 60 } },
         DISCOVERY_RATE_LIMIT: { namespace_id: '19002', simple: { limit: 90, period: 60 } },

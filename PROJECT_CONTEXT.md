@@ -94,7 +94,7 @@ Five destinations, in the header on desktop and a labelled bottom bar at compact
   `position:{id}`.
 - **Sync:** the learner snapshot (`src/lib/sync`) plus three channels on one engine
   (`src/lib/sync/channel.ts`): review operations, word states (incremental by server `synced_at`)
-  and Watch later / Discover preferences. Routine triggers reuse a sync from the last 5 minutes
+  and Watch later / Discover preferences. Learner pulls are incremental too (per-record `synced_at` watermark, a full pull daily). Routine triggers reuse a sync from the last 5 minutes
   unless there are local edits; signed-out and unverified accounts never sync.
 - **Hibiki Bridge:** a Manifest V3 extension (`extension/`) that hands Hibiki a page video's own
   stream (a web file or HLS, played in Hibiki's player through a per-tab request rule) or else
