@@ -195,3 +195,35 @@ test('each destination owns its page, marks itself current and the bottom bar st
   await expect(bar).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Open navigation menu' })).toBeVisible();
 });
+
+test('Practice returns to the destination it was opened from, keeping the Library filter', async ({
+  context,
+  page,
+}) => {
+  await services(context, { user: null });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const back = page.locator('.practice-breadcrumb').getByRole('link', { name: /^Back to / });
+  await page.goto('/practice/demo');
+  await expect(back).toHaveAccessibleName('Back to Library');
+  await expect(back).toHaveAttribute('href', '/library');
+
+  await page.goto('/library');
+  await page
+    .getByRole('group', { name: 'Filter library' })
+    .getByRole('button', { name: 'Completed' })
+    .click();
+  await expect(page).toHaveURL(/\/library\?filter=completed$/);
+  await page.goto('/practice/demo');
+  await expect(back).toHaveAttribute('href', '/library?filter=completed');
+  await back.click();
+  await expect(page).toHaveURL(/\/library\?filter=completed$/);
+  await expect(page.getByRole('button', { name: 'Completed' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+
+  await page.goto('/');
+  await page.goto('/practice/demo');
+  await expect(back).toHaveAccessibleName('Back to Home');
+  await expect(back).toHaveAttribute('href', '/');
+});

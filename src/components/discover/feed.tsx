@@ -347,6 +347,11 @@ export function DiscoverFeed({ library: shared }: { library: ReturnType<typeof u
         {notice ? (
           <div className="discover-notice" role={noticeError ? 'alert' : 'status'}>
             {notice}
+            {notice === 'Saved to Watch Later.' ? (
+              <Link className="text-button" href="/library">
+                Open Library <ArrowRight size={14} />
+              </Link>
+            ) : null}
             {undo ? (
               <button
                 className="text-button"
