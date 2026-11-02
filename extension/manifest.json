@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Hibiki Bridge",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Practise Japanese shadowing with videos on other sites, played inside Hibiki with the page subtitles or optional AI transcription.",
   "minimum_chrome_version": "116",
   "icons": {
@@ -21,6 +21,7 @@
   },
   "background": { "service_worker": "background.js", "type": "module" },
   "permissions": ["activeTab", "scripting", "storage", "declarativeNetRequestWithHostAccess"],
+  "host_permissions": ["https://www.youtube.com/*"],
   "optional_host_permissions": ["<all_urls>"],
   "content_scripts": [
     {

@@ -22,19 +22,28 @@ A web page cannot reach a video on another site, so Hibiki uses a small Chrome e
 
 **Whisper from a page.** The controller captures the element's audio with `captureStream()` while the video plays at normal speed from the start. It resamples to 16 kHz mono and places samples by media time, so pauses and stalls do not shift the timeline. It hands Hibiki 116-second WAV windows that overlap by 4 seconds. Hibiki sends each window through the existing `/api/transcribe` path and merges them like file transcription. **Finish with what was heard so far** keeps the partial result.
 
+## YouTube captions from the learner's browser
+
+YouTube sometimes limits caption requests from Hibiki's servers. When `/api/prepare` fails that way (see [production captions](production-captions.md)), `prepareLinkedVideo` asks an installed Hibiki Bridge 0.3.0+ to make the three caption requests from the learner's own connection instead: the watch page (for the Innertube key), the player API, and the chosen caption file. Hibiki runs the same caption provider code as the server, with the extension's `youtube-fetch` command as its `fetch`, then builds the lesson locally (`YouTube captions via Hibiki Bridge`).
+
+- `youtube-fetch` accepts only `https://www.youtube.com/watch` (GET), `/youtubei/v1/player` (POST, JSON body up to 10 KB) and `/api/timedtext` (GET). It sends no cookies (`credentials: 'omit'`), refuses redirects, times out after 20 seconds and reads at most 4 MB.
+- YouTube's player API rejects requests whose `Origin` is a `chrome-extension://` address, so a `declarativeNetRequest` session rule removes `Origin` from this extension's own requests to `www.youtube.com`. It does not touch requests made by any page.
+- This needs the `https://www.youtube.com/*` host permission, which Chrome asks the learner to accept when an older Bridge updates to 0.3.0.
+- Browser-sourced captions never enter the shared D1 transcript cache; another learner preparing the same video still goes through the server.
+
 ## Pieces
 
 | File | Role |
 | --- | --- |
-| `extension/manifest.json` | Permissions: `activeTab`, `scripting`, `storage`, `declarativeNetRequestWithHostAccess`; optional `<all_urls>` for embedded players and playing streams inside Hibiki |
-| `extension/popup.*` | Lists the page's videos; Practise / Connect; Hibiki address setting |
+| `extension/manifest.json` | Permissions: `activeTab`, `scripting`, `storage`, `declarativeNetRequestWithHostAccess`; host access to `www.youtube.com` for caption requests; optional `<all_urls>` for embedded players and playing streams inside Hibiki |
+| `extension/popup.*` | Lists the page's videos; Practise / Connect |
 | `extension/page-videos.js` | Describes a frame's videos, for the popup and for pasted links |
 | `extension/youtube.js` | Shared YouTube URL validation / canonicalization for the popup and service worker |
-| `extension/background.js` | Routes commands from Hibiki pages to connected tabs and video events back; finds page streams and adds their request rule; state in `chrome.storage.session` |
+| `extension/background.js` | Routes commands from Hibiki pages to connected tabs and video events back; finds page streams and adds their request rule; makes Hibiki's YouTube caption requests (`youtube-fetch`); state in `chrome.storage.session` |
 | `extension/bridge.js` | Content script on Hibiki origins only; relays `window.postMessage` traffic |
 | `extension/controller.js` | Injected on demand into the chosen frame: playback, tracks, stream origin and hosts, overlay, audio capture |
 | `extension/page-player.js` | Run in the page's own world: asks a player that loads subtitles on request (Vidstack) for its Japanese cues, and for the source it plays |
-| `src/lib/extension/` | Hibiki side: protocol client, hand-off and stream validation, capture orchestration |
+| `src/lib/extension/` | Hibiki side: protocol client, hand-off and stream validation, capture orchestration, YouTube captions through the Bridge |
 | `src/components/media-page.tsx`, `media-stream.tsx` | Page lessons: the stream inside Hibiki, or the page's tab |
 
 ## Security and privacy
@@ -42,6 +51,7 @@ A web page cannot reach a video on another site, so Hibiki uses a small Chrome e
 - Commands are accepted only from Hibiki origins (`https://hibikiapp.net`, the former `workers.dev` production origin during migration, `localhost`, `127.0.0.1`), and only for tabs the learner connected from the popup.
 - The extension needs no host permission to control a video in its tab: `activeTab` covers the clicked tab. Embedded players on other origins, and playing a stream inside Hibiki, prompt for optional access.
 - A stream rule applies only to requests from Hibiki's own document in that tab, to the hosts the page's player used. The page's origin and hosts are read in the extension's isolated world, where the page cannot alter them.
+- `youtube-fetch` reaches only YouTube's watch page, player API and caption files, without the learner's YouTube cookies, and its `Origin` rule applies only to the extension's own requests.
 - Page lessons store the page URL and a `pageKey`, never a shared content identity. They sync as metadata with `mediaAvailable: false`.
 - Captured audio goes only to Hibiki's own transcription endpoint, under the same Pro check and rate limit as file transcription.
 
@@ -56,10 +66,10 @@ A web page cannot reach a video on another site, so Hibiki uses a small Chrome e
 
 ## Install (development)
 
-`chrome://extensions` → Developer mode → **Load unpacked** → choose the `extension/` folder. The default production address is `https://hibikiapp.net`; if you installed an older build, reload the extension and update **Settings** in the popup. For a local Hibiki, use `http://localhost:3000`.
+`chrome://extensions` → Developer mode → **Load unpacked** → choose the `extension/` folder. The popup's **Practise in Hibiki** opens `https://hibikiapp.net`; learners cannot change it. To point a development copy at a local Hibiki, open the extension's service worker console from `chrome://extensions` and run `chrome.storage.local.set({ origin: 'http://localhost:3000' })` (only Hibiki origins listed in the manifest are accepted; `chrome.storage.local.remove('origin')` restores production).
 
 ## Tests
 
 - `tests/extension.test.ts`: hand-off validation, track choice, page lessons, sync and saved-word identity.
 - `tests/extension-youtube.test.mjs`: canonical YouTube video detection and rejection of unrelated URLs.
-- `tests/e2e/extension.spec.ts`: loads a copy of the extension into Chromium. The copy is granted all sites so no toolbar click or permission prompt is needed. It covers the page-subtitle lesson playing a referrer-protected video inside Hibiki with exact section pauses, the in-tab fallback for a script-fed video (remote playback, section pause, overlay), a player that loads subtitles only on request, and Whisper capture with a mocked transcription endpoint, plus single-choice YouTube routing to the native caption endpoint.
+- `tests/e2e/extension.spec.ts`: loads a copy of the extension into Chromium. The copy is granted all sites so no toolbar click or permission prompt is needed. It covers the page-subtitle lesson playing a referrer-protected video inside Hibiki with exact section pauses, the in-tab fallback for a script-fed video (remote playback, section pause, overlay), a player that loads subtitles only on request, and Whisper capture with a mocked transcription endpoint, plus single-choice YouTube routing to the native caption endpoint and the Bridge caption fallback when the server is limited (only the three allowed YouTube requests, without cookies; other YouTube addresses refused).

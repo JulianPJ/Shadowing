@@ -5,10 +5,6 @@ import { describeVideos } from './page-videos.js';
 const statusLine = document.getElementById('status');
 const list = document.getElementById('videos');
 const allow = document.getElementById('allow');
-const originInput = document.getElementById('origin');
-
-const ALLOWED_ORIGIN =
-  /^(https:\/\/hibikiapp\.net|https:\/\/shadowing\.julianpopovskijones\.workers\.dev|http:\/\/(localhost|127\.0\.0\.1)(:\d{1,5})?)$/;
 
 const send = (message) =>
   chrome.runtime.sendMessage({ type: 'popup', ...message }).then((response) => {
@@ -146,20 +142,6 @@ async function render() {
 
 allow.addEventListener('click', async () => {
   if (await chrome.permissions.request({ origins: ['<all_urls>'] })) await render();
-});
-
-void chrome.storage.local.get('origin').then(({ origin }) => {
-  originInput.value = origin || 'https://hibikiapp.net';
-});
-originInput.addEventListener('change', async () => {
-  const value = originInput.value.trim().replace(/\/+$/, '');
-  if (!ALLOWED_ORIGIN.test(value)) {
-    originInput.setCustomValidity('Use the Hibiki site or a localhost address.');
-    originInput.reportValidity();
-    return;
-  }
-  originInput.setCustomValidity('');
-  await send({ action: 'origin', origin: value });
 });
 
 render().catch((error) => {

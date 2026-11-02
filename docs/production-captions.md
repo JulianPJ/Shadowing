@@ -24,6 +24,8 @@ segmentation in the app Worker
 
 The app keeps one direct caption-provider attempt as a fallback for relay infrastructure failures. All providers return the same normalized cue contract, so the UI, segmentation and media player do not depend on provider-specific behavior.
 
+When the server still fails with a code the learner's own connection may avoid (`provider-blocked`, `provider-incompatible`, `network`, `network-timeout`, or a 429 / 5xx from `/api/prepare`) and Hibiki Bridge 0.3.0+ is installed, the browser runs the same `youtube-transcript-plus` flow with Hibiki Bridge as its `fetch` (`src/lib/extension/youtube-captions.ts`). Those captions become a local lesson labelled `YouTube captions via Hibiki Bridge` and are never written to the shared D1 transcript cache, because the browser's result cannot be trusted for other learners. See [Hibiki Bridge](browser-extension.md#youtube-captions-from-the-learners-browser).
+
 The broker uses bearer-token authentication, bounded request sizes/concurrency and timeouts. The Node host maintains a small in-memory caption cache. The broker does not store lessons or learner progress.
 
 ## Required production settings

@@ -47,7 +47,8 @@ Five destinations, in the header on desktop and a labelled bottom bar at compact
   diagnostics and Pro Shadowing Match. Shortcuts: Space, R, Enter, ←/→, T, M (record/stop),
   P (play attempt), ? (help). Playback time lives in an external store so ticks re-render only the
   section progress bar.
-- **Sources:** YouTube Japanese captions (authenticated relay, direct fallback; auto-generated
+- **Sources:** YouTube Japanese captions (authenticated relay, direct fallback, then the learner's
+  own browser through Hibiki Bridge when YouTube limits Hibiki's servers; auto-generated
   tracks are labelled and offer "Improve with Whisper"), Vimeo and direct links with a user
   transcript, local media + SRT / VTT / ASS / SSA / JSON / timed TXT, Pro Whisper subtitles for
   local media (Workers AI; 116 s windows overlapping by 4 s, merged by matching text), videos on
