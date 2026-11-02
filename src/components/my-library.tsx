@@ -29,6 +29,7 @@ import { completeLesson, lessonCompleted } from '@/lib/storage/learning';
 import { sourceLabel } from '@/lib/media';
 import { parseYouTubeUrl } from '@/lib/youtube';
 import { LessonThumbnail, lessonDuration } from './lesson-thumbnail';
+import { rememberPracticeOrigin } from './task-return';
 
 const filters = [
   ['all', 'All'],
@@ -55,6 +56,7 @@ export function LibraryTab({ library }: { library: ReturnType<typeof useLibrary>
     if (value === 'all') next.searchParams.delete('filter');
     else next.searchParams.set('filter', value);
     window.history.replaceState(window.history.state, '', next);
+    rememberPracticeOrigin();
   }
   const [url, setUrl] = useState('');
   const [title, setTitle] = useState('');

@@ -100,7 +100,7 @@ test('display defaults, lazy assets, Studio playback continuity, navigation and 
   expect(await page.locator('video').evaluate((v: HTMLVideoElement) => v.currentTime)).toBe(paused);
   await expect(page.getByRole('button', { name: 'Save this section for practice' })).toBeDisabled();
   await studio(page).click();
-  await page.getByRole('link', { name: 'Your practice', exact: true }).click();
+  await page.getByRole('link', { name: /^Back to / }).click();
   await page.goto('/practice/demo');
   await expect(studio(page)).toHaveAttribute('aria-pressed', 'true');
   await page.reload();

@@ -53,6 +53,7 @@ import {
 } from '@/lib/shadowing-client';
 
 import { usePracticeProgress } from '../use-practice-progress';
+import { useTaskReturn } from '../task-return';
 import { useSectionTranslation } from './use-section-translation';
 import { usePlaybackBoundary } from './use-playback-boundary';
 import { TranscriptPanel } from './transcript-panel';
@@ -167,6 +168,7 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
     () => Math.max(0, (media.current?.time() ?? 0) - playbackOffsetSeconds),
     [playbackOffsetSeconds],
   );
+  const { practiceOrigin } = useTaskReturn();
   const progress = usePracticeProgress(
     lesson,
     {
@@ -847,9 +849,9 @@ export function StudyPlayer({ session, onHelp }: { session: Session; onHelp: () 
         </p>
       ) : null}
       <div className="practice-breadcrumb">
-        <Link href="/">
+        <Link href={practiceOrigin.href} aria-label={`Back to ${practiceOrigin.label}`}>
           <ArrowLeft size={14} />
-          Your practice
+          {practiceOrigin.label}
         </Link>
         <span>/</span>
         <span>{sourceLabel(lesson)}</span>
