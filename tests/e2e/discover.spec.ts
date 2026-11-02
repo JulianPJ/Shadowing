@@ -107,7 +107,7 @@ test('save and undo persist through Library and trigger no preparation', async (
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(card.getByRole('button', { name: /^Save for later: / })).toBeVisible();
   await card.getByRole('button', { name: /^Save for later: / }).click();
-  await page.getByRole('link', { name: 'Library', exact: true }).click();
+  await page.locator('.discover-notice').getByRole('link', { name: 'Open Library' }).click();
   await expect(page.locator('.library-queue')).toContainText(title);
   await page.reload();
   await expect(page.locator('.library-queue li')).toHaveCount(1);
