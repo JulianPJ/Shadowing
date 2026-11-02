@@ -35,11 +35,19 @@ Verified with a computed-contrast sweep in both themes of Home, Discover, Librar
 
 Five proposed destinations: **Home · Discover · Library · Vocabulary · Profile**. Home resumes, Discover finds new content, Library revisits kept content. Existing routes, JLPT bands, Review/Words and Library filter meanings are retained. The guide covers mobile/Practice navigation, aliases, handoffs, empty states and current Free/Pro boundaries.
 
-Status: **accepted**, 20 October 2026. The user chose five destinations over the critique's recommendation to keep three sections. Not yet implemented; follow the implementation handoff in the stage guide. Personalised Home is illustrated only enough to explain destination ownership.
+Status: **implemented**. Accepted 20 October 2026: the user chose five destinations over the critique's recommendation to keep three sections.
+
+What shipped:
+
+- **#77 — destinations.** Five labelled header links. Below 1050px, a labelled bottom bar with 44px+ targets that never covers Practice; the Menu dialog keeps all five plus sign-in and theme. Practice and `/prepare` mark no destination as current. Discover and Library are their own pages, Home no longer embeds their feeds, `/prepare` returns to its origin, and the existing aliases keep working. `PROJECT_CONTEXT.md` and `docs/architecture.md` describe the structure.
+- **#79 — personalised Home and Library cards.** First use leads with the demo and own-video entry. Returning learners get one lesson to resume, up to two more in progress, a Vocabulary card that never manufactures urgency, and the import form. Library uses preview cards with Resume / Revisit / Reattach file states and a separate Watch later queue with Prepare. Its filter is kept in `?filter=` and filtered empty states offer Show all lessons.
+- **#83 — remaining hand-offs.** Practice's breadcrumb returns to the destination it was opened from, keeping the Library filter, with Library as the fallback. Discover's Watch later confirmation links to Library.
+
+Not separately verified against this guide: 200% zoom and screen-reader flow across every destination.
 
 ## Next stages
 
-1. Personalised Home — develop the overview and first-use/returning states in more depth.
+1. ~~Personalised Home~~ — shipped in #79 (see stage 02).
 2. Progress and rewards — factual activity, clear next action, no punitive streak pressure.
 3. Practice hierarchy — compare a conservative refinement with a more guided Listen / Speak / Compare approach.
 4. Discover — retain JLPT levels and existing browsing strengths.

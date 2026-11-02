@@ -137,7 +137,7 @@ No application code has been modified or deployed here. The repository's runtime
 | Stage | Focus | Status |
 | --- | --- | --- |
 | 01 | Visual identity, themes and component language | Implemented 20 October 2026 |
-| 02 | Personalised Home and separation of destinations | Five destinations accepted; not yet implemented |
+| 02 | Personalised Home and separation of destinations | Implemented in #77, #79 and #83 |
 | 03 | Rewarding progress and tracking | Pending |
 | 04 | Practice hierarchy with current/proposed comparison | Pending; exploratory because the user is unconvinced |
 | 05 | Discover refinements retaining JLPT | Pending |

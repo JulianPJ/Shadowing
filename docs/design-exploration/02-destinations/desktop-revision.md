@@ -1,6 +1,6 @@
 # Desktop revision — full-page destination views
 
-20 October 2026. Proposed for discussion; generated concept images and documentation only.
+20 October 2026. Generated concept images and documentation only. Accepted and since implemented; see the [exploration index](../README.md#stage-02--clearer-separation-of-destinations).
 
 ## What the previous board missed
 

@@ -1,6 +1,6 @@
 # Hibiki — clearer destinations, stage 02
 
-Status: **proposed for discussion**, 20 October 2026. Continues [stage 01](../01-visual-identity/README.md) on PR #73. This is a design proposal, not an application implementation or an approved change to product context.
+Status: **accepted** 20 October 2026 and **implemented** in #77, #79 and #83; see the [exploration index](../README.md#stage-02--clearer-separation-of-destinations) for what shipped. Continues [stage 01](../01-visual-identity/README.md) on PR #73. The text below is the original proposal, kept as the design record.
 
 ## Start with the mockups
 
@@ -131,7 +131,7 @@ No primary destination should be marked current while a transient Practice page 
 | Expired session | Reuse current actionable reauthentication treatment; no persistent technical sync dashboard |
 | Long Japanese / large text | Wrap lesson titles and sentences naturally; controls stay labelled, usable and unobscured |
 
-## Implementation handoff, when this proposal is approved
+## Implementation handoff (completed)
 
 This stage deliberately edits no runtime source. A later implementation should:
 

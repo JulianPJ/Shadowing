@@ -13,7 +13,7 @@
 
 ## Feedback status
 
-Proposed for discussion. Continuing the exploration is not approval to implement or deploy. Suggested next stage: personalised Home.
+Accepted 20 October 2026 and implemented in #77, #79 and #83. Runtime verification (typecheck, lint, unit and Playwright tests) is recorded on those PRs, not here.
 
 ## Desktop revision, 20 October 2026
 
