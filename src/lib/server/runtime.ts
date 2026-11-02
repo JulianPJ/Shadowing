@@ -14,6 +14,7 @@ import { D1KnowledgeRepository } from '../knowledge/repository';
 import { createD1LinkedTranscriptRepository, linkedTranscripts } from '../linked-transcripts';
 import { createD1GeneratedArtifactRepository, generatedArtifacts } from '../generated-artifacts';
 import { readCatalog } from '../discover/catalog';
+import { readCatalogSnapshot } from '../discover/snapshot';
 import { createWorkersAiShadowingProvider } from '../providers/shadowing';
 import {
   InferenceDenied,
@@ -189,9 +190,10 @@ export function shadowingRoute(
   };
 }
 
-// The catalogue join reads ~4.5 D1 rows per video (about 4,500 per read) and changes mainly on the
-// 15-minute refresh. Isolates in one data centre share it for five minutes and each keeps it for a
-// minute, so feed traffic costs at most one read per data centre per five minutes. Keys carry the
+// The catalogue join reads ~4.5 D1 rows per video (about 4,500 per read), so the scheduled refresh
+// publishes its rows to KV and feed reads cost no D1 rows; D1 is read only while no recent snapshot
+// exists. Isolates in one data centre share the result for five minutes and each keeps it for a
+// minute, so traffic costs at most one KV read per data centre per five minutes. Keys carry the
 // deployed version so a new release never parses an older catalogue shape.
 const CATALOG_SHARED_SECONDS = 300;
 const catalog = cachedRead(
@@ -203,7 +205,9 @@ const catalog = cachedRead(
         env.AUTH_BASE_URL || 'https://hibikiapp.net',
       ).href,
       CATALOG_SHARED_SECONDS,
-      () => readCatalog(env.HIBIKI_DB),
+      async () =>
+        (env.DISCOVER_KV && (await readCatalogSnapshot(env.DISCOVER_KV))) ||
+        readCatalog(env.HIBIKI_DB),
       waitUntil,
     ),
   60_000,

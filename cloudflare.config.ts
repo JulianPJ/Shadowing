@@ -32,6 +32,8 @@ export const worker = defineWorker({
       simple: { limit: 6, period: 60 },
     }),
     HIBIKI_DB: bindings.d1({ id: 'cf88fe7d-16bb-4f58-8839-2b27718a7847' }),
+    // The Discover feed snapshot, published by the catalogue refresh (src/lib/discover/snapshot.ts).
+    DISCOVER_KV: bindings.kv({ id: '7fafee118b5b4e028ae0c4408896fc12' }),
     DISCOVER_ENABLED: bindings.text('true'),
     DISCOVERY_RATE_LIMIT: bindings.rateLimit({
       namespace: '19002',

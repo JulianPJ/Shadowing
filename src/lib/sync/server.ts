@@ -171,6 +171,7 @@ export function accountHandler({
           userId,
           url.searchParams.get('cursor'),
           !canUseFeature(plan, 'learning-sync'),
+          url.searchParams.get('since'),
         );
         if (!canUseFeature(plan, 'learning-sync')) page.data = basicSyncData(page.data);
         return respond(page);
@@ -183,8 +184,12 @@ export function accountHandler({
         // Repository merges keep stored completion monotonic; Free position writes cannot erase it.
         for (let i = 0; i < data.attempts.length; i++)
           data.attempts[i] = await verifyAttempt({ ...data.attempts[i], verified: false }, db);
-        await repository.push(userId, data);
-        return respond({ ok: true });
+        const stored = await repository.push(userId, data);
+        if (!stored) return respond({ ok: true });
+        return respond({
+          ok: true,
+          data: canUseFeature(plan, 'learning-sync') ? stored : basicSyncData(stored),
+        });
       }
       return respond({ error: 'Method or route not supported' }, 405);
     } catch (error) {

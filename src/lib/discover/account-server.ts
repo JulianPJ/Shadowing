@@ -198,15 +198,23 @@ export async function handleDiscoverAccountRequest(
         accepted.push({ videoId: event.videoId, action: event.action, day });
       }
       if (accepted.length)
-        await db.batch(
-          accepted.map((e) =>
+        await db.batch([
+          ...accepted.map((e) =>
             db
               .prepare(
                 'INSERT OR IGNORE INTO discovery_metric_events(user_id,day,video_id,action) VALUES(?,?,?,?)',
               )
               .bind(userId, e.day, e.videoId, e.action),
           ),
-        );
+          // Popularity counts opens, completions and saves, so only engagement queues a roll-up.
+          ...accepted
+            .filter((e) => e.action !== 'impression')
+            .map((e) =>
+              db
+                .prepare('INSERT OR IGNORE INTO discovery_metric_dirty(day,video_id) VALUES(?,?)')
+                .bind(e.day, e.videoId),
+            ),
+        ]);
       return respond({ ok: true });
     }
     return respond({ error: 'Method not supported' }, 405);

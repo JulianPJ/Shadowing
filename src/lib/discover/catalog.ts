@@ -134,12 +134,16 @@ function fromRow(row: Record<string, unknown>): Video | null {
     ),
   };
 }
-/** A single bounded join. No captions, remote metadata or inference on feed reads. */
-export async function readCatalog(db: Database, now = Date.now()): Promise<Video[]> {
+/**
+ * A single bounded join. No captions, remote metadata or inference on feed reads. The rows are
+ * also what the scheduled refresh publishes as the feed snapshot, so cooldowns are applied by
+ * `catalogVideos` at read time: a snapshot outlives the cooldowns it was built with.
+ */
+export async function catalogRows(db: Database, now = Date.now()) {
   const rows = await db
     .prepare(
       `SELECT v.*, s.transcript_key, s.analysis_verified_at, s.audience, s.audience_evidence, s.preparation_status,
-    a.payload_json AS analysis_json, a.generator_version,
+    s.cooldown_until, a.payload_json AS analysis_json, a.generator_version,
     EXISTS(SELECT 1 FROM linked_transcripts t WHERE t.content_key='youtube:'||v.video_id AND t.transcript_hash=s.transcript_hash
       AND t.visibility='system' AND t.owner_user_id IS NULL AND t.source_type='provider-captions' AND t.language='ja'
       AND t.schema_version=1 AND t.normalization_version=1 AND t.segmentation_version=1) AS trusted,
@@ -150,16 +154,29 @@ export async function readCatalog(db: Database, now = Date.now()): Promise<Video
     FROM discovery_videos v LEFT JOIN discovery_video_state s ON s.video_id=v.video_id
     LEFT JOIN generated_artifacts a ON a.id=s.difficulty_artifact_id AND a.transcript_key=s.transcript_key
       AND a.source_transcript_hash=s.transcript_hash AND a.artifact_type='difficulty' AND a.schema_version=1
-    WHERE v.status='available' AND v.expires_at>? AND (s.cooldown_until IS NULL OR s.cooldown_until<=?)
+    WHERE v.status='available' AND v.expires_at>?
     ORDER BY v.indexed_at DESC,v.video_id LIMIT 1000`,
     )
-    .bind(
-      new Date(now - 7 * 86400000).toISOString().slice(0, 10),
-      new Date(now).toISOString(),
-      new Date(now).toISOString(),
-    )
+    .bind(new Date(now - 7 * 86400000).toISOString().slice(0, 10), new Date(now).toISOString())
     .all<Record<string, unknown>>();
-  return withChannelLevels(rows.results.map(fromRow).filter((v): v is Video => v !== null));
+  return rows.results;
+}
+/** Feed candidates from catalogue rows that are still unexpired and out of cooldown at `now`. */
+export function catalogVideos(rows: Record<string, unknown>[], now = Date.now()): Video[] {
+  const time = new Date(now).toISOString();
+  return withChannelLevels(
+    rows
+      .filter(
+        (r) =>
+          String(r.expires_at) > time &&
+          (r.cooldown_until == null || String(r.cooldown_until) <= time),
+      )
+      .map(fromRow)
+      .filter((v): v is Video => v !== null),
+  );
+}
+export async function readCatalog(db: Database, now = Date.now()): Promise<Video[]> {
+  return catalogVideos(await catalogRows(db, now), now);
 }
 export async function saveVideos(db: Database, videos: AssessedVideo[]) {
   if (!videos.length) return;

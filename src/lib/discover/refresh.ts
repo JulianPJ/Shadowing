@@ -27,6 +27,7 @@ import {
   recentlyRejected,
 } from './ingest';
 import { catalogueHealth } from './health';
+import { publishCatalogSnapshot, type SnapshotStore } from './snapshot';
 
 // Conservative internal weights: a search costs 100 points, a metadata batch costs one.
 // This also keeps searches below Google's separate default 100-search/day allowance.
@@ -63,8 +64,20 @@ const hosted = (t: string) => `${t}.language='ja' AND ${t}.visibility IN ('syste
  * from transcripts (a few dozen) rather than re-checking every catalogue video each hour. Each
  * video is re-checked at most hourly, so a transcript or artifact that fails validation cannot
  * repeat the work on every run. A successful preparation clears the hourly mark.
+ *
+ * Without `sweep`, only videos whose mark is clear (new state rows, fresh preparations and nightly
+ * analyses) are checked: an index probe instead of reading every hosted transcript.
  */
-async function analysesToVerify(db: D1Database, now: number) {
+async function analysesToVerify(db: D1Database, now: number, sweep: boolean) {
+  if (!sweep) {
+    const rows = await db
+      .prepare(
+        `SELECT video_id FROM discovery_video_state INDEXED BY discovery_video_state_unchecked
+        WHERE last_catalog_check_at IS NULL LIMIT 100`,
+      )
+      .all<{ video_id: string }>();
+    return rows.results.map((r) => r.video_id);
+  }
   const rows = await db
     .prepare(
       `WITH latest AS (
@@ -93,11 +106,15 @@ async function analysesToVerify(db: D1Database, now: number) {
     .all<{ video_id: string }>();
   return rows.results.map((r) => r.video_id);
 }
-/** Only scheduled execution calls this. Existing validated artifacts are reused without inference. */
-export async function verifyAnalyses(db: D1Database, now = Date.now()) {
+/**
+ * Only scheduled execution calls this. Existing validated artifacts are reused without inference.
+ * Returns how many videos were checked successfully.
+ */
+export async function verifyAnalyses(db: D1Database, now = Date.now(), sweep = true) {
   const transcripts = createD1LinkedTranscriptRepository(db),
     artifacts = createD1GeneratedArtifactRepository(db);
-  for (const id of await analysesToVerify(db, now)) {
+  let checked = 0;
+  for (const id of await analysesToVerify(db, now, sweep)) {
     // One failing video stays unverified until its next hourly check; the rest still run.
     try {
       let artifactId: string | null = null,
@@ -150,10 +167,12 @@ export async function verifyAnalyses(db: D1Database, now = Date.now()) {
           artifactId ? new Date(now).toISOString() : null,
         )
         .run();
+      checked++;
     } catch {
       storageEvent('discover.verify.failed');
     }
   }
+  return checked;
 }
 // Seeds whose schedule lies beyond the longest adaptive cooldown are treated as legacy and due.
 const MAX_COOLDOWN = 13 * 3600000;
@@ -215,11 +234,38 @@ async function catalogueCoverage(db: D1Database): Promise<Coverage> {
   }
   return { total: rows.results.length, levels, topics };
 }
+// Coverage only steers which seeds run; an hour-old tally moves by about one percent.
+const COVERAGE_TTL_MS = 3600000;
+async function seedCoverage(db: D1Database, now: number): Promise<Coverage> {
+  const stored = await db
+    .prepare("SELECT value_json,updated_at FROM discovery_job_state WHERE key='coverage'")
+    .first<{ value_json: string; updated_at: string }>();
+  const age = now - Date.parse(stored?.updated_at ?? '');
+  if (stored && age >= 0 && age < COVERAGE_TTL_MS)
+    try {
+      return JSON.parse(stored.value_json) as Coverage;
+    } catch {
+      /* Recomputed below. */
+    }
+  const coverage = await catalogueCoverage(db);
+  await db
+    .prepare(
+      `INSERT INTO discovery_job_state(key,value_json,updated_at) VALUES('coverage',?,?)
+      ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json,updated_at=excluded.updated_at`,
+    )
+    .bind(JSON.stringify(coverage), new Date(now).toISOString())
+    .run();
+  return coverage;
+}
+// Metadata is refreshed every three days and expires after seven, so one failed refresh never
+// removes a video. Rewriting every video daily was most of the database's writes.
+const METADATA_REFRESH_MS = 3 * 86400000;
 export async function refreshCatalog(
   db: D1Database,
   apiKey?: string,
   fetchImpl: typeof fetch = fetch,
   now = Date.now(),
+  snapshots?: SnapshotStore,
 ) {
   const time = new Date(now).toISOString(),
     lease = new Date(now + 15 * 60000).toISOString();
@@ -234,7 +280,8 @@ export async function refreshCatalog(
     refreshed = 0,
     accepted = 0,
     rejected = 0,
-    backfilled = 0;
+    backfilled = 0,
+    removed = 0;
   try {
     // Expired public API metadata is deleted even when the key is missing or quota exhausted.
     await db.batch([
@@ -288,7 +335,7 @@ export async function refreshCatalog(
           .prepare(
             'SELECT video_id FROM discovery_videos WHERE fetched_at<? ORDER BY fetched_at LIMIT 100',
           )
-          .bind(new Date(now - 86400000).toISOString())
+          .bind(new Date(now - METADATA_REFRESH_MS).toISOString())
           .all<{ video_id: string }>();
         // Refreshed metadata is re-assessed: a video that no longer qualifies leaves the catalogue.
         for (let i = 0; i < stale.results.length; i += 50) {
@@ -297,6 +344,7 @@ export async function refreshCatalog(
           const result = await ingestVideos(db, ids, videos, now);
           refreshed += videos.length;
           rejected += result.rejected;
+          removed += result.rejected;
         }
         // Videos already prepared from trusted Japanese captions are the most useful additions.
         // The candidate query reads every YouTube transcript, so it runs once an hour.
@@ -308,7 +356,7 @@ export async function refreshCatalog(
           rejected += result.rejected;
         }
         const due = await dueSeeds(db, now);
-        const seeds = due.length ? chooseSeeds(due, await catalogueCoverage(db), now) : [];
+        const seeds = due.length ? chooseSeeds(due, await seedCoverage(db, now), now) : [];
         for (const seed of seeds) {
           const order = seedOrder(seed);
           const found = await api.search(seed.query, order);
@@ -366,17 +414,34 @@ export async function refreshCatalog(
     }
     // An upstream outage/quota limit must not stop local re-assessment, analysis reuse or metrics.
     const reassessed = await reassessCatalogue(db, now);
-    await verifyAnalyses(db, now);
+    const hourly = new Date(now).getUTCMinutes() < 15;
+    const verified = await verifyAnalyses(db, now, hourly);
     // Minimum ten distinct authenticated learners, unique events per learner/day/video/action.
-    await db
-      .prepare(
+    // Only (day, video) pairs with new engagement are recomputed; impressions alone never change
+    // popularity. One batch is one transaction, so a pair queued meanwhile stays queued. CROSS JOIN
+    // keeps the queue as the outer loop; otherwise the planner may scan every event instead.
+    await db.batch([
+      db.prepare(
         `INSERT INTO discovery_aggregate_metrics(day,video_id,cohort,impressions,opens,successful_prepares,completions,saves)
-      SELECT day,video_id,COUNT(DISTINCT user_id),SUM(action='impression'),SUM(action='open'),SUM(action='prepared'),SUM(action='complete'),SUM(action='save')
-      FROM discovery_metric_events WHERE day>=? GROUP BY day,video_id HAVING COUNT(DISTINCT user_id)>=10
+      SELECT e.day,e.video_id,COUNT(DISTINCT e.user_id),SUM(e.action='impression'),SUM(e.action='open'),SUM(e.action='prepared'),SUM(e.action='complete'),SUM(e.action='save')
+      FROM discovery_metric_dirty d CROSS JOIN discovery_metric_events e INDEXED BY discovery_metric_day ON e.day=d.day AND e.video_id=d.video_id
+      WHERE true GROUP BY e.day,e.video_id HAVING COUNT(DISTINCT e.user_id)>=10
       ON CONFLICT(day,video_id) DO UPDATE SET cohort=excluded.cohort,impressions=excluded.impressions,opens=excluded.opens,successful_prepares=excluded.successful_prepares,completions=excluded.completions,saves=excluded.saves`,
-      )
-      .bind(new Date(now - 7 * 86400000).toISOString().slice(0, 10))
-      .run();
+      ),
+      db.prepare('DELETE FROM discovery_metric_dirty'),
+    ]);
+    let published = false;
+    if (snapshots)
+      try {
+        published = await publishCatalogSnapshot(
+          db,
+          snapshots,
+          now,
+          verified > 0 || removed > 0 || reassessed.removed > 0 || backfilled > 0,
+        );
+      } catch {
+        storageEvent('discover.snapshot.unavailable');
+      }
     console.info(
       JSON.stringify({
         event: 'discover.refresh',
@@ -387,6 +452,8 @@ export async function refreshCatalog(
         backfilled,
         reassessed: reassessed.reassessed,
         removed: reassessed.removed,
+        verified,
+        published,
         keyConfigured: !!apiKey,
       }),
     );

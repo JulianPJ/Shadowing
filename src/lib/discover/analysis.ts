@@ -58,8 +58,8 @@ const ANALYSIS_FAILED = 'analysis-failed';
 type Candidate = { video_id: string; title: string; description: string; learner: number };
 /**
  * Unanalysed, available videos without a failed or captionless preparation. Reported captions
- * and higher quality go first. The ordering scans the catalogue (about two thousand rows), which
- * is acceptable for a handful of nightly runs.
+ * and higher quality go first. The pinned partial index supplies that order, so the read stops
+ * at the first 200 candidates instead of sorting the catalogue.
  */
 async function candidates(db: D1Database, now: number) {
   const time = new Date(now).toISOString();
@@ -68,7 +68,8 @@ async function candidates(db: D1Database, now: number) {
       `SELECT v.video_id, v.title, v.description_excerpt AS description,
         COALESCE(CASE WHEN s.audience_evidence IS NOT NULL THEN s.audience END,
           CASE WHEN v.orientation_evidence IS NOT NULL THEN v.orientation_hint END)='learner' AS learner
-      FROM discovery_videos v LEFT JOIN discovery_video_state s ON s.video_id=v.video_id
+      FROM discovery_videos v INDEXED BY discovery_videos_analysis
+      LEFT JOIN discovery_video_state s ON s.video_id=v.video_id
       WHERE v.status='available' AND v.embeddable=1 AND v.expires_at>? AND v.duration_seconds<=?
         AND (s.video_id IS NULL OR (s.analysis_verified_at IS NULL
           AND s.preparation_status IN ('unknown','prepared')
@@ -249,6 +250,14 @@ export async function analyseUnplacedVideos({
           provider,
         );
         await saveSharedArtifact(trusted, payload, storage);
+        // Queue verification for the next catalogue run instead of the hourly sweep.
+        await db
+          .prepare(
+            `INSERT INTO discovery_video_state(video_id) VALUES(?)
+            ON CONFLICT(video_id) DO UPDATE SET last_catalog_check_at=NULL`,
+          )
+          .bind(id)
+          .run();
         counts.analysed++;
         report('analysed', bandOf(payload));
       } catch (error) {

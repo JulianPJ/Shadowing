@@ -83,11 +83,22 @@ export const emptySync = (): SyncData => ({
   difficulties: [],
   archives: [],
 });
-export type SyncPage = { data: SyncData; nextCursor: string | null };
+/**
+ * `serverTime` is the watermark for the device's next incremental pull (`since`); a server that
+ * omits it only supports full pulls.
+ */
+export type SyncPage = { data: SyncData; nextCursor: string | null; serverTime?: string };
 export interface UserProgressRepository {
   lesson(userId: string, id: string): Promise<SyncedLesson | null>;
-  bootstrap(userId: string, cursor?: string | null, viewerOnly?: boolean): Promise<SyncPage>;
-  push(userId: string, data: SyncData): Promise<void>;
+  /** With `since`, only records written after it (less a clock-skew overlap) are returned. */
+  bootstrap(
+    userId: string,
+    cursor?: string | null,
+    viewerOnly?: boolean,
+    since?: string | null,
+  ): Promise<SyncPage>;
+  /** Returns the stored version of every pushed record, so the device adopts server merges. */
+  push(userId: string, data: SyncData): Promise<SyncData | void>;
 }
 export type AccountUser = {
   id: string;
