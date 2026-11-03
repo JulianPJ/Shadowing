@@ -30,6 +30,7 @@ Choose a video on a web page, click Hibiki Bridge and select “Practise in Hibi
 - Control the selected video's playback from Hibiki while the video stays on its original website.
 - Display Hibiki's current Japanese line over the original video.
 - Import your own subtitles when a suitable Japanese track is unavailable.
+- Save a YouTube video to Hibiki's Watch later list for another day.
 - Optionally generate Japanese subtitles from supported video audio using Hibiki's transcription service (Pro account required).
 - Reconnect a saved lesson by opening the original page and clicking the extension.
 

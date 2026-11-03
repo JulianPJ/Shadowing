@@ -113,7 +113,7 @@ test.beforeAll(async () => {
   site = await startSite();
   // The toolbar click that grants activeTab cannot be automated, so this test copy of the
   // extension is granted all sites up front, as a learner does when the popup first asks to
-  // play a video inside Hibiki. The shipped manifest asks for no hosts.
+  // play a video inside Hibiki. The shipped manifest asks only for www.youtube.com.
   const extension = fs.mkdtempSync(path.join(os.tmpdir(), 'hibiki-bridge-'));
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'hibiki-bridge-profile-'));
   temporary.push(extension, profile);
@@ -366,6 +366,66 @@ test('YouTube has one popup choice and requests native captions', async () => {
   await popup.close();
   await opened.close();
   await video.close();
+  await context.unroute('https://www.youtube.com/watch**');
+  await context.unroute('**/api/prepare');
+});
+
+test('YouTube popup saves the video to Watch later without preparing it', async () => {
+  test.setTimeout(120_000);
+  const id = 'jNQXAC9IVRw';
+  const watch = `https://www.youtube.com/watch?v=${id}&t=42`;
+  await context.route('https://www.youtube.com/watch**', (route) =>
+    route.fulfill({
+      contentType: 'text/html; charset=utf-8',
+      body: '<!doctype html><html><title>(3) 朝の散歩 - YouTube</title><body></body></html>',
+    }),
+  );
+  let prepared = false;
+  await context.route('**/api/prepare', (route) => {
+    prepared = true;
+    return route.abort();
+  });
+  const video = await context.newPage();
+  await video.goto(watch);
+  const worker = context.serviceWorkers()[0];
+  const tabId = await worker.evaluate(
+    async (url) => (await chrome.tabs.query({})).find((tab) => tab.url === url)?.id,
+    watch,
+  );
+  const popup = await context.newPage();
+  await popup.goto(`chrome-extension://${extensionId}/popup.html?tab=${tabId}`);
+
+  const openedPromise = context.waitForEvent('page', (page) => page.url().startsWith(hibiki));
+  await popup.getByRole('button', { name: 'Save to Watch later' }).click();
+  const opened = await openedPromise;
+  await expect(popup.getByRole('status')).toHaveText('Saved to Watch later in Hibiki.');
+  // The title loses YouTube's notification count and site name; the link is canonical.
+  const queued = opened.locator('.library-queue li');
+  await expect(queued).toHaveCount(1, { timeout: 30_000 });
+  await expect(queued).toContainText('朝の散歩');
+  await expect(opened.getByText('Saved to Watch Later.')).toBeVisible();
+  await expect(opened).toHaveURL(/\/library$/);
+  // Earlier tests may leave an account signed in, which namespaces the key.
+  const libraryKey = await opened.evaluate(() =>
+    Object.keys(localStorage).find((key) => key.endsWith('library:data')),
+  );
+  const stored = await opened.evaluate((key) => localStorage.getItem(key!), libraryKey);
+  expect(JSON.parse(stored!).queue[0]).toMatchObject({
+    url: `https://www.youtube.com/watch?v=${id}`,
+    title: '朝の散歩',
+  });
+
+  // Saving again keeps one copy.
+  const againPromise = context.waitForEvent('page', (page) => page.url().startsWith(hibiki));
+  await popup.reload();
+  await popup.getByRole('button', { name: 'Save to Watch later' }).click();
+  const again = await againPromise;
+  await expect(again.getByText('Already in Watch Later.')).toBeVisible({ timeout: 30_000 });
+  await expect(again.locator('.library-queue li')).toHaveCount(1);
+  expect(prepared).toBe(false);
+
+  await opened.evaluate((key) => localStorage.removeItem(key!), libraryKey);
+  for (const page of [popup, opened, again, video]) await page.close();
   await context.unroute('https://www.youtube.com/watch**');
   await context.unroute('**/api/prepare');
 });

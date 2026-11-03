@@ -466,6 +466,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       });
       return { ok: true };
     }
+    // Watch later lives in Hibiki's own storage and account sync, so Library saves the link.
+    if (message.action === 'youtube-save') {
+      const tab = await chrome.tabs.get(message.tabId);
+      const canonicalUrl = tab?.url === message.pageUrl ? canonicalYouTubeUrl(tab.url) : null;
+      if (!canonicalUrl) throw new Error('Open a YouTube video and try again.');
+      const title = (tab.title ?? '')
+        .replace(/^\(\d+\)\s+/, '')
+        .replace(/\s+-\s+YouTube$/, '')
+        .trim()
+        .slice(0, 160);
+      const query = new URLSearchParams({ save: canonicalUrl, ...(title ? { title } : {}) });
+      await chrome.tabs.create({ url: `${origin}/library?${query}` });
+      return { ok: true };
+    }
     if (message.action === 'import') {
       await save({
         pendingImport: await handOff(

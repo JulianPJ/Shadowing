@@ -53,7 +53,7 @@ Five destinations, in the header on desktop and a labelled bottom bar at compact
   transcript, local media + SRT / VTT / ASS / SSA / JSON / timed TXT, Pro Whisper subtitles for
   local media (Workers AI; 116 s windows overlapping by 4 s, merged by matching text), videos on
   other sites through the **Hibiki Bridge** Chrome extension, from its popup or by pasting the page
-  link ([details](docs/browser-extension.md)),
+  link, and YouTube videos saved to Watch later from the same popup ([details](docs/browser-extension.md)),
   and the bundled demo. **Subtitle sources** (Profile): with the learner's own Jimaku API key,
   saved on the device per account, a video without Japanese subtitles is searched on Jimaku by its
   inferred title and episode and the best file loads directly (Free; see below).

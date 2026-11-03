@@ -64,7 +64,22 @@ async function render() {
           button.disabled = false;
         }
       });
-      item.append(details, button);
+      const later = document.createElement('button');
+      later.type = 'button';
+      later.textContent = 'Save to Watch later';
+      later.addEventListener('click', async () => {
+        later.disabled = true;
+        statusLine.textContent = 'Saving to Watch later…';
+        try {
+          await send({ action: 'youtube-save', tabId: tab.id, pageUrl: tab.url });
+          statusLine.textContent = 'Saved to Watch later in Hibiki.';
+          if (!new URLSearchParams(location.search).get('tab')) window.close();
+        } catch (error) {
+          statusLine.textContent = error.message;
+          later.disabled = false;
+        }
+      });
+      item.append(details, button, later);
       list.append(item);
       return;
     }

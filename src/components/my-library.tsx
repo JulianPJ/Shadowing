@@ -18,6 +18,7 @@ import { useAccount } from './account';
 import {
   addQueueLink,
   importDeviceQueue,
+  loadLibrary,
   pinLesson,
   removeLessonFromLibrary,
   restoreLessonToLibrary,
@@ -106,6 +107,38 @@ export function LibraryTab({ library }: { library: ReturnType<typeof useLibrary>
       report('error', error instanceof Error ? error.message : 'This link could not be saved.');
     }
   }
+  // Hibiki Bridge's Save to Watch later opens /library?save=<YouTube link>&title=<page title>.
+  // It waits for the account so the link lands in the signed-in learner's queue.
+  useEffect(() => {
+    if (!account.loaded) return;
+    const page = new URL(window.location.href);
+    const link = page.searchParams.get('save');
+    if (link === null) return;
+    const name = page.searchParams.get('title') ?? '';
+    page.searchParams.delete('save');
+    page.searchParams.delete('title');
+    window.history.replaceState(window.history.state, '', page);
+    let id: string;
+    try {
+      id = parseYouTubeUrl(link);
+    } catch (error) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      report('error', error instanceof Error ? error.message : 'This link could not be saved.');
+      return;
+    }
+    const url = `https://www.youtube.com/watch?v=${id}`;
+    if (loadLibrary().queue.some((item) => item.url === url))
+      return report('success', 'Already in Watch Later.');
+    try {
+      const saved = addQueueLink(url, name);
+      report(
+        'success',
+        saved ? 'Saved to Watch Later.' : 'Saved for this visit. Browser storage is unavailable.',
+      );
+    } catch (error) {
+      report('error', error instanceof Error ? error.message : 'This link could not be saved.');
+    }
+  }, [account.loaded]);
   const displayed = lessons.filter(
     (item) =>
       filter === 'all' ||

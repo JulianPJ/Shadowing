@@ -34,7 +34,7 @@ def main():
         "storage",
         "declarativeNetRequestWithHostAccess",
     ]
-    assert manifest.get("host_permissions", []) == []
+    assert manifest.get("host_permissions", []) == ["https://www.youtube.com/*"]
     assert manifest["optional_host_permissions"] == ["<all_urls>"]
     assert len(manifest["description"]) <= 132
     assert manifest["background"]["service_worker"] == "background.js"

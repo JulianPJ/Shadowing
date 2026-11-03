@@ -6,6 +6,7 @@ A web page cannot reach a video on another site, so Hibiki uses a small Chrome e
 
 1. On a page with a video, the learner clicks **Hibiki Bridge** and chooses **Practise in Hibiki**.
    - **YouTube watch, Shorts, live, embed, and youtu.be links** are matched by video ID: the popup shows one video regardless of extra HTML `<video>` elements. The extension opens `/prepare?video=...` with a canonical YouTube link and the site runs its existing `/api/prepare` Japanese caption pipeline.
+   - **Save to Watch later**, the second YouTube choice, opens `/library?save=<canonical link>&title=<tab title>` instead (the title without YouTube's notification count or " - YouTube"). Library waits until the account is known, adds the link to Watch later as its own Save action does (so it syncs for signed-in learners), removes the query and says whether it was saved or already there. Nothing is prepared.
    - **Other websites** use the page-video bridge in the following steps.
 
    Pasting a page link into Hibiki's link box does the same without the popup: a link that is not YouTube, Vimeo or a media file goes to the extension (`open-page`), which opens the page in a background tab, waits for its largest video with a known length (showing the tab after 6 seconds, for players that load only when visible), hands it over as below, and closes the tab once Hibiki plays the stream. This needs the all-sites access the popup asks for once; until then Hibiki explains how to grant it.
@@ -36,7 +37,7 @@ YouTube sometimes limits caption requests from Hibiki's servers. When `/api/prep
 | File | Role |
 | --- | --- |
 | `extension/manifest.json` | Permissions: `activeTab`, `scripting`, `storage`, `declarativeNetRequestWithHostAccess`; host access to `www.youtube.com` for caption requests; optional `<all_urls>` for embedded players and playing streams inside Hibiki |
-| `extension/popup.*` | Lists the page's videos; Practise / Connect |
+| `extension/popup.*` | Lists the page's videos; Practise / Connect, and Save to Watch later on YouTube |
 | `extension/page-videos.js` | Describes a frame's videos, for the popup and for pasted links |
 | `extension/youtube.js` | Shared YouTube URL validation / canonicalization for the popup and service worker |
 | `extension/background.js` | Routes commands from Hibiki pages to connected tabs and video events back; finds page streams and adds their request rule; makes Hibiki's YouTube caption requests (`youtube-fetch`); state in `chrome.storage.session` |
@@ -72,4 +73,4 @@ YouTube sometimes limits caption requests from Hibiki's servers. When `/api/prep
 
 - `tests/extension.test.ts`: hand-off validation, track choice, page lessons, sync and saved-word identity.
 - `tests/extension-youtube.test.mjs`: canonical YouTube video detection and rejection of unrelated URLs.
-- `tests/e2e/extension.spec.ts`: loads a copy of the extension into Chromium. The copy is granted all sites so no toolbar click or permission prompt is needed. It covers the page-subtitle lesson playing a referrer-protected video inside Hibiki with exact section pauses, the in-tab fallback for a script-fed video (remote playback, section pause, overlay), a player that loads subtitles only on request, and Whisper capture with a mocked transcription endpoint, plus single-choice YouTube routing to the native caption endpoint and the Bridge caption fallback when the server is limited (only the three allowed YouTube requests, without cookies; other YouTube addresses refused).
+- `tests/e2e/extension.spec.ts`: loads a copy of the extension into Chromium. The copy is granted all sites so no toolbar click or permission prompt is needed. It covers the page-subtitle lesson playing a referrer-protected video inside Hibiki with exact section pauses, the in-tab fallback for a script-fed video (remote playback, section pause, overlay), a player that loads subtitles only on request, and Whisper capture with a mocked transcription endpoint, plus single-choice YouTube routing to the native caption endpoint, Save to Watch later from the YouTube popup (clean title, canonical link, no duplicate) and the Bridge caption fallback when the server is limited (only the three allowed YouTube requests, without cookies; other YouTube addresses refused).
