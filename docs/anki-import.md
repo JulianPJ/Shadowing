@@ -4,6 +4,10 @@ Vocabulary now includes `/vocabulary` (overview), `/review`, `/words`, and `/voc
 
 ## Local package inspection
 
+Export an Anki Deck Package (`.apkg`), include scheduling information for interval classification, and disable media export: Hibiki imports text and deck structure only.
+
+Modern Anki databases use a custom `unicase` collation, including on `WITHOUT ROWID` field metadata. The browser parser substitutes `BINARY` in the private in-memory metadata table declarations before enabling query-only mode. It scans those tables without secondary indexes and orders fields only by numeric note-type ID and ordinal; it never relies on substituted name comparison rules. Original package bytes, text and Anki data remain unchanged. Regression fixtures include this layout and its name index.
+
 Import is Pro and requires a verified account. It never connects to AnkiWeb or changes Anki. A dedicated browser worker reads ZIP using zip.js, SQLite using sql.js/WASM and modern Zstandard collections using fzstd. It supports package metadata versions 1–3: `collection.anki2`, `collection.anki21`, and `collection.anki21b`, including schema-18 normalized note types, fields and decks. References: [Anki exporting](https://docs.ankiweb.net/manual/exporting), [official package metadata](https://github.com/ankitects/anki/blob/main/proto/anki/import_export.proto), [official schema normalization](https://github.com/ankitects/anki/blob/main/rslib/src/storage/upgrades/schema15_upgrade.sql).
 
 The package stays on the device. Checking existing vocabulary and saving send only selected mapped text and deck names. Templates are never evaluated or mounted. Fields become text rendered through React. Audio/image members are not extracted, played or uploaded. Unknown metadata versions, encrypted collections, malformed databases and excessive resource requirements fail recoverably. Limits:

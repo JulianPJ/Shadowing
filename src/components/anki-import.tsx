@@ -198,11 +198,15 @@ function ImportFlow() {
       {step === 0 ? (
         <div className="import-stage">
           <h3>Choose a package</h3>
-          <p>
-            In Anki, select a deck, choose File → Export, then Anki Deck Package (.apkg). Include
-            scheduling information if you want to classify by review interval. Exporting without
-            media makes the file smaller.
-          </p>
+          <p>In Anki, select your deck and choose File → Export:</p>
+          <ul>
+            <li>Export as Anki Deck Package (.apkg).</li>
+            <li>Include scheduling information to enable review-interval classification.</li>
+            <li>
+              <strong>Do NOT include media.</strong> Hibiki does not support importing audio or
+              images.
+            </li>
+          </ul>
           <p>
             Analysis runs on your device. Only mapped text and selected deck names are sent when you
             check the preview or import. Audio, images, templates and Anki review history are

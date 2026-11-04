@@ -84,7 +84,19 @@ export function readCollection(
 ): AnkiPackage {
   const db = new SQL.Database(bytes);
   try {
-    db.run('PRAGMA query_only=ON; PRAGMA trusted_schema=OFF;');
+    // sql.js has no Anki `unicase` collation. In modern WITHOUT ROWID fields
+    // tables, even a scan fails without it. Adapt only the private in-memory
+    // metadata schema; the package bytes and stored text are never changed.
+    // We scan these tables without secondary indexes and only order numeric
+    // IDs/ordinals, so Anki's name comparison rules are not needed here.
+    db.run(`
+      PRAGMA trusted_schema=OFF;
+      PRAGMA writable_schema=ON;
+      UPDATE sqlite_schema SET sql=replace(sql,'COLLATE unicase','COLLATE BINARY')
+        WHERE type='table' AND name IN ('fields','notetypes','decks');
+      PRAGMA writable_schema=RESET;
+      PRAGMA query_only=ON;
+    `);
     const rows = (sql: string) => {
       const statement = db.prepare(sql);
       const out: Record<string, unknown>[] = [];
@@ -110,13 +122,13 @@ export function readCollection(
     let models: AnkiModel[];
     const decks = new Map<string, string>();
     if (tables.has('notetypes') && tables.has('fields') && tables.has('decks')) {
-      const fields = rows('SELECT ntid,ord,name FROM fields ORDER BY ntid,ord');
-      models = rows('SELECT id,name FROM notetypes').map((r) => ({
+      const fields = rows('SELECT ntid,ord,name FROM fields NOT INDEXED ORDER BY ntid,ord');
+      models = rows('SELECT id,name FROM notetypes NOT INDEXED').map((r) => ({
         id: String(r.id),
         name: String(r.name),
         fields: fields.filter((f) => f.ntid === r.id).map((f) => String(f.name)),
       }));
-      for (const d of rows('SELECT id,name FROM decks'))
+      for (const d of rows('SELECT id,name FROM decks NOT INDEXED'))
         decks.set(String(d.id), String(d.name).replace(/\u001f/g, '::'));
     } else {
       const legacyModels = JSON.parse(String(col.models)) as Record<

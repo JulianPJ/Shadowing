@@ -32,7 +32,7 @@ export async function ankiFixture(
   db.run('INSERT INTO col VALUES (?,?)', [JSON.stringify(models), JSON.stringify(decks)]);
   if (format === 'current') {
     db.run(
-      'CREATE TABLE notetypes(id INTEGER PRIMARY KEY,name TEXT COLLATE NOCASE); CREATE TABLE fields(ntid INTEGER,ord INTEGER,name TEXT); CREATE TABLE decks(id INTEGER PRIMARY KEY,name TEXT COLLATE NOCASE);',
+      'CREATE TABLE notetypes(id INTEGER PRIMARY KEY,name TEXT COLLATE NOCASE); CREATE TABLE fields(ntid INTEGER NOT NULL,ord INTEGER NOT NULL,name TEXT NOT NULL COLLATE NOCASE,PRIMARY KEY(ntid,ord)) WITHOUT ROWID; CREATE UNIQUE INDEX idx_fields_name_ntid ON fields(name,ntid); CREATE TABLE decks(id INTEGER PRIMARY KEY,name TEXT COLLATE NOCASE);',
     );
     for (const [id, m] of Object.entries(models)) {
       db.run('INSERT INTO notetypes VALUES (?,?)', [Number(id), m.name]);
@@ -44,7 +44,7 @@ export async function ankiFixture(
       db.run('INSERT INTO decks VALUES (?,?)', [Number(id), d.name.replaceAll('::', '\u001f')]);
     // Real modern files name this Anki-specific collation, even when the import does no comparisons on it.
     db.run(
-      "PRAGMA writable_schema=ON; UPDATE sqlite_master SET sql=replace(sql,'COLLATE NOCASE','COLLATE unicase') WHERE name IN ('decks','notetypes'); PRAGMA writable_schema=OFF;",
+      "PRAGMA writable_schema=ON; UPDATE sqlite_master SET sql=replace(sql,'COLLATE NOCASE','COLLATE unicase') WHERE name IN ('decks','notetypes','fields'); PRAGMA writable_schema=OFF;",
     );
   }
   for (let i = 0; i < count; i++) {

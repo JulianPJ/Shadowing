@@ -82,6 +82,12 @@ for (const width of [1440, 390])
       });
     });
     await page.goto('/vocabulary/import');
+    const instructions = page.locator('.import-stage li');
+    await expect(instructions).toHaveText([
+      'Export as Anki Deck Package (.apkg).',
+      'Include scheduling information to enable review-interval classification.',
+      'Do NOT include media. Hibiki does not support importing audio or images.',
+    ]);
     await page.getByLabel('Anki package', { exact: true }).setInputFiles({
       name: 'current.apkg',
       mimeType: 'application/octet-stream',
