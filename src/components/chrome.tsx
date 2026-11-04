@@ -38,7 +38,7 @@ const sections = [
   {
     label: 'Vocabulary',
     href: '/review',
-    paths: ['/review', '/words', '/dictionary'],
+    paths: ['/review', '/words', '/dictionary', '/vocabulary'],
     icon: BookOpenText,
   },
   {

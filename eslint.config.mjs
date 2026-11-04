@@ -14,5 +14,6 @@ export default defineConfig([
     'test-results/**',
     'playwright-report/**',
     'public/furigana/**',
+    'public/anki/**',
   ]),
 ]);

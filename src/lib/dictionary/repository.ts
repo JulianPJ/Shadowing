@@ -18,6 +18,7 @@ export interface DictionaryDatabase {
 }
 
 type DictionaryRow = {
+  import_source: string | null;
   id: string;
   term: string;
   normalized_term: string;
@@ -51,6 +52,7 @@ function entry(row: DictionaryRow): DictionaryEntry {
     sourceSentence: row.source_sentence,
     sourceSentenceTranslation: row.source_sentence_translation,
     source: {
+      ...(row.import_source ? JSON.parse(row.import_source) : {}),
       lessonId: row.lesson_id,
       segmentId: row.segment_id,
       lessonTitle: row.lesson_title,
@@ -68,7 +70,7 @@ function entry(row: DictionaryRow): DictionaryEntry {
   };
 }
 
-const columns = `id,term,normalized_term,reading,translation,source_sentence,
+const columns = `import_source,id,term,normalized_term,reading,translation,source_sentence,
 source_sentence_translation,lesson_id,segment_id,lesson_title,lesson_author,media_type,media_id,
 media_url,media_content_key,transcript_key,section_start,section_end,created_at,updated_at`;
 
@@ -76,32 +78,47 @@ export function createD1DictionaryRepository(db: DictionaryDatabase): Dictionary
   const repository: DictionaryRepository = {
     async page(userId, input) {
       const query = validateDictionaryQuery(input);
-      const conditions = ['user_id=?'];
+      const conditions = ['e.user_id=?'];
       const values: (string | number)[] = [userId];
+      const from = query.collectionId
+        ? 'user_vocabulary_memberships m JOIN user_dictionary_entries e ON e.user_id=m.user_id AND e.id=m.entry_id'
+        : 'user_dictionary_entries e';
+      const ordered = query.collectionId
+        ? 'm.created_at DESC,m.entry_id DESC'
+        : 'e.created_at DESC,e.id DESC';
+      if (query.collectionId) {
+        conditions.push('m.user_id=? AND m.collection_id=?');
+        values.push(userId, query.collectionId);
+      }
       for (const [field, value] of [
         ['normalized_term', query.term],
         ['lesson_id', query.lessonId],
         ['transcript_key', query.transcriptKey],
       ] as const)
         if (value) {
-          conditions.push(`${field}=?`);
+          conditions.push(`e.${field}=?`);
           values.push(value);
         }
       if (query.search) {
         const pattern = `%${query.search.replace(/[\\%_]/g, '\\$&')}%`;
         conditions.push(
-          "(normalized_term LIKE ? ESCAPE '\\' OR lower(reading) LIKE ? ESCAPE '\\' OR lower(translation) LIKE ? ESCAPE '\\')",
+          "(e.normalized_term LIKE ? ESCAPE '\\' OR lower(e.reading) LIKE ? ESCAPE '\\' OR lower(e.translation) LIKE ? ESCAPE '\\')",
         );
         values.push(pattern, pattern, pattern);
       }
       if (query.cursor) {
         const cursor = parseDictionaryCursor(query.cursor);
-        conditions.push('(created_at,id)<(?,?)');
+        conditions.push(
+          query.collectionId ? '(m.created_at,m.entry_id)<(?,?)' : '(e.created_at,e.id)<(?,?)',
+        );
         values.push(cursor.createdAt, cursor.id);
       }
       const rows = await db
         .prepare(
-          `SELECT ${columns} FROM user_dictionary_entries WHERE ${conditions.join(' AND ')} ORDER BY created_at DESC,id DESC LIMIT ?`,
+          `SELECT ${columns
+            .split(',')
+            .map((c) => 'e.' + c.trim())
+            .join(',')} FROM ${from} WHERE ${conditions.join(' AND ')} ORDER BY ${ordered} LIMIT ?`,
         )
         .bind(...values, query.limit + 1)
         .all<DictionaryRow>();

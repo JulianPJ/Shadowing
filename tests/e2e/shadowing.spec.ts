@@ -190,6 +190,8 @@ test('invalid URL, shortcut typing guard, bookmarks, search, and mobile layout',
   await expect(help).toContainText('Record / stop');
   await expect(help).toContainText('Play your recording');
   await page.getByRole('button', { name: 'Close help' }).click();
+  await expect(help).not.toBeVisible();
+  await page.locator('body').click({ position: { x: 3, y: 3 } });
   await page.keyboard.press('t');
   await expect(page.locator('#current-translation')).toContainText(demo.segments[1].translation);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(

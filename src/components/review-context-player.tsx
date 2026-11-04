@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import demoData from '@/data/demo.json';
 import { loadLesson, getLiveMedia } from '@/lib/storage/lessons';
 import { lessonMedia, migrateLesson } from '@/lib/media';
@@ -62,8 +62,9 @@ export function ReviewContextPlayer({ entry }: { entry: DictionaryEntry }) {
       document.removeEventListener('visibilitychange', visibility);
     };
   }, [entry, start, end]);
-  useEffect(() => {
-    // Capture the mounted handle: React clears refs before passive unmount cleanup.
+  useLayoutEffect(() => {
+    // Stop playback before child video refs are cleared during DOM removal.
+    // A captured handle in passive cleanup still closes over the cleared video ref.
     const player = media.current;
     return () => player?.pause();
   }, [loaded]);

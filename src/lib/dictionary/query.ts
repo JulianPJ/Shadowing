@@ -41,6 +41,8 @@ export function validateDictionaryQuery(
   query: DictionaryQuery,
 ): DictionaryQuery & { limit: number } {
   const limit = query.limit ?? 100;
+  if (query.collectionId !== undefined && !/^[a-f0-9]{64}$/.test(query.collectionId))
+    throw new DictionaryValidationError('Invalid collection');
   if (!Number.isInteger(limit) || limit < 1 || limit > DICTIONARY_PAGE_MAX)
     throw new DictionaryValidationError('Invalid dictionary page size');
   if (query.cursor !== undefined && query.cursor !== null) parseDictionaryCursor(query.cursor);
@@ -71,14 +73,23 @@ export function dictionaryQueryParams(query: DictionaryQuery) {
 export function readDictionaryQuery(params: URLSearchParams) {
   for (const key of params.keys())
     if (
-      !['limit', 'cursor', 'term', 'search', 'lessonId', 'transcriptKey', 'ids'].includes(key) ||
+      ![
+        'limit',
+        'cursor',
+        'term',
+        'search',
+        'lessonId',
+        'transcriptKey',
+        'ids',
+        'collectionId',
+      ].includes(key) ||
       params.getAll(key).length !== 1
     )
       throw new DictionaryValidationError('Invalid dictionary query');
   return validateDictionaryQuery({
     ...(params.has('limit') ? { limit: Number(params.get('limit')) } : {}),
     ...Object.fromEntries(
-      ['cursor', 'term', 'search', 'lessonId', 'transcriptKey']
+      ['cursor', 'term', 'search', 'lessonId', 'transcriptKey', 'collectionId']
         .filter((k) => params.has(k))
         .map((k) => [k, params.get(k)]),
     ),

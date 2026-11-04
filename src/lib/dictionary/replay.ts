@@ -1,5 +1,6 @@
 import type { DictionaryEntry } from './types';
 export function contextHref(entry: DictionaryEntry) {
+  if (entry.source.kind === 'anki') return '/vocabulary?word=' + encodeURIComponent(entry.id);
   return `/practice/${encodeURIComponent(entry.source.lessonId)}?section=${encodeURIComponent(entry.source.segmentId)}&transcript=${encodeURIComponent(entry.source.transcriptKey)}`;
 }
 export function reviewContextHref(entry: DictionaryEntry) {

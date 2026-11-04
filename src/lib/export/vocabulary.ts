@@ -8,8 +8,8 @@ export type VocabularyExportRow = {
   sourceTranslation: string;
   lessonTitle: string;
   sourceUrl: string;
-  start: number;
-  end: number;
+  start: number | '';
+  end: number | '';
 };
 const columns: (keyof VocabularyExportRow)[] = [
   'term',
@@ -31,8 +31,8 @@ export function vocabularyRows(entries: DictionaryEntry[]): VocabularyExportRow[
     sourceTranslation: e.sourceSentenceTranslation,
     lessonTitle: e.source.lessonTitle,
     sourceUrl: externalReplay(e) ?? '',
-    start: e.source.start,
-    end: e.source.end,
+    start: e.source.kind === 'anki' ? '' : e.source.start,
+    end: e.source.kind === 'anki' ? '' : e.source.end,
   }));
 }
 function cell(value: string | number) {

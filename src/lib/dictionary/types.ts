@@ -1,6 +1,10 @@
 export type DictionaryMediaType = 'youtube' | 'vimeo' | 'direct' | 'local' | 'demo';
 
 export type DictionarySource = {
+  /** Anki text has no lesson, transcript or playable timing. Empty legacy locators are intentional. */
+  kind?: 'anki';
+  collection?: string;
+  contentKey?: string;
   lessonId: string;
   segmentId: string;
   lessonTitle: string;
@@ -32,6 +36,7 @@ export type DictionaryEntry = DictionarySaveInput & {
 };
 
 export type DictionaryQuery = {
+  collectionId?: string;
   limit?: number;
   cursor?: string | null;
   term?: string;

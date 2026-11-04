@@ -11,6 +11,7 @@ import { vocabularyCsv, vocabularyRows, vocabularyTsv } from '@/lib/export/vocab
 import { markWords } from '@/lib/knowledge/client';
 import type { WordState } from '@/lib/knowledge/types';
 import { activeCard, learnWord, markWordKnown } from '@/lib/vocabulary';
+import { normalizeLemma } from '@/lib/knowledge/validation';
 import { timestamp } from '@/lib/youtube';
 import { authPath } from '@/lib/auth/return-path';
 import { useAccount } from './account';
@@ -76,6 +77,7 @@ function SavedWords({
 }) {
   const account = useAccount();
   const review = useReview();
+  const { states } = useWordKnowledge();
   const [term, setTerm] = useState('');
   const [search, setSearch] = useState('');
   const [attempt, setAttempt] = useState(0);
@@ -120,14 +122,11 @@ function SavedWords({
   }, [search, queryKey]);
   const ready = loaded?.key === queryKey;
   const entries = ready ? loaded.entries : [];
-  const learning = (entry: DictionaryEntry) => !!activeCard(entry.id, review.data.cards);
-  // Saved words are Learning while they have a review card and Known otherwise.
-  const visible = entries.filter(
-    (entry) =>
-      filter === 'all' ||
-      (filter === 'learning' && learning(entry)) ||
-      (filter === 'known' && !learning(entry)),
-  );
+  const entryState = (entry: DictionaryEntry) =>
+    states[normalizeLemma(entry.term)]?.state ??
+    (activeCard(entry.id, review.data.cards) ? 'learning' : 'known');
+  const learning = (entry: DictionaryEntry) => entryState(entry) === 'learning';
+  const visible = entries.filter((entry) => filter === 'all' || entryState(entry) === filter);
   async function loadMore() {
     if (!nextCursor || busy) return;
     const ticket = generation.current;
@@ -260,7 +259,7 @@ function SavedWords({
                   </div>
                   <strong>{entry.translation}</strong>
                   <span className={`word-status ${inReview ? 'in-review' : ''}`}>
-                    {inReview ? 'Learning' : 'Known'}
+                    {stateLabels[entryState(entry)]}
                   </span>
                 </div>
                 <div className="dictionary-entry-context">
@@ -271,12 +270,14 @@ function SavedWords({
                 </div>
                 <div className="dictionary-entry-source">
                   <span>
-                    {entry.source.lessonTitle} · {timestamp(entry.source.start)}
+                    {entry.source.kind === 'anki'
+                      ? `Anki · ${entry.source.collection}`
+                      : `${entry.source.lessonTitle} · ${timestamp(entry.source.start)}`}
                   </span>
                   <div>
                     <Link className="button small-button" href={reviewContextHref(entry)}>
                       <Play size={14} />
-                      Open section
+                      {entry.source.kind === 'anki' ? 'Word details' : 'Open section'}
                     </Link>
                     {inReview ? (
                       <button
