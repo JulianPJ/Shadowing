@@ -461,7 +461,7 @@ function DailyReviewContent() {
             </button>
           ) : (
             <div className="review-answer">
-              <strong>{entry.translation}</strong>
+              <strong>{entry.translation || 'No meaning was mapped for this word.'}</strong>
               <p lang="ja">
                 <JapaneseText text={entry.sourceSentence} furigana={sentenceReading} />
               </p>
@@ -475,7 +475,11 @@ function DailyReviewContent() {
                   {sentenceReading ? 'Hide sentence readings' : 'Show sentence readings'}
                 </button>
               </div>
-              <ContextPlayer key={entry.id} entry={entry} />
+              {entry.source.kind !== 'anki' ? (
+                <ContextPlayer key={entry.id} entry={entry} />
+              ) : (
+                <p className="small muted">Imported from Anki · text practice</p>
+              )}
               <div className="review-grades">
                 {GRADES.map((g, i) => {
                   const preview = previewReview(
@@ -498,16 +502,18 @@ function DailyReviewContent() {
                   );
                 })}
               </div>
-              <div className="review-lesson-link">
-                <Link
-                  className="text-button"
-                  href={reviewContextHref(entry)}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Open full lesson ↗
-                </Link>
-              </div>
+              {entry.source.kind !== 'anki' ? (
+                <div className="review-lesson-link">
+                  <Link
+                    className="text-button"
+                    href={reviewContextHref(entry)}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Open full lesson ↗
+                  </Link>
+                </div>
+              ) : null}
             </div>
           )}
         </article>

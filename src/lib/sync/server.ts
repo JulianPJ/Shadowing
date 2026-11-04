@@ -1,4 +1,5 @@
 import type { AuthEnvironment, HibikiAuth } from '../auth/server';
+import { handleAnkiRequest } from '../anki/server';
 import {
   adultConfirmationRequiredResponse,
   adultConfirmed,
@@ -139,6 +140,42 @@ export function accountHandler({
           cursor = page?.nextCursor ?? null;
         } while (cursor);
         return respond({
+          importedCollections: db
+            ? (
+                await db
+                  .prepare('SELECT id,name FROM user_vocabulary_collections WHERE user_id=?')
+                  .bind(userId)
+                  .all()
+              ).results
+            : [],
+          importedMemberships: db
+            ? (
+                await db
+                  .prepare(
+                    'SELECT collection_id,entry_id FROM user_vocabulary_memberships WHERE user_id=?',
+                  )
+                  .bind(userId)
+                  .all()
+              ).results
+            : [],
+          importedIdentities: db
+            ? (
+                await db
+                  .prepare(
+                    'SELECT content_key,entry_id FROM user_vocabulary_import_keys WHERE user_id=?',
+                  )
+                  .bind(userId)
+                  .all()
+              ).results
+            : [],
+          importUsage: db
+            ? (
+                await db
+                  .prepare('SELECT day,contexts FROM user_vocabulary_import_usage WHERE user_id=?')
+                  .bind(userId)
+                  .all()
+              ).results
+            : [],
           learning,
           vocabulary: (await dictionary?.list(userId)) ?? [],
           review: (await review?.snapshot(userId)) ?? null,
@@ -148,6 +185,23 @@ export function accountHandler({
       if (url.pathname === '/api/dictionary') {
         if (!dictionary) return respond({ error: 'Dictionary storage unavailable' }, 503);
         return handleDictionaryRequest(request, userId, session.user.emailVerified, dictionary);
+      }
+      if (url.pathname === '/api/vocabulary/import' && db)
+        return handleAnkiRequest(request, userId, session.user.emailVerified, db);
+      if (url.pathname === '/api/vocabulary/collections' && db && request.method === 'GET') {
+        const cursor = url.searchParams.get('cursor') ?? '';
+        if (cursor.length > 240 || /[\u0000-\u001f]/.test(cursor))
+          return respond({ error: 'Invalid collection cursor' }, 400);
+        const collections = await db
+          .prepare(
+            'SELECT id,name FROM user_vocabulary_collections WHERE user_id=? AND name>? ORDER BY name LIMIT 101',
+          )
+          .bind(userId, cursor)
+          .all<{ id: string; name: string }>();
+        return respond({
+          collections: collections.results.slice(0, 100),
+          nextCursor: collections.results.length > 100 ? collections.results[99].name : null,
+        });
       }
       if (url.pathname === '/api/review') {
         if (!review) return respond({ error: 'Review storage unavailable' }, 503);

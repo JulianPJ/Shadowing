@@ -291,7 +291,13 @@ test('downgrade denies paid reads and writes without deleting D1 data; personal 
   const words = await knowledge.page(userA);
   await db.prepare("UPDATE user_access SET plan='free' WHERE user_id=?").bind(userA).run();
   try {
-    for (const path of ['/api/dictionary', '/api/review', '/api/knowledge']) {
+    for (const path of [
+      '/api/dictionary',
+      '/api/review',
+      '/api/knowledge',
+      '/api/vocabulary/import',
+      '/api/vocabulary/collections',
+    ]) {
       assert.equal((await handler(request(path, undefined, cookieA))).status, 403);
       assert.equal(
         (await handler(request(path, { action: 'delete', id: 'anything' }, cookieA))).status,

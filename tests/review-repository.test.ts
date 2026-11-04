@@ -67,6 +67,13 @@ before(async () => {
   );
   review = createD1ReviewRepository(db);
   dictionary = createD1DictionaryRepository(db);
+  await db.batch(
+    (await readFile('migrations/0019_anki_collections.sql', 'utf8'))
+      .split(';')
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map((s) => db.prepare(s)),
+  );
 });
 after(() => mf.dispose());
 async function fixture() {

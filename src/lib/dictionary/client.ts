@@ -64,7 +64,8 @@ export async function dictionaryPage(
         .map((e) => cache.records[e.id]?.entry ?? e),
     };
   } catch (error) {
-    if (remoteOnly || owner !== storageAccount() || !canUseCache(error)) throw error;
+    if (remoteOnly || query.collectionId || owner !== storageAccount() || !canUseCache(error))
+      throw error;
     return { entries: cachedDictionaryQuery(query), nextCursor: null, offline: true };
   }
 }

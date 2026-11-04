@@ -1,6 +1,8 @@
 # Vocabulary
 
-Hibiki has one vocabulary model. Every word has a **status**, and every saved word also has a **review card** tied to the sentence and audio it came from.
+Hibiki has one vocabulary model. Every word has a **status**. Learning words use the existing scheduler; saved context comes from a Hibiki lesson or a text-only Anki import.
+
+The new Vocabulary overview, Anki import, imported collections, source compatibility and measured limits are documented in [Anki import and dashboard](anki-import.md). Imports organize vocabulary around the same scheduler; they do not restore active decks.
 
 | Status | Meaning | How a word gets it |
 | --- | --- | --- |
