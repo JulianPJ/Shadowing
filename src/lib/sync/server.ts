@@ -1,5 +1,4 @@
 import type { AuthEnvironment, HibikiAuth } from '../auth/server';
-import { handleAnkiRequest } from '../anki/server';
 import {
   adultConfirmationRequiredResponse,
   adultConfirmed,
@@ -186,8 +185,6 @@ export function accountHandler({
         if (!dictionary) return respond({ error: 'Dictionary storage unavailable' }, 503);
         return handleDictionaryRequest(request, userId, session.user.emailVerified, dictionary);
       }
-      if (url.pathname === '/api/vocabulary/import' && db)
-        return handleAnkiRequest(request, userId, session.user.emailVerified, db);
       if (url.pathname === '/api/vocabulary/collections' && db && request.method === 'GET') {
         const cursor = url.searchParams.get('cursor') ?? '';
         if (cursor.length > 240 || /[\u0000-\u001f]/.test(cursor))

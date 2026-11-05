@@ -5,11 +5,7 @@ import { useReview } from './use-review';
 import { dueReviews } from '@/lib/review-scheduler';
 
 /** Vocabulary has two views: today's review and the words you have saved or marked. */
-export function VocabularyHeader({
-  active,
-}: {
-  active: 'review' | 'words' | 'overview' | 'import';
-}) {
+export function VocabularyHeader({ active }: { active: 'review' | 'words' | 'overview' }) {
   const account = useAccount();
   const { data } = useReview();
   const due = account.user ? dueReviews(data.cards, new Date().toISOString()).length : 0;
@@ -24,7 +20,6 @@ export function VocabularyHeader({
           ['overview', 'Overview', '/vocabulary'],
           ['review', due ? `Review · ${due} due` : 'Review', '/review'],
           ['words', 'Words', '/words'],
-          ['import', 'Import Anki deck', '/vocabulary/import'],
         ]}
       />
     </>

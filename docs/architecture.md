@@ -12,7 +12,7 @@ Hibiki is one Cloudflare Worker built with vinext (Next.js App Router on Vite). 
 | Subtitle sources: Jimaku key on Profile, search by inferred title and episode, file ranking | `src/components/subtitle-sources.tsx`, `src/lib/subtitle-sources/` |
 | Vocabulary: Daily Review and Words | `src/components/daily-review.tsx`, `src/components/vocabulary-words.tsx`, `src/components/vocabulary-header.tsx` |
 | Vocabulary overview, evidence, kanji relationships and temporary practice | `src/components/vocabulary-dashboard.tsx`, `src/lib/vocabulary-dashboard.ts` |
-| Local Anki packages, mapping, atomic bounded import and collection memberships | `src/lib/anki/`, `src/components/anki-import.tsx`, `migrations/0019_anki_collections.sql` ([contracts and cost](anki-import.md)) |
+| Imported Anki words and collection memberships (no in-app importer) | `src/lib/dictionary/repository.ts`, `migrations/0019_anki_collections.sql` ([model and manual insert](vocabulary-dashboard.md)) |
 | Profile: progress, weekly report, account settings | `src/components/learner-progress.tsx`, `src/components/weekly-report.tsx`, `src/components/account.tsx` |
 | Practice hydration / missing lesson | `src/components/practice.tsx` |
 | Player state, navigation, recording and quiz coordination | `src/components/practice/study-player.tsx` |

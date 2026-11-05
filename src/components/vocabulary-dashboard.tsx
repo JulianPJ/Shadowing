@@ -442,12 +442,7 @@ function Dashboard() {
           Select up to 20 matching words
         </button>
         <ul className="dashboard-words">{filtered.map((e) => row(e))}</ul>
-        {!filtered.length ? (
-          <p>
-            No loaded words match. Save words from a lesson or{' '}
-            <Link href="/vocabulary/import">import an Anki deck</Link>.
-          </p>
-        ) : null}
+        {!filtered.length ? <p>No loaded words match. Save words from a lesson.</p> : null}
         {cursor ? (
           <button className="button" disabled={busy} onClick={() => void more()}>
             {busy ? 'Loading…' : 'Load 100 more contexts'}

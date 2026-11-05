@@ -56,13 +56,6 @@ export default function NoticesPage() {
           <a href="/furigana/v1/MEDIABUNNY-LICENSE.txt">Mozilla Public License 2.0</a>.
         </p>
       </section>
-      <section>
-        <h2>Anki package reading</h2>
-        <p>
-          Local package inspection uses zip.js, sql.js (SQLite) and fzstd.{' '}
-          <a href="/anki/NOTICE.txt">Full library licences</a>.
-        </p>
-      </section>
     </main>
   );
 }

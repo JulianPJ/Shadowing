@@ -295,7 +295,6 @@ test('downgrade denies paid reads and writes without deleting D1 data; personal 
       '/api/dictionary',
       '/api/review',
       '/api/knowledge',
-      '/api/vocabulary/import',
       '/api/vocabulary/collections',
     ]) {
       assert.equal((await handler(request(path, undefined, cookieA))).status, 403);

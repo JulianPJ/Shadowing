@@ -18,7 +18,6 @@ __pycache__/
 .wrangler/
 
 /public/furigana/
-/public/anki/
 /.impeccable/review/
 /public/lexicon/
 /.lexicon-cache/

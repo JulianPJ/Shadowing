@@ -28,12 +28,7 @@ export function canUseFeature(plan: AccessPlan | undefined, feature: ProFeature)
 
 /** Lookup is local/public; /api/dictionary stores personal learning data. */
 export function accountRouteFeature(path: string): ProFeature | null {
-  if (
-    path === '/api/dictionary' ||
-    path === '/api/vocabulary/import' ||
-    path === '/api/vocabulary/collections'
-  )
-    return 'vocabulary';
+  if (path === '/api/dictionary' || path === '/api/vocabulary/collections') return 'vocabulary';
   if (path === '/api/review') return 'review';
   if (path === '/api/knowledge') return 'knowledge';
   return null;
